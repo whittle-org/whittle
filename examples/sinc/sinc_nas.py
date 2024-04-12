@@ -1,0 +1,199 @@
+#
+# Licensed under the Apache License, Version 2.0 (the "License").
+# You may not use this file except in compliance with the License.
+# A copy of the License is located at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# or in the "license" file accompanying this file. This file is distributed
+# on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied. See the License for the specific language governing
+# permissions and limitations under the License.
+import os
+
+import numpy as np
+import json
+import torch
+import torch.nn as nn
+
+from argparse import ArgumentParser
+from pathlib import Path
+from torch.utils.data import DataLoader
+
+from syne_tune.report import Reporter
+from functools import partial
+from lobotomy.training_strategies import register_mask, loss_function, train_epoch, train_sandwich, train_random, \
+    train_random_linear, train_sandwich_kd, train_ats
+
+report = Reporter()
+
+
+def f(x):
+    return np.sinc(x * 10 - 5)
+    # return (x - 0.5) ** 2 + np.random.randn() * 1e-3
+
+
+class MLP(nn.Module):
+    def __init__(self, input_dim, hidden_dim=200, device="cuda"):
+        super(MLP, self).__init__()
+
+        self.hidden_dim = hidden_dim
+        self.input_layer = nn.Linear(input_dim, hidden_dim)
+        self.hidden_layer = nn.Linear(hidden_dim, hidden_dim)
+        self.output_layer = nn.Linear(hidden_dim, 1)
+
+    def forward(self, x):
+        x_ = self.input_layer(x)
+        x_ = torch.tanh(x_)
+        x_ = self.hidden_layer(x_)
+        x_ = torch.tanh(x_)
+        x_ = self.output_layer(x_)
+        return x_
+
+
+def validate(model, valid_loader, device, mask=None):
+    model.eval()
+    overall_loss = 0
+
+    if mask is not None:
+        handle = register_mask(model.hidden_layer, mask)
+
+    for batch_idx, batch in enumerate(valid_loader):
+        x = batch[:, 0].reshape(-1, 1)
+        y = batch[:, 1].reshape(-1, 1)
+        x = x.to(device)
+
+        y_hat = model(x)
+        loss = loss_function(y, y_hat)
+
+        overall_loss += loss.item()
+
+    if mask is not None:
+        handle.remove()
+
+    return overall_loss / (batch_idx + 1)
+
+
+if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--learning_rate", type=float, default=1e-3)
+    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--hidden_dim", type=int, default=128)
+    parser.add_argument("--training_strategy", type=str, default='standard')
+    parser.add_argument("--do_plot", type=bool, default=False)
+    parser.add_argument("--st_checkpoint_dir", type=str, default="./checkpoints")
+
+    args, _ = parser.parse_known_args()
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    rng = np.random.RandomState(42)
+    num_data_points = 500
+    x = rng.rand(num_data_points)
+    y = f(x)
+
+    data = np.empty((num_data_points, 2))
+    # data[:, 0] = (x - np.mean(x)) / np.std(x)
+    # data[:, 1] = (y - np.mean(y)) / np.std(y)
+    data[:, 0] = x
+    data[:, 1] = y
+
+    data = torch.tensor(data, dtype=torch.float)
+    n_train = int(data.shape[0] * 0.7)
+    train_data = data[:n_train]
+    valid_data = data[n_train:]
+
+    train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
+    valid_dataloader = DataLoader(valid_data, batch_size=args.batch_size, shuffle=False)
+
+    model = MLP(
+        input_dim=1,
+        hidden_dim=args.hidden_dim,
+        device=device,
+    )
+    n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+    current_best = None
+    # if args.st_checkpoint_dir is not None:
+    #     os.makedirs(args.st_checkpoint_dir, exist_ok=True)
+    lc_valid = []
+    lc_train = []
+
+    training_strategies = {
+        'standard': train_epoch,
+        'sandwich': train_sandwich,
+        'sandwich_kd': train_sandwich_kd,
+        'random': train_random,
+        'ats': train_ats,
+        'random_linear': partial(train_random_linear,  total_number_of_steps=args.epochs * 500 // args.batch_size),
+    }
+    train_function = training_strategies[args.training_strategy]
+
+    model.train()
+    for epoch in range(args.epochs):
+        train_loss = train_function(
+            model,
+            train_dataloader,
+            optimizer,
+            device=device,
+            current_epoch=epoch,
+        )
+        scheduler.step()
+        valid_loss = validate(model, valid_dataloader, device=device)
+        print(
+            "\tEpoch",
+            epoch + 1,
+            "\tTraining Loss: ",
+            train_loss,
+            "\tValidation Loss: ",
+            valid_loss,
+            "\tLearning Rate: ",
+            scheduler.get_lr()
+
+        )
+        lc_train.append(float(train_loss))
+        lc_valid.append(float(valid_loss))
+        if np.isnan(valid_loss):
+            valid_loss = 1000000
+        report(epoch=epoch + 1, train_loss=train_loss, valid_loss=valid_loss, num_params=n_params)
+        if current_best is None or current_best >= valid_loss:
+            current_best = valid_loss
+            if args.st_checkpoint_dir is not None:
+                os.makedirs(args.st_checkpoint_dir, exist_ok=True)
+                checkpoint = {
+                    "state": model.state_dict(),
+                    "config": {
+                        "hidden_dim": args.hidden_dim,
+                    },
+                }
+                torch.save(checkpoint,
+                           Path(args.st_checkpoint_dir) / f'{args.training_strategy}_model_{args.hidden_dim}.pt')
+
+                history = {
+                    'train_loss': lc_train,
+                    'valid_loss': lc_valid,
+                }
+                json.dump(history, open(
+                    Path(args.st_checkpoint_dir) / f'{args.training_strategy}_history_{args.hidden_dim}.json', 'w'))
+
+    #
+    # # num_layers, num_units, num_heads
+    #
+    if args.do_plot:
+        import matplotlib.pyplot as plt
+
+        plt.scatter(train_data[:, 0], train_data[:, 1], label='Train')
+        plt.scatter(valid_data[:, 0], valid_data[:, 1], label='Valid')
+        model.eval()
+        y_hat = model(valid_data[:, 0].reshape(-1, 1)).detach().numpy()
+        plt.scatter(valid_data[:, 0], y_hat, label='predicted')
+        plt.legend()
+        plt.show()
+        plt.plot(lc_train, label='train')
+        plt.plot(lc_valid, label='valid')
+        plt.yscale('log')
+        plt.legend()
+        plt.show()
