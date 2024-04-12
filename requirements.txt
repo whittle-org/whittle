@@ -1,0 +1,7 @@
+tqdm
+scipy
+numpy
+pandas
+datasets
+evaluate
+transformers[torch]
