@@ -144,7 +144,7 @@ class SupervisedDataset(Dataset):
 
 @dataclass
 class DataCollatorForSupervisedDataset(object):
-    """Collate examples for supervised fine-tuning."""
+    """Collate benchmarks for supervised fine-tuning."""
 
     tokenizer: transformers.PreTrainedTokenizer
 
