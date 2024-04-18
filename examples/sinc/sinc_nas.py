@@ -22,8 +22,10 @@ from torch.utils.data import DataLoader
 
 from syne_tune.report import Reporter
 from functools import partial
-from lobotomy.training_strategies import register_mask, loss_function, train_epoch, train_sandwich, train_random, \
-    train_random_linear, train_sandwich_kd, train_ats
+from lobotomy.training_strategies import SandwichStrategy
+from lobotomy.sampler import RandomSampler
+
+from model import MLP, select_sub_network, search_space
 
 report = Reporter()
 
@@ -33,30 +35,9 @@ def f(x):
     # return (x - 0.5) ** 2 + np.random.randn() * 1e-3
 
 
-class MLP(nn.Module):
-    def __init__(self, input_dim, hidden_dim=200, device="cuda"):
-        super(MLP, self).__init__()
-
-        self.hidden_dim = hidden_dim
-        self.input_layer = nn.Linear(input_dim, hidden_dim)
-        self.hidden_layer = nn.Linear(hidden_dim, hidden_dim)
-        self.output_layer = nn.Linear(hidden_dim, 1)
-
-    def forward(self, x):
-        x_ = self.input_layer(x)
-        x_ = torch.tanh(x_)
-        x_ = self.hidden_layer(x_)
-        x_ = torch.tanh(x_)
-        x_ = self.output_layer(x_)
-        return x_
-
-
-def validate(model, valid_loader, device, mask=None):
+def validate(model, valid_loader, device):
     model.eval()
     overall_loss = 0
-
-    if mask is not None:
-        handle = register_mask(model.hidden_layer, mask)
 
     for batch_idx, batch in enumerate(valid_loader):
         x = batch[:, 0].reshape(-1, 1)
@@ -64,12 +45,9 @@ def validate(model, valid_loader, device, mask=None):
         x = x.to(device)
 
         y_hat = model(x)
-        loss = loss_function(y, y_hat)
+        loss = nn.functional.mse_loss(y, y_hat)
 
         overall_loss += loss.item()
-
-    if mask is not None:
-        handle.remove()
 
     return overall_loss / (batch_idx + 1)
 
@@ -80,15 +58,16 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate", type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--hidden_dim", type=int, default=128)
-    parser.add_argument("--training_strategy", type=str, default='standard')
+    parser.add_argument("--training_strategy", type=str, default='sandwich')
     parser.add_argument("--do_plot", type=bool, default=False)
     parser.add_argument("--st_checkpoint_dir", type=str, default="./checkpoints")
+    parser.add_argument("--seed", type=int, default=42)
 
     args, _ = parser.parse_known_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    rng = np.random.RandomState(42)
+    rng = np.random.RandomState(args.seed)
     num_data_points = 500
     x = rng.rand(num_data_points)
     y = f(x)
@@ -122,26 +101,39 @@ if __name__ == "__main__":
     lc_valid = []
     lc_train = []
 
+    sampler =  RandomSampler(search_space, seed=args.seed)
     training_strategies = {
-        'standard': train_epoch,
-        'sandwich': train_sandwich,
-        'sandwich_kd': train_sandwich_kd,
-        'random': train_random,
-        'ats': train_ats,
-        'random_linear': partial(train_random_linear,  total_number_of_steps=args.epochs * 500 // args.batch_size),
+        # 'standard': train_epoch,
+        'sandwich': SandwichStrategy(select_subnetwork=select_sub_network,
+                                     sampler=sampler,
+                                     loss_function=nn.functional.mse_loss,
+                                     ),
+        # 'sandwich_kd': train_sandwich_kd,
+        # 'random': train_random,
+        # 'ats': train_ats,
+        # 'random_linear': partial(train_random_linear,  total_number_of_steps=args.epochs * 500 // args.batch_size),
     }
-    train_function = training_strategies[args.training_strategy]
+    update_op = training_strategies[args.training_strategy]
 
     model.train()
     for epoch in range(args.epochs):
-        train_loss = train_function(
-            model,
-            train_dataloader,
-            optimizer,
-            device=device,
-            current_epoch=epoch,
-        )
-        scheduler.step()
+        train_loss = 0
+        for batch_idx, batch in enumerate(train_dataloader):
+
+            x = batch[:, 0].reshape(-1, 1)
+            y = batch[:, 1].reshape(-1, 1)
+            x = x.to(device)
+
+            optimizer.zero_grad()
+
+            loss = update_op(model, x, y)
+
+            train_loss += loss
+
+            optimizer.step()
+
+            scheduler.step()
+
         valid_loss = validate(model, valid_dataloader, device=device)
         print(
             "\tEpoch",

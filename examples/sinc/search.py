@@ -22,8 +22,12 @@ from argparse import ArgumentParser
 from pathlib import Path
 from torch.utils.data import DataLoader
 
-from sinc_nas import f, MLP, register_mask, validate
 
+from lobotomy.search import multi_objective_search
+from lobotomy.estimate_efficency import compute_mac_linear_layer
+
+from sinc_nas import validate, f
+from model import MLP,  select_sub_network, search_space
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -31,7 +35,7 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate", type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--hidden_dim", type=int, default=128)
-    parser.add_argument("--training_strategy", type=str, default='standard')
+    parser.add_argument("--training_strategy", type=str, default='sandwich')
     parser.add_argument("--do_plot", type=bool, default=False)
     parser.add_argument("--st_checkpoint_dir", type=str, default="./checkpoints")
 
@@ -69,24 +73,38 @@ if __name__ == "__main__":
     model.load_state_dict(checkpoint['state'])
     model.eval()
 
-    num_subnets = model.hidden_dim
-    grid = []
-    for i in range(1, num_subnets):
-        mask = torch.zeros(model.hidden_dim, )
-        mask[:i] = 1
-        loss = validate(model, valid_dataloader, mask=mask, device=device)
-        grid.append(float(loss))
+    def objective(config):
+        handle = select_sub_network(model, config)
+        loss = validate(model, valid_dataloader, device)
+        handle.remove()
 
-    plt.scatter(np.arange(1, num_subnets), grid)
-    plt.title(args.training_strategy)
+        mac = 0
+        mac += compute_mac_linear_layer(model.input_layer.in_features, model.input_layer.out_features)
+        mac += compute_mac_linear_layer(model.hidden_layer.in_features, config['num_units'])
+        mac += compute_mac_linear_layer(model.output_layer.in_features, model.output_layer.out_features)
 
-    grid = json.load(open('grid.json'))
-    plt.scatter(grid['hidden_dim'], grid['val_loss'],
-                color='black', label='from-scratch')
+        return mac, loss
 
-    plt.xlabel('number of units')
+    results = multi_objective_search(objective, search_space, objective_kwargs={})
+
+    print(results)
+    costs = np.array(results['costs'])
+    plt.scatter(costs[:, 0], costs[:, 1], color='black', label='sub-networks')
+
+    idx = np.array(results['is_pareto_optimal'])
+    plt.scatter(costs[idx, 0], costs[idx, 1], color='red', label='Pareto optimal')
+
+    # plt.scatter(np.arange(1, num_subnets), grid)
+    # plt.title(args.training_strategy)
+    #
+    # grid = json.load(open('grid.json'))
+    # plt.scatter(grid['hidden_dim'], grid['val_loss'],
+    #             color='black', label='from-scratch')
+    #
+    plt.xlabel('mac')
     plt.ylabel('Validation loss')
-    plt.ylim(0.005, 0.08)
+    # plt.ylim(0.005, 0.08)
+    plt.xscale('log')
     plt.grid(linewidth="1", alpha=0.4)
     plt.show()
 
