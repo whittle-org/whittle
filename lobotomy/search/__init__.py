@@ -1,1 +1,1 @@
-from .search import search
+from .search import multi_objective_search

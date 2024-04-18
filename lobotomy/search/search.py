@@ -1,12 +1,12 @@
 import time
 import numpy as np
 
-from baselines import MethodArguments, methods
-from ask_tell_scheduler import AskTellScheduler
-from multi_objective import get_pareto_optimal
+from lobotomy.search.baselines import MethodArguments, methods
+from lobotomy.search.ask_tell_scheduler import AskTellScheduler
+from lobotomy.search.multi_objective import get_pareto_optimal
 
 
-def search(objective, search_space: dict, search_strategy: str = 'random_search',
+def multi_objective_search(objective, search_space: dict, search_strategy: str = 'random_search',
            objective_kwargs: dict = None,
            num_samples:int = 100, seed: int = None):
     """
