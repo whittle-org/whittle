@@ -26,7 +26,6 @@ import transformers
 import evaluate
 
 from tqdm.auto import tqdm
-from accelerate import Accelerator
 from functools import partial
 
 from torch.optim import AdamW
@@ -36,13 +35,15 @@ from transformers import (
     get_scheduler,
     AutoModelForSequenceClassification,
     AutoModelForMultipleChoice,
-    AutoModelForCausalLM,
     HfArgumentParser,
     TrainingArguments,
     set_seed,
 )
 
-from sampling import (
+from lobotomy.sampling import RandomSampler
+from lobotomy.training_strategies import SandwichStrategy
+
+from search_spaces import (
     FullSearchSpace,
     SmallSearchSpace,
     LayerSearchSpace,
@@ -72,7 +73,7 @@ def kd_loss(
         return temperature**2 * kd_loss + predictive_loss
 
 
-sampling = {
+search_spaces = {
     "small": SmallSearchSpace,
     "medium": MediumSearchSpace,
     "layer": LayerSearchSpace,
@@ -86,7 +87,6 @@ logging.basicConfig(level=logging.INFO)
 @dataclass
 class NASArguments:
     search_space: str = field(metadata={"help": ""}, default="small")
-    use_accelerate: bool = field(metadata={"help": ""}, default=False)
     sampling_strategy: str = field(metadata={"help": ""}, default=None)
     log_dir: str = field(metadata={"help": ""}, default="./tensorboard_log_dir")
     num_random_sub_nets: int = field(metadata={"help": ""}, default=1)
@@ -163,8 +163,6 @@ def main():
     train_dataloader, eval_dataloader, test_dataloader = data.get_data_loaders()
     num_labels = data.num_labels
 
-    accelerator = Accelerator()
-
     # Load pretrained model and tokenizer
     #
     # In distributed training, the .from_pretrained methods guarantee that only one local process can concurrently
@@ -219,11 +217,10 @@ def main():
 
     progress_bar = tqdm(range(num_training_steps))
 
-    if not nas_args.use_accelerate:
-        device = (
-            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        )
-        model.to(device)
+    device = (
+        torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    )
+    model.to(device)
 
     dropout_rate = np.linspace(0, 1, num_training_steps)
     step = 0
@@ -250,319 +247,99 @@ def main():
     elif "pythia" in model_type:
         mask = mask_gpt_neox
 
-    if nas_args.use_accelerate:
-        (
-            model,
-            train_dataloader,
-            eval_dataloader,
-            test_dataloader,
-            optimizer,
-            lr_scheduler,
-        ) = accelerator.prepare(
-            model,
-            train_dataloader,
-            eval_dataloader,
-            test_dataloader,
-            optimizer,
-            lr_scheduler,
-        )
+    def loss_function(outputs, labels):
+        return outputs.loss
 
-    kwargs = {"rng": np.random.RandomState(seed=training_args.seed)}
-    if nas_args.search_space == "meta_small_kde":
-        kwargs["dataset_name"] = data_args.task_name
-        kwargs["num_tasks"] = 1
-        kwargs["data_path"] = f"meta_model/meta_data_{model_type}.json"
-        print(kwargs)
+    def select_sub_network(model, config):
+        head_mask, ffn_mask = search_space.config_to_mask(config)
+        head_mask = head_mask.to(device="cuda", dtype=model.dtype)
+        ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
+        handles = mask(model, ffn_mask, head_mask)
+        return handles
 
-    sampler = sampling[nas_args.search_space](config, **kwargs)
+    search_space = search_spaces[nas_args.search_space]
+    sampler = RandomSampler(search_space, seed=training_args.seed)
+    training_strategies = {
+        # 'standard': train_epoch,
+        'sandwich': SandwichStrategy(select_subnetwork=select_sub_network,
+                                     sampler=sampler,
+                                     loss_function=loss_function,
+                                     ),
+        # 'sandwich_kd': train_sandwich_kd,
+        # 'random': train_random,
+        # 'ats': train_ats,
+        # 'random_linear': partial(train_random_linear,  total_number_of_steps=args.epochs * 500 // args.batch_size),
+    }
+
+    update_op = training_strategies[nas_args.sampling_strategy]
 
     if nas_args.store_debug_info:
         from collections import defaultdict
 
         debug_info = defaultdict(list)
 
+
     for epoch in range(int(training_args.num_train_epochs)):
         model.train()
         train_loss = 0
         for batch in train_dataloader:
-            if not nas_args.use_accelerate:
-                batch = {k: v.to(device) for k, v in batch.items()}
+            batch = {k: v.to(device) for k, v in batch.items()}
 
-            if nas_args.sampling_strategy == "one_shot":
-                # update largest sub-network (i.e super-network)
-                outputs = model(**batch)
-                loss = outputs.loss
-                y_teacher = outputs.logits.detach()
-                accelerator.backward(
-                    loss
-                ) if nas_args.use_accelerate else loss.backward()
+            loss = update_op(model, **batch)
 
-                # update smallest sub-network
-                head_mask, ffn_mask = sampler.get_smallest_sub_network()
-                if nas_args.use_accelerate:
-                    head_mask = head_mask.to(device=accelerator.device)
-                    ffn_mask = ffn_mask.to(device=accelerator.device)
-                else:
-                    head_mask = head_mask.to(device="cuda", dtype=model.dtype)
-                    ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
-
-                handles = mask(model, ffn_mask, head_mask)
-                outputs = model(head_mask=head_mask, **batch)
-
-                for handle in handles:
-                    handle.remove()
-                # loss = loss_KD_fn(outputs.logits, y_teacher, batch['labels'], is_regression=is_regression)
-                # loss = distillation_loss(
-                #     F.log_softmax(outputs.logits, dim=-1),
-                #     F.log_softmax(y_teacher, dim=-1),
-                # )
-                loss = distillation_loss(outputs.logits, y_teacher, batch["labels"])
-                accelerator.backward(
-                    loss
-                ) if nas_args.use_accelerate else loss.backward()
-
-                # update random sub-network
-                for k in range(nas_args.num_random_sub_nets):
-                    head_mask, ffn_mask = sampler()
-                    if nas_args.use_accelerate:
-                        head_mask = head_mask.to(device=accelerator.device)
-                        ffn_mask = ffn_mask.to(device=accelerator.device)
-                    else:
-                        head_mask = head_mask.to(device="cuda", dtype=model.dtype)
-                        ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
-
-                    handles = mask(model, ffn_mask, head_mask)
-
-                    outputs = model(head_mask=head_mask, **batch)
-                    for handle in handles:
-                        handle.remove()
-
-                    loss = distillation_loss(outputs.logits, y_teacher, batch["labels"])
-                    accelerator.backward(
-                        loss
-                    ) if nas_args.use_accelerate else loss.backward()
-
-            elif nas_args.sampling_strategy == "one_shot_upper":
-                # update largest sub-network (i.e super-network)
-                outputs = model(**batch)
-                loss = outputs.loss
-                y_teacher = outputs.logits.detach()
-                accelerator.backward(
-                    loss
-                ) if nas_args.use_accelerate else loss.backward()
-
-                # update random sub-network
-                for k in range(nas_args.num_random_sub_nets):
-                    head_mask, ffn_mask = sampler()
-                    if nas_args.use_accelerate:
-                        head_mask = head_mask.to(device=accelerator.device)
-                        ffn_mask = ffn_mask.to(device=accelerator.device)
-                    else:
-                        head_mask = head_mask.to(device="cuda", dtype=model.dtype)
-                        ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
-
-                    handles = mask(model, ffn_mask, head_mask)
-
-                    outputs = model(head_mask=head_mask, **batch)
-                    for handle in handles:
-                        handle.remove()
-
-                    loss = distillation_loss(outputs.logits, y_teacher, batch["labels"])
-                    accelerator.backward(
-                        loss
-                    ) if nas_args.use_accelerate else loss.backward()
-
-            elif nas_args.sampling_strategy == "sandwich":
-                # update largest sub-network (i.e super-network)
-                outputs = model(**batch)
-                loss = outputs.loss
-                accelerator.backward(
-                    loss
-                ) if nas_args.use_accelerate else loss.backward()
-
-                # update smallest sub-network
-                head_mask, ffn_mask = sampler.get_smallest_sub_network()
-                if nas_args.use_accelerate:
-                    head_mask = head_mask.to(device=accelerator.device)
-                    ffn_mask = ffn_mask.to(device=accelerator.device)
-                else:
-                    head_mask = head_mask.to(device="cuda", dtype=model.dtype)
-                    ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
-
-                handles = mask(model, ffn_mask, head_mask)
-                outputs = model(head_mask=head_mask, **batch)
-
-                for handle in handles:
-                    handle.remove()
-
-                loss = outputs.loss
-                accelerator.backward(
-                    loss
-                ) if nas_args.use_accelerate else loss.backward()
-
-                # update random sub-network
-                for k in range(nas_args.num_random_sub_nets):
-                    head_mask, ffn_mask = sampler()
-                    if nas_args.use_accelerate:
-                        head_mask = head_mask.to(device=accelerator.device)
-                        ffn_mask = ffn_mask.to(device=accelerator.device)
-                    else:
-                        head_mask = head_mask.to(device="cuda", dtype=model.dtype)
-                        ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
-
-                    handles = mask(model, ffn_mask, head_mask)
-                    outputs = model(head_mask=head_mask, **batch)
-
-                    for handle in handles:
-                        handle.remove()
-
-                    loss = outputs.loss
-                    accelerator.backward(
-                        loss
-                    ) if nas_args.use_accelerate else loss.backward()
-
-            elif nas_args.sampling_strategy == "random":
-                for k in range(nas_args.num_random_sub_nets):
-                    head_mask, ffn_mask = sampler()
-                    if nas_args.use_accelerate:
-                        head_mask = head_mask.to(device=accelerator.device)
-                        ffn_mask = ffn_mask.to(device=accelerator.device)
-                    else:
-                        head_mask = head_mask.to(device="cuda", dtype=model.dtype)
-                        ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
-
-                    handles = mask(model, ffn_mask, head_mask)
-                    outputs = model(head_mask=head_mask, **batch)
-
-                    for handle in handles:
-                        handle.remove()
-
-                    loss = outputs.loss
-                    accelerator.backward(
-                        loss
-                    ) if nas_args.use_accelerate else loss.backward()
-
-            elif nas_args.sampling_strategy == "linear_random":
-                if np.random.rand() <= dropout_rate[step]:
-                    for k in range(nas_args.num_random_sub_nets):
-                        head_mask, ffn_mask = sampler()
-                        if nas_args.use_accelerate:
-                            head_mask = head_mask.to(device=accelerator.device)
-                            ffn_mask = ffn_mask.to(device=accelerator.device)
-                        else:
-                            head_mask = head_mask.to(device="cuda", dtype=model.dtype)
-                            ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
-
-                        handles = mask(model, ffn_mask, head_mask)
-                        outputs = model(head_mask=head_mask, **batch)
-
-                        for handle in handles:
-                            handle.remove()
-                        loss = outputs.loss
-                        accelerator.backward(
-                            loss
-                        ) if nas_args.use_accelerate else loss.backward()
-                else:
-                    outputs = model(**batch)
-                    loss = outputs.loss
-
-                    accelerator.backward(
-                        loss
-                    ) if nas_args.use_accelerate else loss.backward()
-
-            elif nas_args.sampling_strategy == "kd":
-                y_teacher = model(**batch)
-                if np.random.rand() <= dropout_rate[step]:
-                    for k in range(nas_args.num_random_sub_nets):
-                        head_mask, ffn_mask = sampler()
-                        if nas_args.use_accelerate:
-                            head_mask = head_mask.to(device=accelerator.device)
-                            ffn_mask = ffn_mask.to(device=accelerator.device)
-                        else:
-                            head_mask = head_mask.to(device="cuda", dtype=model.dtype)
-                            ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
-
-                        handles = mask(model, ffn_mask, head_mask)
-                        outputs = model(head_mask=head_mask, **batch)
-
-                        for handle in handles:
-                            handle.remove()
-                        loss = distillation_loss(
-                            outputs.logits, y_teacher.logits.detach(), batch["labels"]
-                        )
-                        accelerator.backward(
-                            loss
-                        ) if nas_args.use_accelerate else loss.backward()
-                else:
-                    loss = y_teacher.loss
-
-                    accelerator.backward(
-                        loss
-                    ) if nas_args.use_accelerate else loss.backward()
-
-            elif nas_args.sampling_strategy == "standard":
-                outputs = model(**batch)
-                loss = outputs.loss
-                accelerator.backward(
-                    loss
-                ) if nas_args.use_accelerate else loss.backward()
-
-            elif nas_args.sampling_strategy == "fix":
-                configs = [
-                    # {"num_layers": 12, "num_heads": 12, "num_units": 3072},
-                    {"num_layers": 11, "num_heads": 12, "num_units": 3072},
-                    {"num_layers": 10, "num_heads": 12, "num_units": 3072},
-                    {"num_layers": 9, "num_heads": 12, "num_units": 3072},
-                    {"num_layers": 8, "num_heads": 12, "num_units": 3072},
-                    {"num_layers": 7, "num_heads": 12, "num_units": 3072},
-                    {"num_layers": 6, "num_heads": 12, "num_units": 3072},
-                    {"num_layers": 5, "num_heads": 12, "num_units": 3072},
-                    {"num_layers": 4, "num_heads": 12, "num_units": 3072},
-                    {"num_layers": 3, "num_heads": 12, "num_units": 3072},
-                    {"num_layers": 2, "num_heads": 12, "num_units": 3072},
-                    # {'num_layers':12, 'num_heads': 12, 'num_units': 3072},
-                    # {'num_layers':10, 'num_heads': 10, 'num_units': 2560},
-                    # {'num_layers':8, 'num_heads': 8, 'num_units': 2048},
-                    # {'num_layers':6, 'num_heads': 6, 'num_units': 1536},
-                    # {'num_layers':4, 'num_heads': 4, 'num_units': 1024},
-                    # {'num_layers':2, 'num_heads': 2, 'num_units': 512}
-                ]
-
-                y_teacher = model(**batch)
-                loss = y_teacher.loss
-                accelerator.backward(
-                    loss
-                ) if nas_args.use_accelerate else loss.backward()
-                for k in range(nas_args.num_random_sub_nets):
-                    idx = np.random.randint(len(configs))
-                    config = configs[idx]
-                    # config = np.random.sample(configs, 1)
-                    head_mask, ffn_mask = sampler.config_to_mask(config)
-                    if nas_args.use_accelerate:
-                        head_mask = head_mask.to(device=accelerator.device)
-                        ffn_mask = ffn_mask.to(device=accelerator.device)
-                    else:
-                        head_mask = head_mask.to(device="cuda", dtype=model.dtype)
-                        ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
-
-                    handles = mask(model, ffn_mask, head_mask)
-
-                    outputs = model(head_mask=head_mask, **batch)
-                    # loss = outputs.loss
-                    loss = distillation_loss(
-                        outputs.logits, y_teacher.logits.detach(), batch["labels"]
-                    )
-                    if nas_args.store_debug_info:
-                        # debug_info[f'index'].append(idx)
-                        debug_info[f"distillation_loss_{idx}"].append(loss.item())
-                        debug_info[f"nll_{idx}"].append(outputs.loss.item())
-                        debug_info[f"loss_largest"].append(y_teacher.loss.item())
-
-                    accelerator.backward(
-                        loss
-                    ) if nas_args.use_accelerate else loss.backward()
-                    for handle in handles:
-                        handle.remove()
+#            if nas_args.sampling_strategy == "one_shot":
+#                # update largest sub-network (i.e super-network)
+#                outputs = model(**batch)
+#                loss = outputs.loss
+#                y_teacher = outputs.logits.detach()
+#                accelerator.backward(
+#                    loss
+#                ) if nas_args.use_accelerate else loss.backward()
+#
+#                # update smallest sub-network
+#                head_mask, ffn_mask = sampler.get_smallest_sub_network()
+#                if nas_args.use_accelerate:
+#                    head_mask = head_mask.to(device=accelerator.device)
+#                    ffn_mask = ffn_mask.to(device=accelerator.device)
+#                else:
+#                    head_mask = head_mask.to(device="cuda", dtype=model.dtype)
+#                    ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
+#
+#                handles = mask(model, ffn_mask, head_mask)
+#                outputs = model(head_mask=head_mask, **batch)
+#
+##                for handle in handles:
+#                    handle.remove()
+#                # loss = loss_KD_fn(outputs.logits, y_teacher, batch['labels'], is_regression=is_regression)
+#                # loss = distillation_loss(
+#                #     F.log_softmax(outputs.logits, dim=-1),
+#                #     F.log_softmax(y_teacher, dim=-1),
+#                # )
+#                loss = distillation_loss(outputs.logits, y_teacher, batch["labels"])
+#                accelerator.backward(
+#                    loss
+#                ) if nas_args.use_accelerate else loss.backward()
+#
+#                # update random sub-network
+#                for k in range(nas_args.num_random_sub_nets):
+#                    head_mask, ffn_mask = sampler()
+#                    if nas_args.use_accelerate:
+#                        head_mask = head_mask.to(device=accelerator.device)
+#                        ffn_mask = ffn_mask.to(device=accelerator.device)
+#                    else:
+#                        head_mask = head_mask.to(device="cuda", dtype=model.dtype)
+#                        ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
+#
+#                    handles = mask(model, ffn_mask, head_mask)
+#
+#                    outputs = model(head_mask=head_mask, **batch)
+#                    for handle in handles:
+#                        handle.remove()
+#
+#                    loss = distillation_loss(outputs.logits, y_teacher, batch["labels"])
+#                    accelerator.backward(
+#                        loss
+#                    ) if nas_args.use_accelerate else loss.backward()
 
             if nas_args.store_debug_info:
                 # debug_info[f'index'].append(idx)
@@ -581,8 +358,7 @@ def main():
 
         model.eval()
         for batch in eval_dataloader:
-            if not nas_args.use_accelerate:
-                batch = {k: v.to(device) for k, v in batch.items()}
+            batch = {k: v.to(device) for k, v in batch.items()}
 
             outputs = model(**batch)
 
@@ -611,58 +387,43 @@ def main():
         if training_args.save_strategy == "epoch":
             os.makedirs(training_args.output_dir, exist_ok=True)
             logging.info(f"Store checkpoint in: {training_args.output_dir}")
-            if nas_args.use_accelerate:
-                accelerator.wait_for_everyone()
-                unwrapped_model = accelerator.unwrap_model(model)
-                unwrapped_model.save_pretrained(
-                    training_args.output_dir,
-                    is_main_process=accelerator.is_main_process,
-                    save_function=accelerator.save,
-                    state_dict=accelerator.get_state_dict(model),
-                )
-            else:
-                # torch.save(
-                #     model.state_dict(),
-                #     os.path.join(training_args.output_dir, "checkpoint.pt"),
-                # )
-                model.save_pretrained(training_args.output_dir)
+            model.save_pretrained(training_args.output_dir)
 
-    if not nas_args.use_accelerate:
-        model.eval()
-        for batch in test_dataloader:
-            batch = {k: v.to(device) for k, v in batch.items()}
+    model.eval()
+    for batch in test_dataloader:
+        batch = {k: v.to(device) for k, v in batch.items()}
 
-            outputs = model(**batch)
+        outputs = model(**batch)
 
-            logits = outputs.logits
+        logits = outputs.logits
             # predictions = torch.argmax(logits, dim=-1)
-            predictions = (
-                torch.squeeze(logits) if is_regression else torch.argmax(logits, dim=-1)
-            )
+        predictions = (
+            torch.squeeze(logits) if is_regression else torch.argmax(logits, dim=-1)
+        )
 
-            metric.add_batch(predictions=predictions, references=batch["labels"])
+        metric.add_batch(predictions=predictions, references=batch["labels"])
 
-        test_metric = metric.compute()
-        n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    test_metric = metric.compute()
+    n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-        results = {}
-        results["dataset"] = data_args.task_name
-        results["params"] = n_params
-        results["search_space"] = nas_args.search_space
-        results["runtime"] = time.time() - start_time
+    results = {}
+    results["dataset"] = data_args.task_name
+    results["params"] = n_params
+    results["search_space"] = nas_args.search_space
+    results["runtime"] = time.time() - start_time
 
-        results[metric_name] = float(eval_metric[metric_name])
-        results["test_" + metric_name] = float(test_metric[metric_name])
-        fname = os.path.join(
+    results[metric_name] = float(eval_metric[metric_name])
+    results["test_" + metric_name] = float(test_metric[metric_name])
+    fname = os.path.join(
             training_args.output_dir, f"results_{data_args.task_name}.json"
         )
-        json.dump(results, open(fname, "w"))
+    json.dump(results, open(fname, "w"))
 
-        if nas_args.store_debug_info:
-            fname = os.path.join(
-                training_args.output_dir, f"debug_info_{data_args.task_name}.json"
-            )
-            json.dump(debug_info, open(fname, "w"))
+    if nas_args.store_debug_info:
+        fname = os.path.join(
+            training_args.output_dir, f"debug_info_{data_args.task_name}.json"
+        )
+        json.dump(debug_info, open(fname, "w"))
 
 
 if __name__ == "__main__":
