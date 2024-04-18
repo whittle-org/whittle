@@ -1,7 +1,6 @@
-import torch
-
-from lobotomy.sampler import RandomSampler
+from lobotomy.sampling.random_sampler import RandomSampler
 from typing import Callable
+
 
 class BaseTrainingStrategy(object):
     def __init__(self, sampler: RandomSampler,
