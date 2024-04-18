@@ -49,7 +49,7 @@ from search_spaces import (
     LayerSearchSpace,
     MediumSearchSpace,
 )
-from task_data import GLUE_TASK_INFO
+from benchmarks.plm_pruning.data_wrapper.task_data import GLUE_TASK_INFO
 from mask import mask_bert, mask_roberta, mask_gpt, mask_gpt_neox
 from hf_args import DataTrainingArguments, ModelArguments, parse_model_name
 from data_wrapper import Glue, IMDB, SWAG

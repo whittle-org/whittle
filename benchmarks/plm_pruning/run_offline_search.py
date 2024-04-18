@@ -41,7 +41,7 @@ from evaluate import load
 from functools import partial
 
 from estimate_efficency import compute_parameters
-from task_data import GLUE_TASK_INFO
+from benchmarks.plm_pruning.data_wrapper.task_data import GLUE_TASK_INFO
 from sampling import (
     SmallSearchSpace,
     MediumSearchSpace,
