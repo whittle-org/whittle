@@ -30,6 +30,10 @@ def mac_per_neuron(seq_len, hidden_size):
     return 2 * seq_len * hidden_size
 
 
+def compute_mac_linear_layer(in_features, out_features):
+    return in_features * out_features
+
+
 def compute_mac(
     num_heads_per_layer,
     num_neurons_per_layer,
