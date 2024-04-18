@@ -21,9 +21,8 @@ from pathlib import Path
 from torch.utils.data import DataLoader
 
 from syne_tune.report import Reporter
-from functools import partial
 from lobotomy.training_strategies import SandwichStrategy
-from lobotomy.sampler import RandomSampler
+from lobotomy.sampling.random_sampler import RandomSampler
 
 from model import MLP, select_sub_network, search_space
 
