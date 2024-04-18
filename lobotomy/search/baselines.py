@@ -28,7 +28,7 @@ from syne_tune.optimizer.schedulers.multiobjective.linear_scalarizer import (
     LinearScalarizedScheduler,
 )
 
-from lobotomy.local_search import LS
+from lobotomy.search.local_search import LS
 
 
 def get_random(config_space):
