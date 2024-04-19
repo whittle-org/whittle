@@ -24,7 +24,7 @@ from transformers.tokenization_utils_base import (
     PreTrainedTokenizerBase,
     PaddingStrategy,
 )
-from data_wrapper import DataWrapper
+from .data_wrapper import DataWrapper
 
 logger = logging.getLogger(__name__)
 

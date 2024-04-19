@@ -11,13 +11,10 @@
 # express or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 import logging
-import numpy as np
 
 from datasets import load_dataset
-from torch.utils.data import Subset, DataLoader
 
-from data_wrapper import DataWrapper
-from task_data import GLUE_TASK_INFO
+from .data_wrapper import DataWrapper
 
 logger = logging.getLogger(__name__)
 

@@ -15,8 +15,8 @@ import numpy as np
 from datasets import load_dataset
 from torch.utils.data import Subset
 
-from task_data import GLUE_TASK_INFO
-from data_wrapper import DataWrapper
+from .task_data import GLUE_TASK_INFO
+from .data_wrapper import DataWrapper
 
 
 class Glue(DataWrapper):
