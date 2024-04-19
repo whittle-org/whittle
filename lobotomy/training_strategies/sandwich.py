@@ -17,30 +17,33 @@ class SandwichStrategy(BaseTrainingStrategy):
         self.select_subnetwork = select_subnetwork
         self.random_samples = random_samples
 
-    def __call__(self, model, x, y, **kwargs):
+    def __call__(self, model, inputs, outputs, **kwargs):
 
         # update super-network
-        y_hat = model(x)
-        loss = self.loss_function(y, y_hat)
+        y_hat = model(**inputs)
+        loss = self.loss_function(outputs, y_hat)
         loss.backward()
 
         # update random sub-networks
         for i in range(self.random_samples):
 
             config = self.sampler.sample()
-            handle = self.select_subnetwork(model, config)
-            y_hat = model(x)
-            loss = self.loss_function(y, y_hat)
+            handles = self.select_subnetwork(model, config)
+            y_hat = model(**inputs)
+            loss = self.loss_function(outputs, y_hat)
             loss.backward()
-            handle.remove()
+            for handle in handles:
+                handle.remove()
 
         # smallest network
         config = self.sampler.get_smallest_sub_network()
-        handle = self.select_subnetwork(model, config)
-        y_hat = model(x)
-        loss = self.loss_function(y, y_hat)
+        handles = self.select_subnetwork(model, config)
+        y_hat = model(**inputs)
+        loss = self.loss_function(outputs, y_hat)
         loss.backward()
-        handle.remove()
+
+        for handle in handles:
+            handle.remove()
 
         return loss.item()
 

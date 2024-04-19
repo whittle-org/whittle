@@ -247,7 +247,7 @@ def main():
     elif "pythia" in model_type:
         mask = mask_gpt_neox
 
-    def loss_function(outputs, labels):
+    def loss_function(labels, outputs):
         return outputs.loss
 
     def select_sub_network(model, config):
@@ -257,8 +257,8 @@ def main():
         handles = mask(model, ffn_mask, head_mask)
         return handles
 
-    search_space = search_spaces[nas_args.search_space]
-    sampler = RandomSampler(search_space, seed=training_args.seed)
+    search_space = search_spaces[nas_args.search_space](model.config, seed=training_args.seed)
+    sampler = RandomSampler(search_space.config_space, seed=training_args.seed)
     training_strategies = {
         # 'standard': train_epoch,
         'sandwich': SandwichStrategy(select_subnetwork=select_sub_network,
@@ -285,7 +285,7 @@ def main():
         for batch in train_dataloader:
             batch = {k: v.to(device) for k, v in batch.items()}
 
-            loss = update_op(model, **batch)
+            loss = update_op(model, batch, None)
 
 #            if nas_args.sampling_strategy == "one_shot":
 #                # update largest sub-network (i.e super-network)
