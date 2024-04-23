@@ -3,6 +3,8 @@ import torch.nn as nn
 
 from syne_tune.config_space import randint
 
+from lobotomy.modules import Linear
+
 search_space = {
     'num_units':  randint(1, 512),
 }
@@ -10,12 +12,13 @@ search_space = {
 
 class MLP(nn.Module):
     def __init__(self, input_dim, hidden_dim=200, device="cuda"):
+
         super(MLP, self).__init__()
 
         self.hidden_dim = hidden_dim
-        self.input_layer = nn.Linear(input_dim, hidden_dim)
-        self.hidden_layer = nn.Linear(hidden_dim, hidden_dim)
-        self.output_layer = nn.Linear(hidden_dim, 1)
+        self.input_layer = Linear(input_dim, hidden_dim)
+        self.hidden_layer = Linear(hidden_dim, hidden_dim)
+        self.output_layer = Linear(hidden_dim, 1)
 
     def forward(self, x):
         x_ = self.input_layer(x)
@@ -25,15 +28,10 @@ class MLP(nn.Module):
         x_ = self.output_layer(x_)
         return x_
 
+    def select_sub_network(self, config):
+        self.hidden_layer.set_sub_network(self.hidden_dim, config['num_units'])
+        self.output_layer.set_sub_network(config['num_units'], 1)
 
-def select_sub_network(model, config):
-    hidden_layer = model.hidden_layer
-    mask = torch.ones(hidden_layer.out_features)
-    mask[config['num_units']:] = 0
-
-    def hook(module, inputs, outputs):
-        outputs = outputs * mask
-        return outputs
-
-    handle = hidden_layer.register_forward_hook(hook)
-    return handle
+    def reset_super_network(self):
+        self.hidden_layer.reset_super_network()
+        self.output_layer.reset_super_network()

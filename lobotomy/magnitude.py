@@ -19,8 +19,6 @@ from argparse import ArgumentParser
 from pathlib import Path
 from torch.utils.data import DataLoader
 
-from examples.sinc.sinc_nas import f, MLP, validate
-
 
 def compute_mag(model, mask):
     magnitude = 0

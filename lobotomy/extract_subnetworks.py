@@ -16,8 +16,6 @@ import torch
 import torch.nn as nn
 from copy import deepcopy
 
-from transformers import AutoModelForSequenceClassification
-
 
 class IdentityAttention(nn.Module):
     def __init__(self, model_type=None):
@@ -165,7 +163,7 @@ def get_final_bert_model(original_model, new_model_config):
 if __name__ == "__main__":
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
     from transformers.models.bert.modeling_bert import BertConfig
-    from mask.mask_bert import mask_bert
+    from benchmarks.plm_pruning.mask import mask_bert
 
     model_type = "bert-base-uncased"
     model = AutoModelForSequenceClassification.from_pretrained(model_type)

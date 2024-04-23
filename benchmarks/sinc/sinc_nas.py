@@ -24,7 +24,7 @@ from syne_tune.report import Reporter
 from lobotomy.training_strategies import SandwichStrategy
 from lobotomy.sampling.random_sampler import RandomSampler
 
-from model import MLP, select_sub_network, search_space
+from model import MLP, search_space
 
 report = Reporter()
 
@@ -103,10 +103,8 @@ if __name__ == "__main__":
     sampler =  RandomSampler(search_space, seed=args.seed)
     training_strategies = {
         # 'standard': train_epoch,
-        'sandwich': SandwichStrategy(select_subnetwork=select_sub_network,
-                                     sampler=sampler,
-                                     loss_function=nn.functional.mse_loss,
-                                     ),
+        'sandwich': SandwichStrategy(sampler=sampler,
+                                     loss_function=nn.functional.mse_loss),
         # 'sandwich_kd': train_sandwich_kd,
         # 'random': train_random,
         # 'ats': train_ats,
@@ -142,7 +140,7 @@ if __name__ == "__main__":
             "\tValidation Loss: ",
             valid_loss,
             "\tLearning Rate: ",
-            scheduler.get_lr()
+            scheduler.get_last_lr()
 
         )
         lc_train.append(float(train_loss))
