@@ -14,21 +14,6 @@ import torch
 import numpy as np
 
 
-def mac_per_head(seq_len, hidden_size, attention_head_size):
-    per_head_qkv = lambda seq_len: 3 * seq_len * hidden_size * attention_head_size
-    per_head_attn = lambda seq_len: 2 * seq_len * seq_len * attention_head_size
-    per_head_output = lambda seq_len: seq_len * attention_head_size * hidden_size
-    mac = per_head_qkv(seq_len) + per_head_attn(seq_len) + per_head_output(seq_len)
-    return mac
-
-
-def mac_per_neuron(seq_len, hidden_size):
-    return 2 * seq_len * hidden_size
-
-
-def compute_mac_linear_layer(in_features, out_features):
-    return in_features * out_features
-
 
 def compute_mac(
     num_heads_per_layer,
@@ -76,28 +61,3 @@ def compute_parameters(dmodel, dhead, num_heads_per_layer, num_neurons_per_layer
         num_parameters += n_attention + n_ffn
     return int(num_parameters)
 
-
-def compute_latency(model, tokenizer, batch, device):
-    # train_dataset[0][sentence1_key],
-    starter, ender = (
-        torch.cuda.Event(enable_timing=True),
-        torch.cuda.Event(enable_timing=True),
-    )
-    repetitions = 300
-    timings = np.zeros((repetitions, 1))
-    # warm-up GPU
-    for _ in range(10):
-        _ = model(**tokenizer(batch, return_tensors="pt").to(device))
-    # measure latency
-    with torch.no_grad():
-        for rep in range(repetitions):
-            starter.record()
-            _ = model(**tokenizer(batch, return_tensors="pt").to(device))
-            ender.record()
-            # synchronize GPU
-            torch.cuda.synchronize()
-            curr_time = starter.elapsed_time(ender)
-            timings[rep] = curr_time
-    mean_syn = np.sum(timings) / repetitions
-
-    return mean_syn
