@@ -16,14 +16,13 @@ from typing import Dict
 from syne_tune.config_space import Domain, Categorical
 from syne_tune.optimizer.baselines import (
     RandomSearch,
-    GridSearch,
     MOREA,
     NSGA2,
     MORandomScalarizationBayesOpt,
     MOASHA,
+    # EHVI
 )
 
-# from ehvi import EHVI
 from syne_tune.optimizer.schedulers.multiobjective.linear_scalarizer import (
     LinearScalarizedScheduler,
 )
@@ -98,16 +97,11 @@ class Methods:
     RS = "random_search"
     MOREA = "morea"
     LS = "local_search"
-    LS_UPPER_BOUND = "local_search_upper_bound"
-    LS_LOWER_BOUND = "local_search_lower_bound"
-    LS_RANDOM = "local_search_random"
     NSGA2 = "nsga2"
     LSBO = "lsbo"
     RSBO = "rsbo"
-    MOBORE = "mobore"
     EHVI = "ehvi"
     MOASHA = "moasha"
-    GRIDSEARCH = "grid_search"
 
 
 methods = {
@@ -118,32 +112,6 @@ methods = {
         random_seed=method_arguments.random_seed,
         points_to_evaluate=initial_design(method_arguments.config_space),
     ),
-    Methods.GRIDSEARCH: lambda method_arguments: GridSearch(
-        config_space=method_arguments.config_space,
-        metric=method_arguments.metrics[0],
-        mode=method_arguments.mode[0],
-        random_seed=method_arguments.random_seed,
-        # points_to_evaluate=[{'num_layers': 12,'num_heads': 12, 'num_units': 3072},
-        #                     {'num_layers': 10, 'num_heads': 10, 'num_units': 2560},
-        #                     {'num_layers': 8, 'num_heads': 8, 'num_units': 2048},
-        #                     {'num_layers': 6, 'num_heads': 6, 'num_units': 1536},
-        #                     {'num_layers': 4, 'num_heads': 4, 'num_units': 1024},
-        #                     {'num_layers': 2, 'num_heads': 2, 'num_units': 512}],
-        points_to_evaluate=[
-            {"num_layers": 12, "num_heads": 12, "num_units": 3072},
-            {"num_layers": 11, "num_heads": 12, "num_units": 3072},
-            {"num_layers": 10, "num_heads": 12, "num_units": 3072},
-            {"num_layers": 9, "num_heads": 12, "num_units": 3072},
-            {"num_layers": 8, "num_heads": 12, "num_units": 3072},
-            {"num_layers": 7, "num_heads": 12, "num_units": 3072},
-            {"num_layers": 6, "num_heads": 12, "num_units": 3072},
-            {"num_layers": 5, "num_heads": 12, "num_units": 3072},
-            {"num_layers": 4, "num_heads": 12, "num_units": 3072},
-            {"num_layers": 3, "num_heads": 12, "num_units": 3072},
-            {"num_layers": 2, "num_heads": 12, "num_units": 3072},
-            {"num_layers": 1, "num_heads": 12, "num_units": 3072},
-        ],
-    ),
     Methods.MOREA: lambda method_arguments: MOREA(
         config_space=method_arguments.config_space,
         metric=method_arguments.metrics,
@@ -153,14 +121,6 @@ methods = {
         population_size=10,
         points_to_evaluate=initial_design(method_arguments.config_space),
     ),
-    Methods.LS_UPPER_BOUND: lambda method_arguments: LS(
-        config_space=method_arguments.config_space,
-        metric=method_arguments.metrics,
-        mode=method_arguments.mode,
-        random_seed=method_arguments.random_seed,
-        start_point=get_upper_bound(config_space=method_arguments.config_space),
-        points_to_evaluate=[],
-    ),
     Methods.LS: lambda method_arguments: LS(
         config_space=method_arguments.config_space,
         metric=method_arguments.metrics,
@@ -168,22 +128,6 @@ methods = {
         random_seed=method_arguments.random_seed,
         start_point=None,
         points_to_evaluate=initial_design(method_arguments.config_space),
-    ),
-    Methods.LS_LOWER_BOUND: lambda method_arguments: LS(
-        config_space=method_arguments.config_space,
-        metric=method_arguments.metrics,
-        mode=method_arguments.mode,
-        random_seed=method_arguments.random_seed,
-        start_point=get_lower_bound(config_space=method_arguments.config_space),
-        points_to_evaluate=[],
-    ),
-    Methods.LS_RANDOM: lambda method_arguments: LS(
-        config_space=method_arguments.config_space,
-        metric=method_arguments.metrics,
-        mode=method_arguments.mode,
-        random_seed=method_arguments.random_seed,
-        start_point=get_random(config_space=method_arguments.config_space),
-        points_to_evaluate=[],
     ),
     Methods.NSGA2: lambda method_arguments: NSGA2(
         config_space=method_arguments.config_space,
@@ -218,43 +162,13 @@ methods = {
         reduction_factor=3,
         brackets=1,
         # random_seed=method_arguments.random_seed,
-        points_to_evaluate=initial_design(method_arguments.config_space),
+        # points_to_evaluate=initial_design(method_arguments.config_space),
     ),
-    # Methods.MOBORE: lambda method_arguments: MultiObjectiveBore(
+    # Methods.EHVI: lambda method_arguments: EHVI(
     #     config_space=method_arguments.config_space,
     #     metric=method_arguments.metrics,
     #     mode=method_arguments.mode,
     #     random_seed=method_arguments.random_seed,
-    #     points_to_evaluate=[]
+    #     points_to_evaluate=initial_design(method_arguments.config_space),
     # ),
-    Methods.EHVI: lambda method_arguments: EHVI(
-        config_space=method_arguments.config_space,
-        metric=method_arguments.metrics,
-        mode=method_arguments.mode,
-        random_seed=method_arguments.random_seed,
-        points_to_evaluate=initial_design(method_arguments.config_space),
-    ),
 }
-
-
-if __name__ == "__main__":
-    from transformers.models.bert.modeling_bert import BertConfig
-    from sampling import (
-        SmallSearchSpace,
-        LayerSearchSpace,
-        MediumSearchSpace,
-        FullSearchSpace,
-    )
-
-    config = BertConfig()
-    spaces = [
-        SmallSearchSpace(config),
-        LayerSearchSpace(config),
-        MediumSearchSpace(config),
-        FullSearchSpace(config),
-    ][:-1]
-
-    for space in spaces:
-        print(get_lower_bound(space.config_space))
-        print(get_mid_point(space.config_space))
-        print(get_upper_bound(space.config_space))

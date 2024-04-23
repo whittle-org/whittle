@@ -8,7 +8,7 @@ from lobotomy.search.multi_objective import get_pareto_optimal
 
 def multi_objective_search(objective, search_space: dict, search_strategy: str = 'random_search',
            objective_kwargs: dict = None,
-           num_samples:int = 100, seed: int = None):
+           num_samples: int = 100, seed: int = None):
     """
     Search for the Pareto optimal sub-networks.
 
