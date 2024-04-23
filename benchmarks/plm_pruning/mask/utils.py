@@ -1,4 +1,3 @@
-
 def get_backbone(model):
     model_type = model.base_model_prefix
     backbone = getattr(model, model_type)
