@@ -49,7 +49,7 @@ base_path = Path(f"/Users/kleiaaro/experiments/nas_search_result/{experiment}")
 #     "rsbo",
 #     "ehvi",
 # ]
-methods = ['random_search', 'morea', 'ehvi', 'local_search', 'nsga2']
+methods = ["random_search", "morea", "ehvi", "local_search", "nsga2"]
 
 checkpoints = ["linear_random", "sandwich", "one_shot", "standard", "random", "kd"]
 epochs = [5, 10, 20, 40][:1]
@@ -61,13 +61,20 @@ seeds = np.arange(10)
 random_sub_nets = [1, 2]
 runs = np.arange(1)
 # datasets = ["rte", "mrpc", "cola", "stsb", "sst2", "qnli", 'imdb', 'swag', "mnli", "qqp"][:6]
-datasets = ['sst2', 'qnli', 'swag', 'stsb', 'cola', 'mrpc', 'imdb', 'rte']
-search_spaces = ["layer", "small", "medium", "uniform", 'meta_small_kde_1_tasks', 'meta_small_kde_5_tasks'][:-2]
+datasets = ["sst2", "qnli", "swag", "stsb", "cola", "mrpc", "imdb", "rte"]
+search_spaces = [
+    "layer",
+    "small",
+    "medium",
+    "uniform",
+    "meta_small_kde_1_tasks",
+    "meta_small_kde_5_tasks",
+][:-2]
 # search_spaces = ["small"]
 
 runtimes = {
     # "rte": np.linspace(110, 400, 100),
-    'rte': np.linspace(150,400, 100),
+    "rte": np.linspace(150, 400, 100),
     "mrpc": np.linspace(150, 500, 100),
     "cola": np.linspace(205, 1000, 100),
     "stsb": np.linspace(200, 1000, 100),
@@ -75,7 +82,6 @@ runtimes = {
     "imdb": np.linspace(500, 10000, 100),
     "swag": np.linspace(500, 5000, 100),
     "qnli": np.linspace(200, 2000, 100),
-
     # "qnli": [50 * i for i in range(4, 61)],
     # "mnli": [50 * i for i in range(4, 61)],
     # "qqp": [50 * i for i in range(4, 61)],
@@ -121,11 +127,13 @@ for (
     )
 
     if not os.path.exists(path):
-        print(f'{path} is missing')
+        print(f"{path} is missing")
         continue
     d = json.load(open(path / f"results_{dataset}.json"))
     N = len(d["params"])
-    print(f"Results {dataset} {method} {checkpoint} {seed} {run}: N={N}, T-min={np.min(d['runtime'])} T-Max={np.max(d['runtime'])}")
+    print(
+        f"Results {dataset} {method} {checkpoint} {seed} {run}: N={N}, T-min={np.min(d['runtime'])} T-Max={np.max(d['runtime'])}"
+    )
     for row in range(N):
         # data["runtime"].append(row)
         # if row == 0:

@@ -6,9 +6,14 @@ from lobotomy.search.ask_tell_scheduler import AskTellScheduler
 from lobotomy.search.multi_objective import get_pareto_optimal
 
 
-def multi_objective_search(objective, search_space: dict, search_strategy: str = 'random_search',
-           objective_kwargs: dict = None,
-           num_samples: int = 100, seed: int = None):
+def multi_objective_search(
+    objective,
+    search_space: dict,
+    search_strategy: str = "random_search",
+    objective_kwargs: dict = None,
+    num_samples: int = 100,
+    seed: int = None,
+):
     """
     Search for the Pareto optimal sub-networks.
 
@@ -44,9 +49,13 @@ def multi_objective_search(objective, search_space: dict, search_strategy: str =
     start_time = time.time()
     for i in range(num_samples):
         trial_suggestion = scheduler.ask()
-        objective_1, objective_2 = objective(config=trial_suggestion.config, **objective_kwargs)
+        objective_1, objective_2 = objective(
+            config=trial_suggestion.config, **objective_kwargs
+        )
 
-        scheduler.tell(trial_suggestion, {"objective_1": objective_1, "objective_2": objective_2})
+        scheduler.tell(
+            trial_suggestion, {"objective_1": objective_1, "objective_2": objective_2}
+        )
 
         # bookkeeping
         costs[i][0] = objective_1
@@ -63,6 +72,6 @@ def multi_objective_search(objective, search_space: dict, search_strategy: str =
         "costs": costs,
         "configs": configs,
         "runtime": runtime,
-        'is_pareto_optimal': idx,
+        "is_pareto_optimal": idx,
     }
     return results

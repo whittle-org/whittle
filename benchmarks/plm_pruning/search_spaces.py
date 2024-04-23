@@ -37,7 +37,7 @@ class SearchSpace(object):
             self.intermediate_size = config.intermediate_size
 
         if seed is None:
-            self.rng = np.random.RandomState(np.random.randint(2**32 - 1))
+            self.rng = np.random.RandomState(np.random.randint(2 ** 32 - 1))
         else:
             self.rng = np.random.RandomState(seed)
         self.config_space = self._define_config_space(**kwargs)
@@ -66,7 +66,7 @@ class SmallSearchSpace(SearchSpace):
 
         if power_of_2_encoding:
             values = [
-                int(self.num_heads / 2**i)
+                int(self.num_heads / 2 ** i)
                 for i in range(int(np.log2(self.num_heads)) + 1)
             ]
             values.reverse()

@@ -3,8 +3,9 @@ from typing import Callable
 
 
 class BaseTrainingStrategy(object):
-    def __init__(self, sampler: RandomSampler,
-                 loss_function: Callable, device: str = 'cuda'):
+    def __init__(
+        self, sampler: RandomSampler, loss_function: Callable, device: str = "cuda"
+    ):
         """
 
         """

@@ -56,21 +56,16 @@ from data_wrapper import Glue, IMDB, SWAG
 
 
 def kd_loss(
-    student_logits,
-    teacher_logits,
-    targets,
-    temperature=1,
-    is_regression=False,
+    student_logits, teacher_logits, targets, temperature=1, is_regression=False
 ):
     if is_regression:
         return F.mse_loss(student_logits, teacher_logits)
     else:
         kd_loss = F.cross_entropy(
-            student_logits / temperature,
-            F.softmax(teacher_logits / temperature, dim=1),
+            student_logits / temperature, F.softmax(teacher_logits / temperature, dim=1)
         )
         predictive_loss = F.cross_entropy(student_logits, targets)
-        return temperature**2 * kd_loss + predictive_loss
+        return temperature ** 2 * kd_loss + predictive_loss
 
 
 search_spaces = {
@@ -130,7 +125,7 @@ def main():
 
     # Set seed before initializing model.
     if int(training_args.seed) == -1:
-        training_args.seed = np.random.randint(2**32 - 1)
+        training_args.seed = np.random.randint(2 ** 32 - 1)
     print(training_args.seed)
     set_seed(training_args.seed)
     torch.manual_seed(training_args.seed)
@@ -217,9 +212,7 @@ def main():
 
     progress_bar = tqdm(range(num_training_steps))
 
-    device = (
-        torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    )
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model.to(device)
 
     dropout_rate = np.linspace(0, 1, num_training_steps)
@@ -257,14 +250,17 @@ def main():
         handles = mask(model, ffn_mask, head_mask)
         return handles
 
-    search_space = search_spaces[nas_args.search_space](model.config, seed=training_args.seed)
+    search_space = search_spaces[nas_args.search_space](
+        model.config, seed=training_args.seed
+    )
     sampler = RandomSampler(search_space.config_space, seed=training_args.seed)
     training_strategies = {
         # 'standard': train_epoch,
-        'sandwich': SandwichStrategy(select_subnetwork=select_sub_network,
-                                     sampler=sampler,
-                                     loss_function=loss_function,
-                                     ),
+        "sandwich": SandwichStrategy(
+            select_subnetwork=select_sub_network,
+            sampler=sampler,
+            loss_function=loss_function,
+        ),
         # 'sandwich_kd': train_sandwich_kd,
         # 'random': train_random,
         # 'ats': train_ats,
@@ -278,7 +274,6 @@ def main():
 
         debug_info = defaultdict(list)
 
-
     for epoch in range(int(training_args.num_train_epochs)):
         model.train()
         train_loss = 0
@@ -287,59 +282,59 @@ def main():
 
             loss = update_op(model, batch, None)
 
-#            if nas_args.sampling_strategy == "one_shot":
-#                # update largest sub-network (i.e super-network)
-#                outputs = model(**batch)
-#                loss = outputs.loss
-#                y_teacher = outputs.logits.detach()
-#                accelerator.backward(
-#                    loss
-#                ) if nas_args.use_accelerate else loss.backward()
-#
-#                # update smallest sub-network
-#                head_mask, ffn_mask = sampler.get_smallest_sub_network()
-#                if nas_args.use_accelerate:
-#                    head_mask = head_mask.to(device=accelerator.device)
-#                    ffn_mask = ffn_mask.to(device=accelerator.device)
-#                else:
-#                    head_mask = head_mask.to(device="cuda", dtype=model.dtype)
-#                    ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
-#
-#                handles = mask(model, ffn_mask, head_mask)
-#                outputs = model(head_mask=head_mask, **batch)
-#
-##                for handle in handles:
-#                    handle.remove()
-#                # loss = loss_KD_fn(outputs.logits, y_teacher, batch['labels'], is_regression=is_regression)
-#                # loss = distillation_loss(
-#                #     F.log_softmax(outputs.logits, dim=-1),
-#                #     F.log_softmax(y_teacher, dim=-1),
-#                # )
-#                loss = distillation_loss(outputs.logits, y_teacher, batch["labels"])
-#                accelerator.backward(
-#                    loss
-#                ) if nas_args.use_accelerate else loss.backward()
-#
-#                # update random sub-network
-#                for k in range(nas_args.num_random_sub_nets):
-#                    head_mask, ffn_mask = sampler()
-#                    if nas_args.use_accelerate:
-#                        head_mask = head_mask.to(device=accelerator.device)
-#                        ffn_mask = ffn_mask.to(device=accelerator.device)
-#                    else:
-#                        head_mask = head_mask.to(device="cuda", dtype=model.dtype)
-#                        ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
-#
-#                    handles = mask(model, ffn_mask, head_mask)
-#
-#                    outputs = model(head_mask=head_mask, **batch)
-#                    for handle in handles:
-#                        handle.remove()
-#
-#                    loss = distillation_loss(outputs.logits, y_teacher, batch["labels"])
-#                    accelerator.backward(
-#                        loss
-#                    ) if nas_args.use_accelerate else loss.backward()
+            #            if nas_args.sampling_strategy == "one_shot":
+            #                # update largest sub-network (i.e super-network)
+            #                outputs = model(**batch)
+            #                loss = outputs.loss
+            #                y_teacher = outputs.logits.detach()
+            #                accelerator.backward(
+            #                    loss
+            #                ) if nas_args.use_accelerate else loss.backward()
+            #
+            #                # update smallest sub-network
+            #                head_mask, ffn_mask = sampler.get_smallest_sub_network()
+            #                if nas_args.use_accelerate:
+            #                    head_mask = head_mask.to(device=accelerator.device)
+            #                    ffn_mask = ffn_mask.to(device=accelerator.device)
+            #                else:
+            #                    head_mask = head_mask.to(device="cuda", dtype=model.dtype)
+            #                    ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
+            #
+            #                handles = mask(model, ffn_mask, head_mask)
+            #                outputs = model(head_mask=head_mask, **batch)
+            #
+            ##                for handle in handles:
+            #                    handle.remove()
+            #                # loss = loss_KD_fn(outputs.logits, y_teacher, batch['labels'], is_regression=is_regression)
+            #                # loss = distillation_loss(
+            #                #     F.log_softmax(outputs.logits, dim=-1),
+            #                #     F.log_softmax(y_teacher, dim=-1),
+            #                # )
+            #                loss = distillation_loss(outputs.logits, y_teacher, batch["labels"])
+            #                accelerator.backward(
+            #                    loss
+            #                ) if nas_args.use_accelerate else loss.backward()
+            #
+            #                # update random sub-network
+            #                for k in range(nas_args.num_random_sub_nets):
+            #                    head_mask, ffn_mask = sampler()
+            #                    if nas_args.use_accelerate:
+            #                        head_mask = head_mask.to(device=accelerator.device)
+            #                        ffn_mask = ffn_mask.to(device=accelerator.device)
+            #                    else:
+            #                        head_mask = head_mask.to(device="cuda", dtype=model.dtype)
+            #                        ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
+            #
+            #                    handles = mask(model, ffn_mask, head_mask)
+            #
+            #                    outputs = model(head_mask=head_mask, **batch)
+            #                    for handle in handles:
+            #                        handle.remove()
+            #
+            #                    loss = distillation_loss(outputs.logits, y_teacher, batch["labels"])
+            #                    accelerator.backward(
+            #                        loss
+            #                    ) if nas_args.use_accelerate else loss.backward()
 
             if nas_args.store_debug_info:
                 # debug_info[f'index'].append(idx)
@@ -396,7 +391,7 @@ def main():
         outputs = model(**batch)
 
         logits = outputs.logits
-            # predictions = torch.argmax(logits, dim=-1)
+        # predictions = torch.argmax(logits, dim=-1)
         predictions = (
             torch.squeeze(logits) if is_regression else torch.argmax(logits, dim=-1)
         )
@@ -415,8 +410,8 @@ def main():
     results[metric_name] = float(eval_metric[metric_name])
     results["test_" + metric_name] = float(test_metric[metric_name])
     fname = os.path.join(
-            training_args.output_dir, f"results_{data_args.task_name}.json"
-        )
+        training_args.output_dir, f"results_{data_args.task_name}.json"
+    )
     json.dump(results, open(fname, "w"))
 
     if nas_args.store_debug_info:

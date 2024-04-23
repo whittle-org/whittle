@@ -169,8 +169,7 @@ class AlpacaDataset(DataWrapper):
     def _load_data(self):
 
         dataset = SupervisedDataset(
-            tokenizer=self.tokenizer,
-            data_path=self.data_args.train_file,
+            tokenizer=self.tokenizer, data_path=self.data_args.train_file
         )
 
         n_train = int(len(dataset) * 0.6)

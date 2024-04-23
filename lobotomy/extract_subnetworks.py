@@ -95,10 +95,7 @@ def get_final_bert_model(original_model, new_model_config):
         attention.self.query = nn.Linear(new_model_config.hidden_size, all_head_size)
         attention.self.key = nn.Linear(new_model_config.hidden_size, all_head_size)
         attention.self.value = nn.Linear(new_model_config.hidden_size, all_head_size)
-        attention.output.dense = nn.Linear(
-            all_head_size,
-            new_model_config.hidden_size,
-        )
+        attention.output.dense = nn.Linear(all_head_size, new_model_config.hidden_size)
 
         attention.self.all_head_size = all_head_size
         attention.self.attention_head_size = attention_head_size

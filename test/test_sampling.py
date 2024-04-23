@@ -2,9 +2,14 @@ import torch
 
 from transformers import AutoConfig
 
-from nas_fine_tuning.sampling import SmallSearchSpace, FullSearchSpace, MediumSearchSpace, LayerSearchSpace
+from nas_fine_tuning.sampling import (
+    SmallSearchSpace,
+    FullSearchSpace,
+    MediumSearchSpace,
+    LayerSearchSpace,
+)
 
-config = AutoConfig.from_pretrained('bert-base-cased')
+config = AutoConfig.from_pretrained("bert-base-cased")
 
 
 def test_small():
@@ -39,8 +44,8 @@ def test_medium():
     assert nm.shape[1] == config.intermediate_size
 
     for i in range(num_layers):
-        assert hm[i, int(num_heads[i]):].sum() == 0
-        assert nm[i, int(num_units[i]):].sum() == 0
+        assert hm[i, int(num_heads[i]) :].sum() == 0
+        assert nm[i, int(num_units[i]) :].sum() == 0
 
 
 def test_large():

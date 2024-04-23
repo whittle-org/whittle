@@ -51,16 +51,12 @@ report = Reporter()
 
 @dataclass
 class PruningArguments:
-    prune_top_n_layers: int = field(
-        default=2,
-    )
+    prune_top_n_layers: int = field(default=2)
 
 
 @dataclass
 class NASArguments:
-    do_nas: bool = field(
-        default=False,
-    )
+    do_nas: bool = field(default=False)
 
     num_layers: int = field(default=12)
     num_heads: int = field(default=12)

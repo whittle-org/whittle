@@ -40,7 +40,6 @@ labels = {
     # "uniform": "Large",
     "meta_small_kde_1_tasks": "meta-1",
     "meta_small_kde_5_tasks": "meta-5",
-
 }
 
 marker = ["o", "x", "s", "d", "p", "P", "^", "v", "<", ">"]

@@ -114,8 +114,7 @@ class SWAG(DataWrapper):
         valid_dataset = split["test"]
 
         valid_dataset = Subset(
-            valid_dataset,
-            np.random.choice(len(valid_dataset), 2048).tolist(),
+            valid_dataset, np.random.choice(len(valid_dataset), 2048).tolist()
         )
 
         test_dataset = raw_datasets["validation"]

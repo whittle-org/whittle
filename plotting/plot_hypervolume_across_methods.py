@@ -32,53 +32,53 @@ df = df.query(
     f"search_space == '{search_space}' & checkpoint == '{checkpoint}' & epoch == {epochs} & random_sub_net == {random_sub_net}"
 )
 method_info = {
-    'morea': {'label': 'MO-REA', 'color': 'C6'},
+    "morea": {"label": "MO-REA", "color": "C6"},
     "random_search": {"label": "RS", "color": "C0"},
     # 'local_search_random': {'label': 'LS-R', 'color': 'C4'},
     "local_search": {"label": "LS", "color": "C1"},
     # 'local_search_lower_bound': {'label': 'LS-L', 'color': 'C5'},
     "nsga2": {"label": "NSGA-2", "color": "C3"},
-    'moasha': {'label': 'MO-ASHA', 'color': 'C6'},
+    "moasha": {"label": "MO-ASHA", "color": "C6"},
     "lsbo": {"label": "LS-BO", "color": "C2"},
     "rsbo": {"label": "RS-BO", "color": "C5"},
     "ehvi": {"label": "EHVI", "color": "black"},
 }
 ylims = {}
-ylims['bert-base-cased'] = {
-    "rte": (0.2, .4),
-    "stsb": (0.3, .7),
+ylims["bert-base-cased"] = {
+    "rte": (0.2, 0.4),
+    "stsb": (0.3, 0.7),
     "cola": (0.3, 0.6),
     "mrpc": (0.2, 0.6),
     "swag": (0.3, 0.6),
     "sst2": (0.2, 0.4),
     "imdb": (0.4, 0.6),
     "qnli": (0.3, 0.6),
-    "mnli": (0., .7),
-    "qqp": (0., 1.7),
+    "mnli": (0.0, 0.7),
+    "qqp": (0.0, 1.7),
 }
-ylims['roberta-base'] = {
-    "rte": (0.6, .8),
-    "stsb": (0.75, 1.),
-    "cola": (0.8, .925),
-    "mrpc": (0.8, 1.),
-    "swag": (0.75, .91),
-    "sst2": (0.85, 1.),
-    "imdb": (0.7, .9),
-    "qnli": (0.7, .9),
-    "mnli": (0., .7),
-    "qqp": (0., 1.7),
+ylims["roberta-base"] = {
+    "rte": (0.6, 0.8),
+    "stsb": (0.75, 1.0),
+    "cola": (0.8, 0.925),
+    "mrpc": (0.8, 1.0),
+    "swag": (0.75, 0.91),
+    "sst2": (0.85, 1.0),
+    "imdb": (0.7, 0.9),
+    "qnli": (0.7, 0.9),
+    "mnli": (0.0, 0.7),
+    "qqp": (0.0, 1.7),
 }
 marker = ["o", "x", "s", "d", "p", "P", "^", "v", "<", ">"]
 methods = []
 
 for model, df_model in df.groupby("model"):
-    if model == 'bert-base-cased':
+    if model == "bert-base-cased":
         continue
 
     n_runs = 9
     n_iters = 100
-    n_methods = len(df['method'].unique())
-    n_tasks = len(df['dataset'].unique())
+    n_methods = len(df["method"].unique())
+    n_tasks = len(df["dataset"].unique())
 
     error = np.empty((n_methods, n_tasks, n_runs, n_iters))
 
@@ -149,14 +149,14 @@ for model, df_model in df.groupby("model"):
             marker="o",
             label=method_info[method]["label"],
             color=method_info[method]["color"],
-            linestyle='--'
+            linestyle="--",
         )
 
     plot_label = False
 
     plt.grid(linewidth="1", alpha=0.4)
     plt.legend(loc=1)
-    plt.title(model.replace('_', '-').upper())
+    plt.title(model.replace("_", "-").upper())
     plt.xlabel("time steps", fontsize=20)
     plt.ylabel("average rank", fontsize=15)
     # plt.xticks(thresholds, [f"{int(xi * 100)}%" for xi in thresholds])

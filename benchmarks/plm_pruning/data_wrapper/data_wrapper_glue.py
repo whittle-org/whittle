@@ -69,8 +69,7 @@ class Glue(DataWrapper):
 
         if self.data_args.task_name in ["sst2", "qqp", "qnli", "mnli"]:
             valid_dataset = Subset(
-                valid_dataset,
-                np.random.choice(len(valid_dataset), 2048).tolist(),
+                valid_dataset, np.random.choice(len(valid_dataset), 2048).tolist()
             )
 
         return train_dataset, valid_dataset, test_dataset

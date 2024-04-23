@@ -86,7 +86,7 @@ load_dataset_routines = {
     "standard_nas": partial(
         load_standard_nas_data,
         # method="local_search_upper_bound",
-        method='moasha',
+        method="moasha",
         search_space="small",
         epochs=epochs,
     ),

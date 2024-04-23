@@ -14,11 +14,7 @@ import logging
 
 from torch.utils.data import DataLoader
 
-from transformers import (
-    AutoTokenizer,
-    DataCollatorWithPadding,
-    default_data_collator,
-)
+from transformers import AutoTokenizer, DataCollatorWithPadding, default_data_collator
 
 
 logger = logging.getLogger(__name__)

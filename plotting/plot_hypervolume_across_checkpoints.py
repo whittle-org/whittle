@@ -39,10 +39,17 @@ config = {
     "kd": {"label": "inplace-kd", "random_sub_nets": 2},
     "one_shot": {"label": "full", "random_sub_nets": 2},
     "ats": {"label": "ats", "random_sub_nets": 2},
-
 }
 marker = ["o", "x", "s", "d", "p", "P", "^", "v", "<", ">"]
-checkpoint_names = ["standard", "random", "linear_random", "sandwich", "one_shot", "kd", 'ats']
+checkpoint_names = [
+    "standard",
+    "random",
+    "linear_random",
+    "sandwich",
+    "one_shot",
+    "kd",
+    "ats",
+]
 for dataset, df_benchmark in df.groupby("dataset"):
     plt.figure(dpi=200)
     # checkpoint_names, vals, xs = [], [], []
@@ -66,18 +73,13 @@ for dataset, df_benchmark in df.groupby("dataset"):
     palette = [f"C{i}" for i in range(len(checkpoint_names))]
     for x, val, c in zip(xs, vals, palette):
         plt.scatter(x, val, alpha=0.4, color=c)
-    plt.xticks(
-        np.arange(1, 1 + len(checkpoint_names)),
-        labels,
-        fontsize=15,
-    )
+    plt.xticks(np.arange(1, 1 + len(checkpoint_names)), labels, fontsize=15)
     plt.ylabel("hypervolume", fontsize=20)
 
     plt.title(f"{dataset.upper()}", fontsize=20)
     plt.xlabel("super-network training strategy", fontsize=20)
     plt.grid(linewidth="1", alpha=0.4)
     plt.savefig(
-        f"./figures/hypervolume_checkpoints_{dataset}_{model}.pdf",
-        bbox_inches="tight",
+        f"./figures/hypervolume_checkpoints_{dataset}_{model}.pdf", bbox_inches="tight"
     )
     plt.show()

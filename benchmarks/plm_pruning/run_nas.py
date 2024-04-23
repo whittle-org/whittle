@@ -96,9 +96,7 @@ if __name__ == "__main__":
     valid_error = []
     configs = []
 
-    model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_name,
-    )
+    model = AutoModelForSequenceClassification.from_pretrained(args.model_name)
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     for trial, trial_df in df.groupby("trial_id"):

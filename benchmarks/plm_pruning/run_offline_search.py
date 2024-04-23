@@ -121,7 +121,7 @@ def main():
     # Set seed before initializing model.
 
     if int(training_args.seed) == -1:
-        training_args.seed = np.random.randint(2**32 - 1)
+        training_args.seed = np.random.randint(2 ** 32 - 1)
     set_seed(training_args.seed)
 
     model_type = parse_model_name(model_args)

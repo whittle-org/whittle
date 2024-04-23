@@ -14,11 +14,7 @@ import torch
 import numpy as np
 
 
-def mac_per_head(
-    seq_len,
-    hidden_size,
-    attention_head_size,
-):
+def mac_per_head(seq_len, hidden_size, attention_head_size):
     per_head_qkv = lambda seq_len: 3 * seq_len * hidden_size * attention_head_size
     per_head_attn = lambda seq_len: 2 * seq_len * seq_len * attention_head_size
     per_head_output = lambda seq_len: seq_len * attention_head_size * hidden_size
@@ -83,8 +79,9 @@ def compute_parameters(dmodel, dhead, num_heads_per_layer, num_neurons_per_layer
 
 def compute_latency(model, tokenizer, batch, device):
     # train_dataset[0][sentence1_key],
-    starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(
-        enable_timing=True
+    starter, ender = (
+        torch.cuda.Event(enable_timing=True),
+        torch.cuda.Event(enable_timing=True),
     )
     repetitions = 300
     timings = np.zeros((repetitions, 1))

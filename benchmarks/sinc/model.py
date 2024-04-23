@@ -5,9 +5,7 @@ from syne_tune.config_space import randint
 
 from lobotomy.modules import Linear
 
-search_space = {
-    'num_units':  randint(1, 512),
-}
+search_space = {"num_units": randint(1, 512)}
 
 
 class MLP(nn.Module):
@@ -29,8 +27,8 @@ class MLP(nn.Module):
         return x_
 
     def select_sub_network(self, config):
-        self.hidden_layer.set_sub_network(self.hidden_dim, config['num_units'])
-        self.output_layer.set_sub_network(config['num_units'], 1)
+        self.hidden_layer.set_sub_network(self.hidden_dim, config["num_units"])
+        self.output_layer.set_sub_network(config["num_units"], 1)
 
     def reset_super_network(self):
         self.hidden_layer.reset_super_network()

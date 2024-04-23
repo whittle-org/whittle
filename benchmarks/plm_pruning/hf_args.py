@@ -68,8 +68,7 @@ class DataTrainingArguments:
         },
     )
     dataset_seed: int = field(
-        default=128,
-        metadata={"help": "Seed for the dataset sampling"},
+        default=128, metadata={"help": "Seed for the dataset sampling"}
     )
     overwrite_cache: bool = field(
         default=False,

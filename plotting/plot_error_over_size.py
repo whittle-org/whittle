@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from parse_data.load_distillation import load_distillation
 
 
-data = pandas.read_csv('./parse_data/data_relative_to_model_size.csv')
-suffix = ''
+data = pandas.read_csv("./parse_data/data_relative_to_model_size.csv")
+suffix = ""
 # data = pandas.read_csv('./parse_data/data_relative_to_model_size_standard_nas.csv')
 # suffix = "_standard_nas"
 # data = pandas.read_csv("./parse_data/data_relative_to_model_size_ws_nas.csv")
@@ -14,7 +14,7 @@ suffix = ''
 num_runs = 10
 epochs = 5
 # model = "bert-base-cased"
-model = 'roberta-base'
+model = "roberta-base"
 # model = 'gpt2'
 data = data[data["model"] == model]
 
@@ -24,8 +24,8 @@ data_unpruned = data_unpruned[data_unpruned["model"] == model]
 
 plot_distillation = False
 
-colors = ["C0", "C1", "C2", "C3", "C4", "C5", 'C6', "C7"]
-marker = ['x', 'o', 'D', 's', 'v', '^']
+colors = ["C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7"]
+marker = ["x", "o", "D", "s", "v", "^"]
 ylims = {
     # "mrpc": (0.07, 0.25),
     # "stsb": (0.05, 0.5),
@@ -39,11 +39,11 @@ ylims = {
     "qqp": (0.5, 0.9),
 }
 labels = {
-    'hp': 'HP',
-    'ld': 'LD',
-    'nas': 'WS-NAS',
-    'standard_nas': 'S-NAS',
-    'rfp': 'RFP'
+    "hp": "HP",
+    "ld": "LD",
+    "nas": "WS-NAS",
+    "standard_nas": "S-NAS",
+    "rfp": "RFP",
 }
 for dataset, df_data in data.groupby("dataset"):
     for runtime, df_runtime in df_data.groupby("runtime"):
@@ -85,24 +85,24 @@ for dataset, df_data in data.groupby("dataset"):
             #                  color=colors[i])
 
         if plot_distillation:
-            mean_loss, std_loss, relative_parameters, distillation_model = load_distillation(dataset, model, num_runs, epochs)
+            mean_loss, std_loss, relative_parameters, distillation_model = load_distillation(
+                dataset, model, num_runs, epochs
+            )
             plt.errorbar(
                 relative_parameters,
                 1 - mean_loss,
                 yerr=std_loss,
-                marker='D',
+                marker="D",
                 markersize=8,
                 label=distillation_model,
-                color='black',
+                color="black",
                 linestyle="--",
             )
         # plt.xscale('log')
         plt.grid(linewidth="1", alpha=0.4)
         plt.legend(loc=3)
 
-        sub_data_unpruned = data_unpruned.query(
-            f"dataset == '{dataset}'"
-        )
+        sub_data_unpruned = data_unpruned.query(f"dataset == '{dataset}'")
         y_star = 1 - np.mean(sub_data_unpruned["test_error"])
         plt.axhline(y_star, linestyle="--", color="black", alpha=0.5)
         plt.axhline(0.95 * y_star, linestyle="--", color="black", alpha=0.3)
