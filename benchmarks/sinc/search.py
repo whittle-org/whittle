@@ -10,12 +10,8 @@
 # on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
 # express or implied. See the License for the specific language governing
 # permissions and limitations under the License.
-import os
-
 import numpy as np
-import json
 import torch
-import torch.nn as nn
 import matplotlib.pyplot as plt
 
 from argparse import ArgumentParser
@@ -27,7 +23,8 @@ from lobotomy.search import multi_objective_search
 from lobotomy.estimate_efficency import compute_mac_linear_layer
 
 from sinc_nas import validate, f
-from model import MLP, select_sub_network, search_space
+from model import MLP, search_space
+
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -45,12 +42,9 @@ if __name__ == "__main__":
     rng = np.random.RandomState(42)
     num_data_points = 500
     x = rng.rand(num_data_points)
-    print(x[:10])
     y = f(x)
 
     data = np.empty((num_data_points, 2))
-    # data[:, 0] = (x - np.mean(x)) / np.std(x)
-    # data[:, 1] = (y - np.mean(y)) / np.std(y)
     data[:, 0] = x
     data[:, 1] = y
 
@@ -73,9 +67,8 @@ if __name__ == "__main__":
     model.eval()
 
     def objective(config):
-        handle = select_sub_network(model, config)
+        model.select_sub_network(config)
         loss = validate(model, valid_dataloader, device)
-        handle.remove()
 
         mac = 0
         mac += compute_mac_linear_layer(
@@ -88,27 +81,20 @@ if __name__ == "__main__":
             model.output_layer.in_features, model.output_layer.out_features
         )
 
+        model.reset_super_network()
+
         return mac, loss
 
     results = multi_objective_search(objective, search_space, objective_kwargs={})
 
-    print(results)
     costs = np.array(results["costs"])
     plt.scatter(costs[:, 0], costs[:, 1], color="black", label="sub-networks")
 
     idx = np.array(results["is_pareto_optimal"])
     plt.scatter(costs[idx, 0], costs[idx, 1], color="red", label="Pareto optimal")
 
-    # plt.scatter(np.arange(1, num_subnets), grid)
-    # plt.title(args.training_strategy)
-    #
-    # grid = json.load(open('grid.json'))
-    # plt.scatter(grid['hidden_dim'], grid['val_loss'],
-    #             color='black', label='from-scratch')
-    #
     plt.xlabel("mac")
     plt.ylabel("Validation loss")
-    # plt.ylim(0.005, 0.08)
     plt.xscale("log")
     plt.grid(linewidth="1", alpha=0.4)
     plt.show()
