@@ -9,8 +9,7 @@ from typing import Any, Literal, Optional, Type, Union
 import torch
 from typing_extensions import Self
 
-import gpt.model
-from gpt.utils import find_multiple
+from lobotomy.models.gpt.utils import find_multiple
 
 
 @dataclass
