@@ -3,7 +3,8 @@ import torch.nn as nn
 import math
 from typing import Optional
 
-from lobotomy.models.gpt.config import Config
+from litgpt import Config
+
 from lobotomy.models.gpt.blocks.kv_cache import KVCache
 from lobotomy.modules import Linear
 
@@ -24,7 +25,6 @@ class CausalSelfAttention(nn.Module):
         self.sample_n_head = None  # type: Optional[int]
         self.sample_head_size = None  # type: Optional[int]
         self.sample_qkv_shape = None  # type: Optional[int]
-        self.device = config.device
 
     def set_sample_config(
         self, sample_embed_dim: int, sample_n_head: int, sample_bias_flag: bool

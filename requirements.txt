@@ -6,3 +6,4 @@ datasets
 evaluate
 syne-tune
 transformers[torch]
+litgpt[all]

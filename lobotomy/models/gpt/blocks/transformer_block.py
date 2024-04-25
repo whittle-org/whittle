@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 from typing import Optional
 
-from lobotomy.models.gpt.config import Config
+from litgpt import Config
+
 from lobotomy.models.gpt.blocks.causal_self_attention import CausalSelfAttention
 from lobotomy.modules.rmsnorm import RMSNorm
 from lobotomy.modules.layernorm import LayerNorm
@@ -41,13 +42,13 @@ class Block(nn.Module):
 
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
-        if self.config._norm_class == "RMSNorm":
+        if self.config.norm_class == "RMSNorm":
             return RMSNorm
         return LayerNorm
 
     def mlp_class(self):
         # `self._mlp_class` cannot be the type to keep the config json serializable
-        if self.config._mlp_class == "LLaMAMLP":
+        if self.config.mlp_class == "LLaMAMLP":
             return LLaMAMLP
         return GptNeoxMLP
 

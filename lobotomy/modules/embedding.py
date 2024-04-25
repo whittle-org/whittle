@@ -1,21 +1,24 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
+from typing import Optional
 
-class SuperEmbedding(torch.nn.Embedding):
-    def __init__(self, vocab_size: int, super_embed_dim: int):
-        super().__init__(vocab_size, super_embed_dim)
 
-        # the largest embed dim
-        self.vocab_size = vocab_size
-        self.super_embed_dim = super_embed_dim
+class Embedding(torch.nn.Embedding):
+    def __init__(self, num_embeddings: int, embedding_dim: int, padding_idx: Optional[int] = None,
+                 max_norm: Optional[float] = None, norm_type: float = 2., scale_grad_by_freq: bool = False,
+                 sparse: bool = False,
+                 device=None, dtype=None) -> None:
+        super().__init__(num_embeddings, embedding_dim, padding_idx, max_norm, norm_type, scale_grad_by_freq, sparse, device, dtype)
 
-        # the current sampled embed dim
-        self.sample_embed_dim = None
+        # the embedding dimensionality of the current sub-network
+        self.sub_network_embedding_dim = None
 
-    def set_sample_config(self, sample_embed_dim: int):
-        self.sample_embed_dim = sample_embed_dim
+    def set_sub_network(self, sub_network_embedding_dim: int):
+        self.sub_network_embedding_dim = sub_network_embedding_dim
+
+    def reset_super_network(self):
+        self.sub_network_embedding_dim = self.embedding_dim
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return F.embedding(

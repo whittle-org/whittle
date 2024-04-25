@@ -11,11 +11,12 @@ from typing_extensions import Self
 import torch
 import torch.nn as nn
 
-from lobotomy.models.gpt.config import Config
+from litgpt import Config
+
 from lobotomy.models.gpt.blocks import Block
-from lobotomy.modules.embedding import SuperEmbedding
+from lobotomy.modules.embedding import Embedding
 from lobotomy.modules.rotary_embedding import SuperRotaryEmbedding
-from lobotomy.modules.lmhead import LMHead
+from lobotomy.modules.linear import Linear
 from lobotomy.modules.rmsnorm import RMSNorm
 from lobotomy.modules.layernorm import LayerNorm
 
@@ -26,7 +27,7 @@ class GPT(nn.Module):
         assert config.padded_vocab_size is not None
         self.config = config
 
-        self.lm_head = LMHead(
+        self.lm_head = Linear(
             config.n_embd, config.padded_vocab_size, config.lm_head_bias
         )
         self.rotary_embeddings = [
@@ -36,7 +37,7 @@ class GPT(nn.Module):
         self.rotary_dummy = SuperRotaryEmbedding(config, config.block_size)
         self.transformer = nn.ModuleDict(
             dict(
-                wte=SuperEmbedding(config.padded_vocab_size, config.n_embd),
+                wte=Embedding(config.padded_vocab_size, config.n_embd),
                 h=nn.ModuleList(
                     Block(config, self.rotary_embeddings[i])
                     for i in range(config.n_layer)
@@ -56,7 +57,7 @@ class GPT(nn.Module):
     @property
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
-        if self.config._norm_class == "RMSNorm":
+        if self.config.norm_class == "RMSNorm":
 
             return RMSNorm
         return LayerNorm
@@ -163,10 +164,7 @@ class GPT(nn.Module):
 
     def set_kv_cache(
         self,
-        batch_size: int,
-        rope_cache_length: Optional[int] = None,
         device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
     ) -> None:
         """if rope_cache_length is None:
             rope_cache_length = self.cos.size(-1)
