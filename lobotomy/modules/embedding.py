@@ -23,7 +23,7 @@ class Embedding(torch.nn.Embedding):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return F.embedding(
             x,
-            self.weight[:, : self.sample_embed_dim],
+            self.weight[:, : self.sub_network_embedding_dim],
             self.padding_idx,
             self.max_norm,
             self.norm_type,
