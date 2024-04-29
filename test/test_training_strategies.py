@@ -1,16 +1,15 @@
 import pytest
-import numpy as np
 import torch.nn as nn
 import torch.nn.functional
 
 from syne_tune.config_space import randint
 
-from lobotomy.training_strategies import SandwichStrategy
+from lobotomy.training_strategies import SandwichStrategy, RandomStrategy, StandardStrategy
 from lobotomy.sampling.random_sampler import RandomSampler
 from lobotomy.modules.linear import Linear
 
 
-methods = [SandwichStrategy]
+methods = [SandwichStrategy, RandomStrategy, StandardStrategy]
 
 search_space = {"num_units": randint(1, 64)}
 
