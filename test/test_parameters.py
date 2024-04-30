@@ -1,10 +1,9 @@
-from transformers.models.bert import BertModel
-
 from lobotomy.metrics.parameters import compute_parameters
+
+from test.test_training_strategies import MLP
 
 
 def test_compute_parameters():
-    model_type = "bert-base-cased"
-    model = BertModel.from_pretrained(model_type)
+    model = MLP(8)
 
-    assert compute_parameters(model) == 108211810
+    assert compute_parameters(model) == 641
