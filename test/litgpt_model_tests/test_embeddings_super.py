@@ -1,16 +1,16 @@
-from gpt.super_modules.rotary_embedding import SuperRotaryEmbedding
-from gpt.super_modules.embedding_super import SuperEmbedding
-from gpt.config import Config
+from lobotomy.models.litgpt.super_layers.rotary_embedding import SuperRotaryEmbedding
+from lobotomy.models.litgpt.super_layers.embedding_super import SuperEmbedding
+from lobotomy.models.litgpt.config import Config
 import torch
 
 
 super_embed_dim = 1024
-sample_embed_dim = [512, 256]
+sample_embed_dim = [1024, 512, 256]
 sample_heads = [2, 4]
 max_seq_len = 1000
 vocab_size = 500
 n_layer = 2
-n_head = 2
+n_head = 4
 n_embd = 1024
 block_size = 100
 model_args = dict(n_layer=n_layer, n_head=n_head, n_embd=n_embd, block_size=block_size,
@@ -30,7 +30,7 @@ for emb in sample_embed_dim:
 for heads in sample_heads:
     for emb in sample_embed_dim:
         rotary_embed_super.set_sample_config(emb, heads)
-        head_size = emb // heads
+        head_size = super_embed_dim//max(sample_heads)
         x = torch.ones(1, max_seq_len, head_size)
         cos, sin = rotary_embed_super.rope_cache()
         y = rotary_embed_super.apply_rope(x[...,:int(head_size*config.rotary_percentage)], cos, sin)
