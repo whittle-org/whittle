@@ -13,11 +13,11 @@ import torch
 import torch.nn as nn
 from typing_extensions import Self
 
-from models.litgpt.config import Config
-from models.litgpt.super_modules.block import Block
-from models.litgpt.super_layers.embedding_super import SuperEmbedding
-from models.litgpt.super_layers.rotary_embedding import SuperRotaryEmbedding
-from models.litgpt.super_layers.lmhead_super import LMHeadSuper
+from lobotomy.models.litgpt.config import Config
+from lobotomy.models.litgpt.super_modules.block import Block
+from lobotomy.models.litgpt.super_layers.embedding_super import SuperEmbedding
+from lobotomy.models.litgpt.super_layers.rotary_embedding import SuperRotaryEmbedding
+from lobotomy.models.litgpt.super_layers.lmhead_super import LMHeadSuper
 
 
 class GPT(nn.Module):

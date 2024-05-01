@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from typing import Optional
-from models.litgpt.config import Config
+from lobotomy.models.litgpt.config import Config
 
 class GptNeoxMLP(nn.Module):
     def __init__(self, config: Config) -> None:

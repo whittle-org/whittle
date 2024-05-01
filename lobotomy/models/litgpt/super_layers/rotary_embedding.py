@@ -35,10 +35,7 @@ class SuperRotaryEmbedding(nn.Module):
         )
     
     def set_sample_config(self, sample_embed_dim: int, sample_num_heads) -> None:
-        if self.config.fix_head_size:
-           self.sample_head_size = self.config.head_size
-        else:
-           self.sample_head_size = sample_embed_dim // sample_num_heads
+        self.sample_head_size = self.config.head_size
 
 
     def apply_rope(self, x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:

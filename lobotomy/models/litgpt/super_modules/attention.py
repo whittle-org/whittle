@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
-from litgpt.config import Config
+from lobotomy.models.litgpt.config import Config
 from typing import Optional
 import math
-from litgpt.modules.kv_cache import KVCache
-from litgpt.super_layers.linear_super import SuperLinear
+from lobotomy.models.litgpt.modules.kv_cache import KVCache
+from lobotomy.models.litgpt.super_layers.linear_super import SuperLinear
 
 class CausalSelfAttention(nn.Module):
     def __init__(self, config: Config, rotary_emb: nn.Module) -> None:
@@ -36,13 +36,13 @@ class CausalSelfAttention(nn.Module):
            self.sample_head_size = self.config.head_size
            self.sample_qkv_shape = (self.sample_n_head + 2 * self.sample_n_query_groups) * self.sample_head_size
         else:
-           self.sample_head_size = self.sample_embed_dim // self.sample_n_head
+           self.sample_head_size = self.config.n_embd// self.sample_n_head
            self.sample_qkv_shape = (self.config.n_head + 2 * self.config.n_query_groups) * self.config.head_size
         
         #print(self.sample_qkv_shape)
         self.attn.set_sample_config(sample_embed_dim, self.sample_qkv_shape)
         self.proj.set_sample_config(self.sample_head_size*self.sample_n_head, sample_embed_dim)
-        self.rotary_embedding.set_sample_config(sample_embed_dim, sample_n_head)
+        self.rotary_embedding.set_sample_config(self.config.n_embd, sample_n_head)
         self.cos, self.sin = self.reset_parameters(device=self.device)
 
     def reset_parameters(self, device="cuda") -> None:
@@ -95,17 +95,22 @@ class CausalSelfAttention(nn.Module):
             k = k.reshape(B, -1, T, self.sample_head_size)
             v = v.reshape(B, -1, T, self.sample_head_size)
         else:
-            sample_q_per_kv = self.sample_head_size // self.config.head_size
+            sample_q_per_kv = self.sample_n_head // self.sample_n_query_groups
+            #print(q.shape)
             q = q[:,:self.sample_n_query_groups,:sample_q_per_kv,:,:]
             q = q.reshape(B, -1, T, self.config.head_size)  # (B, nh_q, T, hs)
             k = k[:,:self.sample_n_query_groups,:,:,:]
             k = k.reshape(B, -1, T, self.config.head_size)  # (B, nh_k, T, hs)
             v = v[:,:self.sample_n_query_groups,:,:,:]
             v = v.reshape(B, -1, T, self.config.head_size)  # (B, nh_v, T, hs)
-            v = torch.nn.functional.pad(v[:,:,:,:self.n_embed//self.sampled_num_heads],(0,abs(self.config.head_size-self.sample_head_size)))
+            v = torch.nn.functional.pad(v,(0,abs(self.config.head_size-self.sample_head_size)))
+            #print(q.shape)
+            #print(k.shape)
+            #print(v.shape)
         if self.config.fix_head_size:
             rope_n_elem = int(self.sample_head_size * self.config.rotary_percentage)
         else:
+            #print(self.config.head_size)
             rope_n_elem = int(self.config.head_size * self.config.rotary_percentage)
         q_roped = self.rotary_embedding.apply_rope(q[..., :rope_n_elem], cos, sin)
         k_roped = self.rotary_embedding.apply_rope(k[..., :rope_n_elem], cos, sin)
@@ -118,9 +123,11 @@ class CausalSelfAttention(nn.Module):
             k, v = self.kv_cache(input_pos, k, v)
 
         y = self.scaled_dot_product_attention(q, k, v, mask)
-
+        #print(y.shape)
+        #print(self.sample_n_head)
+        #print(self.sample_head_size)
         y = y.reshape(B, T, self.sample_head_size * self.sample_n_head)  # re-assemble all head outputs side by side
-
+        #print("Y",y.shape)
         # output projection
         return self.proj(y)
 

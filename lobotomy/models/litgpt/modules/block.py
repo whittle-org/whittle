@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
-from models.litgpt.config import Config
+from lobotomy.models.litgpt.config import Config
 from typing import Optional
-from models.litgpt.modules.attention import CausalSelfAttention
+from lobotomy.models.litgpt.modules.attention import CausalSelfAttention
 
 class Block(nn.Module):
     def __init__(self, config: Config) -> None:

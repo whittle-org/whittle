@@ -8,11 +8,7 @@ from typing import Any, Literal, Optional, Type, Union
 import torch
 import yaml
 from typing_extensions import Self
-
-import litgpt.model
-from litgpt.utils import find_multiple
-from litgpt.modules.mlp import GptNeoxMLP, LLaMAMLP, GemmaMLP, LLaMAMoE
-from litgpt.modules.norm import RMSNorm
+from lobotomy.models.litgpt.utils import find_multiple
 @dataclass
 class Config:
     name: str = ""
@@ -129,6 +125,7 @@ class Config:
 
     @property
     def mlp_class(self) -> Type:
+        from lobotomy.models.litgpt.modules.mlp import GptNeoxMLP, LLaMAMLP, GemmaMLP, LLaMAMoE
         # `self.mlp_class_name` cannot be the type to keep the config serializable
         if self.mlp_class_name == "GptNeoxMLP":
             return GptNeoxMLP
