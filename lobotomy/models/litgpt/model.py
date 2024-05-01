@@ -49,9 +49,9 @@ class GPT(nn.Module):
     @property
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
-        from models.litgpt.super_layers.rmsnorm_super import RMSNormSuper
-        from models.litgpt.super_layers.layernorm_super import LayerNormSuper
-        if self.config._norm_class == "RMSNorm":
+        from lobotomy.models.litgpt.super_layers.rmsnorm_super import RMSNormSuper
+        from lobotomy.models.litgpt.super_layers.layernorm_super import LayerNormSuper
+        if self.config.norm_class_name == "RMSNorm":
 
             return RMSNormSuper
         return LayerNormSuper

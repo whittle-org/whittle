@@ -1,12 +1,13 @@
 import torch
 import torch.nn as nn
-from models.litgpt.config import Config
+from lobotomy.models.litgpt.config import Config
 from typing import Optional
-from models.litgpt.super_modules.attention import CausalSelfAttention
+from lobotomy.models.litgpt.super_modules.attention import CausalSelfAttention
 
 class Block(nn.Module):
     def __init__(self, config: Config, rotary_emb: nn.Module) -> None:
         super().__init__()
+        self.config = config
         if not config.parallel_residual and config.shared_attention_norm:
             raise NotImplementedError(
                 "No checkpoint amongst the ones we support uses this configuration"
@@ -18,25 +19,25 @@ class Block(nn.Module):
         self.norm_2 = None if config.shared_attention_norm else self.norm_class()(config.n_embd, eps=config.norm_eps)
         self.mlp = self.mlp_class()(config)
 
-        self.config = config
+        
 
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
-        from models.litgpt.super_layers.rmsnorm_super import RMSNormSuper
-        from models.litgpt.super_layers.layernorm_super import LayerNormSuper
-        if self.config._norm_class == "RMSNorm":
+        from lobotomy.models.litgpt.super_layers.rmsnorm_super import RMSNormSuper
+        from lobotomy.models.litgpt.super_layers.layernorm_super import LayerNormSuper
+        if self.config.norm_class_name == "RMSNorm":
 
             return RMSNormSuper
         return LayerNormSuper    
 
     def mlp_class(self):
         # `self._mlp_class` cannot be the type to keep the config json serializable
-        from models.litgpt.super_modules.mlp import GptNeoxMLP, LLaMAMLP, GemmaMLP
-        if self.config._mlp_class == "LLaMAMLP":
+        from lobotomy.models.litgpt.super_modules.mlp import GptNeoxMLP, LLaMAMLP, GemmaMLP
+        if self.config.mlp_class_name == "LLaMAMLP":
             return LLaMAMLP
-        elif self.config._mlp_class == "GemmaMLP":
+        elif self.config.mlp_class_name == "GemmaMLP":
             return GemmaMLP
-        elif self.config._mlp_class == "GptNeoxMLP":
+        elif self.config.mlp_class_name == "GptNeoxMLP":
             return GptNeoxMLP
         else:
             raise ValueError(f"Unknown MLP class: {self.config._mlp_class}")

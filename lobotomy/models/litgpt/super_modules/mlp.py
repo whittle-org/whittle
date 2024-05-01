@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from typing import Any, Optional, Tuple
-from models.litgpt.config import Config
-from models.litgpt.super_layers.linear_super import SuperLinear
+from lobotomy.models.litgpt.config import Config
+from lobotomy.models.litgpt.super_layers.linear_super import SuperLinear
 
 
 class GptNeoxMLP(nn.Module):

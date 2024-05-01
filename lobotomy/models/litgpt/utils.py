@@ -23,6 +23,8 @@ from lightning.fabric.utilities.load import _lazy_load as lazy_load
 from lightning.pytorch.loggers import WandbLogger
 from torch.serialization import normalize_storage_type
 from typing_extensions import Self
+import random
+import numpy as np
 
 if TYPE_CHECKING:
     from litgpt import GPT, Config
@@ -480,3 +482,150 @@ def choose_logger(
     if logger_name == "wandb":
         return WandbLogger(project=name, resume=resume, **kwargs)
     raise ValueError(f"`--logger_name={logger_name}` is not a valid option. Choose from 'csv', 'tensorboard', 'wandb'.")
+
+
+
+def sample_config(choices_dict: dict, layer_sampling_scheme: str = "normal", seed:int = 0) -> dict:
+    """Sample a configuration from a dictionary of choices.
+
+    Args:
+        choices_dict: a dictionary of choices for each architectural dimension
+
+    Returns:
+        a dictionary with the same keys as `choices_dict` and the sampled choices
+    """
+    sampled_dict = {}
+    r = random.Random(seed)
+    # sample embed dim -> held constant throughout transformer
+    sampled_dict['sample_embed_dim'] = r.choice(choices_dict['embed_dim_choices'])
+    # sample number of layers 
+    sampled_dict['sample_n_layer'] =  r.choice(choices_dict['n_layer_choices'])
+    # sample layer indices 
+    max_layer = max(choices_dict['n_layer_choices'])
+    sampled_dict['sample_layer_indices'] = []
+    if layer_sampling_scheme == "normal":
+        sampled_dict['sample_layer_indices'] = list(range(sampled_dict['sample_n_layer']))
+    elif layer_sampling_scheme == "strided":
+     if sampled_dict["sample_n_layer"] == max_layer:
+        sampled_dict['sample_layer_indices'] = list(range(sampled_dict['sample_n_layer']))
+     elif sampled_dict["sample_n_layer"] == max_layer - 1:
+        sampled_dict['sample_layer_indices'] = list(range(sampled_dict['sample_n_layer']))
+        sampled_dict['sample_layer_indices'][-1] = max_layer - 1
+     else:
+        increment_floor = max_layer // sampled_dict['sample_n_layer']
+        increment_ceil = int(np.ceil(max_layer / sampled_dict['sample_n_layer']))
+        sampled_dict['sample_layer_indices'] = [0 for _ in range(sampled_dict['sample_n_layer'])]
+        counter_layer = 0
+        for i in range(sampled_dict['sample_n_layer']):
+            if counter_layer < (max_layer//2):
+               sampled_dict['sample_layer_indices'][i] = counter_layer
+               counter_layer += increment_ceil
+            else:
+               sampled_dict['sample_layer_indices'][i] = counter_layer
+               counter_layer += increment_floor
+
+        sampled_dict['sample_layer_indices'][0] = 0
+        sampled_dict['sample_layer_indices'][-1] = max_layer - 1
+
+    # sample number of heads
+    sampled_dict['sample_n_head'] = [r.choice(choices_dict['n_head_choices']) for _ in range(max_layer)]
+    # sample mlp ratio
+    sampled_dict['sample_mlp_ratio'] = [r.choice(choices_dict['mlp_ratio_choices']) for _ in range(max_layer)]
+    # sample bias
+    sampled_dict['sample_bias'] = r.choice(choices_dict['bias_choices'])
+
+    return sampled_dict
+
+def sample_config_max(choices_dict: dict, layer_sampling_scheme: str = "normal") -> dict:
+    """Sample a configuration from a dictionary of choices.
+
+    Args:
+        choices_dict: a dictionary of choices for each architectural dimension
+
+    Returns:
+        a dictionary with the same keys as `choices_dict` and the sampled choices
+    """
+    sampled_dict = {}
+    # sample embed dim -> held constant throughout transformer
+    sampled_dict['sample_embed_dim'] = max(choices_dict['embed_dim_choices'])
+    # sample number of layers 
+    sampled_dict['sample_n_layer'] =  max(choices_dict['n_layer_choices'])
+    # sample layer indices 
+    max_layer = max(choices_dict['n_layer_choices'])
+    sampled_dict['sample_layer_indices'] = []
+    sampled_dict['sample_layer_indices'] = list(range(sampled_dict['sample_n_layer']))
+    # sample number of heads
+    sampled_dict['sample_n_head'] = [max(choices_dict['n_head_choices']) for _ in range(max_layer)]
+    # sample mlp ratio
+    sampled_dict['sample_mlp_ratio'] = [max(choices_dict['mlp_ratio_choices']) for _ in range(max_layer)]
+    # sample bias
+    sampled_dict['sample_bias'] = True
+
+    return sampled_dict
+
+
+
+def sample_config_min(choices_dict: dict, layer_sampling_scheme: str = "normal") -> dict:
+    """Sample a configuration from a dictionary of choices.
+
+    Args:
+        choices_dict: a dictionary of choices for each architectural dimension
+
+    Returns:
+        a dictionary with the same keys as `choices_dict` and the sampled choices
+    """
+    sampled_dict = {}
+    # sample embed dim -> held constant throughout transformer
+    sampled_dict['sample_embed_dim'] = min(choices_dict['embed_dim_choices'])
+    # sample number of layers 
+    sampled_dict['sample_n_layer'] =  min(choices_dict['n_layer_choices'])
+    # sample layer indices 
+    max_layer = min(choices_dict['n_layer_choices'])
+    sampled_dict['sample_layer_indices'] = []
+    sampled_dict['sample_layer_indices'] = list(range(sampled_dict['sample_n_layer']))
+
+    
+
+
+
+    # sample number of heads
+    sampled_dict['sample_n_head'] = [min(choices_dict['n_head_choices']) for _ in range(max_layer)]
+    # sample mlp ratio
+    sampled_dict['sample_mlp_ratio'] = [min(choices_dict['mlp_ratio_choices']) for _ in range(max_layer)]
+    # sample bias
+    sampled_dict['sample_bias'] = True
+
+    return sampled_dict
+
+def sample_config_mid(choices_dict: dict, layer_sampling_scheme: str = "normal") -> dict:
+    """Sample a configuration from a dictionary of choices.
+
+    Args:
+        choices_dict: a dictionary of choices for each architectural dimension
+
+    Returns:
+        a dictionary with the same keys as `choices_dict` and the sampled choices
+    """
+    sampled_dict = {}
+    # sample embed dim -> held constant throughout transformer
+    sampled_dict['sample_embed_dim'] = choices_dict['embed_dim_choices'][1]
+    # sample number of layers 
+    sampled_dict['sample_n_layer'] =  choices_dict['n_layer_choices'][1]
+    # sample layer indices 
+    max_layer = choices_dict['n_layer_choices'][1]
+    sampled_dict['sample_layer_indices'] = []
+    sampled_dict['sample_layer_indices'] = list(range(sampled_dict['sample_n_layer']))
+
+    
+
+
+
+    # sample number of heads
+    sampled_dict['sample_n_head'] = [choices_dict['n_head_choices'][1] for _ in range(max_layer)]
+    # sample mlp ratio
+    sampled_dict['sample_mlp_ratio'] = [choices_dict['mlp_ratio_choices'][1] for _ in range(max_layer)]
+    # sample bias
+    sampled_dict['sample_bias'] = True
+
+    return sampled_dict
+

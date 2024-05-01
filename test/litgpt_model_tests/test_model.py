@@ -1,13 +1,13 @@
-from gpt.model import GPT
-from gpt.config import Config
+from lobotomy.models.litgpt.model import GPT
+from lobotomy.models.litgpt.config import Config
 import torch 
 import torch.nn as nn
 import numpy as np
-from gpt.utils import *
+from lobotomy.models.litgpt.utils import *
 sample_embed_dim = [512, 256]
 sample_n_head = [2, 4]
 sample_mlp_ratio = [4, 2]
-sample_bias = [True, False]
+sample_bias = [False]
 n_layer = 12
 sample_layer = [1,2,3,4,5,6,7,8,9,10,11,12]
 n_head = 4
@@ -27,13 +27,13 @@ choices_dict['embed_dim_choices'] = sample_embed_dim
 choices_dict['mlp_ratio_choices'] = sample_mlp_ratio
 choices_dict['bias_choices'] = sample_bias
 sampled_config = sample_config(choices_dict, layer_sampling_scheme="normal")
-gpt.set_sample_config(sampled_config["sample_embed_dim"], sampled_config["sample_mlp_ratio"]*sampled_config["sample_embed_dim"], sampled_config["sample_n_head"], sampled_config["sample_n_layer"], sampled_config["sample_bias"], sampled_config["sample_layer_indices"])
+gpt.set_sample_config(sampled_config["sample_embed_dim"], sampled_config["sample_mlp_ratio"]*sampled_config["sample_embed_dim"], sampled_config["sample_n_head"], sampled_config["sample_n_layer"], sampled_config["sample_layer_indices"])
 x = torch.randint(0, 500, (1, 100))
 y = gpt(x)
 print(y.shape)
 
 sampled_config = sample_config(choices_dict, layer_sampling_scheme="strided")
-gpt.set_sample_config(sampled_config["sample_embed_dim"], sampled_config["sample_mlp_ratio"]*sampled_config["sample_embed_dim"], sampled_config["sample_n_head"], sampled_config["sample_n_layer"], sampled_config["sample_bias"], sampled_config["sample_layer_indices"])
+gpt.set_sample_config(sampled_config["sample_embed_dim"], sampled_config["sample_mlp_ratio"]*sampled_config["sample_embed_dim"], sampled_config["sample_n_head"], sampled_config["sample_n_layer"], sampled_config["sample_layer_indices"])
 x = torch.randint(0, 500, (1, 100))
 y = gpt(x)
 print(y.shape)

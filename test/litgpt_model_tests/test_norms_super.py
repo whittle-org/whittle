@@ -1,5 +1,5 @@
-from gpt.super_modules.rmsnorm_super import RMSNormSuper
-from gpt.super_modules.layernorm_super import LayerNormSuper
+from lobotomy.models.litgpt.super_layers.rmsnorm_super import RMSNormSuper
+from lobotomy.models.litgpt.super_layers.layernorm_super import LayerNormSuper
 import torch
 
 super_embed_dim = 1024
