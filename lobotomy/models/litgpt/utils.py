@@ -485,7 +485,7 @@ def choose_logger(
 
 
 
-def sample_config(choices_dict: dict, layer_sampling_scheme: str = "normal", seed:int = 0) -> dict:
+def sample_config(choices_dict: dict, layer_sampling_scheme: str = "normal", seed:int = 0, fix_head:bool=True, fix_mlp_ratio:bool=False) -> dict:
     """Sample a configuration from a dictionary of choices.
 
     Args:
@@ -528,11 +528,18 @@ def sample_config(choices_dict: dict, layer_sampling_scheme: str = "normal", see
         sampled_dict['sample_layer_indices'][-1] = max_layer - 1
 
     # sample number of heads
-    sampled_dict['sample_n_head'] = [r.choice(choices_dict['n_head_choices']) for _ in range(max_layer)]
+    if not fix_head:
+        sampled_dict['sample_n_head'] = [r.choice(choices_dict['n_head_choices']) for _ in range(max_layer)]
+    else:
+        head_choice = r.choice(choices_dict['n_head_choices'])
+        sampled_dict['sample_n_head'] = [head_choice for _ in range(max_layer)]
     # sample mlp ratio
-    sampled_dict['sample_mlp_ratio'] = [r.choice(choices_dict['mlp_ratio_choices']) for _ in range(max_layer)]
+    if not fix_mlp_ratio:
+       sampled_dict['sample_mlp_ratio'] = [r.choice(choices_dict['mlp_ratio_choices']) for _ in range(max_layer)]
+    else:
+       mlp_ratio_choice = r.choice(choices_dict['mlp_ratio_choices'])
+       sampled_dict['sample_mlp_ratio'] = [mlp_ratio_choice for _ in range(max_layer)]
     # sample bias
-    sampled_dict['sample_bias'] = r.choice(choices_dict['bias_choices'])
 
     return sampled_dict
 
@@ -559,7 +566,6 @@ def sample_config_max(choices_dict: dict, layer_sampling_scheme: str = "normal")
     # sample mlp ratio
     sampled_dict['sample_mlp_ratio'] = [max(choices_dict['mlp_ratio_choices']) for _ in range(max_layer)]
     # sample bias
-    sampled_dict['sample_bias'] = True
 
     return sampled_dict
 
@@ -592,9 +598,6 @@ def sample_config_min(choices_dict: dict, layer_sampling_scheme: str = "normal")
     sampled_dict['sample_n_head'] = [min(choices_dict['n_head_choices']) for _ in range(max_layer)]
     # sample mlp ratio
     sampled_dict['sample_mlp_ratio'] = [min(choices_dict['mlp_ratio_choices']) for _ in range(max_layer)]
-    # sample bias
-    sampled_dict['sample_bias'] = True
-
     return sampled_dict
 
 def sample_config_mid(choices_dict: dict, layer_sampling_scheme: str = "normal") -> dict:
@@ -625,7 +628,6 @@ def sample_config_mid(choices_dict: dict, layer_sampling_scheme: str = "normal")
     # sample mlp ratio
     sampled_dict['sample_mlp_ratio'] = [choices_dict['mlp_ratio_choices'][1] for _ in range(max_layer)]
     # sample bias
-    sampled_dict['sample_bias'] = True
 
     return sampled_dict
 
