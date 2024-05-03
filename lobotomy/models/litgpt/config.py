@@ -46,6 +46,13 @@ class Config:
     #   n_query_groups=4       n_query_groups=2      n_query_groups=1
     #
     # credit https://arxiv.org/pdf/2305.13245.pdf
+    embed_choices: list = field(default_factory=list)
+    head_choices:list = field(default_factory=list)
+    layer_choices:list = field(default_factory=list)
+    mlp_ratio_choices:list =  field(default_factory=list)
+    bias_choices:list = field(default_factory=list)
+    _norm_class: str = "LayerNorm"
+    _mlp_class: str = "GptNeoxMLP"
     n_query_groups: Optional[int] = None
     shared_attention_norm: bool = False
     norm_class_name: Literal["LayerNorm", "RMSNorm"] = "LayerNorm"
