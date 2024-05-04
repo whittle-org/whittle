@@ -19,6 +19,7 @@ class SuperLinear(nn.Linear):
         self.sample_dim_out = sample_dim_out
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        #print(self.bias)
         if self.bias is not None:
             return F.linear(x, self.weight[:self.sample_dim_out, :self.sample_dim_in], self.bias[:self.sample_dim_out])
         else:

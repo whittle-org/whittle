@@ -23,7 +23,7 @@ class CausalSelfAttention(nn.Module):
         self.sample_n_head = None # type: Optional[int]
         self.sample_head_size = None # type: Optional[int]
         self.sample_qkv_shape = None # type: Optional[int]
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = "cpu"
 
     def set_sample_config(self, sample_embed_dim:int, sample_n_head:int) -> None:
         self.sample_embed_dim = sample_embed_dim

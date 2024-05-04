@@ -43,7 +43,7 @@ class GPT(nn.Module):
         self.sample_embed_dim = None  # type: Optional[int]
         self.sample_intermediate_size = None
         self.sample_num_heads = None
-        self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
+        #self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
 
 
     @property
@@ -94,7 +94,7 @@ class GPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def set_sample_config(self, sample_embed_dim: int, sample_intermediate_size: int, sample_num_heads: int, sample_n_layer: int, sample_layer_indices: list) -> None:
+    def set_sample_config(self, sample_embed_dim: int, sample_intermediate_size: list, sample_num_heads: list, sample_n_layer: int, sample_layer_indices: list) -> None:
         self.sample_embed_dim = sample_embed_dim
         self.sample_intermediate_size = sample_intermediate_size
         self.sample_num_heads = sample_num_heads
@@ -128,12 +128,16 @@ class GPT(nn.Module):
             mask = None
 
         x = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
+        #print("Sum after wte: ", x.sum())
+        #return
         if self.config.scale_embeddings:
             x = x * (self.sample_embed_dim**0.5)
 
         for i in self.sample_layer_indices:
             block = self.transformer.h[i]
             x = block(x, mask, input_pos)
+            #print("Sum after block: ", x.sum())
+            #return
         x = self.transformer.ln_f(x)
         return self.lm_head(x)  # (b, t, vocab_size)
 

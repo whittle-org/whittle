@@ -72,12 +72,18 @@ class Block(nn.Module):
         """
 
         x_normed = self.norm_1(x)
+        #print("Sum after norm_1: ", x_normed.sum())
         attention_output = self.attn(x_normed, mask, input_pos)
+        #print("Sum after attention: ", attention_output.sum())
 
         if self.config.parallel_residual:
             x_normed = x_normed if self.config.shared_attention_norm else self.norm_2(x)
+            #print("sum after norm_2: ", x_normed.sum())
             x = self.mlp(x_normed) + attention_output + x
+            #print("Sum after mlp: ", x.sum())
         else:
             x = attention_output + x
+            #print("Sum after attention: ", x.sum())
             x = self.mlp(self.norm_2(x)) + x
+            #print("Sum after mlp: ", x.sum())
         return x

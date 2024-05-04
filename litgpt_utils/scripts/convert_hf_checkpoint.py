@@ -356,17 +356,38 @@ if __name__ == "__main__":
 
     #CLI(convert_hf_checkpoint)
     #convert_hf_checkpoint()
-    #from litgpt.model import GPT
-    #checkpoint_dir = "checkpoints/stabilityai/stablelm-base-alpha-3b"
-    #config = Config.from_file("/work/dlclarge1/sukthank-molora/LoRA4Pruning/checkpoints/stabilityai/stablelm-base-alpha-3b/model_config.yaml")
-    #model = GPT(config)
-    #model.load_state_dict(torch.load("checkpoints/stabilityai/stablelm-base-alpha-3b/lit_model.pth"))
+    # set seed
+    import torch
+    torch.manual_seed(0)
+
+    from litgpt_utils.base_model import GPT
+    config = Config.from_file("/work/dlclarge1/sukthank-molora/lobotomy/checkpoints/stabilityai/stablelm-base-alpha-3b/model_config.yaml")
+    input_ids = torch.randint(0, config.vocab_size, (1, config.block_size))#.cuda()
+    checkpoint_dir = "checkpoints/stabilityai/stablelm-base-alpha-3b"
+    
+    model = GPT(config)#.cuda()
+    model.load_state_dict(torch.load("checkpoints/stabilityai/stablelm-base-alpha-3b/lit_model.pth"))
+    # test output
+    model.eval()
+    output_lit = model(input_ids)
     
     from lobotomy.models.litgpt.model import GPT
+    from lobotomy.models.litgpt.utils import *
     #from litgpt.super_model import Config
     # pip install litgpt
     # litgpt download --repo_id stabilityai/stablelm-base-alpha-3b
     checkpoint_dir = "checkpoints/stabilityai/stablelm-base-alpha-3b"
     config = Config.from_file("supernet_configs/stabilityai/stablelm-base-alpha-3b/supernet_config.yaml")
-    model = GPT(config)
+    model = GPT(config)#.cuda()
     model.load_state_dict(torch.load("checkpoints/stabilityai/stablelm-base-alpha-3b/lit_model.pth"))
+    # test output 
+    model.eval()
+    choices_dict = {"embed_dim_choices": config.embed_choices, "n_head_choices": config.head_choices, "mlp_ratio_choices": config.mlp_ratio_choices, "n_layer_choices": config.layer_choices}
+
+    max_config = sample_config_max(choices_dict)
+    sample_intermediate_size = [max_config["sample_mlp_ratio"][i]*max_config["sample_embed_dim"] for i in range(len(max_config["sample_mlp_ratio"]))]
+    model.set_sample_config(max_config["sample_embed_dim"], sample_intermediate_size, max_config["sample_n_head"], max_config["sample_n_layer"], max_config["sample_layer_indices"])
+
+    output_lobotomy = model(input_ids)
+    print(torch.sum(output_lit - output_lobotomy))
+    assert torch.allclose(output_lit, output_lobotomy, atol=1e-4)

@@ -17,8 +17,12 @@ class GptNeoxMLP(nn.Module):
         self.proj.set_sample_config(sample_intermediate_size, sample_embed_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        #print(self.fc.sample_dim_in)
+        #print(self.fc.sample_dim_out)
         x = self.fc(x)
+        #print("after fc",torch.sum(x))
         x = torch.nn.functional.gelu(x, approximate=self.config.gelu_approximate)
+        #print("After gelu",torch.sum(x))
         return self.proj(x)
     
 
