@@ -391,3 +391,38 @@ if __name__ == "__main__":
     output_lobotomy = model(input_ids)
     print(torch.sum(output_lit - output_lobotomy))
     assert torch.allclose(output_lit, output_lobotomy, atol=1e-4)
+
+
+    # test for phi-2
+
+    from litgpt_utils.base_model import GPT
+    config = Config.from_file("/work/dlclarge1/sukthank-molora/lobotomy/checkpoints/microsoft/phi-2/model_config.yaml")
+    input_ids = torch.randint(0, config.vocab_size, (1, config.block_size))#.cuda()
+    checkpoint_dir = "checkpoints/microsoft/phi-2"
+    
+    model = GPT(config)#.cuda()
+    model.load_state_dict(torch.load("checkpoints/microsoft/phi-2/lit_model.pth"))
+    # test output
+    model.eval()
+    output_lit = model(input_ids)
+    
+    from lobotomy.models.litgpt.model import GPT
+    from lobotomy.models.litgpt.utils import *
+    #from litgpt.super_model import Config
+    # pip install litgpt
+    # litgpt download --repo_id stabilityai/stablelm-base-alpha-3b
+    checkpoint_dir = "checkpoints/microsoft/phi-2"
+    config = Config.from_file("supernet_configs/microsoft/phi-2/supernet_config.yaml")
+    model = GPT(config)#.cuda()
+    model.load_state_dict(torch.load("checkpoints/microsoft/phi-2/lit_model.pth"))
+    # test output 
+    model.eval()
+    choices_dict = {"embed_dim_choices": config.embed_choices, "n_head_choices": config.head_choices, "mlp_ratio_choices": config.mlp_ratio_choices, "n_layer_choices": config.layer_choices}
+
+    max_config = sample_config_max(choices_dict)
+    sample_intermediate_size = [max_config["sample_mlp_ratio"][i]*max_config["sample_embed_dim"] for i in range(len(max_config["sample_mlp_ratio"]))]
+    model.set_sample_config(max_config["sample_embed_dim"], sample_intermediate_size, max_config["sample_n_head"], max_config["sample_n_layer"], max_config["sample_layer_indices"])
+
+    output_lobotomy = model(input_ids)
+    print(torch.sum(output_lit - output_lobotomy))
+    assert torch.allclose(output_lit, output_lobotomy, atol=1e-4)
