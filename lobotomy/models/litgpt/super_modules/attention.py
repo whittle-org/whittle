@@ -3,7 +3,7 @@ import torch.nn as nn
 from lobotomy.models.litgpt.config import Config
 from typing import Optional
 import math
-from lobotomy.models.litgpt.modules.kv_cache import KVCache
+from litgpt_utils.base_model import KVCache
 from lobotomy.models.litgpt.super_layers.linear_super import SuperLinear
 
 class CausalSelfAttention(nn.Module):
