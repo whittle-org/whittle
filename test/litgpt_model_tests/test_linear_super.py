@@ -1,34 +1,33 @@
 import torch
-from lobotomy.models.litgpt.super_layers.linear_super import SuperLinear
+from lobotomy.modules.linear import Linear
 
 def test_linear():
 
     input_features = torch.rand(8, 64)
-    l = SuperLinear(super_dim_in=64, super_dim_out=32)
-
+    l = Linear(64, 32, bias=True)
+    l.reset_super_network()
     out = l(input_features)
     assert out.shape == (8, 32)
-    l.set_sample_config(sample_dim_in=64, sample_dim_out=16)
+    l.set_sub_network(sub_network_in_features=64, sub_network_out_features=16)
     out = l(input_features)
     assert out.shape == (8, 16)
-
-    l.set_sample_config(sample_dim_in=64, sample_dim_out=32)
+    l.set_sub_network(sub_network_in_features=64, sub_network_out_features=32)
     out = l(input_features)
     assert out.shape == (8, 32)
 
     input_small = torch.rand(8, 16)
     l.weight.data = torch.ones_like(l.weight.data)
     l.bias.data = torch.ones_like(l.bias.data)
-    l.set_sample_config(sample_dim_in=64, sample_dim_out=16)
+    l.set_sub_network(sub_network_in_features=64, sub_network_out_features=16)
     out_small = l(input_features)
-    l.set_sample_config(sample_dim_in=64, sample_dim_out=32)
+    l.set_sub_network(sub_network_in_features=64, sub_network_out_features=32)
     out_large = l(input_features)
-    l.set_sample_config(sample_dim_in=16, sample_dim_out=32)
+    l.set_sub_network(sub_network_in_features=16, sub_network_out_features=32)
     out_small_large = l(input_small)
 
     
 
-    small_layer = torch.nn.Linear(64, 16)
+    small_layer = torch.nn.Linear(64, 16, bias=True)
 
     small_layer.weight.data = torch.ones_like(small_layer.weight.data)
     small_layer.bias.data = torch.ones_like(small_layer.bias.data)

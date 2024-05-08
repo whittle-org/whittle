@@ -1,26 +1,26 @@
 import torch
 
-from lobotomy.models.litgpt.super_layers.embedding_super import SuperEmbedding
+from lobotomy.modules.embedding import Embedding
 
 
 def test_embedding():
 
     input_features = torch.randint(low=1, high=64, size=(4, 8))
-    emb = SuperEmbedding(vocab_size=64, super_embed_dim=32)
+    emb = Embedding(64, 32)
 
     out = emb(input_features)
     assert out.shape == (4, 8, 32)
-    emb.set_sample_config(16)
+    emb.set_sub_network(16)
     out = emb(input_features)
     assert out.shape == (4, 8, 16)
-    emb.set_sample_config(32)
+    emb.set_sub_network(32)
     out = emb(input_features)
     assert out.shape == (4, 8, 32)
 
     emb.weight.data = torch.ones_like(emb.weight.data)
-    emb.set_sample_config(16)
+    emb.set_sub_network(16)
     out_small = emb(input_features)
-    emb.set_sample_config(32)
+    emb.set_sub_network(32)
     out_large = emb(input_features)
 
     small_layer = torch.nn.Embedding(64, 16)

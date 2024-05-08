@@ -4,23 +4,25 @@ import torch.nn.functional as F
 
 
 class LayerNorm(torch.nn.LayerNorm):
-    def __init__(self, super_embed_dim: int, eps: float = 1e-5):
-        super().__init__(super_embed_dim)
-
-        # the largest embed dim
-        self.super_embed_dim = super_embed_dim
+    def __init__(self, in_features: int, eps: float = 1e-5):
+        super().__init__(in_features, eps)
+        self.in_features = in_features
 
         # the current sampled embed dim
-        self.sample_embed_dim = None
+        self.sub_network_in_features = None
 
-    def set_sample_config(self, sample_embed_dim: int):
-        self.sample_embed_dim = sample_embed_dim
+    def set_sub_network(self, sub_network_in_features: int):
+        self.sub_network_in_features = sub_network_in_features
+
+    def reset_super_network(self):
+        self.sub_network_in_features = self.in_features
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        assert self.sub_network_in_features is not None, "sub_network_in_features is not set"
         return F.layer_norm(
             x,
-            (self.sample_embed_dim,),
-            weight=self.weight[: self.sample_embed_dim],
-            bias=self.bias[: self.sample_embed_dim],
+            (self.sub_network_in_features,),
+            weight=self.weight[: self.sub_network_in_features],
+            bias=self.bias[: self.sub_network_in_features],
             eps=self.eps,
         )

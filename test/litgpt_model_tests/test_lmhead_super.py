@@ -1,19 +1,19 @@
 import torch
-from lobotomy.models.litgpt.super_layers.lmhead_super import LMHeadSuper
+from lobotomy.modules.linear import Linear
 
 def test_linear():
 
     input_features = torch.rand(8, 64)
-    l = LMHeadSuper(super_dim_in=64, output_dim=10, bias=True)
-
+    l = Linear(64, 10, bias=True)
+    l.reset_super_network()
     out = l(input_features)
     assert out.shape == (8, 10)
     input_features = torch.rand(8, 16)
-    l.set_sample_config(sample_dim_in=16)
+    l.set_sub_network(sub_network_in_features=16)
     out = l(input_features)
     assert out.shape == (8, 10)
 
-    l.set_sample_config(sample_dim_in=64)
+    l.set_sub_network(sub_network_in_features=64)
     input_features = torch.rand(8, 64)
     out = l(input_features)
     assert out.shape == (8, 10)
@@ -21,15 +21,15 @@ def test_linear():
 
     l.weight.data = torch.ones_like(l.weight.data)
     l.bias.data = torch.ones_like(l.bias.data)
-    l.set_sample_config(sample_dim_in=16)
+    l.set_sub_network(sub_network_in_features=16)
     input_features_small = torch.rand(8, 16)
     out_small = l(input_features_small)
     input_features_large = torch.rand(8, 64)
-    l.set_sample_config(sample_dim_in=64)
+    l.set_sub_network(sub_network_in_features=64)
     out_large = l(input_features_large)
     
 
-    small_layer = torch.nn.Linear(16, 10)
+    small_layer = torch.nn.Linear(16, 10, bias=True)
 
     small_layer.weight.data = torch.ones_like(small_layer.weight.data)
     small_layer.bias.data = torch.ones_like(small_layer.bias.data)
