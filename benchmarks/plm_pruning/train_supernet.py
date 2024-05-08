@@ -38,7 +38,16 @@ from search_spaces import (
 from benchmarks.plm_pruning.data_wrapper.task_data import GLUE_TASK_INFO
 from hf_args import DataTrainingArguments, ModelArguments, parse_model_name
 from data_wrapper import Glue, IMDB, SWAG
-from benchmarks.plm_pruning.bert import SuperNetBertForSequenceClassification
+from benchmarks.plm_pruning.bert import (
+    SuperNetBertForMultipleChoiceSMALL,
+    SuperNetBertForMultipleChoiceMEDIUM,
+    SuperNetBertForMultipleChoiceLAYER,
+    SuperNetBertForMultipleChoiceLARGE,
+    SuperNetBertForSequenceClassificationSMALL,
+    SuperNetBertForSequenceClassificationMEDIUM,
+    SuperNetBertForSequenceClassificationLAYER,
+    SuperNetBertForSequenceClassificationLARGE,
+)
 
 
 def kd_loss(
@@ -51,7 +60,7 @@ def kd_loss(
             student_logits / temperature, F.softmax(teacher_logits / temperature, dim=1)
         )
         predictive_loss = F.cross_entropy(student_logits, targets)
-        return temperature ** 2 * kd_loss + predictive_loss
+        return temperature**2 * kd_loss + predictive_loss
 
 
 search_spaces = {
@@ -60,6 +69,23 @@ search_spaces = {
     "layer": LayerSearchSpace,
     "uniform": FullSearchSpace,
     "smallpower2": partial(SmallSearchSpace, power_of_2_encoding=True),
+}
+
+model_types = {
+    "seq_classification":
+        {
+            "small": SuperNetBertForSequenceClassificationSMALL,
+            "medium": SuperNetBertForSequenceClassificationMEDIUM,
+            "layer": SuperNetBertForSequenceClassificationLAYER,
+            "uniform": SuperNetBertForSequenceClassificationLARGE,
+        },
+    "multiple_choice":
+        {
+            "small": SuperNetBertForMultipleChoiceSMALL,
+            "medium": SuperNetBertForMultipleChoiceMEDIUM,
+            "layer": SuperNetBertForMultipleChoiceLAYER,
+            "uniform": SuperNetBertForMultipleChoiceLARGE,
+        }
 }
 
 logging.basicConfig(level=logging.INFO)
@@ -111,7 +137,7 @@ def main():
 
     # Set seed before initializing model.
     if int(training_args.seed) == -1:
-        training_args.seed = np.random.randint(2 ** 32 - 1)
+        training_args.seed = np.random.randint(2**32 - 1)
     print(training_args.seed)
     set_seed(training_args.seed)
     torch.manual_seed(training_args.seed)
@@ -158,14 +184,11 @@ def main():
     )
 
     if data_args.task_name in ["swag"]:
-        pass
+        model_cls = model_types['multiple_choice'][nas_args.search_space]
     else:
-        if model_type.startswith('bert'):
-            model_cls = SuperNetBertForSequenceClassification
+        model_cls = model_types['seq_classification'][nas_args.search_space]
 
-    search_space = search_spaces[nas_args.search_space](
-        config, seed=training_args.seed
-    )
+    search_space = search_spaces[nas_args.search_space](config, seed=training_args.seed)
 
     model = model_cls.from_pretrained(
         model_type,
@@ -218,7 +241,6 @@ def main():
 
     def loss_function(labels, outputs):
         return outputs.loss
-
 
     sampler = RandomSampler(search_space.config_space, seed=training_args.seed)
     training_strategies = {

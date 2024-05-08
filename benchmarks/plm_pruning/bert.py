@@ -1,14 +1,18 @@
-from transformers.models.bert.modeling_bert import BertForSequenceClassification
+from transformers.models.bert.modeling_bert import (
+    BertForSequenceClassification,
+    BertForMultipleChoice,
+)
 
 from model_wrapper.mask import mask_bert
-from search_spaces import SmallSearchSpace
+from search_spaces import (
+    SmallSearchSpace,
+    LayerSearchSpace,
+    FullSearchSpace,
+    MediumSearchSpace,
+)
 
 
 class BERTSuperNetMixin(object):
-
-    # def __init__(self, config, search_space, add_pooling_layer=True):
-    #     super().__init__(config=config, add_pooling_layer=add_pooling_layer)
-    #     self.search_space = search_space
     search_space = None
     handles = None
 
@@ -23,13 +27,81 @@ class BERTSuperNetMixin(object):
             handle.remove()
 
 
-class BERTSuperNetMixinSMALLSpace(BERTSuperNetMixin):
+class BERTSuperNetMixinLAYERSpace(BERTSuperNetMixin):
+    @property
+    def search_space(self):
+        return LayerSearchSpace(self.config)
 
+
+class BERTSuperNetMixinMEDIUMSpace(BERTSuperNetMixin):
+    @property
+    def search_space(self):
+        return MediumSearchSpace(self.config)
+
+
+class BERTSuperNetMixinLARGESpace(BERTSuperNetMixin):
+    @property
+    def search_space(self):
+        return FullSearchSpace(self.config)
+
+
+class BERTSuperNetMixinSMALLSpace(BERTSuperNetMixin):
     @property
     def search_space(self):
         return SmallSearchSpace(self.config)
 
 
-class SuperNetBertForSequenceClassification(BertForSequenceClassification, BERTSuperNetMixinSMALLSpace):
+class SuperNetBertForSequenceClassificationSMALL(
+    BertForSequenceClassification, BERTSuperNetMixinSMALLSpace
+):
+    def forward(self, inputs, **kwargs):
+        return super().forward(**inputs)
+
+
+class SuperNetBertForMultipleChoiceSMALL(
+    BertForMultipleChoice, BERTSuperNetMixinSMALLSpace
+):
+    def forward(self, inputs, **kwargs):
+        return super().forward(**inputs)
+
+
+class SuperNetBertForSequenceClassificationLAYER(
+    BertForSequenceClassification, BERTSuperNetMixinLAYERSpace
+):
+    def forward(self, inputs, **kwargs):
+        return super().forward(**inputs)
+
+
+class SuperNetBertForMultipleChoiceLAYER(
+    BertForMultipleChoice, BERTSuperNetMixinLAYERSpace
+):
+    def forward(self, inputs, **kwargs):
+        return super().forward(**inputs)
+
+
+class SuperNetBertForSequenceClassificationMEDIUM(
+    BertForSequenceClassification, BERTSuperNetMixinMEDIUMSpace
+):
+    def forward(self, inputs, **kwargs):
+        return super().forward(**inputs)
+
+
+class SuperNetBertForMultipleChoiceMEDIUM(
+    BertForMultipleChoice, BERTSuperNetMixinMEDIUMSpace
+):
+    def forward(self, inputs, **kwargs):
+        return super().forward(**inputs)
+
+
+class SuperNetBertForSequenceClassificationLARGE(
+    BertForSequenceClassification, BERTSuperNetMixinLARGESpace
+):
+    def forward(self, inputs, **kwargs):
+        return super().forward(**inputs)
+
+
+class SuperNetBertForMultipleChoiceLARGE(
+    BertForMultipleChoice, BERTSuperNetMixinLARGESpace
+):
     def forward(self, inputs, **kwargs):
         return super().forward(**inputs)
