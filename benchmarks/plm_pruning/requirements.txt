@@ -1,1 +1,5 @@
 scikit-learn
+transformers[torch]
+datasets
+evaluate
+tqdm
