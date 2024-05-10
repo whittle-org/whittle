@@ -1,7 +1,10 @@
+import torch
+
+from litgpt.model import RMSNorm
+
 from lobotomy.modules.layernorm import LayerNorm as LayerNormSuper
 from lobotomy.modules.rmsnorm import RMSNorm as RMSNormSuper
-from litgpt_utils.base_model import RMSNorm
-import torch
+
 
 def test_rmsnorm():
     input_features_large = torch.rand(8, 64)

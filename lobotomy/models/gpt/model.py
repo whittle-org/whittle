@@ -107,7 +107,7 @@ class GPT(nn.Module):
         for i in range(sub_network_n_layers):
             block = self.transformer.h[i]
             block.set_sub_network(sub_network_n_embd, sub_network_intermediate_size[i], sub_network_num_heads[i])
-        self.lm_head.set_sub_network(sub_network_n_embd)
+        self.lm_head.set_sub_network(sub_network_n_embd, self.config.padded_vocab_size)
 
     def reset_super_network(self):
         self.sub_network_n_embd = self.config.n_embd
