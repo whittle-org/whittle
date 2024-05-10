@@ -44,25 +44,3 @@ class SandwichStrategy(BaseTrainingStrategy):
         total_loss += loss.item()
 
         return total_loss
-
-
-def __main__():
-
-    model = Net()
-    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-    scheduler = StepLR(optimizer, step_size=1, gamma=0.7)
-    update_op = SandwichStrategy(loss_function=loss_function)
-    model.train()
-    overall_loss = 0
-    for batch_idx, batch in enumerate(train_loader):
-        x = batch[:, 0].reshape(-1, 1)
-        y = batch[:, 1].reshape(-1, 1)
-        x = x.to(device)
-
-        optimizer.zero_grad()
-
-        loss = update_op(model, x, y)
-
-        optimizer.step()
-
-        scheduler.step()
