@@ -3,8 +3,8 @@
 import re
 import logging
 
-from gpt.model import GPT
-from gpt.config import Config
+from lobotomy.models.gpt.model import GPT
+from litgpt import Config
 
 from lightning_utilities.core.imports import RequirementCache
 

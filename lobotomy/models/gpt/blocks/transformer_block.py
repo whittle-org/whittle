@@ -1,74 +1,106 @@
 import torch
 import torch.nn as nn
 from typing import Optional
-
+import litgpt
 from litgpt import Config
-
 from lobotomy.models.gpt.blocks.causal_self_attention import CausalSelfAttention
 from lobotomy.modules.rmsnorm import RMSNorm
 from lobotomy.modules.layernorm import LayerNorm
-from lobotomy.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP
+from lobotomy.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP, GemmaMLP
 
-
-class Block(nn.Module):
+class Block(litgpt.model.Block):
     def __init__(self, config: Config, rotary_emb: nn.Module) -> None:
-        super().__init__()
+        super().__init__(config)
         self.config = config
+        if not config.parallel_residual and config.shared_attention_norm:
+            raise NotImplementedError(
+                "No checkpoint amongst the ones we support uses this configuration"
+                " (non-parallel residual and shared attention norm)."
+            )
+
         self.norm_1 = self.norm_class()(config.n_embd, eps=config.norm_eps)
         self.attn = CausalSelfAttention(config, rotary_emb)
-        self.norm_2 = (
-            None
-            if config.shared_attention_norm
-            else self.norm_class()(config.n_embd, eps=config.norm_eps)
-        )
+        self.norm_2 = None if config.shared_attention_norm else self.norm_class()(config.n_embd, eps=config.norm_eps)
         self.mlp = self.mlp_class()(config)
 
-    def set_sample_config(
-        self,
-        sample_embed_dim: int,
-        sample_intermediate_size: int,
-        sample_num_heads: int,
-        sample_bias_flag: bool,
-    ) -> None:
-        self.norm_1.set_sample_config(sample_embed_dim)
-        self.attn.set_sample_config(
-            sample_embed_dim, sample_num_heads, sample_bias_flag
-        )
-        if not self.config.shared_attention_norm:
-            self.norm_2.set_sample_config(sample_embed_dim)
-        self.mlp.set_sample_config(
-            sample_embed_dim, sample_intermediate_size, sample_bias_flag
-        )
+        self.sub_network_n_embd = None
+        self.sub_network_intermediate_size = None
+        self.sub_network_num_heads = None
+
 
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
-        if self.config.norm_class == "RMSNorm":
+        if self.config.norm_class_name == "RMSNorm":
+
             return RMSNorm
         return LayerNorm
 
     def mlp_class(self):
         # `self._mlp_class` cannot be the type to keep the config json serializable
-        if self.config.mlp_class == "LLaMAMLP":
+        if self.config.mlp_class_name == "LLaMAMLP":
             return LLaMAMLP
-        return GptNeoxMLP
+        elif self.config.mlp_class_name == "GemmaMLP":
+            return GemmaMLP
+        elif self.config.mlp_class_name == "GptNeoxMLP":
+            return GptNeoxMLP
+        else:
+            raise ValueError(f"Unknown MLP class: {self.config._mlp_class}")
+    
+    def set_sub_network(
+            self,
+            sub_network_n_embd: int,
+            sub_network_intermediate_size: int,
+            sub_network_num_heads: int,
+        ) -> None:
+        self.sub_network_n_embd = sub_network_n_embd
+        self.sub_network_intermediate_size = sub_network_intermediate_size
+        self.sub_network_num_heads = sub_network_num_heads
+        self.norm_1.set_sub_network(self.sub_network_n_embd)
+        self.attn.set_sub_network(self.sub_network_n_embd, self.sub_network_num_heads)
+        if not self.config.shared_attention_norm:
+            self.norm_2.set_sub_network(self.sub_network_n_embd)
+        self.mlp.set_sub_network(self.sub_network_n_embd, self.sub_network_intermediate_size)
 
+    def reset_super_network(self):
+        self.sub_network_n_embd = self.config.n_embd
+        self.sub_network_intermediate_size = self.config.intermediate_size
+        self.sub_network_num_heads = self.config.n_head
+        self.norm_1.reset_super_network()
+        self.attn.reset_super_network()
+        if not self.config.shared_attention_norm:
+            self.norm_2.reset_super_network()
+        self.mlp.reset_super_network()
+
+    
     def forward(
         self,
         x: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
         input_pos: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        n_1 = self.norm_1(x)
-        h = self.attn(n_1, mask, input_pos)
+        """
+        Non-parallel residual       Parallel residual
+           ┌─ x                     ┌─ x ────────────┐             Note: if `shared_attention_norm` is True,
+           │  ↓                     │  ↓             ↓                   the output from `norm_1` is reused
+           │  norm_1                │  norm_1  ───►  norm_2
+           │  ↓                     │  ↓             ↓
+           │  attn                  │  attn          mlp
+           │  ↓                     │  ↓             │
+        ┌─ └► +                     └► + ◄───────────┘
+        │     norm_2
+        │     ↓
+        │     mlp
+        │     ↓
+        └───► +
+        """
+
+        x_normed = self.norm_1(x)
+        attention_output = self.attn(x_normed, mask, input_pos)
+
         if self.config.parallel_residual:
-            n_2 = n_1 if self.config.shared_attention_norm else self.norm_2(x)
-            x = self.mlp(n_2) + h + x
+            x_normed = x_normed if self.config.shared_attention_norm else self.norm_2(x)
+            x = self.mlp(x_normed) + attention_output + x
         else:
-            if self.config.shared_attention_norm:
-                raise NotImplementedError(
-                    "No checkpoint amongst the ones we support uses this configuration"
-                    " (non-parallel residual and shared attention norm)."
-                )
-            x = h + x
+            x = attention_output + x
             x = self.mlp(self.norm_2(x)) + x
         return x
