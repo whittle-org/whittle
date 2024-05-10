@@ -36,8 +36,6 @@ def test_GptNeoxMLP():
    litgpt_neorx_mlp_small.proj.weight.data = torch.ones_like(litgpt_neorx_mlp_small.proj.weight.data)
    litgpt_neorx_mlp_small.proj.bias.data = torch.ones_like(litgpt_neorx_mlp_small.proj.bias.data)
    out_small_lit = litgpt_neorx_mlp_small(input[:8, :32])
-   print(torch.sum(out_small_lit - out_small))
-   print(torch.sum(out_large_lit - out_large))
    assert torch.all(out_small == out_small_lit)
    assert torch.all(out_large == out_large_lit)
 

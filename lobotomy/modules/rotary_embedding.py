@@ -36,8 +36,6 @@ class RotaryEmbedding(nn.Module):
 
     def apply_rope(self, x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:
         head_size = x.size(-1)
-        #print(head_size)
-        print(x.shape)
         x1 = x[..., : head_size // 2]  # (B, nh, T, hs/2)
         x2 = x[..., head_size // 2 :]  # (B, nh, T, hs/2)
         rotated = torch.cat((-x2, x1), dim=-1)  # (B, nh, T, hs)

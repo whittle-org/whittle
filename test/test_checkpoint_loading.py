@@ -26,5 +26,4 @@ def test_checkpoint_loading():
     model.set_sub_network(config.n_embd, sample_intermediate_size, [config.n_head for i in range(config.n_layer)], config.n_layer)
 
     output_lobotomy = model(input_ids)
-    print(torch.sum(output_lit - output_lobotomy))
     assert torch.allclose(output_lit, output_lobotomy)

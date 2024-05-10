@@ -28,9 +28,6 @@ class RMSNorm(torch.nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         assert self.sub_network_in_features is not None, "sub_network_in_features is not set"
-
-        print(x.shape)
-        print(self.sub_network_in_features)
         dtype = x.dtype
         x = x.float()
         # NOTE: the original RMSNorm paper implementation is not equivalent

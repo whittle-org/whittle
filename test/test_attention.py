@@ -28,8 +28,6 @@ def test_attention_mha():
     attention.set_sub_network(sub_network_n_embd=32, sub_network_n_head=4)
     out_small = attention(input[:,:,:32], mask)
     assert out_small.shape == (8, 512, 32)
-    print(sin.shape)
-    print(cos.shape)
     lit_attention = LitCausalSelfAttention(config)
     lit_attention.attn.weight.data = torch.ones_like(lit_attention.attn.weight.data)
     lit_attention.attn.bias.data = torch.ones_like(lit_attention.attn.bias.data)
