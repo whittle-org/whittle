@@ -1,6 +1,6 @@
 import transformers
 
-from mask import mask_bert, mask_gpt, mask_gpt_neox, mask_roberta
+from benchmarks.plm_pruning.model_wrapper.mask import mask_bert, mask_gpt, mask_gpt_neox, mask_roberta
 
 
 def get_model_data(model):

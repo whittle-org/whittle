@@ -16,29 +16,24 @@ from transformers import (
     HfArgumentParser,
     TrainingArguments,
     set_seed,
-    AutoModelForSequenceClassification,
-    AutoModelForMultipleChoice,
 )
-
-from transformers.models.bert.modeling_bert import BertConfig
 
 from evaluate import load
 from functools import partial
 
+from lobotomy.search import multi_objective_search
+
+from bert import SuperNetBertForSequenceClassification
 from estimate_efficency import compute_parameters
 from benchmarks.plm_pruning.data_wrapper.task_data import GLUE_TASK_INFO
-from sampling import (
+from search_spaces import (
     SmallSearchSpace,
     MediumSearchSpace,
     LayerSearchSpace,
     FullSearchSpace,
 )
-from baselines import MethodArguments, methods
-from ask_tell_scheduler import AskTellScheduler
 from hf_args import DataTrainingArguments, ModelArguments, parse_model_name
 from data_wrapper import Glue, IMDB, SWAG
-from mask import mask_bert, mask_gpt, mask_gpt_neox
-from multi_objective import get_pareto_optimal
 from model_data import get_model_data
 
 
@@ -144,37 +139,28 @@ def main():
     st = time.time()
 
     if data_args.task_name in ["swag"]:
-        model_cls = AutoModelForMultipleChoice
+        pass
     else:
-        model_cls = AutoModelForSequenceClassification
+        if model_type.startswith('bert'):
+            model_cls = SuperNetBertForSequenceClassification
 
     model = model_cls.from_pretrained(search_args.checkpoint_dir_model)
     model_data = get_model_data(model)
 
-    mask = model_data["mask"]
     attention_head_size = model_data["attention_head_size"]
     n_params_emb = model_data["n_params_emb"]
     n_params_classifier = model_data["n_params_classifier"]
     attention_size = model_data["attention_size"]
     n_params_super_net = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    # if search_args.use_accelerate:
-    #     model = accelerator.prepare(model)
-    memory_footprint_supernet = model.get_memory_footprint()
     model_loading_time = time.time() - st
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model.to(device)
     model.eval()
 
-    if model_type.startswith("gpt2"):
-        mask = mask_gpt
-    elif model_type.startswith("bert"):
-        mask = mask_bert
-    elif "pythia" in model_type:
-        mask = mask_gpt_neox
-
-    def evaluate_masks(head_mask, ffn_mask, dataloader):
+    def evaluate_masks(config, dataloader):
+        head_mask, ffn_mask = search_space.config_to_mask(config)
         n_params_model = compute_parameters(
             dmodel=attention_size,
             dhead=attention_head_size,
@@ -183,13 +169,12 @@ def main():
         )
         n_params = n_params_emb + n_params_model + n_params_classifier
 
-        handles = mask(model, ffn_mask, head_mask)
-
+        model.select_sub_network(config)
         for batch in dataloader:
             batch = {k: v.to(device) for k, v in batch.items()}
 
             with torch.no_grad():
-                outputs = model(head_mask=head_mask, **batch)
+                outputs = model(batch)
 
             logits = outputs.logits
             predictions = (
@@ -199,8 +184,6 @@ def main():
             metric.add_batch(predictions=predictions, references=batch["labels"])
 
         eval_metric = metric.compute()
-        for handle in handles:
-            handle.remove()
 
         return 1 - eval_metric[metric_name], n_params / n_params_super_net
 
@@ -212,101 +195,35 @@ def main():
     else:
         metrics = ["error", "params"]
 
-    base_scheduler = methods[search_args.search_strategy](
-        MethodArguments(
-            config_space=search_space.get_syne_tune_config_space(),
-            metrics=metrics,
-            mode=["min", "min"],
-            random_seed=training_args.seed,
-        )
-    )
+    search_results = multi_objective_search(objective=evaluate_masks, search_space=search_space.config_space,
+                                     objective_kwargs={'dataloader': eval_dataloader}, num_samples=search_args.num_samples,
+                                     search_strategy=search_args.search_strategy, seed=training_args.seed)
 
-    scheduler = AskTellScheduler(base_scheduler=base_scheduler)
-
-    costs = np.empty((search_args.num_samples, 2))
-    masks = []
-    runtime = []
-    test_errors = []
-    configs = []
-    for i in range(search_args.num_samples):
-        trial_suggestion = scheduler.ask()
-        head_mask, ffn_mask = search_space.config_to_mask(trial_suggestion.config)
-        head_mask = head_mask.to(device)
-        ffn_mask = ffn_mask.to(device)
-        error, params = evaluate_masks(head_mask, ffn_mask, eval_dataloader)
-
-        test_error, _ = evaluate_masks(head_mask, ffn_mask, dataloader=test_dataloader)
-        test_errors.append(test_error)
-
-        if np.isnan(error) and is_regression:
-            error = 1
-
-        if search_args.optimize_memory_footprint:
-            hypers = trial_suggestion.config
-            c = BertConfig(
-                num_hidden_layers=hypers["num_layers"],
-                num_attention_heads=hypers["num_heads"],
-                intermediate_size=hypers["num_units"],
-                attention_size=attention_head_size,
-            )
-            temp_model = AutoModelForSequenceClassification.from_config(c)
-            memory = temp_model.get_memory_footprint() / memory_footprint_supernet
-            scheduler.tell(trial_suggestion, {"error": error, "memory": memory})
-            costs[i][0] = error
-            costs[i][1] = memory
-        else:
-            scheduler.tell(trial_suggestion, {"error": error, "params": params})
-            costs[i][0] = error
-            costs[i][1] = params * n_params_super_net
-        masks.append((head_mask, ffn_mask))
-        configs.append(trial_suggestion.config)
-
-        runtime.append(time.time() - start_time)
-        print(
-            f"iteration {i}: error={error} ; params={params}; runtime = {runtime[-1]}"
-        )
-    idx = get_pareto_optimal(costs)
-    indices = np.arange(costs.shape[0])[idx]
-    masks = [masks[i] for i in indices]
+    idx = search_results['is_pareto_optimal']
 
     os.makedirs(training_args.output_dir, exist_ok=True)
-    test_pareto = []
+    test_error = []
     model.eval()
-    for i, (head_mask, ffn_mask) in enumerate(masks):
+    for i, config in enumerate(search_results['configs']):
         error, n_params = evaluate_masks(
-            head_mask, ffn_mask, dataloader=test_dataloader
+            config, dataloader=test_dataloader
         )
-        test_pareto.append(error)
+        test_error.append(float(error))
 
-        torch.save(
-            head_mask.cpu(), os.path.join(training_args.output_dir, f"head_mask_{i}.pt")
-        )
-        torch.save(
-            ffn_mask.cpu(),
-            os.path.join(training_args.output_dir, f"neuron_mask_{i}.pt"),
-        )
-
-    results = {}
+    results = dict()
     results["dataset"] = data_args.task_name
-    results["error"] = list(costs[:, 0])
-    results["test_error"] = test_errors
+    results["error"] = list(search_results['costs'][:, 0])
+    results["test_error"] = test_error
+    results["params"] = list(search_results['costs'][:, 1])
+    results["params_pareto"] = list(search_results['costs'][idx, 1])
 
-    if search_args.optimize_memory_footprint:
-        results["memory"] = list(costs[:, 1])
-        results["memory_pareto"] = list(costs[idx, 1])
-
-    else:
-        results["params"] = list(costs[:, 1])
-        results["params_pareto"] = list(costs[idx, 1])
-
-    results["test_pareto"] = test_pareto
-    if search_args.search_space != "uniform":
-        results["config"] = configs
-    results["eval_pareto"] = list(costs[idx, 0])
+    results["test_pareto"] = [test_error[i] for i in idx]
+    results["config"] = search_results['configs']
+    results["eval_pareto"] = list(search_results['costs'][idx, 0])
     results["model_loading_time"] = model_loading_time
     results["data_loading_time"] = data_loading_time
-    results["runtime"] = runtime
-    results["indices"] = [int(i) for i in indices]
+    results["runtime"] = list(search_results['runtime'])
+    results["indices"] = list(idx)
     print(results)
 
     fname = os.path.join(

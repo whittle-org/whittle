@@ -16,10 +16,12 @@ class SandwichStrategy(BaseTrainingStrategy):
 
     def __call__(self, model, inputs, outputs, **kwargs):
 
+        total_loss = 0
         # update super-network
         y_hat = model(inputs)
         loss = self.loss_function(outputs, y_hat)
         loss.backward()
+        total_loss += loss.item()
 
         # update random sub-networks
         for i in range(self.random_samples):
@@ -30,6 +32,7 @@ class SandwichStrategy(BaseTrainingStrategy):
             loss = self.loss_function(outputs, y_hat)
             loss.backward()
             model.reset_super_network()
+            total_loss += loss.item()
 
         # smallest network
         config = self.sampler.get_smallest_sub_network()
@@ -38,8 +41,9 @@ class SandwichStrategy(BaseTrainingStrategy):
         loss = self.loss_function(outputs, y_hat)
         loss.backward()
         model.reset_super_network()
+        total_loss += loss.item()
 
-        return loss.item()
+        return total_loss
 
 
 def __main__():

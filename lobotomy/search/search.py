@@ -58,8 +58,8 @@ def multi_objective_search(
         )
 
         # bookkeeping
-        costs[i][0] = objective_1
-        costs[i][1] = objective_2
+        costs[i][0] = float(objective_1)
+        costs[i][1] = float(objective_2)
         configs.append(trial_suggestion.config)
 
         runtime.append(time.time() - start_time)
@@ -72,6 +72,6 @@ def multi_objective_search(
         "costs": costs,
         "configs": configs,
         "runtime": runtime,
-        "is_pareto_optimal": idx,
+        "is_pareto_optimal": [bool(i) for i in idx],
     }
     return results

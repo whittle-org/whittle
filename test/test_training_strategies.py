@@ -1,16 +1,15 @@
 import pytest
-import numpy as np
 import torch.nn as nn
 import torch.nn.functional
 
 from syne_tune.config_space import randint
 
-from lobotomy.training_strategies import SandwichStrategy
+from lobotomy.training_strategies import SandwichStrategy, RandomStrategy, StandardStrategy, RandomLinearStrategy, ATS
 from lobotomy.sampling.random_sampler import RandomSampler
 from lobotomy.modules.linear import Linear
 
 
-methods = [SandwichStrategy]
+methods = [SandwichStrategy, RandomStrategy, StandardStrategy, RandomLinearStrategy, ATS]
 
 search_space = {"num_units": randint(1, 64)}
 
@@ -47,7 +46,8 @@ def test_integration_training_strategies(strategy):
     update_op = strategy(
         sampler=sampler,
         loss_function=loss_function,
-        device='cpu'
+        device='cpu',
+        total_number_of_steps=1,
     )
 
     model = MLP(5)

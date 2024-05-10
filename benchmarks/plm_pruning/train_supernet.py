@@ -21,8 +21,6 @@ from torch.optim import AdamW
 from transformers import (
     AutoConfig,
     get_scheduler,
-    AutoModelForSequenceClassification,
-    AutoModelForMultipleChoice,
     HfArgumentParser,
     TrainingArguments,
     set_seed,
@@ -38,9 +36,18 @@ from search_spaces import (
     MediumSearchSpace,
 )
 from benchmarks.plm_pruning.data_wrapper.task_data import GLUE_TASK_INFO
-from mask import mask_bert, mask_roberta, mask_gpt, mask_gpt_neox
 from hf_args import DataTrainingArguments, ModelArguments, parse_model_name
 from data_wrapper import Glue, IMDB, SWAG
+from benchmarks.plm_pruning.bert import (
+    SuperNetBertForMultipleChoiceSMALL,
+    SuperNetBertForMultipleChoiceMEDIUM,
+    SuperNetBertForMultipleChoiceLAYER,
+    SuperNetBertForMultipleChoiceLARGE,
+    SuperNetBertForSequenceClassificationSMALL,
+    SuperNetBertForSequenceClassificationMEDIUM,
+    SuperNetBertForSequenceClassificationLAYER,
+    SuperNetBertForSequenceClassificationLARGE,
+)
 
 
 def kd_loss(
@@ -53,7 +60,7 @@ def kd_loss(
             student_logits / temperature, F.softmax(teacher_logits / temperature, dim=1)
         )
         predictive_loss = F.cross_entropy(student_logits, targets)
-        return temperature ** 2 * kd_loss + predictive_loss
+        return temperature**2 * kd_loss + predictive_loss
 
 
 search_spaces = {
@@ -62,6 +69,23 @@ search_spaces = {
     "layer": LayerSearchSpace,
     "uniform": FullSearchSpace,
     "smallpower2": partial(SmallSearchSpace, power_of_2_encoding=True),
+}
+
+model_types = {
+    "seq_classification":
+        {
+            "small": SuperNetBertForSequenceClassificationSMALL,
+            "medium": SuperNetBertForSequenceClassificationMEDIUM,
+            "layer": SuperNetBertForSequenceClassificationLAYER,
+            "uniform": SuperNetBertForSequenceClassificationLARGE,
+        },
+    "multiple_choice":
+        {
+            "small": SuperNetBertForMultipleChoiceSMALL,
+            "medium": SuperNetBertForMultipleChoiceMEDIUM,
+            "layer": SuperNetBertForMultipleChoiceLAYER,
+            "uniform": SuperNetBertForMultipleChoiceLARGE,
+        }
 }
 
 logging.basicConfig(level=logging.INFO)
@@ -113,7 +137,7 @@ def main():
 
     # Set seed before initializing model.
     if int(training_args.seed) == -1:
-        training_args.seed = np.random.randint(2 ** 32 - 1)
+        training_args.seed = np.random.randint(2**32 - 1)
     print(training_args.seed)
     set_seed(training_args.seed)
     torch.manual_seed(training_args.seed)
@@ -160,9 +184,12 @@ def main():
     )
 
     if data_args.task_name in ["swag"]:
-        model_cls = AutoModelForMultipleChoice
+        model_cls = model_types['multiple_choice'][nas_args.search_space]
     else:
-        model_cls = AutoModelForSequenceClassification
+        model_cls = model_types['seq_classification'][nas_args.search_space]
+
+    search_space = search_spaces[nas_args.search_space](config, seed=training_args.seed)
+
     model = model_cls.from_pretrained(
         model_type,
         from_tf=bool(".ckpt" in model_type),
@@ -171,12 +198,6 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-
-    if model_type.startswith("gpt2") or "pythia" in model_type:
-        model.config.pad_token_id = model.config.eos_token_id
-        # if tokenizer.pad_token is None:
-        #     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-        # model.resize_token_embeddings(len(tokenizer))
 
     optimizer = AdamW(model.parameters(), lr=training_args.learning_rate)
 
@@ -203,7 +224,6 @@ def main():
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model.to(device)
 
-    dropout_rate = np.linspace(0, 1, num_training_steps)
     step = 0
     logging.info(f"Use {nas_args.sampling_strategy} to update super-network training")
 
@@ -219,33 +239,13 @@ def main():
     #         F.log_softmax(x, dim=-1), F.log_softmax(y, dim=-1)
     #     )
 
-    if model_type.startswith("gpt2"):
-        mask = mask_gpt
-    elif model_type.startswith("bert"):
-        mask = mask_bert
-    elif model_type.startswith("roberta"):
-        mask = mask_roberta
-    elif "pythia" in model_type:
-        mask = mask_gpt_neox
-
     def loss_function(labels, outputs):
         return outputs.loss
 
-    def select_sub_network(model, config):
-        head_mask, ffn_mask = search_space.config_to_mask(config)
-        head_mask = head_mask.to(device="cuda", dtype=model.dtype)
-        ffn_mask = ffn_mask.to(device="cuda", dtype=model.dtype)
-        handles = mask(model, ffn_mask, head_mask)
-        return handles
-
-    search_space = search_spaces[nas_args.search_space](
-        model.config, seed=training_args.seed
-    )
     sampler = RandomSampler(search_space.config_space, seed=training_args.seed)
     training_strategies = {
         # 'standard': train_epoch,
         "sandwich": SandwichStrategy(
-            select_subnetwork=select_sub_network,
             sampler=sampler,
             loss_function=loss_function,
         ),
@@ -343,7 +343,7 @@ def main():
         for batch in eval_dataloader:
             batch = {k: v.to(device) for k, v in batch.items()}
 
-            outputs = model(**batch)
+            outputs = model(batch)
 
             logits = outputs.logits
             # predictions = torch.argmax(logits, dim=-1)
@@ -376,7 +376,7 @@ def main():
     for batch in test_dataloader:
         batch = {k: v.to(device) for k, v in batch.items()}
 
-        outputs = model(**batch)
+        outputs = model(batch)
 
         logits = outputs.logits
         # predictions = torch.argmax(logits, dim=-1)

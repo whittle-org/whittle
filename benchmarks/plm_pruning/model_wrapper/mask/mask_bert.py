@@ -1,6 +1,5 @@
 from .utils import (
     register_mask_ffn,
-    get_backbone,
     register_drop_layer,
     register_drop_attention_layer,
 )
@@ -19,7 +18,7 @@ def get_attention_output(model, index):
 
 
 def get_layers(model):
-    encoder = get_backbone(model).encoder
+    encoder = model.encoder
     layers = encoder.layer
     return layers
 
