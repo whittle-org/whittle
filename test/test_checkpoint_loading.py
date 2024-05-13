@@ -1,25 +1,41 @@
+import pytest
 import torch
+import pathlib
+
 from litgpt import Config
 from litgpt.model import GPT as LitGPT
+from litgpt.scripts.download import download_from_hub
 from lobotomy.models.gpt.model import GPT as LobotomyGPT
-def test_checkpoint_loading():
+
+
+@pytest.fixture(scope="session")
+def checkpoint_dir(tmp_path_factory):
+    # img = compute_expensive_image()
+    checkpoint_dir = tmp_path_factory.getbasetemp()
+    print(checkpoint_dir)
+    download_from_hub(repo_id='EleutherAI/pythia-70m',
+                      checkpoint_dir=checkpoint_dir)
+    return pathlib.Path(checkpoint_dir) / 'EleutherAI' / 'pythia-70m'
+
+
+def test_checkpoint_loading(checkpoint_dir):
     
     torch.manual_seed(0)
-    config = Config.from_file("checkpoints/stabilityai/stablelm-base-alpha-3b/model_config.yaml")
+    config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
     input_ids = torch.randint(0, config.vocab_size, (1, config.block_size))#.cuda()
     
     model = LitGPT(config)#.cuda()
-    model.load_state_dict(torch.load("checkpoints/stabilityai/stablelm-base-alpha-3b/lit_model.pth"))
+    model.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
     # test output
     model.eval()
     output_lit = model(input_ids)
     #from litgpt.super_model import Config
     # pip install litgpt
     # litgpt download --repo_id stabilityai/stablelm-base-alpha-3b
-    config = Config.from_file("checkpoints/stabilityai/stablelm-base-alpha-3b/model_config.yaml")
+    config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
     config.fix_head_size = True
     model = LobotomyGPT(config)#.cuda()
-    model.load_state_dict(torch.load("checkpoints/stabilityai/stablelm-base-alpha-3b/lit_model.pth"))
+    model.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
     # test output 
     model.eval()
     sample_intermediate_size = [4*config.n_embd for i in range(config.n_layer)]
