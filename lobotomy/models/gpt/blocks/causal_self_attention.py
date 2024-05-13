@@ -20,12 +20,16 @@ class CausalSelfAttention(nn.Module):
         self.rotary_embedding = rotary_emb
         self.config = config
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.sub_network_n_embd = None # type: Optional[int]
-        self.sub_network_n_head = None # type: Optional[int]
-        self.sub_network_head_size = None # type: Optional[int]
-        self.sub_network_qkv_shape = None # type: Optional[int]
-        self.sub_netowork_query_groups = None # type: Optional[int]
-        self.sub_network_q_per_kv = None
+
+        # Set current sub-network to super-network
+        self.sub_network_n_embd = self.config.n_embd
+        self.sub_network_n_head = self.config.n_head
+        self.sub_network_head_size = self.config.head_size
+        self.sub_network_qkv_shape = (self.config.n_head + 2 * self.config.n_query_groups) * self.config.head_size
+        self.sub_network_query_groups = self.config.n_query_groups
+        self.sub_network_q_per_kv = self.sub_network_n_head // self.sub_network_query_groups
+
+        self.cos, self.sin = self.reset_parameters()
 
     def set_sub_network(
         self, sub_network_n_embd: int, 

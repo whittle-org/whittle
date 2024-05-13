@@ -1,7 +1,3 @@
-import torch.optim as optim
-
-from torch.optim.lr_scheduler import StepLR
-
 from lobotomy.training_strategies.base_strategy import BaseTrainingStrategy
 
 

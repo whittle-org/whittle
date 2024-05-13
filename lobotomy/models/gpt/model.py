@@ -39,10 +39,11 @@ class GPT(nn.Module):
         self.max_seq_length = self.config.block_size
         self.mask_cache: Optional[torch.Tensor] = None
 
-        self.sub_network_n_embd = None  # type: Optional[int]
-        self.sub_network_intermediate_size = None
-        self.sub_network_num_heads = None
-        self.sub_network_n_layers = None
+        # Set current sub-network to super-network
+        self.sub_network_n_embd = self.config.n_embd
+        self.sub_network_intermediate_size = self.config.intermediate_size
+        self.sub_network_num_heads = self.config.n_head
+        self.sub_network_n_layers = self.config.n_layer
         #self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
 
 

@@ -8,8 +8,8 @@ class LayerNorm(torch.nn.LayerNorm):
         super().__init__(in_features, eps)
         self.in_features = in_features
 
-        # the current sampled embed dim
-        self.sub_network_in_features = None
+        # Set current sub-network to super-network
+        self.sub_network_in_features = self.in_features
 
     def set_sub_network(self, sub_network_in_features: int):
         self.sub_network_in_features = sub_network_in_features
@@ -18,7 +18,7 @@ class LayerNorm(torch.nn.LayerNorm):
         self.sub_network_in_features = self.in_features
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        assert self.sub_network_in_features is not None, "sub_network_in_features is not set"
+
         return F.layer_norm(
             x,
             (self.sub_network_in_features,),

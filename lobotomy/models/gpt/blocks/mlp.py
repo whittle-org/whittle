@@ -13,8 +13,10 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         self.config = config
         self.in_features = config.n_embd
         self.intermediate_size = config.intermediate_size
-        self.sub_network_n_embd = None
-        self.sub_network_intermediate_size = None
+
+        # Set current sub-network to super-network
+        self.sub_network_n_embd = self.in_features
+        self.sub_network_intermediate_size = self.intermediate_size
 
     def set_sub_network(
         self,

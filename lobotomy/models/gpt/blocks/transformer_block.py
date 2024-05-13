@@ -23,9 +23,10 @@ class Block(litgpt.model.Block):
         self.norm_2 = None if config.shared_attention_norm else self.norm_class()(config.n_embd, eps=config.norm_eps)
         self.mlp = self.mlp_class()(config)
 
-        self.sub_network_n_embd = None
-        self.sub_network_intermediate_size = None
-        self.sub_network_num_heads = None
+        # Set current sub-network to super-network
+        self.sub_network_n_embd = self.config.n_embd
+        self.sub_network_intermediate_size = self.config.intermediate_size
+        self.sub_network_num_heads = self.config.n_head
 
 
     def norm_class(self):
