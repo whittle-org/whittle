@@ -364,7 +364,7 @@ def flops_per_param(
     # this assumes that all samples have a fixed length equal to the block size
     # which is most likely false during finetuning
     flops_per_seq = flops_per_token * max_seq_length
-    attn_flops_per_seq = n_layer * 2 * 2 * (n_embd * (max_seq_length ** 2))
+    attn_flops_per_seq = n_layer * 2 * 2 * (n_embd * (max_seq_length**2))
     return flops_per_seq + attn_flops_per_seq
 
 

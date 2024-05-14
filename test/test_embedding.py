@@ -33,6 +33,5 @@ def test_embedding():
     large_layer.weight.data = torch.ones_like(large_layer.weight.data)
     out_large_layer = large_layer(input_features)
 
-
     assert torch.all(out_small == out_small_layer)
     assert torch.all(out_large == out_large_layer)

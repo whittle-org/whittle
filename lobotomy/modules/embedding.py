@@ -5,11 +5,29 @@ from typing import Optional
 
 
 class Embedding(torch.nn.Embedding):
-    def __init__(self, num_embeddings: int, embedding_dim: int, padding_idx: Optional[int] = None,
-                 max_norm: Optional[float] = None, norm_type: float = 2., scale_grad_by_freq: bool = False,
-                 sparse: bool = False,
-                 device=None, dtype=None) -> None:
-        super().__init__(num_embeddings, embedding_dim, padding_idx, max_norm, norm_type, scale_grad_by_freq, sparse, device, dtype)
+    def __init__(
+        self,
+        num_embeddings: int,
+        embedding_dim: int,
+        padding_idx: Optional[int] = None,
+        max_norm: Optional[float] = None,
+        norm_type: float = 2.0,
+        scale_grad_by_freq: bool = False,
+        sparse: bool = False,
+        device=None,
+        dtype=None,
+    ) -> None:
+        super().__init__(
+            num_embeddings,
+            embedding_dim,
+            padding_idx,
+            max_norm,
+            norm_type,
+            scale_grad_by_freq,
+            sparse,
+            device,
+            dtype,
+        )
 
         # the embedding dimensionality of the current sub-network
         self.sub_network_embedding_dim = None

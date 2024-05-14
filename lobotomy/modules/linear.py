@@ -12,9 +12,7 @@ class Linear(nn.Linear):
         device=None,
         dtype=None,
     ):
-        """
-
-        """
+        """ """
         super().__init__(in_features, out_features, bias, device, dtype)
 
         # Set the current sub-network dimensions equal to super-network

@@ -34,7 +34,6 @@ def test_rmsnorm():
     large_layer.weight.data = torch.ones_like(large_layer.weight.data)
     out_large_layer = large_layer(input_features_large)
 
-
     assert torch.all(out_small == out_small_layer)
     assert torch.all(out_large == out_large_layer)
 
@@ -65,12 +64,10 @@ def test_layernorm():
     small_layer.bias.data = torch.ones_like(small_layer.bias.data)
     out_small_layer = small_layer(input_features_small)
 
-
     large_layer = torch.nn.LayerNorm(64)
     large_layer.weight.data = torch.ones_like(large_layer.weight.data)
     large_layer.bias.data = torch.ones_like(large_layer.bias.data)
     out_large_layer = large_layer(input_features_large)
-
 
     assert torch.all(out_small == out_small_layer)
     assert torch.all(out_large == out_large_layer)

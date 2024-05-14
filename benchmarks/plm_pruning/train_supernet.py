@@ -72,20 +72,18 @@ search_spaces = {
 }
 
 model_types = {
-    "seq_classification":
-        {
-            "small": SuperNetBertForSequenceClassificationSMALL,
-            "medium": SuperNetBertForSequenceClassificationMEDIUM,
-            "layer": SuperNetBertForSequenceClassificationLAYER,
-            "uniform": SuperNetBertForSequenceClassificationLARGE,
-        },
-    "multiple_choice":
-        {
-            "small": SuperNetBertForMultipleChoiceSMALL,
-            "medium": SuperNetBertForMultipleChoiceMEDIUM,
-            "layer": SuperNetBertForMultipleChoiceLAYER,
-            "uniform": SuperNetBertForMultipleChoiceLARGE,
-        }
+    "seq_classification": {
+        "small": SuperNetBertForSequenceClassificationSMALL,
+        "medium": SuperNetBertForSequenceClassificationMEDIUM,
+        "layer": SuperNetBertForSequenceClassificationLAYER,
+        "uniform": SuperNetBertForSequenceClassificationLARGE,
+    },
+    "multiple_choice": {
+        "small": SuperNetBertForMultipleChoiceSMALL,
+        "medium": SuperNetBertForMultipleChoiceMEDIUM,
+        "layer": SuperNetBertForMultipleChoiceLAYER,
+        "uniform": SuperNetBertForMultipleChoiceLARGE,
+    },
 }
 
 logging.basicConfig(level=logging.INFO)
@@ -184,9 +182,9 @@ def main():
     )
 
     if data_args.task_name in ["swag"]:
-        model_cls = model_types['multiple_choice'][nas_args.search_space]
+        model_cls = model_types["multiple_choice"][nas_args.search_space]
     else:
-        model_cls = model_types['seq_classification'][nas_args.search_space]
+        model_cls = model_types["seq_classification"][nas_args.search_space]
 
     search_space = search_spaces[nas_args.search_space](config, seed=training_args.seed)
 

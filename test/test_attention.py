@@ -3,6 +3,8 @@ from lobotomy.models.gpt.blocks import CausalSelfAttention
 from litgpt.model import CausalSelfAttention as LitCausalSelfAttention
 from litgpt import Config
 from litgpt.model import build_mask_cache, build_rope_cache
+
+
 def test_attention_mha():
     config = Config()
     config.n_embd = 64
@@ -28,14 +30,14 @@ def test_attention_mha():
     out_large = attention(input, mask=mask, cos=cos, sin=sin)
     assert out_large.shape == (8, seq_len, 64)
     attention.set_sub_network(sub_network_n_embd=32, sub_network_n_head=4)
-    out_small = attention(input[:,:,:32], mask=mask, cos=cos, sin=sin)
+    out_small = attention(input[:, :, :32], mask=mask, cos=cos, sin=sin)
     assert out_small.shape == (8, seq_len, 32)
     lit_attention = LitCausalSelfAttention(config)
     lit_attention.attn.weight.data = torch.ones_like(lit_attention.attn.weight.data)
     lit_attention.attn.bias.data = torch.ones_like(lit_attention.attn.bias.data)
     lit_attention.proj.bias.data = torch.ones_like(lit_attention.proj.bias.data)
     lit_attention.proj.weight.data = torch.ones_like(lit_attention.proj.weight.data)
-    out_lit_large = lit_attention(input, mask=mask,cos=cos,sin=sin)
+    out_lit_large = lit_attention(input, mask=mask, cos=cos, sin=sin)
     assert torch.all(out_lit_large == out_large)
 
     config.n_embd = 32
@@ -43,13 +45,17 @@ def test_attention_mha():
     config.n_query_groups = 2
 
     lit_attention_small = LitCausalSelfAttention(config)
-    lit_attention_small.attn.weight.data = torch.ones_like(lit_attention_small.attn.weight.data)
-    lit_attention_small.attn.bias.data = torch.ones_like(lit_attention_small.attn.bias.data)
-    lit_attention_small.proj.bias.data = torch.ones_like(lit_attention_small.proj.bias.data)
-    lit_attention_small.proj.weight.data = torch.ones_like(lit_attention_small.proj.weight.data)
-    out_lit_small = lit_attention_small(input[:,:,:32], mask=mask,cos=cos,sin=sin)
+    lit_attention_small.attn.weight.data = torch.ones_like(
+        lit_attention_small.attn.weight.data
+    )
+    lit_attention_small.attn.bias.data = torch.ones_like(
+        lit_attention_small.attn.bias.data
+    )
+    lit_attention_small.proj.bias.data = torch.ones_like(
+        lit_attention_small.proj.bias.data
+    )
+    lit_attention_small.proj.weight.data = torch.ones_like(
+        lit_attention_small.proj.weight.data
+    )
+    out_lit_small = lit_attention_small(input[:, :, :32], mask=mask, cos=cos, sin=sin)
     assert torch.all(out_lit_small == out_small)
-
-
-
-    

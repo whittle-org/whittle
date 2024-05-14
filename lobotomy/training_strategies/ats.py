@@ -16,7 +16,7 @@ class ATS(BaseTrainingStrategy):
         total_loss = 0
         if self.current_step % 2 == 0:
 
-           # update random sub-networks
+            # update random sub-networks
             for i in range(self.random_samples):
 
                 config = self.sampler.sample()

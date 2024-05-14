@@ -1,6 +1,7 @@
 import torch
 from lobotomy.modules.linear import Linear
 
+
 def test_linear():
 
     input_features = torch.rand(8, 64)
@@ -18,7 +19,6 @@ def test_linear():
     out = l(input_features)
     assert out.shape == (8, 10)
 
-
     l.weight.data = torch.ones_like(l.weight.data)
     l.bias.data = torch.ones_like(l.bias.data)
     l.set_sub_network(sub_network_in_features=16, sub_network_out_features=10)
@@ -27,7 +27,6 @@ def test_linear():
     input_features_large = torch.rand(8, 64)
     l.set_sub_network(sub_network_in_features=64, sub_network_out_features=10)
     out_large = l(input_features_large)
-    
 
     small_layer = torch.nn.Linear(16, 10, bias=True)
 

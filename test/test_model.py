@@ -2,11 +2,13 @@ from lobotomy.models.gpt import GPT
 from litgpt import Config
 import torch
 from litgpt.model import GPT as LitGPT
+
+
 def test_gpt():
     config = Config()
     config.padded_vocab_size = 512
     config.n_embd = 64
-    config.intermediate_size = 64*4
+    config.intermediate_size = 64 * 4
     config.n_head = 8
     config.n_query_groups = 4
     config.head_size = 8
@@ -36,12 +38,17 @@ def test_gpt():
         block.mlp.proj.bias.data = torch.ones_like(block.mlp.proj.bias.data)
         block.norm_1.weight.data = torch.ones_like(block.norm_1.weight.data)
         block.norm_2.weight.data = torch.ones_like(block.norm_2.weight.data)
-        
+
     gpt.reset_super_network()
     input = torch.randint(0, 512, (8, 512))
     out_large = gpt(input)
     assert out_large.shape == (8, 512, 512)
-    gpt.set_sub_network(sub_network_n_embd=32, sub_network_intermediate_size=[32*4 for i in range(4)], sub_network_num_heads=[4 for i in range(4)], sub_network_n_layers=4)
+    gpt.set_sub_network(
+        sub_network_n_embd=32,
+        sub_network_intermediate_size=[32 * 4 for i in range(4)],
+        sub_network_num_heads=[4 for i in range(4)],
+        sub_network_n_layers=4,
+    )
     out_small = gpt(input)
     assert out_small.shape == (8, 512, 512)
 
@@ -69,13 +76,19 @@ def test_gpt():
     config.n_embd = 32
     config.n_head = 4
     config.n_query_groups = 2
-    config.intermediate_size = 32*4
+    config.intermediate_size = 32 * 4
     config.n_layer = 4
     lit_gpt_small = LitGPT(config)
-    lit_gpt_small.lm_head.weight.data = torch.ones_like(lit_gpt_small.lm_head.weight.data)
+    lit_gpt_small.lm_head.weight.data = torch.ones_like(
+        lit_gpt_small.lm_head.weight.data
+    )
     lit_gpt_small.lm_head.bias.data = torch.ones_like(lit_gpt_small.lm_head.bias.data)
-    lit_gpt_small.transformer.wte.weight.data = torch.ones_like(lit_gpt_small.transformer.wte.weight.data)
-    lit_gpt_small.transformer.ln_f.weight.data = torch.ones_like(lit_gpt_small.transformer.ln_f.weight.data)
+    lit_gpt_small.transformer.wte.weight.data = torch.ones_like(
+        lit_gpt_small.transformer.wte.weight.data
+    )
+    lit_gpt_small.transformer.ln_f.weight.data = torch.ones_like(
+        lit_gpt_small.transformer.ln_f.weight.data
+    )
     for block in lit_gpt_small.transformer.h:
         block.attn.attn.weight.data = torch.ones_like(block.attn.attn.weight.data)
         block.attn.attn.bias.data = torch.ones_like(block.attn.attn.bias.data)
@@ -89,7 +102,3 @@ def test_gpt():
         block.mlp.proj.bias.data = torch.ones_like(block.mlp.proj.bias.data)
     out_lit_small = lit_gpt_small(input)
     assert torch.all(out_lit_small == out_small)
-
-
-
-
