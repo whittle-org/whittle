@@ -1,9 +1,8 @@
 import torch
-from lobotomy.modules.rotary_embedding import RotaryEmbedding
 from lobotomy.models.gpt.blocks import CausalSelfAttention
 from litgpt.model import CausalSelfAttention as LitCausalSelfAttention
 from litgpt import Config
-from litgpt.model import build_mask_cache
+from litgpt.model import build_mask_cache, build_rope_cache
 def test_attention_mha():
     config = Config()
     config.n_embd = 64
@@ -13,21 +12,24 @@ def test_attention_mha():
     config.fix_head_size = True
     config.max_seq_len = 512
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
-    input = torch.rand(8, 512, 64)
-    rotary_emb = RotaryEmbedding(config, 512)
-    mask = build_mask_cache(512)
-    attention = CausalSelfAttention(config, rotary_emb)
+
+    seq_len = config.max_seq_len
+    cos, sin = build_rope_cache(seq_len, n_elem=config.rope_n_elem)
+    cos = cos[:seq_len]
+    sin = sin[:seq_len]
+    input = torch.rand(8, seq_len, 64)
+    mask = build_mask_cache(seq_len)
+    attention = CausalSelfAttention(config)
     attention.attn.weight.data = torch.ones_like(attention.attn.weight.data)
     attention.attn.bias.data = torch.ones_like(attention.attn.bias.data)
     attention.proj.bias.data = torch.ones_like(attention.proj.bias.data)
     attention.proj.weight.data = torch.ones_like(attention.proj.weight.data)
     attention.reset_super_network()
-    out_large = attention(input, mask)
-    sin, cos = attention.reset_parameters()
-    assert out_large.shape == (8, 512, 64)
+    out_large = attention(input, mask=mask, cos=cos, sin=sin)
+    assert out_large.shape == (8, seq_len, 64)
     attention.set_sub_network(sub_network_n_embd=32, sub_network_n_head=4)
-    out_small = attention(input[:,:,:32], mask)
-    assert out_small.shape == (8, 512, 32)
+    out_small = attention(input[:,:,:32], mask=mask, cos=cos, sin=sin)
+    assert out_small.shape == (8, seq_len, 32)
     lit_attention = LitCausalSelfAttention(config)
     lit_attention.attn.weight.data = torch.ones_like(lit_attention.attn.weight.data)
     lit_attention.attn.bias.data = torch.ones_like(lit_attention.attn.bias.data)
