@@ -18,7 +18,6 @@ from lobotomy.modules.linear import Linear
 from lobotomy.modules.rmsnorm import RMSNorm
 from lobotomy.modules.layernorm import LayerNorm
 
-
 class GPT(nn.Module):
     def __init__(self, config: Config) -> None:
         super().__init__()

@@ -8,7 +8,6 @@ from lobotomy.modules.rmsnorm import RMSNorm
 from lobotomy.modules.layernorm import LayerNorm
 from lobotomy.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP, GemmaMLP
 
-
 class Block(litgpt.model.Block):
     def __init__(self, config: Config) -> None:
         super().__init__(config)
