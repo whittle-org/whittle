@@ -3,11 +3,11 @@ import torch.nn as nn
 from litgpt import Config
 from typing import Optional
 import math
-from litgpt.model import KVCache
+from litgpt.model import KVCache, apply_rope
 from lobotomy.modules import Linear
 
 class CausalSelfAttention(nn.Module):
-    def __init__(self, config: Config, rotary_emb: nn.Module) -> None:
+    def __init__(self, config: Config) -> None:
         super().__init__()
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
@@ -17,7 +17,6 @@ class CausalSelfAttention(nn.Module):
         self.proj = Linear(config.head_size * config.n_head, config.n_embd, bias=config.bias)
         # disabled by default
         self.kv_cache: Optional[KVCache] = None
-        self.rotary_embedding = rotary_emb
         self.config = config
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -28,8 +27,6 @@ class CausalSelfAttention(nn.Module):
         self.sub_network_qkv_shape = (self.config.n_head + 2 * self.config.n_query_groups) * self.config.head_size
         self.sub_network_query_groups = self.config.n_query_groups
         self.sub_network_q_per_kv = self.sub_network_n_head // self.sub_network_query_groups
-
-        self.cos, self.sin = self.reset_parameters()
 
     def set_sub_network(
         self, sub_network_n_embd: int, 
@@ -51,7 +48,6 @@ class CausalSelfAttention(nn.Module):
         self.attn.set_sub_network(self.sub_network_n_embd, self.sub_network_qkv_shape)
         self.proj.set_sub_network(self.sub_network_head_size * self.sub_network_n_head, self.sub_network_n_embd)
         self.sub_network_q_per_kv = self.sub_network_n_head // self.sub_network_query_groups
-        self.cos, self.sin = self.reset_parameters()
 
     def reset_super_network(self):
         self.sub_network_n_embd = self.config.n_embd
@@ -62,17 +58,12 @@ class CausalSelfAttention(nn.Module):
         self.sub_network_q_per_kv = self.sub_network_n_head // self.sub_network_query_groups
         self.attn.reset_super_network()
         self.proj.reset_super_network()
-        self.cos, self.sin = self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        # Trigger resetting the rope-cache
-        cos, sin = self.rotary_embedding.rope_cache(device=self.device)
-        return cos, sin
-
 
     def forward(
         self,
         x: torch.Tensor,
+        cos: torch.Tensor,
+        sin: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
         input_pos: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
@@ -80,8 +71,6 @@ class CausalSelfAttention(nn.Module):
         B, T, C = x.size()  # batch size, sequence length, embedding dimensionality (n_embd)
 
         qkv = self.attn(x)
-        cos = self.cos[:T]
-        sin = self.sin[:T]
 
         # assemble into a number of query groups to support MHA, MQA and GQA together (see `config.n_query_groups`)
         if self.config.fix_head_size:
@@ -125,9 +114,9 @@ class CausalSelfAttention(nn.Module):
         if self.config.fix_head_size:
             rope_n_elem = int(self.sub_network_head_size * self.config.rotary_percentage)
         else:
-            rope_n_elem = int(self.config.head_size * self.config.rotary_percentage)
-        q_roped = self.rotary_embedding.apply_rope(q[..., :rope_n_elem], cos, sin)
-        k_roped = self.rotary_embedding.apply_rope(k[..., :rope_n_elem], cos, sin)
+            rope_n_elem = self.config.rope_n_elem
+        q_roped = apply_rope(q[..., :rope_n_elem], cos, sin)
+        k_roped = apply_rope(k[..., :rope_n_elem], cos, sin)
         q = torch.cat((q_roped, q[..., rope_n_elem :]), dim=-1)
         k = torch.cat((k_roped, k[..., rope_n_elem :]), dim=-1)
 

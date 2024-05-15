@@ -10,15 +10,13 @@ import torch
 import torch.nn as nn
 
 from litgpt import Config
+from litgpt.model import build_rope_cache
 
 from lobotomy.models.gpt.blocks import Block
 from lobotomy.modules.embedding import Embedding
-from lobotomy.modules.rotary_embedding import RotaryEmbedding
 from lobotomy.modules.linear import Linear
 from lobotomy.modules.rmsnorm import RMSNorm
 from lobotomy.modules.layernorm import LayerNorm
-
-
 
 class GPT(nn.Module):
     def __init__(self, config: Config) -> None:
@@ -27,11 +25,10 @@ class GPT(nn.Module):
         self.config = config
 
         self.lm_head = Linear(config.n_embd, config.padded_vocab_size, bias=config.lm_head_bias)
-        self.rotary_embedding = RotaryEmbedding(config, config.block_size)
         self.transformer = nn.ModuleDict(
             dict(
                 wte=Embedding(config.padded_vocab_size, config.n_embd),
-                h=nn.ModuleList(Block(config, self.rotary_embedding) for i in range(config.n_layer)),
+                h=nn.ModuleList(Block(config) for i in range(config.n_layer)),
                 ln_f=self.norm_class(config.n_embd, eps=config.norm_eps),
             )
         )
@@ -70,12 +67,12 @@ class GPT(nn.Module):
         self._max_seq_length = value
         if not hasattr(self, "cos"):
             # first call
-            cos, sin = self.rotary_embedding.rope_cache()
+            cos, sin = self.rope_cache()
             self.register_buffer("cos", cos, persistent=False)
             self.register_buffer("sin", sin, persistent=False)
         # override
         elif value != self.cos.size(0):
-            self.cos, self.sin = self.rotary_embedding.rope_cache(device=self.cos.device)
+            self.cos, self.sin = self.rope_cache(device=self.cos.device)
         # the mask and kv cache size will get updated on `set_kv_cache`. we cannot update it here because we don't know
         # if the kv cache is expected
 
@@ -91,7 +88,16 @@ class GPT(nn.Module):
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
-    
+
+    def rope_cache(self, device: Optional[torch.device] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+        return build_rope_cache(
+            seq_len=self.max_seq_length,
+            n_elem=self.config.rope_n_elem,
+            device=device,
+            condense_ratio=self.config.rope_condense_ratio,
+            base=self.config.rope_base,
+        )
+
     def set_sub_network(
         self,
         sub_network_n_embd: int,
@@ -144,7 +150,7 @@ class GPT(nn.Module):
 
         for i, block in enumerate(self.transformer.h):
             if i<self.sub_network_n_layers:
-                x = block(x, mask, input_pos)
+                x = block(x, cos, sin, mask, input_pos)
             else:
                 break
         x = self.transformer.ln_f(x)

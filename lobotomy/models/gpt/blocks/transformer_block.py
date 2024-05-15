@@ -9,7 +9,7 @@ from lobotomy.modules.layernorm import LayerNorm
 from lobotomy.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP, GemmaMLP
 
 class Block(litgpt.model.Block):
-    def __init__(self, config: Config, rotary_emb: nn.Module) -> None:
+    def __init__(self, config: Config) -> None:
         super().__init__(config)
         self.config = config
         if not config.parallel_residual and config.shared_attention_norm:
@@ -19,7 +19,7 @@ class Block(litgpt.model.Block):
             )
 
         self.norm_1 = self.norm_class()(config.n_embd, eps=config.norm_eps)
-        self.attn = CausalSelfAttention(config, rotary_emb)
+        self.attn = CausalSelfAttention(config)
         self.norm_2 = None if config.shared_attention_norm else self.norm_class()(config.n_embd, eps=config.norm_eps)
         self.mlp = self.mlp_class()(config)
 
@@ -71,37 +71,3 @@ class Block(litgpt.model.Block):
         if not self.config.shared_attention_norm:
             self.norm_2.reset_super_network()
         self.mlp.reset_super_network()
-
-    
-    def forward(
-        self,
-        x: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
-        input_pos: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
-        """
-        Non-parallel residual       Parallel residual
-           ┌─ x                     ┌─ x ────────────┐             Note: if `shared_attention_norm` is True,
-           │  ↓                     │  ↓             ↓                   the output from `norm_1` is reused
-           │  norm_1                │  norm_1  ───►  norm_2
-           │  ↓                     │  ↓             ↓
-           │  attn                  │  attn          mlp
-           │  ↓                     │  ↓             │
-        ┌─ └► +                     └► + ◄───────────┘
-        │     norm_2
-        │     ↓
-        │     mlp
-        │     ↓
-        └───► +
-        """
-
-        x_normed = self.norm_1(x)
-        attention_output = self.attn(x_normed, mask, input_pos)
-
-        if self.config.parallel_residual:
-            x_normed = x_normed if self.config.shared_attention_norm else self.norm_2(x)
-            x = self.mlp(x_normed) + attention_output + x
-        else:
-            x = attention_output + x
-            x = self.mlp(self.norm_2(x)) + x
-        return x

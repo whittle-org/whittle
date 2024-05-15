@@ -1,9 +1,8 @@
 import torch
 from litgpt import Config
-from  lobotomy.modules.rotary_embedding import RotaryEmbedding
 from lobotomy.models.gpt.blocks import Block
 from litgpt.model import Block as LitBlock
-from litgpt.model import build_mask_cache
+from litgpt.model import build_mask_cache, build_rope_cache
 def test_block():
       config = Config()
       config.n_embd = 64
@@ -16,8 +15,9 @@ def test_block():
       config.max_seq_len = 512
       config.rotary_percentage = 0.25
       config.rope_n_elem = int(config.rotary_percentage * config.head_size)
-      rotary_emb = RotaryEmbedding(config, 512)
-      block = Block(config, rotary_emb)
+      cos, sin = build_rope_cache(config.max_seq_len, n_elem=config.rope_n_elem)
+
+      block = Block(config)
       input = torch.rand(8, 512, 64)
       mask = build_mask_cache(512)
       block.attn.attn.weight.data = torch.ones_like(block.attn.attn.weight.data)
@@ -31,13 +31,11 @@ def test_block():
       block.mlp.proj.weight.data = torch.ones_like(block.mlp.proj.weight.data)
       block.mlp.proj.bias.data = torch.ones_like(block.mlp.proj.bias.data)
       block.reset_super_network()
-      out_large = block(input, mask)
+      out_large = block(input,  cos, sin, mask)
       assert out_large.shape == (8, 512, 64)
       block.set_sub_network(sub_network_n_embd=32, sub_network_intermediate_size=32*4, sub_network_num_heads=4)
-      out_small = block(input[:,:,:32], mask)
+      out_small = block(input[:,:,:32], cos, sin, mask)
       assert out_small.shape == (8, 512, 32)
-
-      cos, sin = block.attn.reset_parameters()
 
       lit_block = LitBlock(config)
       lit_block.attn.attn.weight.data = torch.ones_like(lit_block.attn.attn.weight.data)
