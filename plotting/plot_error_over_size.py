@@ -85,9 +85,12 @@ for dataset, df_data in data.groupby("dataset"):
             #                  color=colors[i])
 
         if plot_distillation:
-            mean_loss, std_loss, relative_parameters, distillation_model = load_distillation(
-                dataset, model, num_runs, epochs
-            )
+            (
+                mean_loss,
+                std_loss,
+                relative_parameters,
+                distillation_model,
+            ) = load_distillation(dataset, model, num_runs, epochs)
             plt.errorbar(
                 relative_parameters,
                 1 - mean_loss,

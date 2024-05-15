@@ -101,7 +101,7 @@ def main():
     # Set seed before initializing model.
 
     if int(training_args.seed) == -1:
-        training_args.seed = np.random.randint(2 ** 32 - 1)
+        training_args.seed = np.random.randint(2**32 - 1)
     set_seed(training_args.seed)
 
     model_type = parse_model_name(model_args)
@@ -141,7 +141,7 @@ def main():
     if data_args.task_name in ["swag"]:
         pass
     else:
-        if model_type.startswith('bert'):
+        if model_type.startswith("bert"):
             model_cls = SuperNetBertForSequenceClassification
 
     model = model_cls.from_pretrained(search_args.checkpoint_dir_model)
@@ -195,34 +195,37 @@ def main():
     else:
         metrics = ["error", "params"]
 
-    search_results = multi_objective_search(objective=evaluate_masks, search_space=search_space.config_space,
-                                     objective_kwargs={'dataloader': eval_dataloader}, num_samples=search_args.num_samples,
-                                     search_strategy=search_args.search_strategy, seed=training_args.seed)
+    search_results = multi_objective_search(
+        objective=evaluate_masks,
+        search_space=search_space.config_space,
+        objective_kwargs={"dataloader": eval_dataloader},
+        num_samples=search_args.num_samples,
+        search_strategy=search_args.search_strategy,
+        seed=training_args.seed,
+    )
 
-    idx = search_results['is_pareto_optimal']
+    idx = search_results["is_pareto_optimal"]
 
     os.makedirs(training_args.output_dir, exist_ok=True)
     test_error = []
     model.eval()
-    for i, config in enumerate(search_results['configs']):
-        error, n_params = evaluate_masks(
-            config, dataloader=test_dataloader
-        )
+    for i, config in enumerate(search_results["configs"]):
+        error, n_params = evaluate_masks(config, dataloader=test_dataloader)
         test_error.append(float(error))
 
     results = dict()
     results["dataset"] = data_args.task_name
-    results["error"] = list(search_results['costs'][:, 0])
+    results["error"] = list(search_results["costs"][:, 0])
     results["test_error"] = test_error
-    results["params"] = list(search_results['costs'][:, 1])
-    results["params_pareto"] = list(search_results['costs'][idx, 1])
+    results["params"] = list(search_results["costs"][:, 1])
+    results["params_pareto"] = list(search_results["costs"][idx, 1])
 
     results["test_pareto"] = [test_error[i] for i in idx]
-    results["config"] = search_results['configs']
-    results["eval_pareto"] = list(search_results['costs'][idx, 0])
+    results["config"] = search_results["configs"]
+    results["eval_pareto"] = list(search_results["costs"][idx, 0])
     results["model_loading_time"] = model_loading_time
     results["data_loading_time"] = data_loading_time
-    results["runtime"] = list(search_results['runtime'])
+    results["runtime"] = list(search_results["runtime"])
     results["indices"] = list(idx)
     print(results)
 

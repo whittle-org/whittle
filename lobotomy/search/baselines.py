@@ -149,8 +149,8 @@ methods = {
     #     grace_period=1,
     #     reduction_factor=3,
     #     brackets=1,
-        # random_seed=method_arguments.random_seed,
-        # points_to_evaluate=initial_design(method_arguments.config_space),
+    # random_seed=method_arguments.random_seed,
+    # points_to_evaluate=initial_design(method_arguments.config_space),
     # ),
     # Methods.EHVI: lambda method_arguments: EHVI(
     #     config_space=method_arguments.config_space,

@@ -9,7 +9,7 @@ import torch
 import yaml
 from typing_extensions import Self
 
-import lobotomy.models.litgpt 
+import lobotomy.models.litgpt
 from litgpt.utils import find_multiple
 
 
@@ -54,7 +54,9 @@ class AutoConfig:
     shared_attention_norm: bool = False
     norm_class_name: Literal["LayerNorm", "RMSNorm"] = "LayerNorm"
     norm_eps: float = 1e-5
-    mlp_class_name: Literal["GptNeoxMLP", "LLaMAMLP", "GemmaMLP", "LLaMAMoE"] = "GptNeoxMLP"
+    mlp_class_name: Literal[
+        "GptNeoxMLP", "LLaMAMLP", "GemmaMLP", "LLaMAMoE"
+    ] = "GptNeoxMLP"
     gelu_approximate: str = "none"
     intermediate_size: Optional[int] = None
     rope_condense_ratio: int = 1
@@ -77,7 +79,9 @@ class AutoConfig:
 
         # vocab size should be a power of 2 to be optimal on hardware. compute the closest value
         if self.padded_vocab_size is None:
-            self.padded_vocab_size = find_multiple(self.vocab_size, self.padding_multiple)
+            self.padded_vocab_size = find_multiple(
+                self.vocab_size, self.padding_multiple
+            )
         else:
             # vocab size shouldn't be larger than padded vocab size
             self.vocab_size = min(self.vocab_size, self.padded_vocab_size)
@@ -91,27 +95,29 @@ class AutoConfig:
         # compute the intermediate size for MLP if not set
         if self.intermediate_size is None:
             if self.mlp_class_name == "LLaMAMLP":
-                raise ValueError(f"The config {self.name!r}, needs to set the `intermediate_size`")
+                raise ValueError(
+                    f"The config {self.name!r}, needs to set the `intermediate_size`"
+                )
             self.intermediate_size = 4 * self.n_embd
 
         self.rope_n_elem = int(self.rotary_percentage * self.head_size)
         self._mlp_class = self.mlp_class_name
         self._norm_class = self.norm_class_name
         if self.auto_config:
-            self.embed_choices = [self.n_embd//4, self.n_embd//2, self.n_embd]
-            self.head_choices = [self.n_head//4, self.n_head//2, self.n_head]
-            self.layer_choices = [self.n_layer-2, self.n_layer-1, self.n_layer]
-            max_mlp = self.intermediate_size//self.n_embd
-            self.mlp_ratio_choices = [max_mlp-2, max_mlp-1, max_mlp]
-        
-
+            self.embed_choices = [self.n_embd // 4, self.n_embd // 2, self.n_embd]
+            self.head_choices = [self.n_head // 4, self.n_head // 2, self.n_head]
+            self.layer_choices = [self.n_layer - 2, self.n_layer - 1, self.n_layer]
+            max_mlp = self.intermediate_size // self.n_embd
+            self.mlp_ratio_choices = [max_mlp - 2, max_mlp - 1, max_mlp]
 
     @classmethod
     def from_name(cls, name: str, **kwargs: Any) -> Self:
         if name not in name_to_config:
             # search through all `config['hf_config']['name']`
             try:
-                conf_dict = next(config for config in configs if name == config["hf_config"]["name"])
+                conf_dict = next(
+                    config for config in configs if name == config["hf_config"]["name"]
+                )
             except StopIteration:
                 raise ValueError(f"{name!r} is not a supported config name")
         else:
@@ -137,12 +143,19 @@ class AutoConfig:
             return cls.from_file(config_path, **kwargs)
         if (model_name := path.name) in name_to_config:
             return cls.from_name(model_name, **kwargs)
-        raise FileNotFoundError(f"For {str(path)!r} neither 'model_config.yaml' nor matching config exists.")
+        raise FileNotFoundError(
+            f"For {str(path)!r} neither 'model_config.yaml' nor matching config exists."
+        )
 
     @property
     def mlp_class(self) -> Type:
         # `self.mlp_class_name` cannot be the type to keep the config serializable
-        from lobotomy.models.litgpt.super_modules.mlp import GemmaMLP, LLaMAMLP, GptNeoxMLP
+        from lobotomy.models.litgpt.super_modules.mlp import (
+            GemmaMLP,
+            LLaMAMLP,
+            GptNeoxMLP,
+        )
+
         if self.mlp_class_name == "GptNeoxMLP":
             return GptNeoxMLP
         if self.mlp_class_name == "LLaMAMLP":
@@ -155,6 +168,7 @@ class AutoConfig:
     def norm_class(self) -> Type:
         # `self.norm_class_name` cannot be the type to keep the config serializable
         from lobotomy.models.litgpt.super_layers.layernorm_super import LayerNormSuper
+
         if self.norm_class_name == "RMSNorm":
             from functools import partial
 
@@ -169,7 +183,10 @@ class AutoConfig:
 ########################
 configs = [
     # https://huggingface.co/stabilityai/stablelm-base-alpha-3b/blob/main/config.json
-    dict(name="stablelm-base-alpha-3b", hf_config=dict(org="stabilityai", name="stablelm-base-alpha-3b")),
+    dict(
+        name="stablelm-base-alpha-3b",
+        hf_config=dict(org="stabilityai", name="stablelm-base-alpha-3b"),
+    ),
     # https://huggingface.co/stabilityai/stablelm-base-alpha-7b/blob/main/config.json
     dict(
         name="stablelm-base-alpha-7b",
@@ -179,7 +196,11 @@ configs = [
         padding_multiple=256,
     ),
     # https://huggingface.co/stabilityai/stablelm-tuned-alpha-3b/blob/main/config.json
-    dict(name="stablelm-tuned-alpha-3b", hf_config=dict(org="stabilityai", name="stablelm-tuned-alpha-3b"), n_head=32),
+    dict(
+        name="stablelm-tuned-alpha-3b",
+        hf_config=dict(org="stabilityai", name="stablelm-tuned-alpha-3b"),
+        n_head=32,
+    ),
     # https://huggingface.co/stabilityai/stablelm-tuned-alpha-7b/blob/main/config.json
     dict(
         name="stablelm-tuned-alpha-7b",
@@ -1575,7 +1596,10 @@ tiny_llama = [
     )
 ]
 for c in tiny_llama:
-    for kind, hf_postfix in (("", "-intermediate-step-1431k-3T"), ("-chat", "-Chat-v1.0")):
+    for kind, hf_postfix in (
+        ("", "-intermediate-step-1431k-3T"),
+        ("-chat", "-Chat-v1.0"),
+    ):
         copy = deepcopy(c)
         copy["name"] = c["name"].format(kind)
         copy["hf_config"]["name"] = c["hf_config"]["name"].format(hf_postfix)

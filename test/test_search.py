@@ -35,10 +35,12 @@ def test_multi_objective_search(search_strategy, num_samples=5):
     if search_strategy != "nsga2":
         # check that first config are the initial design
         upper_bound = {hp_name: hp.upper for hp_name, hp in search_space.items()}
-        assert results['configs'][0] == upper_bound
+        assert results["configs"][0] == upper_bound
 
         lower_bound = {hp_name: hp.lower for hp_name, hp in search_space.items()}
-        assert results['configs'][1] == lower_bound
+        assert results["configs"][1] == lower_bound
 
-        mid_point = {hp_name: (hp.upper - hp.lower) // 2 for hp_name, hp in search_space.items()}
-        assert results['configs'][2] == mid_point
+        mid_point = {
+            hp_name: (hp.upper - hp.lower) // 2 for hp_name, hp in search_space.items()
+        }
+        assert results["configs"][2] == mid_point

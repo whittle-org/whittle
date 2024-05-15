@@ -19,7 +19,7 @@ class RandomLinearStrategy(BaseTrainingStrategy):
 
         total_loss = 0
         if np.random.rand() <= self.rate[self.current_step]:
-           # update random sub-networks
+            # update random sub-networks
             for i in range(self.random_samples):
 
                 config = self.sampler.sample()

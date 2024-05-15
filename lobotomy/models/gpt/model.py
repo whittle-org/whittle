@@ -18,13 +18,16 @@ from lobotomy.modules.linear import Linear
 from lobotomy.modules.rmsnorm import RMSNorm
 from lobotomy.modules.layernorm import LayerNorm
 
+
 class GPT(nn.Module):
     def __init__(self, config: Config) -> None:
         super().__init__()
         assert config.padded_vocab_size is not None
         self.config = config
 
-        self.lm_head = Linear(config.n_embd, config.padded_vocab_size, bias=config.lm_head_bias)
+        self.lm_head = Linear(
+            config.n_embd, config.padded_vocab_size, bias=config.lm_head_bias
+        )
         self.transformer = nn.ModuleDict(
             dict(
                 wte=Embedding(config.padded_vocab_size, config.n_embd),
@@ -41,8 +44,7 @@ class GPT(nn.Module):
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
         self.sub_network_n_layers = self.config.n_layer
-        #self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
-
+        # self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
 
     @property
     def norm_class(self):
@@ -51,7 +53,7 @@ class GPT(nn.Module):
 
             return RMSNorm
         return LayerNorm
-    
+
     @property
     def max_seq_length(self) -> int:
         return self._max_seq_length
@@ -63,7 +65,9 @@ class GPT(nn.Module):
         This allows setting a smaller number to avoid allocating unused memory
         """
         if value > self.config.block_size:
-            raise ValueError(f"Cannot attend to {value}, block size is only {self.config.block_size}")
+            raise ValueError(
+                f"Cannot attend to {value}, block size is only {self.config.block_size}"
+            )
         self._max_seq_length = value
         if not hasattr(self, "cos"):
             # first call
@@ -89,7 +93,9 @@ class GPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def rope_cache(self, device: Optional[torch.device] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def rope_cache(
+        self, device: Optional[torch.device] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         return build_rope_cache(
             seq_len=self.max_seq_length,
             n_elem=self.config.rope_n_elem,
@@ -113,7 +119,11 @@ class GPT(nn.Module):
         self.transformer.ln_f.set_sub_network(self.sub_network_n_embd)
         for i in range(sub_network_n_layers):
             block = self.transformer.h[i]
-            block.set_sub_network(sub_network_n_embd, sub_network_intermediate_size[i], sub_network_num_heads[i])
+            block.set_sub_network(
+                sub_network_n_embd,
+                sub_network_intermediate_size[i],
+                sub_network_num_heads[i],
+            )
         self.lm_head.set_sub_network(sub_network_n_embd, self.config.padded_vocab_size)
 
     def reset_super_network(self):
@@ -128,10 +138,14 @@ class GPT(nn.Module):
             block.reset_super_network()
         self.lm_head.reset_super_network()
 
-    def forward(self, idx: torch.Tensor, input_pos: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+        self, idx: torch.Tensor, input_pos: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         T = idx.size(1)
         if self.max_seq_length < T:
-            raise ValueError(f"Cannot forward sequence of length {T}, max seq length is only {self.max_seq_length}.")
+            raise ValueError(
+                f"Cannot forward sequence of length {T}, max seq length is only {self.max_seq_length}."
+            )
 
         if input_pos is not None:  # use the kv cache
             cos = self.cos.index_select(0, input_pos)
@@ -146,10 +160,12 @@ class GPT(nn.Module):
 
         x = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
         if self.config.scale_embeddings:
-            x = x * (self.sub_network_n_embd**0.5) # TODO: forward is only implemented due to change in this line 
+            x = x * (
+                self.sub_network_n_embd**0.5
+            )  # TODO: forward is only implemented due to change in this line
 
         for i, block in enumerate(self.transformer.h):
-            if i<self.sub_network_n_layers:
+            if i < self.sub_network_n_layers:
                 x = block(x, cos, sin, mask, input_pos)
             else:
                 break
@@ -167,7 +183,7 @@ class GPT(nn.Module):
         device: Optional[torch.device] = None,
         dtype: Optional[torch.dtype] = None,
     ) -> None:
-        '''if rope_cache_length is None:
+        """if rope_cache_length is None:
             rope_cache_length = self.cos.size(-1)
         max_seq_length = self.max_seq_length
 
@@ -175,7 +191,7 @@ class GPT(nn.Module):
         for block in self.transformer.h:
             block.attn.kv_cache = block.attn.build_kv_cache(
                 batch_size, max_seq_length, rope_cache_length, device, dtype
-            )'''
+            )"""
 
         if self.mask_cache is None or self.mask_cache.size(3) != self.max_seq_length:
             # passing `attn_mask` to SDPA disables the flash implementation. since we only need the mask
@@ -184,10 +200,12 @@ class GPT(nn.Module):
 
     def clear_kv_cache(self) -> None:
         self.mask_cache = None
-        #for block in self.transformer.h:
+        # for block in self.transformer.h:
         #    block.attn.kv_cache = None
 
 
-def build_mask_cache(max_seq_length: int, device: Optional[torch.device] = None) -> torch.Tensor:
+def build_mask_cache(
+    max_seq_length: int, device: Optional[torch.device] = None
+) -> torch.Tensor:
     ones = torch.ones((max_seq_length, max_seq_length), device=device, dtype=torch.bool)
     return torch.tril(ones).unsqueeze(0).unsqueeze(0)
