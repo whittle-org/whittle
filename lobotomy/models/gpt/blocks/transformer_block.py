@@ -71,38 +71,3 @@ class Block(litgpt.model.Block):
         if not self.config.shared_attention_norm:
             self.norm_2.reset_super_network()
         self.mlp.reset_super_network()
-
-    def forward(
-        self,
-        x: torch.Tensor,
-        cos: torch.Tensor,
-        sin: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
-        input_pos: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
-        """
-        Non-parallel residual       Parallel residual
-           ┌─ x                     ┌─ x ────────────┐             Note: if `shared_attention_norm` is True,
-           │  ↓                     │  ↓             ↓                   the output from `norm_1` is reused
-           │  norm_1                │  norm_1  ───►  norm_2
-           │  ↓                     │  ↓             ↓
-           │  attn                  │  attn          mlp
-           │  ↓                     │  ↓             │
-        ┌─ └► +                     └► + ◄───────────┘
-        │     norm_2
-        │     ↓
-        │     mlp
-        │     ↓
-        └───► +
-        """
-
-        x_normed = self.norm_1(x)
-        attention_output = self.attn(x_normed, cos, sin, mask, input_pos)
-
-        if self.config.parallel_residual:
-            x_normed = x_normed if self.config.shared_attention_norm else self.norm_2(x)
-            x = self.mlp(x_normed) + attention_output + x
-        else:
-            x = attention_output + x
-            x = self.mlp(self.norm_2(x)) + x
-        return x
