@@ -1,5 +1,6 @@
 scipy
 numpy
 pandas
+torch
 syne-tune
 litgpt[all]
