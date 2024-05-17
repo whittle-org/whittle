@@ -1,6 +1,6 @@
 scipy
 numpy
 pandas
-torch
+torch>=2.2.0
 syne-tune
 litgpt[all]
