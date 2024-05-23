@@ -14,6 +14,4 @@ if __name__ == "__main__":
     out_dir = args.output_dir
     tasks = ["hellaswag"]
 
-    evaluate_fn(
-        checkpoint_dir=checkpoint_dir, tasks=",".join(tasks), out_dir=out_dir
-    )
+    evaluate_fn(checkpoint_dir=checkpoint_dir, tasks=",".join(tasks), out_dir=out_dir)

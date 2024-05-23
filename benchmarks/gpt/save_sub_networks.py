@@ -59,10 +59,10 @@ def save_checkpoint_sub_networks(args) -> None:
 
     config_dict = json.load(open(checkpoint_dir / "config.json"))
     mapping_litgpt_hf = {
-        'n_layer': 'num_hidden_layers',
-        'n_head': 'num_attention_heads',
-        'n_embd': 'hidden_size',
-        'intermediate_size': 'intermediate_size',
+        "n_layer": "num_hidden_layers",
+        "n_head": "num_attention_heads",
+        "n_embd": "hidden_size",
+        "intermediate_size": "intermediate_size",
     }
     for name_litgpt, name_hf in mapping_litgpt_hf.items():
         config_dict[name_hf] = getattr(sub_network_config, name_litgpt)
@@ -74,8 +74,11 @@ def save_checkpoint_sub_networks(args) -> None:
         config_dict[field.name] = getattr(sub_network_config, field.name)
     yaml.dump(config_dict, open(output_dir_sub / "model_config.yaml", "w"))
 
-    shutil.copy(checkpoint_dir / 'tokenizer.json', output_dir_sub / 'tokenizer.json')
-    shutil.copy(checkpoint_dir / 'tokenizer_config.json', output_dir_sub / 'tokenizer_config.json')
+    shutil.copy(checkpoint_dir / "tokenizer.json", output_dir_sub / "tokenizer.json")
+    shutil.copy(
+        checkpoint_dir / "tokenizer_config.json",
+        output_dir_sub / "tokenizer_config.json",
+    )
 
 
 if __name__ == "__main__":
