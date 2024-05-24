@@ -20,13 +20,12 @@ def save_checkpoint_sub_networks(args) -> None:
     checkpoint_dir = Path(args.checkpoint_dir)
 
     config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-    config.fix_head_size = True
+    config.fix_head_size = False
     super_network = GPT(config)
     super_network.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
 
     sub_network_config = Config.from_name(args.sub_network)
     sub_network_config.fix_head_size = False
-    sub_network_config.head_size = 64
     sub_network_config.rope_n_elem = 16
 
     super_network.eval()
