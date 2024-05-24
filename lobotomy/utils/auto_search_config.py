@@ -54,9 +54,9 @@ class AutoConfig:
     shared_attention_norm: bool = False
     norm_class_name: Literal["LayerNorm", "RMSNorm"] = "LayerNorm"
     norm_eps: float = 1e-5
-    mlp_class_name: Literal[
-        "GptNeoxMLP", "LLaMAMLP", "GemmaMLP", "LLaMAMoE"
-    ] = "GptNeoxMLP"
+    mlp_class_name: Literal["GptNeoxMLP", "LLaMAMLP", "GemmaMLP", "LLaMAMoE"] = (
+        "GptNeoxMLP"
+    )
     gelu_approximate: str = "none"
     intermediate_size: Optional[int] = None
     rope_condense_ratio: int = 1
