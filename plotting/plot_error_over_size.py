@@ -2,10 +2,10 @@ import pandas
 import numpy as np
 import matplotlib.pyplot as plt
 
-from parse_data.load_distillation import load_distillation
+# from parse_data.load_distillation import load_distillation
 
 
-data = pandas.read_csv("./parse_data/data_relative_to_model_size.csv")
+data = pandas.read_csv("../results/data_relative_to_model_size.csv")
 suffix = ""
 # data = pandas.read_csv('./parse_data/data_relative_to_model_size_standard_nas.csv')
 # suffix = "_standard_nas"
@@ -19,7 +19,7 @@ model = "roberta-base"
 data = data[data["model"] == model]
 
 
-data_unpruned = pandas.read_csv("./parse_data/data_unpruned_model.csv")
+data_unpruned = pandas.read_csv("../results/data_unpruned_model.csv")
 data_unpruned = data_unpruned[data_unpruned["model"] == model]
 
 plot_distillation = False
@@ -84,23 +84,6 @@ for dataset, df_data in data.groupby("dataset"):
             #     plt.scatter(params_grid, all_loss[:, k], marker='.',
             #                  color=colors[i])
 
-        if plot_distillation:
-            (
-                mean_loss,
-                std_loss,
-                relative_parameters,
-                distillation_model,
-            ) = load_distillation(dataset, model, num_runs, epochs)
-            plt.errorbar(
-                relative_parameters,
-                1 - mean_loss,
-                yerr=std_loss,
-                marker="D",
-                markersize=8,
-                label=distillation_model,
-                color="black",
-                linestyle="--",
-            )
         # plt.xscale('log')
         plt.grid(linewidth="1", alpha=0.4)
         plt.legend(loc=3)
@@ -123,7 +106,7 @@ for dataset, df_data in data.groupby("dataset"):
         plt.title(f"{dataset.upper()}", fontsize=15)
 
         plt.savefig(
-            f"./figures/parameter_efficiency_{model}_{dataset}{suffix}.pdf",
+            f"../results/figures/parameter_efficiency_{model}_{dataset}{suffix}.pdf",
             bbox_inches="tight",
         )
         plt.show()

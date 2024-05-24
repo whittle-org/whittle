@@ -9,7 +9,7 @@ from compute_ranks import compute_ranks
 rcParams["text.usetex"] = False
 rcParams["font.family"] = "sans"
 
-experiment = "weight_sharing_v9"
+experiment = "../results/weight_sharing_v9"
 df = pd.read_csv(f"{experiment}.csv")
 
 checkpoint = "one_shot"
@@ -124,7 +124,7 @@ for model, df_model in df.groupby("model"):
         plt.ylim(ylims[model][dataset])
         # plt.yscale('log')
         plt.savefig(
-            f"./figures/hypervolume_search_{dataset}_{model}_{checkpoint}.pdf",
+            f"../results/figures/hypervolume_search_{dataset}_{model}_{checkpoint}.pdf",
             bbox_inches="tight",
         )
         plt.show()

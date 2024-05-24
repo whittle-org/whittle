@@ -16,7 +16,7 @@ model = "bert-base-cased"
 checkpoint = "one_shot"
 epochs = 5
 random_sub_net = 2
-df = pd.read_csv(f"{experiment}.csv")
+df = pd.read_csv(f"../results/{experiment}.csv")
 df = df.query(
     f"model == '{model}' & checkpoint == '{checkpoint}' & method == '{method}' "
     f"& epoch == {epochs} & random_sub_net == {random_sub_net}"
@@ -63,7 +63,7 @@ for dataset, df_benchmark in df.groupby("dataset"):
     )
 
     plt.savefig(
-        f"./figures/hypervolume_search_spaces_{dataset}_{model}.pdf",
+        f"../results/figures/hypervolume_search_spaces_{dataset}_{model}.pdf",
         bbox_inches="tight",
     )
     plt.show()
