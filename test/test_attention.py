@@ -5,12 +5,8 @@ from litgpt import Config
 from litgpt.model import build_mask_cache, build_rope_cache
 
 
-def test_attention_mha():
-    config = Config()
-    config.n_embd = 64
-    config.n_head = 8
-    config.n_query_groups = 4
-    config.head_size = 8
+def test_attention_mha_fix_head_size():
+    config = Config(n_embd=64, n_head=8, n_query_groups=4, head_size=64)
     config.fix_head_size = True
     config.max_seq_len = 512
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
@@ -72,13 +68,9 @@ def test_attention_mha():
     assert torch.all(out_lit_small == out_small)
 
 
-def test_attention_mha_custom_head_size():
+def test_attention_mha_flexible_head_size():
 
-    config = Config()
-    config.n_embd = 64
-    config.n_head = 8
-    config.n_query_groups = 4
-    config.head_size = 8
+    config = Config(n_embd=64, n_head=8, n_query_groups=4)
     config.fix_head_size = False
     config.max_seq_len = 512
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
