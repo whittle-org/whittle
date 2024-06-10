@@ -50,16 +50,14 @@ class CausalSelfAttention(nn.Module):
             )
         if self.config.fix_head_size:
             self.sub_network_head_size = self.config.head_size
-            self.sub_network_qkv_shape = (
-                self.sub_network_n_head + 2 * self.sub_network_query_groups
-            ) * self.sub_network_head_size
         else:
             self.sub_network_head_size = (
                 self.sub_network_n_embd // self.sub_network_n_head
             )
-            self.sub_network_qkv_shape = (
-                self.config.n_head + 2 * self.config.n_query_groups
-            ) * self.config.head_size
+
+        self.sub_network_qkv_shape = (
+            self.sub_network_n_head + 2 * self.sub_network_query_groups
+        ) * self.sub_network_head_size
 
         self.attn.set_sub_network(self.sub_network_n_embd, self.sub_network_qkv_shape)
         self.proj.set_sub_network(
@@ -104,23 +102,16 @@ class CausalSelfAttention(nn.Module):
         qkv = self.attn(x)
 
         # assemble into a number of query groups to support MHA, MQA and GQA together (see `config.n_query_groups`)
-        if self.config.fix_head_size:
-            q_per_kv = self.sub_network_n_head // self.sub_network_query_groups
-        else:
-            q_per_kv = self.config.n_head // self.config.n_query_groups
+        q_per_kv = self.sub_network_n_head // self.sub_network_query_groups
         total_qkv = q_per_kv + 2  # each group has 1+ queries, 1 key, and 1 value
-        if self.config.fix_head_size:
-            qkv = qkv.view(
-                B,
-                T,
-                self.sub_network_query_groups,
-                total_qkv,
-                self.sub_network_head_size,
-            )
-        else:
-            qkv = qkv.view(
-                B, T, self.config.n_query_groups, total_qkv, self.config.head_size
-            )
+        qkv = qkv.view(
+            B,
+            T,
+            self.sub_network_query_groups,
+            total_qkv,
+            self.sub_network_head_size,
+        )
+
         qkv = qkv.permute(0, 2, 3, 1, 4)  # (B, n_query_groups, total_qkv, T, hs)
 
         # split batched computation into three
@@ -129,36 +120,25 @@ class CausalSelfAttention(nn.Module):
         # maybe repeat k and v if for the non multi-head attention cases
         # training: flash attention requires it
         # inference: multi-query would require a full kv cache so avoid it to limit its memory usage
-        if self.config.fix_head_size:
-            if self.sub_network_query_groups != self.sub_network_n_head and (
-                input_pos is None or self.config.n_query_groups != 1
-            ):
-                k = k.expand(
-                    B,
-                    self.sub_network_query_groups,
-                    q_per_kv,
-                    T,
-                    self.sub_network_head_size,
-                )
-                v = v.expand(
-                    B,
-                    self.sub_network_query_groups,
-                    q_per_kv,
-                    T,
-                    self.sub_network_head_size,
-                )
-        else:
-            if self.config.n_query_groups != self.config.n_head and (
-                input_pos is None or self.config.n_query_groups != 1
-            ):
-                k = k.expand(
-                    B, self.config.n_query_groups, q_per_kv, T, self.config.head_size
-                )
-                v = v.expand(
-                    B, self.config.n_query_groups, q_per_kv, T, self.config.head_size
-                )
+        if self.sub_network_query_groups != self.sub_network_n_head and (
+            input_pos is None or self.config.n_query_groups != 1
+        ):
+            k = k.expand(
+                B,
+                self.sub_network_query_groups,
+                q_per_kv,
+                T,
+                self.sub_network_head_size,
+            )
+            v = v.expand(
+                B,
+                self.sub_network_query_groups,
+                q_per_kv,
+                T,
+                self.sub_network_head_size,
+            )
 
-        if self.config.fix_head_size:
+        if not self.config.fix_head_size:
             q = q.reshape(B, -1, T, self.sub_network_head_size)
             k = k.reshape(B, -1, T, self.sub_network_head_size)
             v = v.reshape(B, -1, T, self.sub_network_head_size)
@@ -172,7 +152,7 @@ class CausalSelfAttention(nn.Module):
             v = torch.nn.functional.pad(
                 v, (0, abs(self.config.head_size - self.sub_network_head_size))
             )
-        if self.config.fix_head_size:
+        if not self.config.fix_head_size:
             rope_n_elem = int(
                 self.sub_network_head_size * self.config.rotary_percentage
             )
