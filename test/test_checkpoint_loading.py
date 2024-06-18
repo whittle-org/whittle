@@ -32,7 +32,7 @@ def test_checkpoint_loading(checkpoint_dir):
     # pip install litgpt
     # litgpt download --repo_id stabilityai/stablelm-base-alpha-3b
     config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-    config.fix_head_size = True
+    config.fix_head_size = False
     model = LobotomyGPT(config)  # .cuda()
     model.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
     # test output

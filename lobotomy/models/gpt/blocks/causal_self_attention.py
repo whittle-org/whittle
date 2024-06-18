@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 from litgpt import Config
 from typing import Optional
 import math
@@ -100,10 +101,10 @@ class CausalSelfAttention(nn.Module):
         ) = x.size()  # batch size, sequence length, embedding dimensionality (n_embd)
 
         qkv = self.attn(x)
-
         # assemble into a number of query groups to support MHA, MQA and GQA together (see `config.n_query_groups`)
         q_per_kv = self.sub_network_n_head // self.sub_network_query_groups
         total_qkv = q_per_kv + 2  # each group has 1+ queries, 1 key, and 1 value
+
         qkv = qkv.view(
             B,
             T,
@@ -137,27 +138,10 @@ class CausalSelfAttention(nn.Module):
                 T,
                 self.sub_network_head_size,
             )
-
-        if not self.config.fix_head_size:
-            q = q.reshape(B, -1, T, self.sub_network_head_size)
-            k = k.reshape(B, -1, T, self.sub_network_head_size)
-            v = v.reshape(B, -1, T, self.sub_network_head_size)
-        else:
-            q = q[:, : self.sub_network_query_groups, : self.sub_network_q_per_kv, :, :]
-            q = q.reshape(B, -1, T, self.config.head_size)  # (B, nh_q, T, hs)
-            k = k[:, : self.sub_network_query_groups, :, :, :]
-            k = k.reshape(B, -1, T, self.config.head_size)  # (B, nh_k, T, hs)
-            v = v[:, : self.sub_network_query_groups, :, :, :]
-            v = v.reshape(B, -1, T, self.config.head_size)  # (B, nh_v, T, hs)
-            v = torch.nn.functional.pad(
-                v, (0, abs(self.config.head_size - self.sub_network_head_size))
-            )
-        if not self.config.fix_head_size:
-            rope_n_elem = int(
-                self.sub_network_head_size * self.config.rotary_percentage
-            )
-        else:
-            rope_n_elem = self.config.rope_n_elem
+        q = q.reshape(B, -1, T, self.sub_network_head_size)
+        k = k.reshape(B, -1, T, self.sub_network_head_size)
+        v = v.reshape(B, -1, T, self.sub_network_head_size)
+        rope_n_elem = int(self.sub_network_head_size * self.config.rotary_percentage)
         q_roped = apply_rope(q[..., :rope_n_elem], cos, sin)
         k_roped = apply_rope(k[..., :rope_n_elem], cos, sin)
         q = torch.cat((q_roped, q[..., rope_n_elem:]), dim=-1)
@@ -172,7 +156,6 @@ class CausalSelfAttention(nn.Module):
         y = y.reshape(
             B, T, self.sub_network_head_size * self.sub_network_n_head
         )  # re-assemble all head outputs side by side
-        # output projection
         return self.proj(y)
 
     def scaled_dot_product_attention(
@@ -182,7 +165,7 @@ class CausalSelfAttention(nn.Module):
         v: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        scale = 1.0 / math.sqrt(self.config.head_size)
+        scale = 1.0 / math.sqrt(self.sub_network_head_size)
         y = torch.nn.functional.scaled_dot_product_attention(
             q, k, v, attn_mask=mask, dropout_p=0.0, scale=scale, is_causal=mask is None
         )
