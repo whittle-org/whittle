@@ -200,16 +200,16 @@ def test_attention_mqa_fix_head_size():
 
 def test_attention_mha_flexible_head_size():
 
-    config = Config(n_embd=16, n_head=8, n_query_groups=8)
+    config = Config(n_embd=64, n_head=8, n_query_groups=8)
     config.fix_head_size = False
-    config.max_seq_len = 2
+    config.max_seq_len = 512
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
 
     seq_len = config.max_seq_len
     cos, sin = build_rope_cache(seq_len, n_elem=config.rope_n_elem)
     cos = cos[:seq_len]
     sin = sin[:seq_len]
-    input = torch.rand(1, seq_len, 16)
+    input = torch.rand(32, seq_len, 64)
     mask = build_mask_cache(seq_len)
     attention = CausalSelfAttention(config)
     attention.attn.weight.data = torch.ones_like(attention.attn.weight.data)
@@ -217,18 +217,19 @@ def test_attention_mha_flexible_head_size():
     attention.proj.bias.data = torch.ones_like(attention.proj.bias.data)
     attention.proj.weight.data = torch.ones_like(attention.proj.weight.data)
 
-    attention.set_sub_network(sub_network_n_embd=4, sub_network_n_head=2)
+    attention.set_sub_network(sub_network_n_embd=8, sub_network_n_head=2)
+    head_size = attention.sub_network_head_size
     cos_small, sin_small = build_rope_cache(
-        seq_len, n_elem=int(config.rotary_percentage * 2)
+        seq_len, n_elem=int(config.rotary_percentage * head_size)
     )
     cos_small = cos_small[:seq_len]
     sin_small = sin_small[:seq_len]
-    out_small = attention(input[:, :, :4], mask=mask, cos=cos_small, sin=sin_small)
-    attention.set_sub_network(sub_network_n_embd=16, sub_network_n_head=8)
+    out_small = attention(input[:, :, :8], mask=mask, cos=cos_small, sin=sin_small)
+    attention.set_sub_network(sub_network_n_embd=64, sub_network_n_head=8)
     out_large = attention(input, mask=mask, cos=cos, sin=sin)
 
     # check a reduced head size
-    assert out_small.shape == (1, seq_len, 4)
+    assert out_small.shape == (32, seq_len, 8)
     # assert out_large.shape == (1, seq_len, 16)
 
     lit_attention_large = LitCausalSelfAttention(config)
@@ -249,11 +250,11 @@ def test_attention_mha_flexible_head_size():
     # check that our custom model produces the same output as LitGPT
     assert torch.all(out_lit_large == out_large)
 
-    config.n_embd = 4
+    config.n_embd = 8
     config.n_head = 2
-    config.head_size = 2
+    config.head_size = config.n_embd // config.n_head
     config.n_query_groups = 2
-    config.rope_n_elem = int(config.rotary_percentage * 2)
+    config.rope_n_elem = int(config.rotary_percentage * config.head_size)
     cos, sin = cos_small, sin_small
 
     lit_attention_small = LitCausalSelfAttention(config)
@@ -269,7 +270,7 @@ def test_attention_mha_flexible_head_size():
     lit_attention_small.proj.weight.data = torch.ones_like(
         lit_attention_small.proj.weight.data
     )
-    out_lit_small = lit_attention_small(input[:, :, :4], mask=mask, cos=cos, sin=sin)
+    out_lit_small = lit_attention_small(input[:, :, :8], mask=mask, cos=cos, sin=sin)
 
     # check that our sub-networks the same output as equally sized LitGPT attention layer
     assert torch.all(out_lit_small == out_small)
@@ -293,18 +294,19 @@ def test_attention_gqa_flexible_head_size():
     attention.attn.bias.data = torch.ones_like(attention.attn.bias.data)
     attention.proj.bias.data = torch.ones_like(attention.proj.bias.data)
     attention.proj.weight.data = torch.ones_like(attention.proj.weight.data)
-    attention.set_sub_network(sub_network_n_embd=32, sub_network_n_head=2)
+    attention.set_sub_network(sub_network_n_embd=8, sub_network_n_head=2)
+    head_size = attention.sub_network_head_size
     cos_small, sin_small = build_rope_cache(
-        seq_len, n_elem=int(config.rotary_percentage * 16)
+        seq_len, n_elem=int(config.rotary_percentage * head_size)
     )
     cos_small = cos_small[:seq_len]
     sin_small = sin_small[:seq_len]
-    out_small = attention(input[:, :, :32], mask=mask, cos=cos_small, sin=sin_small)
+    out_small = attention(input[:, :, :8], mask=mask, cos=cos_small, sin=sin_small)
     attention.set_sub_network(sub_network_n_embd=64, sub_network_n_head=8)
     out_large = attention(input, mask=mask, cos=cos, sin=sin)
 
     # check a reduced head size
-    assert out_small.shape == (8, seq_len, 32)
+    assert out_small.shape == (8, seq_len, 8)
     assert out_large.shape == (8, seq_len, 64)
 
     lit_attention_large = LitCausalSelfAttention(config)
@@ -325,7 +327,7 @@ def test_attention_gqa_flexible_head_size():
     # check that our custom model produces the same output as LitGPT
     assert torch.all(out_lit_large == out_large)
 
-    config.n_embd = 32
+    config.n_embd = 8
     config.n_head = 2
     config.n_query_groups = 1
     config.head_size = config.n_embd // config.n_head
@@ -349,7 +351,7 @@ def test_attention_gqa_flexible_head_size():
     lit_attention_small.proj.weight.data = torch.ones_like(
         lit_attention_small.proj.weight.data
     )
-    out_lit_small = lit_attention_small(input[:, :, :32], mask=mask, cos=cos, sin=sin)
+    out_lit_small = lit_attention_small(input[:, :, :8], mask=mask, cos=cos, sin=sin)
     print(torch.sum(out_lit_small - out_small))
     # check that our sub-networks the same output as equally sized LitGPT attention layer
     assert torch.all(out_lit_small == out_small)
@@ -373,18 +375,19 @@ def test_attention_mqa_flexible_head_size():
     attention.proj.bias.data = torch.ones_like(attention.proj.bias.data)
     attention.proj.weight.data = torch.ones_like(attention.proj.weight.data)
 
-    attention.set_sub_network(sub_network_n_embd=32, sub_network_n_head=2)
+    attention.set_sub_network(sub_network_n_embd=8, sub_network_n_head=2)
+    head_size = attention.sub_network_head_size
     cos_small, sin_small = build_rope_cache(
-        seq_len, n_elem=int(config.rotary_percentage * 16)
+        seq_len, n_elem=int(config.rotary_percentage * head_size)
     )
     cos_small = cos_small[:seq_len]
     sin_small = sin_small[:seq_len]
-    out_small = attention(input[:, :, :32], mask=mask, cos=cos_small, sin=sin_small)
+    out_small = attention(input[:, :, :8], mask=mask, cos=cos_small, sin=sin_small)
     attention.set_sub_network(sub_network_n_embd=64, sub_network_n_head=8)
     out_large = attention(input, mask=mask, cos=cos, sin=sin)
 
     # check a reduced head size
-    assert out_small.shape == (8, seq_len, 32)
+    assert out_small.shape == (8, seq_len, 8)
     assert out_large.shape == (8, seq_len, 64)
 
     lit_attention_large = LitCausalSelfAttention(config)
@@ -405,9 +408,9 @@ def test_attention_mqa_flexible_head_size():
     # check that our custom model produces the same output as LitGPT
     assert torch.all(out_lit_large == out_large)
 
-    config.n_embd = 32
+    config.n_embd = 8
     config.n_head = 2
-    config.head_size = 16
+    config.head_size = config.n_embd // config.n_head
     config.n_query_groups = 1
     config.rope_n_elem = int(
         config.rotary_percentage * (config.n_embd // config.n_head)
@@ -429,7 +432,7 @@ def test_attention_mqa_flexible_head_size():
     lit_attention_small.proj.weight.data = torch.ones_like(
         lit_attention_small.proj.weight.data
     )
-    out_lit_small = lit_attention_small(input[:, :, :32], mask=mask, cos=cos, sin=sin)
+    out_lit_small = lit_attention_small(input[:, :, :8], mask=mask, cos=cos, sin=sin)
 
     # check that our sub-networks the same output as equally sized LitGPT attention layer
     assert torch.all(out_lit_small == out_small)
