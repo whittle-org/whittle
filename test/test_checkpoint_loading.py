@@ -12,7 +12,6 @@ from lobotomy.models.gpt.model import GPT as LobotomyGPT
 def checkpoint_dir(tmp_path_factory):
     # img = compute_expensive_image()
     checkpoint_dir = tmp_path_factory.getbasetemp()
-    print(checkpoint_dir)
     download_from_hub(repo_id="EleutherAI/pythia-70m", checkpoint_dir=checkpoint_dir)
     return pathlib.Path(checkpoint_dir) / "EleutherAI" / "pythia-70m"
 

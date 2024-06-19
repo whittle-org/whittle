@@ -1,8 +1,6 @@
 import torch
 from lobotomy.models.gpt.blocks import CausalSelfAttention
 from litgpt.model import CausalSelfAttention as LitCausalSelfAttention
-
-# from lobotomy.models.gpt.blocks.causal_self_attention import CausalSelfAttentionLit as LitCausalSelfAttention
 from litgpt import Config
 from litgpt.model import build_mask_cache, build_rope_cache
 import pytest
@@ -46,14 +44,13 @@ def test_attention(attention_config):
     mask = build_mask_cache(seq_len)
 
     attention = init_attention(config)
-    attention.reset_super_network()
     out_large = attention(input, mask=mask, cos=cos, sin=sin)
 
     # check shape of super network attention
     assert out_large.shape == (8, seq_len, config.n_embd)
     lit_attention = init_lit_attention(config)
     out_lit_large = lit_attention(input, mask=mask, cos=cos, sin=sin)
-    
+
     attention.set_sub_network(sub_network_n_embd=config.n_embd // 2, sub_network_n_head=config.n_head // 4)
     cos, sin = build_rope_cache(seq_len, n_elem=int(config.rotary_percentage * attention.sub_network_head_size))
     out_small = attention(input[:, :, :config.n_embd//2], mask=mask, cos=cos, sin=sin)
