@@ -42,7 +42,7 @@ def test_attention(attention_config):
     cos, sin = build_rope_cache(seq_len, n_elem=config.rope_n_elem)
     cos = cos[:seq_len]
     sin = sin[:seq_len]
-    input = torch.rand(8, seq_len, 64)
+    input = torch.rand(8, seq_len, config.n_embd)
     mask = build_mask_cache(seq_len)
 
     attention = init_attention(config)
@@ -50,14 +50,14 @@ def test_attention(attention_config):
     out_large = attention(input, mask=mask, cos=cos, sin=sin)
 
     # check shape of super network attention
-    assert out_large.shape == (8, seq_len, 64)
+    assert out_large.shape == (8, seq_len, config.n_embd)
 
     attention.set_sub_network(sub_network_n_embd=config.n_embd // 2, sub_network_n_head=config.n_head // 4)
     cos, sin = build_rope_cache(seq_len, n_elem=int(config.rotary_percentage * attention.sub_network_head_size))
-    out_small = attention(input[:, :, :32], mask=mask, cos=cos, sin=sin)
+    out_small = attention(input[:, :, :config.n_embd//2], mask=mask, cos=cos, sin=sin)
 
     # check shape of sub-network attention
-    assert out_small.shape == (8, seq_len, 32)
+    assert out_small.shape == (8, seq_len, config.n_embd // 2)
 
     lit_attention = init_lit_attention(config)
     out_lit_large = lit_attention(input, mask=mask, cos=cos, sin=sin)
@@ -73,7 +73,7 @@ def test_attention(attention_config):
 
     lit_attention_small = init_lit_attention(config)
     
-    out_lit_small = lit_attention_small(input[:, :, :32], mask=mask, cos=cos, sin=sin)
+    out_lit_small = lit_attention_small(input[:, :, :config.n_embd], mask=mask, cos=cos, sin=sin)
 
     # check that our sub-networks the same output as equally sized LitGPT attention layer
     assert torch.all(out_lit_small == out_small)
