@@ -45,6 +45,8 @@ class CausalSelfAttention(nn.Module):
         self.sub_network_n_head = sub_network_n_head
         if self.config.n_query_groups == 1:
             self.sub_network_query_groups = 1
+        elif self.sub_network_n_head % self.config.n_query_groups == 0:
+            self.sub_network_query_groups = self.config.n_query_groups
         else:
             self.sub_network_query_groups = self.sub_network_n_head // (
                 self.config.n_head // self.config.n_query_groups
