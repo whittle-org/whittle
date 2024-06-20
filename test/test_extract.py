@@ -9,13 +9,10 @@ from lobotomy.models.gpt.extract import extract_sub_network
 def test_extract_sub_network() -> None:
 
     config = Config.from_name("pythia-70m")
-    config.fix_head_size = True
+    config.fix_head_size = False
 
     super_network = GPT(config)
     sub_network_config = Config.from_name("pythia-14m")
-    sub_network_config.fix_head_size = False
-    sub_network_config.head_size = 64
-    sub_network_config.rope_n_elem = 16
 
     super_network.eval()
     super_network.set_sub_network(
