@@ -139,6 +139,19 @@ class GPT(nn.Module):
             block.reset_super_network()
         self.lm_head.reset_super_network()
 
+    def process_rope_cache(self, cos, sin, input_pos, T):
+        if input_pos is not None:  # use the kv cache
+            cos = cos.index_select(0, input_pos)
+            sin = sin.index_select(0, input_pos)
+            if self.mask_cache is None:
+                raise TypeError("You need to call `gpt.set_kv_cache()`")
+            mask = self.mask_cache.index_select(2, input_pos)
+        else:
+            cos = cos[:T]
+            sin = sin[:T]
+            mask = None
+        return cos, sin, mask
+
     def forward(
         self, idx: torch.Tensor, input_pos: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
@@ -148,17 +161,6 @@ class GPT(nn.Module):
                 f"Cannot forward sequence of length {T}, max seq length is only {self.max_seq_length}."
             )
 
-        if input_pos is not None:  # use the kv cache
-            cos = self.cos.index_select(0, input_pos)
-            sin = self.sin.index_select(0, input_pos)
-            if self.mask_cache is None:
-                raise TypeError("You need to call `gpt.set_kv_cache()`")
-            mask = self.mask_cache.index_select(2, input_pos)
-        else:
-            cos = self.cos[:T]
-            sin = self.sin[:T]
-            mask = None
-
         x = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
         if self.config.scale_embeddings:
             x = x * (
@@ -167,6 +169,23 @@ class GPT(nn.Module):
 
         for i, block in enumerate(self.transformer.h):
             if i < self.sub_network_n_layers:
+                if isinstance(self.sub_network_num_heads, list):
+                    cos, sin = build_rope_cache(
+                        T,
+                        n_elem=int(
+                            self.config.rotary_percentage
+                            * (self.sub_network_n_embd // self.sub_network_num_heads[i])
+                        ),
+                    )
+                else:
+                    cos, sin = build_rope_cache(
+                        T,
+                        n_elem=int(
+                            self.config.rotary_percentage
+                            * (self.sub_network_n_embd // self.sub_network_num_heads)
+                        ),
+                    )
+                cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
                 x = block(x, cos, sin, mask, input_pos)
             else:
                 break

@@ -12,7 +12,6 @@ from lobotomy.models.gpt.model import GPT as LobotomyGPT
 def checkpoint_dir(tmp_path_factory):
     # img = compute_expensive_image()
     checkpoint_dir = tmp_path_factory.getbasetemp()
-    print(checkpoint_dir)
     download_from_hub(repo_id="EleutherAI/pythia-70m", checkpoint_dir=checkpoint_dir)
     return pathlib.Path(checkpoint_dir) / "EleutherAI" / "pythia-70m"
 
@@ -32,7 +31,7 @@ def test_checkpoint_loading(checkpoint_dir):
     # pip install litgpt
     # litgpt download --repo_id stabilityai/stablelm-base-alpha-3b
     config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-    config.fix_head_size = True
+    config.fix_head_size = False
     model = LobotomyGPT(config)  # .cuda()
     model.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
     # test output
