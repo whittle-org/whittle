@@ -31,6 +31,7 @@ def validate(model, valid_loader, device):
         x = batch[:, 0].reshape(-1, 1)
         y = batch[:, 1].reshape(-1, 1)
         x = x.to(device)
+        y = y.to(device)
 
         y_hat = model(x)
         loss = nn.functional.mse_loss(y, y_hat)
@@ -74,7 +75,7 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     valid_dataloader = DataLoader(valid_data, batch_size=args.batch_size, shuffle=False)
 
-    model = MLP(input_dim=1, hidden_dim=args.hidden_dim, device=device)
+    model = MLP(input_dim=1, hidden_dim=args.hidden_dim, device=device).to(device)
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
@@ -106,6 +107,7 @@ if __name__ == "__main__":
             x = batch[:, 0].reshape(-1, 1)
             y = batch[:, 1].reshape(-1, 1)
             x = x.to(device)
+            y = y.to(device)
 
             optimizer.zero_grad()
 
