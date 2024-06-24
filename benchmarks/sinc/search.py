@@ -18,7 +18,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
-    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--hidden_dim", type=int, default=128)
     parser.add_argument("--training_strategy", type=str, default="sandwich")
     parser.add_argument("--search_strategy", type=str, default="random_search")
