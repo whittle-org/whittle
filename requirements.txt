@@ -3,3 +3,4 @@ numpy
 pandas
 torch>=2.2.0
 litgpt[all]
+syne-tune[moo]
