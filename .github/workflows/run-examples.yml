@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         # Run in all these versions of Python
-        python-version: [3.8, 3.9]
+        python-version: [3.9]
 
     steps:
     - uses: actions/checkout@v4
@@ -35,4 +35,5 @@ jobs:
     - name: Run sinc example
       run: |
         python benchmarks/sinc/sinc_nas.py
+        export PYTHONPATH=.
         python benchmarks/sinc/search.py
