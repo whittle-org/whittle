@@ -57,6 +57,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     rng = np.random.RandomState(args.seed)
+    os.makedirs(args.st_checkpoint_dir, exist_ok=True)
     num_data_points = 500
     x = rng.rand(num_data_points)
     y = f(x)
