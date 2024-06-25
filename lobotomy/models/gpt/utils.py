@@ -17,6 +17,7 @@ from typing import (
     Optional,
     TypeVar,
     Union,
+    Iterator,
 )
 
 import lightning as L
@@ -412,7 +413,7 @@ class CycleIterator:
     def __init__(self, iterable: Iterable) -> None:
         self.iterable = iterable
         self.epoch = 0
-        self._iterator = None
+        self._iterator: Optional[Iterator] = None
 
     def __next__(self) -> Any:
         if self._iterator is None:

@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 import litgpt
 from litgpt import Config
@@ -48,8 +50,8 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         self.proj = Linear(config.intermediate_size, config.n_embd, bias=config.bias)
         self.in_features = config.n_embd
         self.intermediate_size = config.intermediate_size
-        self.sub_network_n_embd = None
-        self.sub_network_intermediate_size = None
+        self.sub_network_n_embd: Optional[int] = None
+        self.sub_network_intermediate_size: Optional[int] = None
         self.config = config
 
     def set_sub_network(

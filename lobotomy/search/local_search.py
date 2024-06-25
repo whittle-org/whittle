@@ -48,7 +48,7 @@ class LS(FIFOScheduler):
         config_space: Dict[str, Any],
         metric: List[str],
         mode: Union[List[str], str] = "min",
-        start_point: Dict[str, Any] = None,
+        start_point: Optional[Dict[str, Any]] = None,
         random_seed: Optional[int] = None,
         points_to_evaluate: Optional[List[dict]] = None,
         **kwargs,
@@ -76,10 +76,10 @@ class LocalSearch(StochasticSearcher):
     def __init__(
         self,
         config_space,
-        metric: str,
+        metric: Union[List[str], str],
         points_to_evaluate: Optional[List[dict]] = None,
-        start_point: Dict = None,
-        mode: str = "min",
+        start_point: Optional[Dict] = None,
+        mode: Union[List[str], str] = "min",
         **kwargs,
     ):
         if start_point is None:
@@ -90,7 +90,7 @@ class LocalSearch(StochasticSearcher):
         else:
             self.start_point = start_point
 
-        self._pareto_front = []
+        self._pareto_front: List[PopulationElement] = []
 
         if points_to_evaluate is None:
             points_to_evaluate = [self.start_point]
@@ -105,7 +105,7 @@ class LocalSearch(StochasticSearcher):
             **kwargs,
         )
         if isinstance(self._mode, List):
-            self._metric_op = {
+            self._metric_op: Dict[str, Any] = {
                 metric: 1 if mode == "min" else -1
                 for metric, mode in zip(metric, self._mode)
             }
@@ -173,7 +173,7 @@ class LocalSearch(StochasticSearcher):
             for metric in self._metric
         }
 
-    def _update(self, trial_id: str, config: Dict[str, Any], result: Dict[str, Any]):
+    def _update(self, trial_id: int, config: Dict[str, Any], result: Dict[str, Any]):
         # assume that the new point is in the Pareto Front
         element = PopulationElement(
             trial_id=trial_id, config=config, result=self._metric_dict(result)
