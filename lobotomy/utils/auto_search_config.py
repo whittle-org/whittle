@@ -5,11 +5,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Optional, Type, Union
 
-import torch
 import yaml
 from typing_extensions import Self
 
-import lobotomy.models.litgpt
 from litgpt.utils import find_multiple
 
 

@@ -7,7 +7,6 @@ from lobotomy.models.gpt.extract import extract_sub_network
 
 
 def test_extract_sub_network() -> None:
-
     config = Config.from_name("pythia-70m")
     config.fix_head_size = False
 

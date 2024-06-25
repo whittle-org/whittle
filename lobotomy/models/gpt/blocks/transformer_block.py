@@ -1,6 +1,3 @@
-import torch
-import torch.nn as nn
-from typing import Optional
 import litgpt
 from litgpt import Config
 from lobotomy.models.gpt.blocks.causal_self_attention import CausalSelfAttention
@@ -36,7 +33,6 @@ class Block(litgpt.model.Block):
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
         if self.config.norm_class_name == "RMSNorm":
-
             return RMSNorm
         return LayerNorm
 
