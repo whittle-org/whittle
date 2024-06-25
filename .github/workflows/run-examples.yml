@@ -34,6 +34,6 @@ jobs:
         python -m pip install matplotlib
     - name: Run sinc example
       run: |
-        python benchmarks/sinc/sinc_nas.py
+        python examples/sinc/sinc_nas.py
         export PYTHONPATH=.
-        python benchmarks/sinc/search.py
+        python examples/sinc/search.py

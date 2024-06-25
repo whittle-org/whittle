@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 
 
 from lobotomy.search import multi_objective_search
-from benchmarks.sinc.estimate_efficiency import compute_mac_linear_layer
+from examples.sinc.estimate_efficiency import compute_mac_linear_layer
 
 from sinc_nas import validate, f
 from model import MLP, search_space
