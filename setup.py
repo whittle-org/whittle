@@ -33,7 +33,7 @@ setup(
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache Software License",
     ],
-	python_requires='>=3.11',
+	python_requires='>=3.8',
     platforms=['Linux'],
     install_requires=required_packages,
     include_package_data=True
