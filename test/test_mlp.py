@@ -105,7 +105,7 @@ def test_LLaMAMLP():
     litllama_mlp_large.proj.bias.data = torch.ones_like(
         litllama_mlp_large.proj.bias.data
     )
-    out_large_lit = litllama_mlp_large(input)
+    _ = litllama_mlp_large(input)
     config.n_embd = 32
     config.intermediate_size = 32 * 4
     litllama_mlp_small = LitLLaMAMLP(config)
