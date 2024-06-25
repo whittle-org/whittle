@@ -3,7 +3,6 @@ from lobotomy.modules.linear import Linear
 
 
 def test_linear():
-
     input_features = torch.rand(8, 64)
     l = Linear(64, 10, bias=True)
     l.reset_super_network()

@@ -51,7 +51,6 @@ class GPT(nn.Module):
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
         if self.config.norm_class_name == "RMSNorm":
-
             return RMSNorm
         return LayerNorm
 

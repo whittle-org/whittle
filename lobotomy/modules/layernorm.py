@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 
@@ -18,7 +17,6 @@ class LayerNorm(torch.nn.LayerNorm):
         self.sub_network_in_features = self.in_features
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-
         return F.layer_norm(
             x,
             (self.sub_network_in_features,),

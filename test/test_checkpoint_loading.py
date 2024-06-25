@@ -17,7 +17,6 @@ def checkpoint_dir(tmp_path_factory):
 
 
 def test_checkpoint_loading(checkpoint_dir):
-
     torch.manual_seed(0)
     config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
     input_ids = torch.randint(0, config.vocab_size, (1, config.block_size))  # .cuda()

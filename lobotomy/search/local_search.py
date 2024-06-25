@@ -6,9 +6,6 @@ from dataclasses import dataclass
 
 from syne_tune.optimizer.schedulers import FIFOScheduler
 from syne_tune.optimizer.schedulers.searchers import StochasticSearcher
-from syne_tune.optimizer.schedulers.searchers.searcher_base import (
-    sample_random_configuration,
-)
 from syne_tune.config_space import Domain
 
 
@@ -215,8 +212,6 @@ class LocalSearch(StochasticSearcher):
 
 
 if __name__ == "__main__":
-    import torch
-
     from transformers import AutoConfig
 
     from nas_fine_tuning.sampling import SmallSearchSpace

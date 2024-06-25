@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import litgpt
 from litgpt import Config
 from lobotomy.modules import Linear
