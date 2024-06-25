@@ -6,6 +6,7 @@ from syne_tune.config_space import randint, choice
 from lobotomy.models.gpt import GPT
 from lobotomy.training_strategies import (
     SandwichStrategy,
+    SandwichStrategyKD,
     RandomStrategy,
     StandardStrategy,
     RandomLinearStrategy,
@@ -17,6 +18,7 @@ from lobotomy.modules.linear import Linear
 
 methods = [
     SandwichStrategy,
+    SandwichStrategyKD,
     RandomStrategy,
     StandardStrategy,
     RandomLinearStrategy,

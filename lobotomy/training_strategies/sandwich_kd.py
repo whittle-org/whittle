@@ -1,7 +1,7 @@
 from lobotomy.training_strategies.base_strategy import BaseTrainingStrategy
 
 
-class SandwichStrategy(BaseTrainingStrategy):
+class SandwichStrategyKD(BaseTrainingStrategy):
     """
     Sandwich strategy.
     """
@@ -14,8 +14,8 @@ class SandwichStrategy(BaseTrainingStrategy):
 
         total_loss = 0
         # update super-network
-        y_hat = model(inputs)
-        loss = self.loss_function(y_hat, outputs)
+        y_hat_supernet = model(inputs)
+        loss = self.loss_function(y_hat_supernet, outputs)
         loss.backward()
         total_loss += loss.item()
 
@@ -25,7 +25,7 @@ class SandwichStrategy(BaseTrainingStrategy):
             config = self.sampler.sample()
             model.select_sub_network(config)
             y_hat = model(inputs)
-            loss = self.loss_function(y_hat, outputs)
+            loss = self.loss_function(y_hat, y_hat_supernet.detach())
             loss.backward()
             model.reset_super_network()
             total_loss += loss.item()
@@ -34,7 +34,7 @@ class SandwichStrategy(BaseTrainingStrategy):
         config = self.sampler.get_smallest_sub_network()
         model.select_sub_network(config)
         y_hat = model(inputs)
-        loss = self.loss_function(y_hat, outputs)
+        loss = self.loss_function(y_hat, y_hat_supernet.detach())
         loss.backward()
         model.reset_super_network()
         total_loss += loss.item()
