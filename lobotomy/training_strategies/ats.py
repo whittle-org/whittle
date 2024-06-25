@@ -20,9 +20,10 @@ class ATS(BaseTrainingStrategy):
             for i in range(self.random_samples):
 
                 config = self.sampler.sample()
+                print(config)
                 model.select_sub_network(config)
                 y_hat = model(inputs)
-                loss = self.loss_function(outputs, y_hat)
+                loss = self.loss_function(y_hat, outputs)
                 loss.backward()
                 model.reset_super_network()
 
