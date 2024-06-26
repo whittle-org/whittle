@@ -8,7 +8,7 @@ class BaseTrainingStrategy(object):
         sampler: RandomSampler,
         loss_function: Callable,
         device: str = "cuda",
-        **kwargs
+        **kwargs,
     ):
         """ """
         self.sampler = sampler

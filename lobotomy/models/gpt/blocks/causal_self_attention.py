@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import numpy as np
 from litgpt import Config
 from typing import Optional
 import math

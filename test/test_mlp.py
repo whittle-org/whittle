@@ -129,6 +129,7 @@ def test_LLaMAMLP():
     )
     out_small_lit = litllama_mlp_small(input[:8, :32])
     assert torch.all(out_small == out_small_lit)
+    assert torch.all(out_large == out_large_lit)
 
 
 def test_GemmaMLP():

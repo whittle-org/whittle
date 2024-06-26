@@ -16,12 +16,10 @@ class RandomLinearStrategy(BaseTrainingStrategy):
         self.rate = np.linspace(0.0, 1, total_number_of_steps)
 
     def __call__(self, model, inputs, outputs, **kwargs):
-
         total_loss = 0
         if np.random.rand() <= self.rate[self.current_step]:
             # update random sub-networks
             for i in range(self.random_samples):
-
                 config = self.sampler.sample()
                 model.select_sub_network(config)
                 y_hat = model(inputs)
