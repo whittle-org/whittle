@@ -36,5 +36,16 @@ setup(
     platforms=["Linux"],
     install_requires=required_packages,
     include_package_data=True,
-    # extras_require=optional_requirements
+    extras_require={
+        "test": [
+            "pytest"
+        ],
+        "all": [
+            "pytest",
+            "tqdm",
+            "pygmo",
+            "scikit-learn"
+        ],
+    },
 )
+
