@@ -42,6 +42,8 @@ setup(
         ],
         "all": [
             "pytest",
+            "datasets",
+            "evaluate"
             "tqdm",
             "pygmo",
             "scikit-learn"
