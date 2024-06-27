@@ -12,13 +12,10 @@ class ATS(BaseTrainingStrategy):
         self.current_step = 0
 
     def __call__(self, model, inputs, outputs, **kwargs):
-
         total_loss = 0
         if self.current_step % 2 == 0:
-
             # update random sub-networks
             for i in range(self.random_samples):
-
                 config = self.sampler.sample()
                 print(config)
                 model.select_sub_network(config)

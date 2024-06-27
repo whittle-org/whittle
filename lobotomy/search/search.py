@@ -1,4 +1,6 @@
 import time
+from typing import Optional
+
 import numpy as np
 
 from lobotomy.search.baselines import MethodArguments, methods
@@ -10,9 +12,9 @@ def multi_objective_search(
     objective,
     search_space: dict,
     search_strategy: str = "random_search",
-    objective_kwargs: dict = None,
     num_samples: int = 100,
-    seed: int = None,
+    objective_kwargs: Optional[dict] = None,
+    seed: Optional[int] = None,
 ):
     """
     Search for the Pareto optimal sub-networks.

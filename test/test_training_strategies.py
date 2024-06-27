@@ -42,7 +42,6 @@ sampler_gpt = RandomSampler(config_space=search_space_gpt, seed=42)
 
 class MLP(nn.Module):
     def __init__(self, input_dim):
-
         super(MLP, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = 64
@@ -64,7 +63,6 @@ class MLP(nn.Module):
 
 @pytest.mark.parametrize("strategy", methods)
 def test_integration_training_strategies_mlp(strategy):
-
     update_op = strategy(
         sampler=sampler_mlp,
         loss_function=loss_function,

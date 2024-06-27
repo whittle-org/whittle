@@ -45,13 +45,14 @@ class GPT(nn.Module):
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
         self.sub_network_n_layers = self.config.n_layer
+        self.cos: torch.Tensor
+        self.sin: torch.Tensor
         # self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
 
     @property
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
         if self.config.norm_class_name == "RMSNorm":
-
             return RMSNorm
         return LayerNorm
 

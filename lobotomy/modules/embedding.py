@@ -30,7 +30,7 @@ class Embedding(torch.nn.Embedding):
         )
 
         # the embedding dimensionality of the current sub-network
-        self.sub_network_embedding_dim = None
+        self.sub_network_embedding_dim: Optional[int] = None
 
     def set_sub_network(self, sub_network_embedding_dim: int):
         self.sub_network_embedding_dim = sub_network_embedding_dim
