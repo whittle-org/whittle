@@ -11,7 +11,6 @@ class SandwichStrategy(BaseTrainingStrategy):
         self.random_samples = random_samples
 
     def __call__(self, model, inputs, outputs, **kwargs):
-
         total_loss = 0
         # update super-network
         y_hat = model(inputs)
@@ -21,7 +20,6 @@ class SandwichStrategy(BaseTrainingStrategy):
 
         # update random sub-networks
         for i in range(self.random_samples):
-
             config = self.sampler.sample()
             model.select_sub_network(config)
             y_hat = model(inputs)

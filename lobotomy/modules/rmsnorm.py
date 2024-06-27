@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 
 
@@ -21,7 +23,7 @@ class RMSNorm(torch.nn.Module):
         self.eps = eps
         self.dim = dim
         self.add_unit_offset = add_unit_offset
-        self.sub_network_in_features = None
+        self.sub_network_in_features: Optional[int] = None
 
     def set_sub_network(
         self,
