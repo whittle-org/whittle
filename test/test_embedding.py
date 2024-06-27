@@ -4,7 +4,6 @@ from lobotomy.modules.embedding import Embedding
 
 
 def test_embedding():
-
     input_features = torch.randint(low=1, high=64, size=(4, 8))
     emb = Embedding(64, 32)
 

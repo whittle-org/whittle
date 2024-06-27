@@ -4,3 +4,4 @@ pandas
 torch>=2.2.0
 syne-tune[moo]
 litgpt[all]
+pre-commit
