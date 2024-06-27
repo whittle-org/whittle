@@ -43,7 +43,7 @@ def test_lm_eval_harness(checkpoint_dir_lit, checkpoint_dir_lob) -> None:
         checkpoint_dir_lit,
         out_dir="test_eval/",
         device=None,
-        tasks="hellaswag",
+        tasks="logiqa",
         force_conversion=True,
         batch_size=2,
         limit=5,
@@ -52,7 +52,7 @@ def test_lm_eval_harness(checkpoint_dir_lit, checkpoint_dir_lob) -> None:
     results_json = "test_eval/results.json"
     with open(results_json, "r") as f:
         results = json.load(f)
-    result_litgpt = results["results"]["hellaswag"]["acc,none"]
+    result_litgpt = results["results"]["logiqa"]["acc,none"]
     sub_network = extract_sub_network(super_network, sub_network_config)
     sub_network.load_state_dict(torch.load(str(checkpoint_dir_lit / "lit_model.pth")))
     sub_network.eval()
@@ -62,7 +62,7 @@ def test_lm_eval_harness(checkpoint_dir_lit, checkpoint_dir_lob) -> None:
         checkpoint_dir_lob,
         out_dir="test_eval/",
         device=None,
-        tasks="hellaswag",
+        tasks="logiqa",
         force_conversion=True,
         batch_size=2,
         limit=5,
@@ -70,5 +70,5 @@ def test_lm_eval_harness(checkpoint_dir_lit, checkpoint_dir_lob) -> None:
     results_json = "test_eval/results.json"
     with open(results_json, "r") as f:
         results = json.load(f)
-    result_lobotomy = results["results"]["hellaswag"]["acc,none"]
+    result_lobotomy = results["results"]["logiqa"]["acc,none"]
     assert result_litgpt == result_lobotomy
