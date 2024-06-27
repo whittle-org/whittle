@@ -1,12 +1,9 @@
 import torch
 import pytest
 from litgpt.config import Config
-import torch
 import pathlib
-import contextlib
 import shutil
 import json
-from litgpt.model import GPT as LitGPT
 from lobotomy.models.gpt import GPT
 from lobotomy.models.gpt.extract import extract_sub_network
 import litgpt.eval.evaluate as module
