@@ -104,7 +104,6 @@ if __name__ == "__main__":
     for epoch in range(args.epochs):
         train_loss = 0
         for batch_idx, batch in enumerate(train_dataloader):
-
             x = batch[:, 0].reshape(-1, 1)
             y = batch[:, 1].reshape(-1, 1)
             x = x.to(device)

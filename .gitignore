@@ -11,6 +11,7 @@
 # IDE related
 .vscode/
 .idea/
+test_eval/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
