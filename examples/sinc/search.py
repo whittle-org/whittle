@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 
 
 from lobotomy.search import multi_objective_search
-from lobotomy.estimate_efficency import compute_mac_linear_layer
+from examples.sinc.estimate_efficiency import compute_mac_linear_layer
 
 from sinc_nas import validate, f
 from model import MLP, search_space
@@ -18,9 +18,10 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
-    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--hidden_dim", type=int, default=128)
     parser.add_argument("--training_strategy", type=str, default="sandwich")
+    parser.add_argument("--search_strategy", type=str, default="random_search")
     parser.add_argument("--do_plot", type=bool, default=False)
     parser.add_argument("--st_checkpoint_dir", type=str, default="./checkpoints")
 
@@ -52,6 +53,7 @@ if __name__ == "__main__":
     )
     checkpoint = torch.load(path)
     model.load_state_dict(checkpoint["state"])
+    model = model.to(device)
     model.eval()
 
     def objective(config):
@@ -73,16 +75,25 @@ if __name__ == "__main__":
 
         return mac, loss
 
-    results = multi_objective_search(objective, search_space, objective_kwargs={})
+    results = multi_objective_search(
+        objective,
+        search_space,
+        objective_kwargs={},
+        search_strategy=args.search_strategy,
+        num_samples=100,
+        seed=42,
+    )
 
     costs = np.array(results["costs"])
     plt.scatter(costs[:, 0], costs[:, 1], color="black", label="sub-networks")
 
     idx = np.array(results["is_pareto_optimal"])
-    plt.scatter(costs[idx, 0], costs[idx, 1], color="red", label="Pareto optimal")
+    if args.do_plot:
+        plt.scatter(costs[idx, 0], costs[idx, 1], color="red", label="Pareto optimal")
 
-    plt.xlabel("mac")
-    plt.ylabel("Validation loss")
-    plt.xscale("log")
-    plt.grid(linewidth="1", alpha=0.4)
-    plt.show()
+        plt.xlabel("mac")
+        plt.ylabel("Validation loss")
+        plt.xscale("log")
+        plt.grid(linewidth="1", alpha=0.4)
+        plt.title("Pareto front for Sinc NAS")
+        plt.savefig("pareto_front.png")
