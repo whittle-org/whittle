@@ -7,6 +7,7 @@ from .ats import ATS
 
 __all__ = [
     "SandwichStrategy",
+    "SandwichStrategyKD",
     "RandomStrategy",
     "StandardStrategy",
     "RandomLinearStrategy",

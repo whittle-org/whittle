@@ -79,7 +79,6 @@ def test_integration_training_strategies_mlp(strategy):
 
 @pytest.mark.parametrize("strategy", methods)
 def test_integration_training_strategies_gpt(strategy):
-
     update_op = strategy(
         sampler=sampler_gpt,
         loss_function=torch.nn.CrossEntropyLoss(),
