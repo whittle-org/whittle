@@ -28,8 +28,7 @@ lobotomy/
 ├── extract_subnetworks.py
 ├── __init__.py
 ├── metrics
-│   ├── magnitude.py
-│   └── parameters.py
+│   ├── parameters.py
 ├── models
 │   ├── gpt
 │   │   ├── blocks
@@ -65,9 +64,9 @@ lobotomy/
 │   ├── random_linear.py
 │   ├── random.py
 │   ├── sandwich.py
+│   ├── sandwich_kd.py
 │   └── standard.py
 └── utils
-    ├── auto_search_config.py
     └── __init__.py
 ```
 
