@@ -118,8 +118,12 @@ class GPT(nn.Module):
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
         self.sub_network_n_layers = sub_network_n_layers
-        self.transformer.wte.set_sub_network(self.sub_network_n_embd, sample_random_indices)
-        self.transformer.ln_f.set_sub_network(self.sub_network_n_embd, sample_random_indices)
+        self.transformer.wte.set_sub_network(
+            self.sub_network_n_embd, sample_random_indices
+        )
+        self.transformer.ln_f.set_sub_network(
+            self.sub_network_n_embd, sample_random_indices
+        )
         for i in range(sub_network_n_layers):
             block = self.transformer.h[i]
             block.set_sub_network(
@@ -128,7 +132,9 @@ class GPT(nn.Module):
                 sub_network_num_heads[i],
                 sample_random_indices,
             )
-        self.lm_head.set_sub_network(sub_network_n_embd, self.config.padded_vocab_size, sample_random_indices)
+        self.lm_head.set_sub_network(
+            sub_network_n_embd, self.config.padded_vocab_size, sample_random_indices
+        )
 
     def reset_super_network(self):
         self.sub_network_n_embd = self.config.n_embd

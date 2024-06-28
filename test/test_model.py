@@ -4,6 +4,7 @@ import torch
 import pytest
 from litgpt.model import GPT as LitGPT
 
+
 @pytest.mark.parametrize("sample_random_indices", [True, False])
 def test_gpt(sample_random_indices):
     config = Config()

@@ -30,16 +30,20 @@ class Embedding(torch.nn.Embedding):
         )
 
         # the embedding dimensionality of the current sub-network
-        self.sub_network_embedding_dim: Optional[int] = self.embedding_dim 
+        self.sub_network_embedding_dim: Optional[int] = self.embedding_dim
         self.random_indices = torch.arange(self.sub_network_embedding_dim)
 
-    def set_sub_network(self, sub_network_embedding_dim: int, sample_random_indices:bool=False):
+    def set_sub_network(
+        self, sub_network_embedding_dim: int, sample_random_indices: bool = False
+    ):
         self.sub_network_embedding_dim = sub_network_embedding_dim
         if sample_random_indices:
-          if self.sub_network_embedding_dim > self.embedding_dim:
-           self.random_indices = torch.randint(0, self.embedding_dim, (self.sub_network_embedding_dim,))
-          else:
-           self.random_indices = torch.arange(self.sub_network_embedding_dim)
+            if self.sub_network_embedding_dim > self.embedding_dim:
+                self.random_indices = torch.randint(
+                    0, self.embedding_dim, (self.sub_network_embedding_dim,)
+                )
+            else:
+                self.random_indices = torch.arange(self.sub_network_embedding_dim)
         else:
             self.random_indices = torch.arange(self.sub_network_embedding_dim)
 

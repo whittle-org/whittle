@@ -23,7 +23,7 @@ class RMSNorm(torch.nn.Module):
         self.eps = eps
         self.dim = dim
         self.add_unit_offset = add_unit_offset
-        self.sub_network_in_features: Optional[int]  = self.in_features
+        self.sub_network_in_features: Optional[int] = self.in_features
         self.random_indices = torch.arange(self.sub_network_in_features)
 
     def set_sub_network(

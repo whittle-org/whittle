@@ -11,13 +11,17 @@ class LayerNorm(torch.nn.LayerNorm):
         self.sub_network_in_features = self.in_features
         self.random_indices = torch.arange(self.sub_network_in_features)
 
-    def set_sub_network(self, sub_network_in_features: int, sample_random_indices:bool=False):
+    def set_sub_network(
+        self, sub_network_in_features: int, sample_random_indices: bool = False
+    ):
         self.sub_network_in_features = sub_network_in_features
         if sample_random_indices:
-           if self.sub_network_in_features > self.in_features:
-            self.random_indices = torch.randint(0, self.in_features, (self.sub_network_in_features,))
-           else:
-            self.random_indices = torch.arange(self.sub_network_in_features)
+            if self.sub_network_in_features > self.in_features:
+                self.random_indices = torch.randint(
+                    0, self.in_features, (self.sub_network_in_features,)
+                )
+            else:
+                self.random_indices = torch.arange(self.sub_network_in_features)
         else:
             self.random_indices = torch.arange(self.sub_network_in_features)
 
