@@ -9,18 +9,27 @@ class LayerNorm(torch.nn.LayerNorm):
 
         # Set current sub-network to super-network
         self.sub_network_in_features = self.in_features
+        self.random_indices = torch.arange(self.sub_network_in_features)
 
-    def set_sub_network(self, sub_network_in_features: int):
+    def set_sub_network(self, sub_network_in_features: int, sample_random_indices:bool=False):
         self.sub_network_in_features = sub_network_in_features
+        if sample_random_indices:
+           if self.sub_network_in_features > self.in_features:
+            self.random_indices = torch.randint(0, self.in_features, (self.sub_network_in_features,))
+           else:
+            self.random_indices = torch.arange(self.sub_network_in_features)
+        else:
+            self.random_indices = torch.arange(self.sub_network_in_features)
 
     def reset_super_network(self):
         self.sub_network_in_features = self.in_features
+        self.random_indices = torch.arange(self.sub_network_in_features)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return F.layer_norm(
             x,
             (self.sub_network_in_features,),
-            weight=self.weight[: self.sub_network_in_features],
-            bias=self.bias[: self.sub_network_in_features],
+            weight=self.weight[self.random_indices],
+            bias=self.bias[self.random_indices],
             eps=self.eps,
         )
