@@ -1,11 +1,7 @@
 import torch
 import torch.nn as nn
 
-from syne_tune.config_space import randint
-
 from lobotomy.modules import Linear
-
-search_space = {"num_units": randint(1, 128)}
 
 
 class MLP(nn.Module):
