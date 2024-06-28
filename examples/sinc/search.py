@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from torch.utils.data import DataLoader
 
-
+from syne_tune.config_space import randint
 from lobotomy.search import multi_objective_search
 from examples.sinc.estimate_efficiency import compute_mac_linear_layer
 
@@ -24,8 +24,9 @@ if __name__ == "__main__":
     parser.add_argument("--search_strategy", type=str, default="random_search")
     parser.add_argument("--do_plot", type=bool, default=False)
     parser.add_argument("--st_checkpoint_dir", type=str, default="./checkpoints")
-
+    search_space = {}
     args, _ = parser.parse_known_args()
+    search_space = {"num_units": randint(1, args.hidden_dim)}
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     rng = np.random.RandomState(42)

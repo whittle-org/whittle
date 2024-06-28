@@ -12,8 +12,8 @@ from torch.utils.data import DataLoader
 from syne_tune.report import Reporter
 from lobotomy.training_strategies import SandwichStrategy
 from lobotomy.sampling.random_sampler import RandomSampler
-
-from model import MLP, search_space
+from syne_tune.config_space import randint
+from model import MLP
 
 report = Reporter()
 
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     #     os.makedirs(args.st_checkpoint_dir, exist_ok=True)
     lc_valid = []
     lc_train = []
-
+    search_space = {"num_units": randint(1, args.hidden_dim)}
     sampler = RandomSampler(search_space, seed=args.seed)
     training_strategies = {
         # 'standard': train_epoch,

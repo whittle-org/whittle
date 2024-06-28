@@ -7,7 +7,7 @@
 
 # Model files
 *.pth
-
+checkpoints/
 # IDE related
 .vscode/
 .idea/
