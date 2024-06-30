@@ -18,6 +18,7 @@ from lobotomy.modules.embedding import Embedding
 from lobotomy.modules.linear import Linear
 from lobotomy.modules.rmsnorm import RMSNorm
 from lobotomy.modules.layernorm import LayerNorm
+import random
 
 
 class GPT(nn.Module):
@@ -45,6 +46,7 @@ class GPT(nn.Module):
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
         self.sub_network_n_layers = self.config.n_layer
+        self.sample_random_indices = False
         self.cos: torch.Tensor
         self.sin: torch.Tensor
         # self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
@@ -114,6 +116,7 @@ class GPT(nn.Module):
         sub_network_n_layers: int,
         sample_random_indices: bool = False,
     ) -> None:
+        self.sample_random_indices = sample_random_indices
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
@@ -175,29 +178,31 @@ class GPT(nn.Module):
             x = x * (
                 self.sub_network_n_embd**0.5
             )  # TODO: forward is only implemented due to change in this line
-
-        for i, block in enumerate(self.transformer.h):
-            if i < self.sub_network_n_layers:
-                if isinstance(self.sub_network_num_heads, list):
-                    cos, sin = build_rope_cache(
-                        T,
-                        n_elem=int(
-                            self.config.rotary_percentage
-                            * (self.sub_network_n_embd // self.sub_network_num_heads[i])
-                        ),
-                    )
-                else:
-                    cos, sin = build_rope_cache(
-                        T,
-                        n_elem=int(
-                            self.config.rotary_percentage
-                            * (self.sub_network_n_embd // self.sub_network_num_heads)
-                        ),
-                    )
-                cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
-                x = block(x, cos, sin, mask, input_pos)
+        if self.sample_random_indices:
+            random_layers = list(range(self.sub_network_n_layers))
+            random.shuffle(random_layers)
+        else:
+            random_layers = list(range(self.sub_network_n_layers))
+        for i in random_layers:
+            block = self.transformer.h[i]
+            if isinstance(self.sub_network_num_heads, list):
+                cos, sin = build_rope_cache(
+                    T,
+                    n_elem=int(
+                        self.config.rotary_percentage
+                        * (self.sub_network_n_embd // self.sub_network_num_heads[i])
+                    ),
+                )
             else:
-                break
+                cos, sin = build_rope_cache(
+                    T,
+                    n_elem=int(
+                        self.config.rotary_percentage
+                        * (self.sub_network_n_embd // self.sub_network_num_heads)
+                    ),
+                )
+            cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
+            x = block(x, cos, sin, mask, input_pos)
         x = self.transformer.ln_f(x)
         return self.lm_head(x)  # (b, t, vocab_size)
 
