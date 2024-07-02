@@ -48,6 +48,7 @@ def compute_mac(
 
 
 def compute_parameters(dmodel, dhead, num_heads_per_layer, num_neurons_per_layer):
+
     num_layers = num_heads_per_layer.shape[0]
     assert num_layers == num_neurons_per_layer.shape[0]
 
@@ -78,9 +79,8 @@ def compute_parameters(dmodel, dhead, num_heads_per_layer, num_neurons_per_layer
 
 def compute_latency(model, tokenizer, batch, device):
     # train_dataset[0][sentence1_key],
-    starter, ender = (
-        torch.cuda.Event(enable_timing=True),
-        torch.cuda.Event(enable_timing=True),
+    starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(
+        enable_timing=True
     )
     repetitions = 300
     timings = np.zeros((repetitions, 1))

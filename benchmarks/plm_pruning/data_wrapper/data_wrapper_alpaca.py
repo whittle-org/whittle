@@ -157,6 +157,7 @@ class DataCollatorForSupervisedDataset(object):
 
 class AlpacaDataset(DataWrapper):
     def _load_data(self):
+
         dataset = SupervisedDataset(
             tokenizer=self.tokenizer, data_path=self.data_args.train_file
         )
@@ -198,6 +199,7 @@ class AlpacaDataset(DataWrapper):
         return tokenizer
 
     def get_data_collator(self):
+
         data_collator = DataCollatorForSupervisedDataset(tokenizer=self.tokenizer)
 
         return data_collator
