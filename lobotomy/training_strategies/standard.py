@@ -4,9 +4,17 @@ from lobotomy.training_strategies.base_strategy import BaseTrainingStrategy
 class StandardStrategy(BaseTrainingStrategy):
     """
     Standard strategy.
+
+    Only updates the super-network.
     """
 
     def __init__(self, **kwargs):
+        """
+        Initialises a `StandardStrategy`
+
+        Args:
+            **kwargs: kwargs of `BaseTrainingStrategy`
+        """
         super().__init__(**kwargs)
 
     def __call__(self, model, inputs, outputs, **kwargs):
