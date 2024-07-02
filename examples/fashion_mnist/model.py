@@ -18,7 +18,7 @@ class LeNet(nn.Module):
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 10)
 
-    def forward_dense_lottery(self, x, fc1_out, fc2_out, sample_last: Optional[bool]=False):
+    def forward_dense_lottery(self, x, fc1_out, fc2_out, sample_last: Optional[bool] = False):
         x = x.reshape(x.shape[0], -1)
         x = self.fc_base(x)
         x = F.relu(x)
@@ -38,15 +38,29 @@ class LeNet(nn.Module):
         return x
 
     @staticmethod
-    def sample_ids(max_id, min_id, num_ids):
-        ids = np.random.choice(np.arange(max_id), num_ids)
-        return ids
+    def sample_ids(max_id: int, num_ids: int):
+        return np.random.choice(np.arange(max_id), num_ids)
 
     def forward_dense_random_neurons(self, x, fc1_out, fc2_out, seed=1234):
+        """
+        # TODO: replace these individual forwards with calls to lobotomy.modules.Linear 
+        
+        Randomly samples a subset of neurons from each layer (i.e., a sub-network) and computes the forward pass.
+        Args:
+            x: input tensor
+            fc1_out: 
+            fc2_out: 
+            seed: 
+
+        Returns:
+
+        """
         np.random.seed(seed)
         x = x.reshape(x.shape[0], -1)
-        fc1_ids = self.sample_ids(120, 0, fc1_out)
-        fc2_ids = self.sample_ids(84, 0, fc2_out)
+        # TODO: in the case of fc1_out=120 and fc2_out=84, this will sample all neurons, but currently with replacement
+        fc1_ids = self.sample_ids(max_id=120, num_ids=fc1_out)
+        fc2_ids = self.sample_ids(max_id=84, num_ids=fc2_out)
+
         x = self.fc_base(x)
         x = F.relu(x)
         x = F.linear(x, weight=self.fc1.weight[fc1_ids, :], bias=self.fc1.bias[fc1_ids])
