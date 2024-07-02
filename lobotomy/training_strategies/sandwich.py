@@ -2,7 +2,8 @@ from lobotomy.training_strategies.base_strategy import BaseTrainingStrategy
 
 
 class SandwichStrategy(BaseTrainingStrategy):
-    """Sandwich strategy.
+    """
+    Sandwich strategy.
 
     In each step, the sandwich strategy updates the super-network, the smallest, and `random_samples` randomly sampled
     sub-networks.

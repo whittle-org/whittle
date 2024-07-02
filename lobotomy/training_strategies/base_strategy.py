@@ -3,7 +3,8 @@ from typing import Callable
 
 
 class BaseTrainingStrategy(object):
-    """Base Training Strategy
+    """
+    Base Training Strategy.
 
     Base class that all training strategies inherit from.
     """
