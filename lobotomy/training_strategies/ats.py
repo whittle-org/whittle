@@ -13,13 +13,17 @@ class ATS(BaseTrainingStrategy):
 
     def __call__(self, model, inputs, outputs, **kwargs):
         total_loss = 0
+        y_supernet = model(inputs).detach()
         if self.current_step % 2 == 0:
             # update random sub-networks
             for i in range(self.random_samples):
                 config = self.sampler.sample()
                 model.select_sub_network(config)
                 y_hat = model(inputs)
-                loss = self.loss_function(y_hat, outputs)
+                if self.use_kd_loss:
+                    loss = self.kd_loss(y_hat, outputs, y_supernet)
+                else:
+                    loss = self.loss_function(y_hat, outputs)
                 loss.backward()
                 model.reset_super_network()
 
