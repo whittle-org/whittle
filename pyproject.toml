@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "lobotomy"
+version = "0.0.1"
+description = "Two-stage weight sharing neural architecture search."
+authors = ["Aaron Klein"]
+license = "Apache License 2.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9, <3.12"
+#scipy = "^1.14.0"
+pandas = "^2.2.2"
+PyYAML = "^6.0.1"
+matplotlib = "^3.9.0"
+transformers = "^4.42.3"
+typing-extensions = "^4.12.2"
+torch = ">=2.2.0"
+litgpt = {extras = ["all"], version = "^0.4.2"}
+syne-tune = {extras = ["moo"], version = "^0.13.0"}
+
+[tool.poetry.dev-dependencies]
+pre-commit = "^3.7.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
