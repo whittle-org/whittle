@@ -1,11 +1,9 @@
 name: Run Examples
-
 on:
   push:
     branches: [ main, examples ]
   pull_request:
     branches: [ main ]
-
 jobs:
   test-examples:
     runs-on: ubuntu-latest
