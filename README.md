@@ -10,6 +10,9 @@ A framework for two-stage neural architecture search (NAS) and structural prunin
 5. Install dependencies with `poetry install`
 6. Activate the environment with `poetry shell`
 
+`Note: the library supports and is tested for python 3.9. to 3.11`
+
+
 ```sh
 curl -sSL https://install.python-poetry.org | python3 -
 git clone git@github.com:aaronkl/lobotomy.git
@@ -17,7 +20,6 @@ cd ./lobotomy
 poetry install
 poetry shell
 ```
-
 
 ## Structure
 
