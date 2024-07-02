@@ -8,12 +8,12 @@ import torch.nn as nn
 from argparse import ArgumentParser
 from pathlib import Path
 from torch.utils.data import DataLoader
-
+from syne_tune.config_space import randint
 from syne_tune.report import Reporter
 from lobotomy.training_strategies import SandwichStrategy
 from lobotomy.sampling.random_sampler import RandomSampler
 
-from model import MLP, search_space
+from model import MLP
 
 report = Reporter()
 
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    search_space = {"num_units": randint(1, args.hidden_dim)}
     rng = np.random.RandomState(args.seed)
     os.makedirs(args.st_checkpoint_dir, exist_ok=True)
     num_data_points = 500
@@ -104,7 +104,6 @@ if __name__ == "__main__":
     for epoch in range(args.epochs):
         train_loss = 0
         for batch_idx, batch in enumerate(train_dataloader):
-
             x = batch[:, 0].reshape(-1, 1)
             y = batch[:, 1].reshape(-1, 1)
             x = x.to(device)

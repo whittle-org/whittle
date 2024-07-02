@@ -6,12 +6,12 @@ from argparse import ArgumentParser
 from pathlib import Path
 from torch.utils.data import DataLoader
 
-
+from syne_tune.config_space import randint
 from lobotomy.search import multi_objective_search
 from examples.sinc.estimate_efficiency import compute_mac_linear_layer
 
 from sinc_nas import validate, f
-from model import MLP, search_space
+from model import MLP
 
 
 if __name__ == "__main__":
@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     args, _ = parser.parse_known_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    search_space = {"num_units": randint(1, args.hidden_dim)}
     rng = np.random.RandomState(42)
     num_data_points = 500
     x = rng.rand(num_data_points)

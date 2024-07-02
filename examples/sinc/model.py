@@ -5,12 +5,9 @@ from syne_tune.config_space import randint
 
 from lobotomy.modules import Linear
 
-search_space = {"num_units": randint(1, 512)}
-
 
 class MLP(nn.Module):
     def __init__(self, input_dim, hidden_dim=200, device="cuda"):
-
         super(MLP, self).__init__()
 
         self.hidden_dim = hidden_dim
