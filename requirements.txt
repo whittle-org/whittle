@@ -1,6 +1,11 @@
 scipy
 numpy
 pandas
+pyyaml
+matplotlib
+transformers
+typing_extensions
 torch>=2.2.0
-syne-tune[moo]
 litgpt[all]
+syne-tune[moo]
+pre-commit

@@ -1,6 +1,5 @@
-import torch
-import torch.nn as nn
-from typing import Optional
+from typing import Optional, Union
+
 import litgpt
 from litgpt import Config
 from lobotomy.models.gpt.blocks.causal_self_attention import CausalSelfAttention
@@ -21,7 +20,7 @@ class Block(litgpt.model.Block):
 
         self.norm_1 = self.norm_class()(config.n_embd, eps=config.norm_eps)
         self.attn = CausalSelfAttention(config)
-        self.norm_2 = (
+        self.norm_2: Optional[Union[LayerNorm, RMSNorm]] = (
             None
             if config.shared_attention_norm
             else self.norm_class()(config.n_embd, eps=config.norm_eps)
@@ -36,7 +35,6 @@ class Block(litgpt.model.Block):
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
         if self.config.norm_class_name == "RMSNorm":
-
             return RMSNorm
         return LayerNorm
 
@@ -62,7 +60,7 @@ class Block(litgpt.model.Block):
         self.sub_network_num_heads = sub_network_num_heads
         self.norm_1.set_sub_network(self.sub_network_n_embd)
         self.attn.set_sub_network(self.sub_network_n_embd, self.sub_network_num_heads)
-        if not self.config.shared_attention_norm:
+        if not self.config.shared_attention_norm and self.norm_2 is not None:
             self.norm_2.set_sub_network(self.sub_network_n_embd)
         self.mlp.set_sub_network(
             self.sub_network_n_embd, self.sub_network_intermediate_size

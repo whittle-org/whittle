@@ -31,6 +31,7 @@ def validate(model, valid_loader, device):
         x = batch[:, 0].reshape(-1, 1)
         y = batch[:, 1].reshape(-1, 1)
         x = x.to(device)
+        y = y.to(device)
 
         y_hat = model(x)
         loss = nn.functional.mse_loss(y, y_hat)
@@ -44,7 +45,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
-    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--hidden_dim", type=int, default=128)
     parser.add_argument("--training_strategy", type=str, default="sandwich")
     parser.add_argument("--do_plot", type=bool, default=False)
@@ -56,6 +57,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     rng = np.random.RandomState(args.seed)
+    os.makedirs(args.st_checkpoint_dir, exist_ok=True)
     num_data_points = 500
     x = rng.rand(num_data_points)
     y = f(x)
@@ -74,7 +76,7 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     valid_dataloader = DataLoader(valid_data, batch_size=args.batch_size, shuffle=False)
 
-    model = MLP(input_dim=1, hidden_dim=args.hidden_dim, device=device)
+    model = MLP(input_dim=1, hidden_dim=args.hidden_dim, device=device).to(device)
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
@@ -106,6 +108,7 @@ if __name__ == "__main__":
             x = batch[:, 0].reshape(-1, 1)
             y = batch[:, 1].reshape(-1, 1)
             x = x.to(device)
+            y = y.to(device)
 
             optimizer.zero_grad()
 
