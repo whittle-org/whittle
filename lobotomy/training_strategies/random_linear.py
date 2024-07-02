@@ -23,14 +23,14 @@ class RandomLinearStrategy(BaseTrainingStrategy):
                 config = self.sampler.sample()
                 model.select_sub_network(config)
                 y_hat = model(inputs)
-                loss = self.loss_function(outputs, y_hat)
+                loss = self.loss_function(y_hat, outputs)
                 loss.backward()
                 model.reset_super_network()
 
                 total_loss += loss.item()
         else:
             y_hat = model(inputs)
-            loss = self.loss_function(outputs, y_hat)
+            loss = self.loss_function(y_hat, outputs)
             loss.backward()
             total_loss = loss.item()
         self.current_step += 1
