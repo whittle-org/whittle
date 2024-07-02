@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  examples-test:
 
     runs-on: ubuntu-latest
 
@@ -17,23 +17,18 @@ jobs:
         python-version: [3.9]
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-    - name: Display Python version
-      run: python -c "import sys; print(sys.version)"
-    - name: Install dependencies
-      run: |
-        python -m pip install -r requirements.txt
-        python -m pip install . 
-        python -m pip install pytest
-        python -m pip install syne-tune[moo]
-        python -m pip install matplotlib
-    - name: Run sinc example
-      run: |
-        python examples/sinc/sinc_nas.py
-        export PYTHONPATH=.
-        python examples/sinc/search.py
+      - uses: actions/checkout@v4
+      - name: Install poetry
+        run: pipx install poetry
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'poetry'
+      - name: Install dependencies with poetry
+        run: poetry install
+      - name: Run sinc example
+        run: |
+          poetry run examples/sinc/sinc_nas.py
+          export PYTHONPATH=.
+          poetry run examples/sinc/search.py
