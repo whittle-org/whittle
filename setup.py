@@ -37,17 +37,7 @@ setup(
     install_requires=required_packages,
     include_package_data=True,
     extras_require={
-        "test": [
-            "pytest"
-        ],
-        "all": [
-            "pytest",
-            "datasets",
-            "evaluate"
-            "tqdm",
-            "pygmo",
-            "scikit-learn"
-        ],
+        "test": ["pytest"],
+        "all": ["pytest", "datasets", "evaluate" "tqdm", "pygmo", "scikit-learn"],
     },
 )
-
