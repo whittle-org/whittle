@@ -17,7 +17,9 @@ class LayerNorm(torch.nn.LayerNorm):
         self.sub_network_in_features = sub_network_in_features
         if sample_random_indices:
             if self.sub_network_in_features < self.in_features:
-                self.random_indices = torch.randperm(self.in_features)[:self.sub_network_in_features]
+                self.random_indices = torch.randperm(self.in_features)[
+                    : self.sub_network_in_features
+                ]
             else:
                 self.random_indices = torch.arange(self.sub_network_in_features)
         else:
