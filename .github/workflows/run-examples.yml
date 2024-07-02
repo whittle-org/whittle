@@ -23,6 +23,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'poetry'
+      - name: Install dependencies with poetry
+        run: poetry install
       - name: Run sinc example
         run: |
           poetry run python examples/sinc/sinc_nas.py
