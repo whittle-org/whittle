@@ -4,9 +4,19 @@ from lobotomy.training_strategies.base_strategy import BaseTrainingStrategy
 class ATS(BaseTrainingStrategy):
     """
     ATS strategy.
+
+    Updates `random_samples` randomly sampled sub-networks if `self.current_step` is even, otherwise it updates
+    the super-network.
     """
 
     def __init__(self, random_samples: int = 1, **kwargs):
+        """
+        Initialises an `ATS` strategy.
+
+        Args:
+            random_samples: the number of randomly sampled sub-networks to sample and update in each step
+            **kwargs: kwargs of `BaseTrainingStrategy`
+        """
         super().__init__(**kwargs)
         self.random_samples = random_samples
         self.current_step = 0

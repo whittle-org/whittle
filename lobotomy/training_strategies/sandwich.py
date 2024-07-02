@@ -2,11 +2,23 @@ from lobotomy.training_strategies.base_strategy import BaseTrainingStrategy
 
 
 class SandwichStrategy(BaseTrainingStrategy):
-    """
-    Sandwich strategy.
+    """Sandwich strategy.
+
+    In each step, the sandwich strategy updates the super-network, the smallest, and `random_samples` randomly sampled
+    sub-networks.
+
+    refs:
+        * https://arxiv.org/abs/1903.05134
     """
 
     def __init__(self, random_samples=2, **kwargs):
+        """
+        Initialises a `SandwichStrategy`
+
+        Args:
+            random_samples: the number of randomly sampled sub-networks to sample and update in each step
+            **kwargs: kwargs of `BaseTrainingStrategy`
+        """
         super().__init__(**kwargs)
         self.random_samples = random_samples
 

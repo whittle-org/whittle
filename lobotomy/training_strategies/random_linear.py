@@ -6,9 +6,24 @@ from lobotomy.training_strategies.base_strategy import BaseTrainingStrategy
 class RandomLinearStrategy(BaseTrainingStrategy):
     """
     Random linear strategy.
+
+    Updates `random_samples` randomly sampled sub-network with probability `p` or the super-network with `1 - p`. `p`
+    linearly increases with the step count.
+
+    refs:
+        * https://arxiv.org/abs/2405.02267
+        * https://proceedings.mlr.press/v80/bender18a/bender18a.pdf
     """
 
     def __init__(self, total_number_of_steps: int, random_samples: int = 1, **kwargs):
+        """
+        Initialises a `RandomLinearStrategy`
+
+        Args:
+            total_number_of_steps: the number of steps the optimization runs for
+            random_samples: the number of randomly sampled sub-networks to sample and update in each step
+            **kwargs: kwargs of `BaseTrainingStrategy`
+        """
         super().__init__(**kwargs)
         self.random_samples = random_samples
         self.total_number_of_steps = total_number_of_steps
