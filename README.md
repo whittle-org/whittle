@@ -3,23 +3,21 @@ A framework for two-stage neural architecture search (NAS) and structural prunin
 
 ## Setup
 
-Create a virtual environment if you are not using one. Using miniconda:
+1. clone this repository
+2. Install [poetry](https://python-poetry.org/docs/#installation)
+3. Make sure to add poetry to your `PATH`
+4. `cd` into the directory of the repository
+5. Install dependencies with `poetry install`
+6. Activate the environment with `poetry shell`
 
 ```sh
-$ conda create -n lobotomy python==3.9
-$ conda activate lobotomy
-$ pip install --upgrade pip setuptools
+curl -sSL https://install.python-poetry.org | python3 -
+git clone git@github.com:aaronkl/lobotomy.git
+cd ./lobotomy
+poetry install
+poetry shell
 ```
 
-To install in developer mode (-e) run:
-
-```sh
-$ git clone https://github.com/aaronkl/lobotomy
-$ cd lobotomy
-$ pip install -e .[all]
-```
-
-For a minimal installation use `pip install -e .` instead.
 
 ## Structure
 
