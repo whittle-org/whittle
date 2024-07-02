@@ -21,7 +21,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'poetry'
+#          cache: 'poetry'
+      - name: cache poetry install
+        uses: actions/cache@v2
+        with:
+          path: ~/.local
+          key: poetry
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
