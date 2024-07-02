@@ -30,7 +30,6 @@ search_space_mlp = {"num_units": randint(1, 64)}
 sampler_mlp = RandomSampler(config_space=search_space_mlp, seed=42)
 
 loss_function = torch.nn.functional.mse_loss
-
 search_space_gpt = {
     "embed_dim": randint(1, 32),
     "num_heads": choice([2, 4]),
@@ -78,10 +77,12 @@ def test_integration_training_strategies_mlp(strategy):
 
 
 @pytest.mark.parametrize("strategy", methods)
-def test_integration_training_strategies_gpt(strategy):
+@pytest.mark.parametrize("use_kd_loss", [True, False])
+def test_integration_training_strategies_gpt(strategy, use_kd_loss):
     update_op = strategy(
         sampler=sampler_gpt,
         loss_function=torch.nn.CrossEntropyLoss(),
+        use_kd_loss=use_kd_loss,
         device="cpu",
         total_number_of_steps=1,
     )
