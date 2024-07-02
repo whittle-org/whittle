@@ -24,15 +24,25 @@ class RMSNorm(torch.nn.Module):
         self.dim = dim
         self.add_unit_offset = add_unit_offset
         self.sub_network_in_features: Optional[int] = None
+        self.random_indices = torch.arange(self.in_features)
 
     def set_sub_network(
         self,
         sub_network_in_features: int,
+        sample_random_indices: bool = False,
     ):
         self.sub_network_in_features = sub_network_in_features
+        if sample_random_indices:
+            if self.sub_network_in_features < self.in_features:
+                self.random_indices_in_features = torch.randperm(self.in_features)[:self.sub_network_in_features]
+            else:
+                self.random_indices = torch.arange(self.sub_network_in_features)
+        else:
+            self.random_indices = torch.arange(self.sub_network_in_features)
 
     def reset_super_network(self):
         self.sub_network_in_features = self.in_features
+        self.random_indices = torch.arange(self.sub_network_in_features)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         assert (
@@ -44,8 +54,8 @@ class RMSNorm(torch.nn.Module):
         norm_x = torch.mean(x * x, dim=self.dim, keepdim=True)
         x_normed = x * torch.rsqrt(norm_x + self.eps)
         if self.add_unit_offset:
-            return x_normed * (1.0 + self.weight[: self.sub_network_in_features])
-        return (self.weight[: self.sub_network_in_features] * x_normed).to(dtype=dtype)
+            return x_normed * (1.0 + self.weight[self.random_indices])
+        return (self.weight[self.random_indices] * x_normed).to(dtype=dtype)
 
     def reset_parameters(self) -> None:
         torch.nn.init.ones_(self.weight)
