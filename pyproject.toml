@@ -20,6 +20,7 @@ syne-tune = {extras = ["moo"], version = "^0.13.0"}
 
 [tool.poetry.dev-dependencies]
 pre-commit = "^3.7.1"
+pytest = "^8.2.2"
 
 
 [build-system]
