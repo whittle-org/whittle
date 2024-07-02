@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         # Run in all these versions of Python
-        python-version: [3.9]
+        python-version: [3.9, 3.10, 3.11]
     steps:
       - uses: actions/checkout@v4
       - name: Install poetry
@@ -20,8 +20,7 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-#          python-version: ${{ matrix.python-version }}
-          python-version-file: "pyproject.toml"
+          python-version: ${{ matrix.python-version }}
           cache: 'poetry'
       - name: Run sinc example
         run: |
