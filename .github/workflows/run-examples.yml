@@ -29,6 +29,6 @@ jobs:
         run: poetry install
       - name: Run sinc example
         run: |
-          python examples/sinc/sinc_nas.py
+          poetry run python -V examples/sinc/sinc_nas.py
           export PYTHONPATH=.
-          python examples/sinc/search.py
+          poetry run python -V  examples/sinc/search.py
