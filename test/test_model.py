@@ -1,10 +1,12 @@
 from lobotomy.models.gpt import GPT
 from litgpt import Config
 import torch
+import pytest
 from litgpt.model import GPT as LitGPT
 
 
-def test_gpt():
+@pytest.mark.parametrize("sample_random_indices", [True, False])
+def test_gpt(sample_random_indices):
     config = Config()
     config.padded_vocab_size = 512
     config.n_embd = 64
@@ -48,6 +50,7 @@ def test_gpt():
         sub_network_intermediate_size=[32 * 4 for i in range(4)],
         sub_network_num_heads=[4 for i in range(4)],
         sub_network_n_layers=4,
+        sample_random_indices=sample_random_indices,
     )
     out_small = gpt(input)
     assert out_small.shape == (8, 512, 512)
