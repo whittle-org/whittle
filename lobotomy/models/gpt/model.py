@@ -204,7 +204,7 @@ class GPT(nn.Module):
         device: Optional[torch.device] = None,
         dtype: Optional[torch.dtype] = None,
     ) -> None:
-        """if rope_cache_length is None:
+        if rope_cache_length is None:
             rope_cache_length = self.cos.size(-1)
         max_seq_length = self.max_seq_length
 
@@ -212,7 +212,7 @@ class GPT(nn.Module):
         for block in self.transformer.h:
             block.attn.kv_cache = block.attn.build_kv_cache(
                 batch_size, max_seq_length, rope_cache_length, device, dtype
-            )"""
+            )
 
         if self.mask_cache is None or self.mask_cache.size(3) != self.max_seq_length:
             # passing `attn_mask` to SDPA disables the flash implementation. since we only need the mask
