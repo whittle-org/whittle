@@ -37,15 +37,14 @@ class Embedding(torch.nn.Embedding):
         self, sub_network_embedding_dim: int, sample_random_indices: bool = False
     ):
         self.sub_network_embedding_dim = sub_network_embedding_dim
-        if sample_random_indices:
-            if self.sub_network_embedding_dim < self.embedding_dim:
-                self.random_indices = torch.randperm(self.embedding_dim)[
-                    : self.sub_network_embedding_dim
-                ]
-            else:
-                self.random_indices = torch.arange(self.sub_network_embedding_dim)
-        else:
-            self.random_indices = torch.arange(self.sub_network_embedding_dim)
+        self.random_indices = torch.arange(self.sub_network_embedding_dim)
+        if (
+            sample_random_indices
+            and self.sub_network_embedding_dim < self.embedding_dim
+        ):
+            self.random_indices = torch.randperm(self.embedding_dim)[
+                : self.sub_network_embedding_dim
+            ]
 
     def reset_super_network(self):
         self.sub_network_embedding_dim = self.embedding_dim

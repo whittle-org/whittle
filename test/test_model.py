@@ -7,6 +7,7 @@ from litgpt.model import GPT as LitGPT
 
 @pytest.mark.parametrize("sample_random_indices", [True, False])
 def test_gpt(sample_random_indices):
+    torch.manual_seed(0)
     config = Config()
     config.padded_vocab_size = 512
     config.n_embd = 64
@@ -14,7 +15,7 @@ def test_gpt(sample_random_indices):
     config.n_head = 8
     config.n_query_groups = 4
     config.head_size = 8
-    config.n_layer = 8
+    config.n_layer = 2
     config.block_size = 512
     config.norm_class_name = "RMSNorm"
     config.mlp_class_name = "LLaMAMLP"
@@ -27,6 +28,7 @@ def test_gpt(sample_random_indices):
     gpt.lm_head.weight.data = torch.ones_like(gpt.lm_head.weight.data)
     gpt.lm_head.bias.data = torch.ones_like(gpt.lm_head.bias.data)
     gpt.transformer.ln_f.weight.data = torch.ones_like(gpt.transformer.ln_f.weight.data)
+
     for block in gpt.transformer.h:
         block.attn.attn.weight.data = torch.ones_like(block.attn.attn.weight.data)
         block.attn.attn.bias.data = torch.ones_like(block.attn.attn.bias.data)
@@ -49,10 +51,50 @@ def test_gpt(sample_random_indices):
         sub_network_n_embd=32,
         sub_network_intermediate_size=[32 * 4 for i in range(4)],
         sub_network_num_heads=[4 for i in range(4)],
-        sub_network_n_layers=4,
+        sub_network_n_layers=1,
         sample_random_indices=sample_random_indices,
     )
     out_small = gpt(input)
+    if sample_random_indices:
+        assert torch.all(
+            gpt.transformer.wte.random_indices
+            == torch.tensor(
+                [
+                    7,
+                    1,
+                    39,
+                    6,
+                    29,
+                    35,
+                    43,
+                    52,
+                    25,
+                    21,
+                    19,
+                    5,
+                    55,
+                    51,
+                    23,
+                    33,
+                    31,
+                    45,
+                    46,
+                    2,
+                    13,
+                    0,
+                    17,
+                    40,
+                    27,
+                    4,
+                    3,
+                    11,
+                    12,
+                    59,
+                    9,
+                    58,
+                ]
+            )
+        )
     assert out_small.shape == (8, 512, 512)
 
     lit_gpt = LitGPT(config)
@@ -80,7 +122,7 @@ def test_gpt(sample_random_indices):
     config.n_head = 4
     config.n_query_groups = 2
     config.intermediate_size = 32 * 4
-    config.n_layer = 4
+    config.n_layer = 1
     lit_gpt_small = LitGPT(config)
     lit_gpt_small.lm_head.weight.data = torch.ones_like(
         lit_gpt_small.lm_head.weight.data
