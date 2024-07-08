@@ -1,5 +1,5 @@
 from lobotomy.sampling.random_sampler import RandomSampler
-from typing import Callable
+from typing import Callable, Optional
 from lobotomy.loss import DistillLoss
 import torch
 
@@ -9,7 +9,7 @@ class BaseTrainingStrategy(object):
         self,
         sampler: RandomSampler,
         loss_function: Callable,
-        kd_loss: DistillLoss = None,
+        kd_loss: Optional[DistillLoss] = None,
         device: str = "cuda",
         **kwargs,
     ):
