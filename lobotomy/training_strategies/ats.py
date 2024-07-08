@@ -20,7 +20,7 @@ class ATS(BaseTrainingStrategy):
                 config = self.sampler.sample()
                 model.select_sub_network(config)
                 y_hat = model(inputs)
-                if self.use_kd_loss:
+                if self.kd_loss is not None:
                     loss = self.kd_loss(y_hat, outputs, y_supernet)
                 else:
                     loss = self.loss_function(y_hat, outputs)
@@ -30,7 +30,10 @@ class ATS(BaseTrainingStrategy):
                 total_loss += loss.item()
         else:
             y_hat = model(inputs)
-            loss = self.loss_function(y_hat, outputs)
+            if self.kd_loss is not None:
+                loss = self.kd_loss(y_hat, outputs, y_supernet)
+            else:
+                loss = self.loss_function(y_hat, outputs)
             loss.backward()
             total_loss = loss.item()
         self.current_step += 1

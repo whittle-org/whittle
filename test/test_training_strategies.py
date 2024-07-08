@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional
 
 from syne_tune.config_space import randint, choice
-
+from lobotomy.loss import DistillLoss
 from lobotomy.training_strategies import (
     SandwichStrategy,
     RandomStrategy,
@@ -77,12 +77,12 @@ def test_integration_training_strategies_mlp(strategy):
 
 
 @pytest.mark.parametrize("strategy", methods)
-@pytest.mark.parametrize("use_kd_loss", [True, False])
-def test_integration_training_strategies_gpt(strategy, use_kd_loss):
+@pytest.mark.parametrize("kd_loss", [None, DistillLoss(0.5, 0.5)])
+def test_integration_training_strategies_gpt(strategy, kd_loss):
     update_op = strategy(
         sampler=sampler_gpt,
         loss_function=torch.nn.CrossEntropyLoss(),
-        use_kd_loss=use_kd_loss,
+        kd_loss=kd_loss,
         device="cpu",
         total_number_of_steps=1,
     )

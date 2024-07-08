@@ -1,6 +1,7 @@
 from lobotomy.sampling.random_sampler import RandomSampler
 from typing import Callable
 from lobotomy.loss import DistillLoss
+import torch
 
 
 class BaseTrainingStrategy(object):
@@ -8,16 +9,20 @@ class BaseTrainingStrategy(object):
         self,
         sampler: RandomSampler,
         loss_function: Callable,
-        use_kd_loss: bool = False,
+        kd_loss: DistillLoss = None,
         device: str = "cuda",
         **kwargs,
     ):
         """ """
         self.sampler = sampler
         self.loss_function = loss_function
-        self.kd_loss = DistillLoss(0.5, 0.5)
         self.device = device
-        self.use_kd_loss = use_kd_loss
+        self.kd_loss = kd_loss
+        if self.kd_loss is not None:
+            if not isinstance(loss_function, torch.nn.CrossEntropyLoss):
+                raise TypeError(
+                    "KD Loss not yet supported: Expected torch.nn.CrossEntropyLoss"
+                )
 
     def update(self, **kwargs):
         raise NotImplementedError
