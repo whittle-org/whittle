@@ -2,8 +2,8 @@ import pytest
 import torch.nn as nn
 import torch.nn.functional
 
-from syne_tune.config_space import randint
-
+from syne_tune.config_space import randint, choice
+from lobotomy.loss import DistillLoss
 from lobotomy.training_strategies import (
     SandwichStrategy,
     RandomStrategy,
@@ -11,6 +11,8 @@ from lobotomy.training_strategies import (
     RandomLinearStrategy,
     ATS,
 )
+from litgpt import Config
+from lobotomy.models.gpt import GPT
 from lobotomy.sampling.random_sampler import RandomSampler
 from lobotomy.modules.linear import Linear
 
@@ -23,11 +25,18 @@ methods = [
     ATS,
 ]
 
-search_space = {"num_units": randint(1, 64)}
+search_space_mlp = {"num_units": randint(1, 64)}
 
-sampler = RandomSampler(config_space=search_space, seed=42)
+sampler_mlp = RandomSampler(config_space=search_space_mlp, seed=42)
 
 loss_function = torch.nn.functional.mse_loss
+search_space_gpt = {
+    "embed_dim": randint(1, 32),
+    "num_heads": choice([2, 4]),
+    "mlp_ratio": randint(1, 2),
+    "depth": randint(1, 2),
+}
+sampler_gpt = RandomSampler(config_space=search_space_gpt, seed=42)
 
 
 class MLP(nn.Module):
@@ -52,9 +61,9 @@ class MLP(nn.Module):
 
 
 @pytest.mark.parametrize("strategy", methods)
-def test_integration_training_strategies(strategy):
+def test_integration_training_strategies_mlp(strategy):
     update_op = strategy(
-        sampler=sampler,
+        sampler=sampler_mlp,
         loss_function=loss_function,
         device="cpu",
         total_number_of_steps=1,
@@ -64,4 +73,37 @@ def test_integration_training_strategies(strategy):
     inputs = torch.rand((8, 5))
     outputs = torch.rand((8, 1))
     loss = update_op(model, inputs, outputs)
+    assert isinstance(loss, float)
+
+
+@pytest.mark.parametrize("strategy", methods)
+@pytest.mark.parametrize("kd_loss", [None, DistillLoss(0.5, 0.5)])
+def test_integration_training_strategies_gpt(strategy, kd_loss):
+    update_op = strategy(
+        sampler=sampler_gpt,
+        loss_function=torch.nn.CrossEntropyLoss(),
+        kd_loss=kd_loss,
+        device="cpu",
+        total_number_of_steps=1,
+    )
+
+    config = Config()
+    config.padded_vocab_size = 512
+    config.n_embd = 32
+    config.intermediate_size = 32 * 2
+    config.n_head = 4
+    config.n_query_groups = 4
+    config.head_size = 8
+    config.n_layer = 2
+    config.block_size = 512
+    config.norm_class_name = "RMSNorm"
+    config.mlp_class_name = "LLaMAMLP"
+    config.rope_n_elem = int(config.rotary_percentage * config.head_size)
+    config.norm_eps = 1e-5
+    config.lm_head_bias = True
+    config.fix_head_size = True
+    gpt = GPT(config)
+    inputs = torch.randint(0, 512, (1, 512))
+    outputs = torch.randn([1, 512, 512])
+    loss = update_op(gpt, inputs, outputs)
     assert isinstance(loss, float)
