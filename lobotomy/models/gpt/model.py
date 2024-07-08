@@ -128,6 +128,14 @@ class GPT(nn.Module):
             )
         self.lm_head.set_sub_network(sub_network_n_embd, self.config.padded_vocab_size)
 
+    def select_sub_network(self, config):
+        self.set_sub_network(
+            config["embed_dim"],
+            [config["mlp_ratio"] * config["embed_dim"] for i in range(config["depth"])],
+            [config["num_heads"] for i in range(config["depth"])],
+            config["depth"],
+        )
+
     def reset_super_network(self):
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_intermediate_size = self.config.intermediate_size
@@ -170,22 +178,37 @@ class GPT(nn.Module):
 
         for i, block in enumerate(self.transformer.h):
             if i < self.sub_network_n_layers:
-                if isinstance(self.sub_network_num_heads, list):
-                    cos, sin = build_rope_cache(
-                        T,
-                        n_elem=int(
-                            self.config.rotary_percentage
-                            * (self.sub_network_n_embd // self.sub_network_num_heads[i])
-                        ),
-                    )
+                if not self.config.fix_head_size:
+                    if isinstance(self.sub_network_num_heads, list):
+                        cos, sin = build_rope_cache(
+                            T,
+                            n_elem=int(
+                                self.config.rotary_percentage
+                                * (
+                                    self.sub_network_n_embd
+                                    // self.sub_network_num_heads[i]
+                                )
+                            ),
+                        )
+                    else:
+                        cos, sin = build_rope_cache(
+                            T,
+                            n_elem=int(
+                                self.config.rotary_percentage
+                                * (
+                                    self.sub_network_n_embd
+                                    // self.sub_network_num_heads
+                                )
+                            ),
+                        )
                 else:
                     cos, sin = build_rope_cache(
                         T,
                         n_elem=int(
-                            self.config.rotary_percentage
-                            * (self.sub_network_n_embd // self.sub_network_num_heads)
+                            self.config.rotary_percentage * (self.config.head_size)
                         ),
                     )
+
                 cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
                 x = block(x, cos, sin, mask, input_pos)
             else:
