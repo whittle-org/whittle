@@ -64,6 +64,8 @@ exclude = [
 
 target-version = "py39"
 
+src = ["lobotomy", "tests", "benchmarks", "examples"]
+
 [tool.ruff.lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
 # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
