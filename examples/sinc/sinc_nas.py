@@ -8,11 +8,10 @@ import torch
 import torch.nn as nn
 from lobotomy.sampling.random_sampler import RandomSampler
 from lobotomy.training_strategies import SandwichStrategy
+from model import MLP
 from syne_tune.config_space import randint
 from syne_tune.report import Reporter
 from torch.utils.data import DataLoader
-
-from .model import MLP
 
 report = Reporter()
 

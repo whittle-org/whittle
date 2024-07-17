@@ -4,13 +4,12 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from estimate_efficiency import compute_mac_linear_layer
 from lobotomy.search import multi_objective_search
+from model import MLP
+from sinc_nas import f, validate
 from syne_tune.config_space import randint
 from torch.utils.data import DataLoader
-
-from .estimate_efficiency import compute_mac_linear_layer
-from .model import MLP
-from .sinc_nas import f, validate
 
 if __name__ == "__main__":
     parser = ArgumentParser()
