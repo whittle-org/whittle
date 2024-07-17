@@ -19,6 +19,6 @@ class StandardStrategy(BaseTrainingStrategy):
 
     def __call__(self, model, inputs, outputs, **kwargs):
         y_hat = model(inputs)
-        loss = self.loss_function(outputs, y_hat)
+        loss = self.loss_function(y_hat, outputs)
         loss.backward()
         return loss.item()

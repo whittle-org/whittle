@@ -47,6 +47,7 @@ class GPT(nn.Module):
         self.sub_network_n_layers = self.config.n_layer
         self.cos: torch.Tensor
         self.sin: torch.Tensor
+        self.random_layers = list(range(self.config.n_layer))
         # self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
 
     @property
@@ -112,21 +113,45 @@ class GPT(nn.Module):
         sub_network_intermediate_size: list,
         sub_network_num_heads: list,
         sub_network_n_layers: int,
+        sample_random_indices: bool = False,
     ) -> None:
+        self.sample_random_indices = sample_random_indices
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
         self.sub_network_n_layers = sub_network_n_layers
-        self.transformer.wte.set_sub_network(self.sub_network_n_embd)
-        self.transformer.ln_f.set_sub_network(self.sub_network_n_embd)
-        for i in range(sub_network_n_layers):
-            block = self.transformer.h[i]
+        self.transformer.wte.set_sub_network(
+            self.sub_network_n_embd, sample_random_indices
+        )
+        self.transformer.ln_f.set_sub_network(
+            self.sub_network_n_embd, sample_random_indices
+        )
+        if sample_random_indices and sub_network_n_layers < self.config.n_layer:
+            self.random_layers = torch.randperm(self.config.n_layer)[
+                :sub_network_n_layers
+            ]
+        else:
+            self.random_layers = list(range(self.sub_network_n_layers))
+
+        for i, j in enumerate(self.random_layers):
+            block = self.transformer.h[j]
             block.set_sub_network(
                 sub_network_n_embd,
                 sub_network_intermediate_size[i],
                 sub_network_num_heads[i],
+                sample_random_indices,
             )
-        self.lm_head.set_sub_network(sub_network_n_embd, self.config.padded_vocab_size)
+        self.lm_head.set_sub_network(
+            sub_network_n_embd, self.config.padded_vocab_size, sample_random_indices
+        )
+
+    def select_sub_network(self, config):
+        self.set_sub_network(
+            config["embed_dim"],
+            [config["mlp_ratio"] * config["embed_dim"] for i in range(config["depth"])],
+            [config["num_heads"] for i in range(config["depth"])],
+            config["depth"],
+        )
 
     def reset_super_network(self):
         self.sub_network_n_embd = self.config.n_embd
@@ -167,9 +192,9 @@ class GPT(nn.Module):
             x = x * (
                 self.sub_network_n_embd**0.5
             )  # TODO: forward is only implemented due to change in this line
-
-        for i, block in enumerate(self.transformer.h):
-            if i < self.sub_network_n_layers:
+        for i, j in enumerate(self.random_layers):
+            block = self.transformer.h[j]
+            if not self.config.fix_head_size:
                 if isinstance(self.sub_network_num_heads, list):
                     cos, sin = build_rope_cache(
                         T,
@@ -186,10 +211,15 @@ class GPT(nn.Module):
                             * (self.sub_network_n_embd // self.sub_network_num_heads)
                         ),
                     )
-                cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
-                x = block(x, cos, sin, mask, input_pos)
             else:
-                break
+                cos, sin = build_rope_cache(
+                    T,
+                    n_elem=int(self.config.rotary_percentage * (self.config.head_size)),
+                )
+
+            cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
+
+            x = block(x, cos, sin, mask, input_pos)
         x = self.transformer.ln_f(x)
         return self.lm_head(x)  # (b, t, vocab_size)
 
@@ -204,7 +234,7 @@ class GPT(nn.Module):
         device: Optional[torch.device] = None,
         dtype: Optional[torch.dtype] = None,
     ) -> None:
-        """if rope_cache_length is None:
+        if rope_cache_length is None:
             rope_cache_length = self.cos.size(-1)
         max_seq_length = self.max_seq_length
 
@@ -212,7 +242,7 @@ class GPT(nn.Module):
         for block in self.transformer.h:
             block.attn.kv_cache = block.attn.build_kv_cache(
                 batch_size, max_seq_length, rope_cache_length, device, dtype
-            )"""
+            )
 
         if self.mask_cache is None or self.mask_cache.size(3) != self.max_seq_length:
             # passing `attn_mask` to SDPA disables the flash implementation. since we only need the mask
