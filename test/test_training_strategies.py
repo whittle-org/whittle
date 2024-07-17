@@ -2,6 +2,8 @@ import pytest
 import torch.nn as nn
 import torch.nn.functional
 from litgpt import Config
+from syne_tune.config_space import choice, randint
+
 from lobotomy.loss import DistillLoss
 from lobotomy.models.gpt import GPT
 from lobotomy.modules.linear import Linear
@@ -13,7 +15,6 @@ from lobotomy.training_strategies import (
     SandwichStrategy,
     StandardStrategy,
 )
-from syne_tune.config_space import choice, randint
 
 methods = [
     SandwichStrategy,

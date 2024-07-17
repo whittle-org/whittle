@@ -2,6 +2,7 @@ import pytest
 import torch
 from litgpt import Config
 from litgpt.model import GPT as LitGPT
+
 from lobotomy.models.gpt import GPT
 
 

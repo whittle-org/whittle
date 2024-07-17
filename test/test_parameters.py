@@ -1,5 +1,4 @@
 from lobotomy.metrics.parameters import compute_parameters
-
 from test.test_training_strategies import MLP
 
 

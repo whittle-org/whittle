@@ -20,6 +20,7 @@ from typing import (
     TypeVar,
     Union,
 )
+from typing_extensions import Self
 
 import lightning as L
 import numpy as np
@@ -29,7 +30,6 @@ import torch.utils._device
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities.load import _lazy_load as lazy_load
 from torch.serialization import normalize_storage_type
-from typing_extensions import Self
 
 if TYPE_CHECKING:
     from gpt.model import GPT

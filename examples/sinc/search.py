@@ -5,11 +5,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from estimate_efficiency import compute_mac_linear_layer
-from lobotomy.search import multi_objective_search
 from model import MLP
 from sinc_nas import f, validate
 from syne_tune.config_space import randint
 from torch.utils.data import DataLoader
+
+from lobotomy.search import multi_objective_search
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -55,14 +56,13 @@ if __name__ == "__main__":
     model = MLP(input_dim=1, hidden_dim=args.hidden_dim, device=device)
 
     path = (
-            Path(args.st_checkpoint_dir)
-            / f"{args.training_strategy}_model_{args.hidden_dim}.pt"
+        Path(args.st_checkpoint_dir)
+        / f"{args.training_strategy}_model_{args.hidden_dim}.pt"
     )
     checkpoint = torch.load(path)
     model.load_state_dict(checkpoint["state"])
     model = model.to(device)
     model.eval()
-
 
     def objective(config):
         model.select_sub_network(config)
@@ -83,7 +83,6 @@ if __name__ == "__main__":
         model.reset_super_network()
 
         return mac, loss
-
 
     results = multi_objective_search(
         objective,

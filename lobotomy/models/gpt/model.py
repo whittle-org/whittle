@@ -5,12 +5,12 @@ https://github.com/EleutherAI/gpt-neox/tree/main/megatron/model.
 """
 
 from typing import Any, Optional, Tuple
+from typing_extensions import Self
 
 import torch
 import torch.nn as nn
 from litgpt import Config
 from litgpt.model import build_rope_cache
-from typing_extensions import Self
 
 from lobotomy.models.gpt.blocks import Block
 from lobotomy.modules.embedding import Embedding

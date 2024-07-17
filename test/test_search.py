@@ -1,8 +1,9 @@
 import numpy as np
 import pytest
+from syne_tune.config_space import randint
+
 from lobotomy.search import multi_objective_search
 from lobotomy.search.baselines import methods
-from syne_tune.config_space import randint
 
 
 def objective(config, **kwargs):
