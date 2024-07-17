@@ -11,8 +11,14 @@ class RandomLinearStrategy(BaseTrainingStrategy):
     linearly increases with the step count.
 
     refs:
-        * https://arxiv.org/abs/2405.02267
-        * https://proceedings.mlr.press/v80/bender18a/bender18a.pdf
+        Structural Pruning of Pre-trained Language Models via Neural Architecture Search
+        Aaron Klein, Jacek Golebiowski, Xingchen Ma, Valerio Perrone, Cedric Archambeau
+        https://arxiv.org/abs/2405.02267
+
+        Understanding and Simplifying One-Shot Architecture Search
+        Gabriel Bender, Pieter-Jan Kindermans, Barret Zoph, Vijay Vasudevan, Quoc Le
+        International Conference on Machine Learning (ICML) 2018
+        https://proceedings.mlr.press/v80/bender18a/bender18a.pdf
     """
 
     def __init__(self, total_number_of_steps: int, random_samples: int = 1, **kwargs):

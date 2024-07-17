@@ -20,8 +20,8 @@ class RandomStrategy(BaseTrainingStrategy):
         self.random_samples = random_samples
 
     def __call__(self, model, inputs, outputs, **kwargs):
+        """Updates randomly sampled sub-networks in each step."""
         total_loss = 0
-        # update random sub-networks
         for i in range(self.random_samples):
             config = self.sampler.sample()
             model.select_sub_network(config)

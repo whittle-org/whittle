@@ -5,8 +5,14 @@ class ATS(BaseTrainingStrategy):
     """
     ATS strategy.
 
-    Updates `random_samples` randomly sampled sub-networks if `self.current_step` is even, otherwise it updates
-    the super-network.
+    Follows the approach by Mohtashami et al. and updates a set of randomly sampled sub-networks if
+    if the current step is even, otherwise it updates the super-network.
+
+    refs:
+        Masked Training of Neural Networks with Partial Gradients
+        Amirkeivan Mohtashami, Martin Jaggi, Sebastian Stich
+        Proceedings of The 25th International Conference on Artificial Intelligence and Statistics
+        https://arxiv.org/abs/2106.08895
     """
 
     def __init__(self, random_samples: int = 1, **kwargs):
@@ -22,6 +28,10 @@ class ATS(BaseTrainingStrategy):
         self.current_step = 0
 
     def __call__(self, model, inputs, outputs, **kwargs):
+        """
+        Updates a set of randomly sampled sub-networks if the current step is odd. Else, it updates the
+        super-network.
+        """
         total_loss = 0
         if self.current_step % 2 == 0:
             # update random sub-networks

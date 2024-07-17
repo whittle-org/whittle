@@ -5,7 +5,7 @@ class StandardStrategy(BaseTrainingStrategy):
     """
     Standard strategy.
 
-    Only updates the super-network.
+    Implements the standard update rule and updates all weights of the super-network.
     """
 
     def __init__(self, **kwargs):
