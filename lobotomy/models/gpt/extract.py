@@ -43,7 +43,9 @@ def extract_linear(super_network_linear):
     ]
 
     if super_network_linear.use_bias:
-        new_state_dict["bias"] = super_network_state["bias"][:out_feat_sub]
+        new_state_dict["bias"] = super_network_state["bias"][
+            :out_feat_sub
+        ]
 
     return new_state_dict
 
@@ -51,7 +53,9 @@ def extract_linear(super_network_linear):
 def extract_embedding(super_network_embedding):
     super_network_state = super_network_embedding.state_dict()
     new_state_dict = OrderedDict()
-    sub_network_embedding_dim = super_network_embedding.sub_network_embedding_dim
+    sub_network_embedding_dim = (
+        super_network_embedding.sub_network_embedding_dim
+    )
 
     new_state_dict["weight"] = super_network_state["weight"][
         :, :sub_network_embedding_dim

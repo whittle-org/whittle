@@ -9,22 +9,30 @@ def test_linear():
     out = linear(input_features)
     assert out.shape == (8, 10)
     input_features = torch.rand(8, 16)
-    linear.set_sub_network(sub_network_in_features=16, sub_network_out_features=10)
+    linear.set_sub_network(
+        sub_network_in_features=16, sub_network_out_features=10
+    )
     out = linear(input_features)
     assert out.shape == (8, 10)
 
-    linear.set_sub_network(sub_network_in_features=64, sub_network_out_features=10)
+    linear.set_sub_network(
+        sub_network_in_features=64, sub_network_out_features=10
+    )
     input_features = torch.rand(8, 64)
     out = linear(input_features)
     assert out.shape == (8, 10)
 
     linear.weight.data = torch.ones_like(linear.weight.data)
     linear.bias.data = torch.ones_like(linear.bias.data)
-    linear.set_sub_network(sub_network_in_features=16, sub_network_out_features=10)
+    linear.set_sub_network(
+        sub_network_in_features=16, sub_network_out_features=10
+    )
     input_features_small = torch.rand(8, 16)
     out_small = linear(input_features_small)
     input_features_large = torch.rand(8, 64)
-    linear.set_sub_network(sub_network_in_features=64, sub_network_out_features=10)
+    linear.set_sub_network(
+        sub_network_in_features=64, sub_network_out_features=10
+    )
     out_large = linear(input_features_large)
 
     small_layer = torch.nn.Linear(16, 10, bias=True)

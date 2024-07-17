@@ -33,7 +33,10 @@ class RMSNorm(torch.nn.Module):
     ):
         self.sub_network_in_features = sub_network_in_features
         self.random_indices = torch.arange(self.sub_network_in_features)
-        if sample_random_indices and self.sub_network_in_features < self.in_features:
+        if (
+            sample_random_indices
+            and self.sub_network_in_features < self.in_features
+        ):
             self.random_indices = torch.randperm(self.in_features)[
                 : self.sub_network_in_features
             ]
@@ -53,7 +56,9 @@ class RMSNorm(torch.nn.Module):
         x_normed = x * torch.rsqrt(norm_x + self.eps)
         if self.add_unit_offset:
             return x_normed * (1.0 + self.weight[self.random_indices])
-        return (self.weight[self.random_indices] * x_normed).to(dtype=dtype)
+        return (self.weight[self.random_indices] * x_normed).to(
+            dtype=dtype
+        )
 
     def reset_parameters(self) -> None:
         torch.nn.init.ones_(self.weight)

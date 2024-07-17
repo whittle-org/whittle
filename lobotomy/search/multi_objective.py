@@ -16,7 +16,9 @@ def get_pareto_optimal(costs: np.ndarray):
         if is_pareto[i]:
             # determine all points that have a smaller cost
             all_with_lower_costs = np.any(costs < c, axis=1)
-            keep_on_front = np.logical_and(all_with_lower_costs, is_pareto)
+            keep_on_front = np.logical_and(
+                all_with_lower_costs, is_pareto
+            )
             is_pareto = keep_on_front
             is_pareto[i] = True  # keep self
     return is_pareto
