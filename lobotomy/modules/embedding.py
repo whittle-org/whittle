@@ -1,7 +1,7 @@
+from typing import Optional
+
 import torch
 import torch.nn.functional as F
-
-from typing import Optional
 
 
 class Embedding(torch.nn.Embedding):
@@ -34,7 +34,9 @@ class Embedding(torch.nn.Embedding):
         self.random_indices = torch.arange(self.sub_network_embedding_dim)
 
     def set_sub_network(
-        self, sub_network_embedding_dim: int, sample_random_indices: bool = False
+        self,
+        sub_network_embedding_dim: int,
+        sample_random_indices: bool = False,
     ):
         self.sub_network_embedding_dim = sub_network_embedding_dim
         self.random_indices = torch.arange(self.sub_network_embedding_dim)

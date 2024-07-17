@@ -1,16 +1,21 @@
 from typing import Optional
 
-import torch
 import litgpt
+import torch
 from litgpt import Config
+
 from lobotomy.modules import Linear
 
 
 class GptNeoxMLP(litgpt.model.GptNeoxMLP):
     def __init__(self, config: Config) -> None:
         super().__init__(config)
-        self.fc = Linear(config.n_embd, config.intermediate_size, bias=config.bias)
-        self.proj = Linear(config.intermediate_size, config.n_embd, bias=config.bias)
+        self.fc = Linear(
+            config.n_embd, config.intermediate_size, bias=config.bias
+        )
+        self.proj = Linear(
+            config.intermediate_size, config.n_embd, bias=config.bias
+        )
         self.config = config
         self.in_features = config.n_embd
         self.intermediate_size = config.intermediate_size
@@ -50,9 +55,15 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
 class LLaMAMLP(litgpt.model.LLaMAMLP):
     def __init__(self, config: Config) -> None:
         super().__init__(config)
-        self.fc_1 = Linear(config.n_embd, config.intermediate_size, bias=config.bias)
-        self.fc_2 = Linear(config.n_embd, config.intermediate_size, bias=config.bias)
-        self.proj = Linear(config.intermediate_size, config.n_embd, bias=config.bias)
+        self.fc_1 = Linear(
+            config.n_embd, config.intermediate_size, bias=config.bias
+        )
+        self.fc_2 = Linear(
+            config.n_embd, config.intermediate_size, bias=config.bias
+        )
+        self.proj = Linear(
+            config.intermediate_size, config.n_embd, bias=config.bias
+        )
         self.in_features = config.n_embd
         self.intermediate_size = config.intermediate_size
         self.sub_network_n_embd: Optional[int] = None
@@ -101,7 +112,9 @@ class GemmaMLP(LLaMAMLP):
         x_fc_1 = self.fc_1(x)
         x_fc_2 = self.fc_2(x)
         x = (
-            torch.nn.functional.gelu(x_fc_1, approximate=self.config.gelu_approximate)
+            torch.nn.functional.gelu(
+                x_fc_1, approximate=self.config.gelu_approximate
+            )
             * x_fc_2
         )
         return self.proj(x)

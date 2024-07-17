@@ -1,21 +1,19 @@
 import pytest
 import torch.nn as nn
 import torch.nn.functional
-
-from syne_tune.config_space import randint, choice
-from lobotomy.loss import DistillLoss
-from lobotomy.training_strategies import (
-    SandwichStrategy,
-    RandomStrategy,
-    StandardStrategy,
-    RandomLinearStrategy,
-    ATS,
-)
 from litgpt import Config
+from lobotomy.loss import DistillLoss
 from lobotomy.models.gpt import GPT
-from lobotomy.sampling.random_sampler import RandomSampler
 from lobotomy.modules.linear import Linear
-
+from lobotomy.sampling.random_sampler import RandomSampler
+from lobotomy.training_strategies import (
+    ATS,
+    RandomLinearStrategy,
+    RandomStrategy,
+    SandwichStrategy,
+    StandardStrategy,
+)
+from syne_tune.config_space import choice, randint
 
 methods = [
     SandwichStrategy,

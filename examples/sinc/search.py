@@ -1,18 +1,16 @@
-import numpy as np
-import torch
-import matplotlib.pyplot as plt
-
 from argparse import ArgumentParser
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from lobotomy.search import multi_objective_search
+from syne_tune.config_space import randint
 from torch.utils.data import DataLoader
 
-from syne_tune.config_space import randint
-from lobotomy.search import multi_objective_search
 from examples.sinc.estimate_efficiency import compute_mac_linear_layer
-
-from sinc_nas import validate, f
-from model import MLP
-
+from examples.sinc.model import MLP
+from examples.sinc.sinc_nas import f, validate
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -20,10 +18,16 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate", type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--hidden_dim", type=int, default=128)
-    parser.add_argument("--training_strategy", type=str, default="sandwich")
-    parser.add_argument("--search_strategy", type=str, default="random_search")
+    parser.add_argument(
+        "--training_strategy", type=str, default="sandwich"
+    )
+    parser.add_argument(
+        "--search_strategy", type=str, default="random_search"
+    )
     parser.add_argument("--do_plot", type=bool, default=False)
-    parser.add_argument("--st_checkpoint_dir", type=str, default="./checkpoints")
+    parser.add_argument(
+        "--st_checkpoint_dir", type=str, default="./checkpoints"
+    )
 
     args, _ = parser.parse_known_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -42,8 +46,12 @@ if __name__ == "__main__":
     train_data = data[:n_train]
     valid_data = data[n_train:]
 
-    train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
-    valid_dataloader = DataLoader(valid_data, batch_size=args.batch_size, shuffle=False)
+    train_dataloader = DataLoader(
+        train_data, batch_size=args.batch_size, shuffle=True
+    )
+    valid_dataloader = DataLoader(
+        valid_data, batch_size=args.batch_size, shuffle=False
+    )
 
     model = MLP(input_dim=1, hidden_dim=args.hidden_dim, device=device)
 
@@ -68,7 +76,8 @@ if __name__ == "__main__":
             model.hidden_layer.in_features, config["num_units"]
         )
         mac += compute_mac_linear_layer(
-            model.output_layer.in_features, model.output_layer.out_features
+            model.output_layer.in_features,
+            model.output_layer.out_features,
         )
 
         model.reset_super_network()
@@ -85,11 +94,18 @@ if __name__ == "__main__":
     )
 
     costs = np.array(results["costs"])
-    plt.scatter(costs[:, 0], costs[:, 1], color="black", label="sub-networks")
+    plt.scatter(
+        costs[:, 0], costs[:, 1], color="black", label="sub-networks"
+    )
 
     idx = np.array(results["is_pareto_optimal"])
     if args.do_plot:
-        plt.scatter(costs[idx, 0], costs[idx, 1], color="red", label="Pareto optimal")
+        plt.scatter(
+            costs[idx, 0],
+            costs[idx, 1],
+            color="red",
+            label="Pareto optimal",
+        )
 
         plt.xlabel("mac")
         plt.ylabel("Validation loss")

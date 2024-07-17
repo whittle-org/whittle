@@ -1,5 +1,5 @@
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 
 
 class DistillLoss(nn.Module):
@@ -54,10 +54,13 @@ class DistillLoss(nn.Module):
                 F.softmax(outputs_teacher / self.temperature, dim=1),
             ) * (self.temperature**2)
 
-        hard_target_loss = F.cross_entropy(outputs, labels, reduction="mean")
+        hard_target_loss = F.cross_entropy(
+            outputs, labels, reduction="mean"
+        )
 
-        total_loss = soft_target_loss * self.distillation_weight + hard_target_loss * (
-            1 - self.distillation_weight
+        total_loss = (
+            soft_target_loss * self.distillation_weight
+            + hard_target_loss * (1 - self.distillation_weight)
         )
 
         return total_loss

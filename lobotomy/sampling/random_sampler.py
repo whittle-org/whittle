@@ -1,8 +1,7 @@
 from typing import Dict, Optional
 
 import numpy as np
-
-from syne_tune.config_space import Domain, Categorical
+from syne_tune.config_space import Categorical, Domain
 
 
 class RandomSampler(object):

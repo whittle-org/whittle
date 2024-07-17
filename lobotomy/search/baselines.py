@@ -1,15 +1,15 @@
 from dataclasses import dataclass
 from typing import Dict
 
-from syne_tune.config_space import Domain, Categorical
+from syne_tune.config_space import Categorical, Domain
 from syne_tune.optimizer.baselines import (
-    RandomSearch,
     MOREA,
     NSGA2,
     MORandomScalarizationBayesOpt,
-    # EHVI
+    RandomSearch,
 )
 
+# EHVI
 from syne_tune.optimizer.schedulers.multiobjective.linear_scalarizer import (
     LinearScalarizedScheduler,
 )

@@ -1,19 +1,18 @@
-import os
-
-import numpy as np
 import json
-import torch
-import torch.nn as nn
-
+import os
 from argparse import ArgumentParser
 from pathlib import Path
-from torch.utils.data import DataLoader
+
+import numpy as np
+import torch
+import torch.nn as nn
+from lobotomy.sampling.random_sampler import RandomSampler
+from lobotomy.training_strategies import SandwichStrategy
 from syne_tune.config_space import randint
 from syne_tune.report import Reporter
-from lobotomy.training_strategies import SandwichStrategy
-from lobotomy.sampling.random_sampler import RandomSampler
+from torch.utils.data import DataLoader
 
-from model import MLP
+from examples.sinc.model import MLP
 
 report = Reporter()
 
@@ -47,9 +46,13 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate", type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--hidden_dim", type=int, default=128)
-    parser.add_argument("--training_strategy", type=str, default="sandwich")
+    parser.add_argument(
+        "--training_strategy", type=str, default="sandwich"
+    )
     parser.add_argument("--do_plot", type=bool, default=False)
-    parser.add_argument("--st_checkpoint_dir", type=str, default="./checkpoints")
+    parser.add_argument(
+        "--st_checkpoint_dir", type=str, default="./checkpoints"
+    )
     parser.add_argument("--seed", type=int, default=42)
 
     args, _ = parser.parse_known_args()
@@ -73,14 +76,26 @@ if __name__ == "__main__":
     train_data = data[:n_train]
     valid_data = data[n_train:]
 
-    train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
-    valid_dataloader = DataLoader(valid_data, batch_size=args.batch_size, shuffle=False)
+    train_dataloader = DataLoader(
+        train_data, batch_size=args.batch_size, shuffle=True
+    )
+    valid_dataloader = DataLoader(
+        valid_data, batch_size=args.batch_size, shuffle=False
+    )
 
-    model = MLP(input_dim=1, hidden_dim=args.hidden_dim, device=device).to(device)
-    n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    model = MLP(
+        input_dim=1, hidden_dim=args.hidden_dim, device=device
+    ).to(device)
+    n_params = sum(
+        p.numel() for p in model.parameters() if p.requires_grad
+    )
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=args.learning_rate
+    )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=args.epochs
+    )
     current_best = None
     # if args.st_checkpoint_dir is not None:
     #     os.makedirs(args.st_checkpoint_dir, exist_ok=True)

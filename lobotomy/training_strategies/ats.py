@@ -1,4 +1,6 @@
-from lobotomy.training_strategies.base_strategy import BaseTrainingStrategy
+from lobotomy.training_strategies.base_strategy import (
+    BaseTrainingStrategy,
+)
 
 
 class ATS(BaseTrainingStrategy):

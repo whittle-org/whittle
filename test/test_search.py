@@ -1,9 +1,8 @@
-import pytest
 import numpy as np
-
-from syne_tune.config_space import randint
+import pytest
 from lobotomy.search import multi_objective_search
 from lobotomy.search.baselines import methods
+from syne_tune.config_space import randint
 
 
 def objective(config, **kwargs):
@@ -24,7 +23,8 @@ def test_multi_objective_search(search_strategy, num_samples=5):
     )
 
     assert all(
-        key in results for key in ["costs", "configs", "runtime", "is_pareto_optimal"]
+        key in results
+        for key in ["costs", "configs", "runtime", "is_pareto_optimal"]
     )
 
     assert results["costs"].shape == (num_samples, 2)
@@ -34,13 +34,18 @@ def test_multi_objective_search(search_strategy, num_samples=5):
 
     if search_strategy != "nsga2":
         # check that first config are the initial design
-        upper_bound = {hp_name: hp.upper for hp_name, hp in search_space.items()}
+        upper_bound = {
+            hp_name: hp.upper for hp_name, hp in search_space.items()
+        }
         assert results["configs"][0] == upper_bound
 
-        lower_bound = {hp_name: hp.lower for hp_name, hp in search_space.items()}
+        lower_bound = {
+            hp_name: hp.lower for hp_name, hp in search_space.items()
+        }
         assert results["configs"][1] == lower_bound
 
         mid_point = {
-            hp_name: (hp.upper - hp.lower) // 2 for hp_name, hp in search_space.items()
+            hp_name: (hp.upper - hp.lower) // 2
+            for hp_name, hp in search_space.items()
         }
         assert results["configs"][2] == mid_point

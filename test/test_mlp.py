@@ -1,11 +1,15 @@
 import torch
-from lobotomy.models.gpt.blocks import GptNeoxMLP, LLaMAMLP, GemmaMLP
+from litgpt import Config
 from litgpt.model import (
-    GptNeoxMLP as LitGptNeoxMLP,
-    LLaMAMLP as LitLLaMAMLP,
     GemmaMLP as LitGemmaMLP,
 )
-from litgpt import Config
+from litgpt.model import (
+    GptNeoxMLP as LitGptNeoxMLP,
+)
+from litgpt.model import (
+    LLaMAMLP as LitLLaMAMLP,
+)
+from lobotomy.models.gpt.blocks import GemmaMLP, GptNeoxMLP, LLaMAMLP
 
 
 def test_GptNeoxMLP():
@@ -16,10 +20,16 @@ def test_GptNeoxMLP():
     config.intermediate_size = 64 * 4
     gpt_neox_mlp = GptNeoxMLP(config)
     # init weights and biases
-    gpt_neox_mlp.fc.weight.data = torch.ones_like(gpt_neox_mlp.fc.weight.data)
+    gpt_neox_mlp.fc.weight.data = torch.ones_like(
+        gpt_neox_mlp.fc.weight.data
+    )
     gpt_neox_mlp.fc.bias.data = torch.ones_like(gpt_neox_mlp.fc.bias.data)
-    gpt_neox_mlp.proj.weight.data = torch.ones_like(gpt_neox_mlp.proj.weight.data)
-    gpt_neox_mlp.proj.bias.data = torch.ones_like(gpt_neox_mlp.proj.bias.data)
+    gpt_neox_mlp.proj.weight.data = torch.ones_like(
+        gpt_neox_mlp.proj.weight.data
+    )
+    gpt_neox_mlp.proj.bias.data = torch.ones_like(
+        gpt_neox_mlp.proj.bias.data
+    )
     gpt_neox_mlp.reset_super_network()
     out_large = gpt_neox_mlp(input)
     assert out_large.shape == (8, 64)
@@ -71,11 +81,17 @@ def test_LLaMAMLP():
     config.intermediate_size = 64 * 4
     llama_mlp = LLaMAMLP(config)
     # init weights and biases
-    llama_mlp.fc_1.weight.data = torch.ones_like(llama_mlp.fc_1.weight.data)
+    llama_mlp.fc_1.weight.data = torch.ones_like(
+        llama_mlp.fc_1.weight.data
+    )
     llama_mlp.fc_1.bias.data = torch.ones_like(llama_mlp.fc_1.bias.data)
-    llama_mlp.fc_2.weight.data = torch.ones_like(llama_mlp.fc_2.weight.data)
+    llama_mlp.fc_2.weight.data = torch.ones_like(
+        llama_mlp.fc_2.weight.data
+    )
     llama_mlp.fc_2.bias.data = torch.ones_like(llama_mlp.fc_2.bias.data)
-    llama_mlp.proj.weight.data = torch.ones_like(llama_mlp.proj.weight.data)
+    llama_mlp.proj.weight.data = torch.ones_like(
+        llama_mlp.proj.weight.data
+    )
     llama_mlp.proj.bias.data = torch.ones_like(llama_mlp.proj.bias.data)
     llama_mlp.reset_super_network()
     out_large = llama_mlp(input)
@@ -140,11 +156,17 @@ def test_GemmaMLP():
     config.intermediate_size = 64 * 4
     gemma_mlp = GemmaMLP(config)
     # init weights and biases
-    gemma_mlp.fc_1.weight.data = torch.ones_like(gemma_mlp.fc_1.weight.data)
+    gemma_mlp.fc_1.weight.data = torch.ones_like(
+        gemma_mlp.fc_1.weight.data
+    )
     gemma_mlp.fc_1.bias.data = torch.ones_like(gemma_mlp.fc_1.bias.data)
-    gemma_mlp.fc_2.weight.data = torch.ones_like(gemma_mlp.fc_2.weight.data)
+    gemma_mlp.fc_2.weight.data = torch.ones_like(
+        gemma_mlp.fc_2.weight.data
+    )
     gemma_mlp.fc_2.bias.data = torch.ones_like(gemma_mlp.fc_2.bias.data)
-    gemma_mlp.proj.weight.data = torch.ones_like(gemma_mlp.proj.weight.data)
+    gemma_mlp.proj.weight.data = torch.ones_like(
+        gemma_mlp.proj.weight.data
+    )
     gemma_mlp.proj.bias.data = torch.ones_like(gemma_mlp.proj.bias.data)
     gemma_mlp.reset_super_network()
     out_large = gemma_mlp(input)

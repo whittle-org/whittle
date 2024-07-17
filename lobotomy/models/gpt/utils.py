@@ -4,6 +4,7 @@
 
 import math
 import pickle
+import random
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -12,24 +13,23 @@ from typing import (
     Any,
     Dict,
     Iterable,
+    Iterator,
     List,
     Mapping,
     Optional,
     TypeVar,
     Union,
-    Iterator,
 )
 
 import lightning as L
+import numpy as np
 import torch
 import torch.nn as nn
-import random
 import torch.utils._device
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities.load import _lazy_load as lazy_load
 from torch.serialization import normalize_storage_type
 from typing_extensions import Self
-import numpy as np
 
 if TYPE_CHECKING:
     from gpt.model import GPT
@@ -42,7 +42,9 @@ def find_multiple(n: int, k: int) -> int:
     return n + k - (n % k)
 
 
-def num_parameters(module: nn.Module, requires_grad: Optional[bool] = None) -> int:
+def num_parameters(
+    module: nn.Module, requires_grad: Optional[bool] = None
+) -> int:
     total = 0
     for p in module.parameters():
         if requires_grad is None or p.requires_grad == requires_grad:
@@ -62,7 +64,9 @@ def check_valid_checkpoint_dir(checkpoint_dir: Path) -> None:
             checkpoint_dir / "tokenizer.json"
         ).is_file()
         or (checkpoint_dir / "tokenizer.model").is_file(),
-        "tokenizer_config.json": (checkpoint_dir / "tokenizer_config.json").is_file(),
+        "tokenizer_config.json": (
+            checkpoint_dir / "tokenizer_config.json"
+        ).is_file(),
     }
     if checkpoint_dir.is_dir():
         if all(files.values()):
@@ -95,7 +99,10 @@ class SavingProxyForStorage:
     def __init__(self, obj, saver, protocol_version=5):
         self.protocol_version = protocol_version
         self.saver = saver
-        if not (isinstance(obj, torch.storage.TypedStorage) or torch.is_storage(obj)):
+        if not (
+            isinstance(obj, torch.storage.TypedStorage)
+            or torch.is_storage(obj)
+        ):
             raise TypeError(f"expected storage, not {type(obj)}")
 
         # this logic is taken from PyTorch 2.0+ torch/serialization.py
@@ -128,17 +135,26 @@ class SavingProxyForStorage:
 class SavingProxyForTensor:
     def __init__(self, tensor, saver, protocol_version=5):
         self.protocol_version = protocol_version
-        self.reduce_ret_fn, reduce_args = tensor.__reduce_ex__(protocol_version)
+        self.reduce_ret_fn, reduce_args = tensor.__reduce_ex__(
+            protocol_version
+        )
         if reduce_args[0] == torch._utils._rebuild_tensor_v2:
             # for Tensors with Python attributes
-            (a0, a1, (storage, *a2_other), *other_reduce_args) = reduce_args
+            (a0, a1, (storage, *a2_other), *other_reduce_args) = (
+                reduce_args
+            )
             assert isinstance(
                 storage, torch.storage.TypedStorage
             ), "Please check for updates"
             storage_proxy = SavingProxyForStorage(
                 storage, saver, protocol_version=protocol_version
             )
-            self.reduce_args = (a0, a1, (storage_proxy, *a2_other), *other_reduce_args)
+            self.reduce_args = (
+                a0,
+                a1,
+                (storage_proxy, *a2_other),
+                *other_reduce_args,
+            )
         else:
             (storage, *other_reduce_args) = reduce_args
             assert isinstance(
@@ -174,7 +190,9 @@ class IncrementalPyTorchPickler(pickle.Pickler):
         if isinstance(obj, SavingProxyForStorage):
             return obj.storage_info
 
-        if isinstance(obj, torch.storage.TypedStorage) or torch.is_storage(obj):
+        if isinstance(
+            obj, torch.storage.TypedStorage
+        ) or torch.is_storage(obj):
             if isinstance(obj, torch.storage.TypedStorage):
                 # TODO: Once we decide to break serialization FC, this case
                 # can be deleted
@@ -195,20 +213,33 @@ class IncrementalPyTorchPickler(pickle.Pickler):
             # not allocated, don't perform this check
             if storage.data_ptr() != 0:
                 if storage.data_ptr() in self.storage_dtypes:
-                    if storage_dtype != self.storage_dtypes[storage.data_ptr()]:
+                    if (
+                        storage_dtype
+                        != self.storage_dtypes[storage.data_ptr()]
+                    ):
                         raise RuntimeError(
                             "Cannot save multiple tensors or storages that view the same data as different types"
                         )
                 else:
-                    self.storage_dtypes[storage.data_ptr()] = storage_dtype
+                    self.storage_dtypes[storage.data_ptr()] = (
+                        storage_dtype
+                    )
 
             storage_key = self.id_map.get(storage._cdata)
             if storage_key is None:
-                storage_key = self.saver._write_storage_and_return_key(storage)
+                storage_key = self.saver._write_storage_and_return_key(
+                    storage
+                )
                 self.id_map[storage._cdata] = storage_key
             location = torch.serialization.location_tag(storage)
 
-            return ("storage", storage_type, storage_key, location, storage_numel)
+            return (
+                "storage",
+                storage_type,
+                storage_key,
+                location,
+                storage_numel,
+            )
 
         return None
 
@@ -226,7 +257,9 @@ class incremental_save:
     def store_early(self, tensor):
         if isinstance(tensor, torch.Tensor):
             return SavingProxyForTensor(tensor, self)
-        raise TypeError(f"can only store tensors early, not {type(tensor)}")
+        raise TypeError(
+            f"can only store tensors early, not {type(tensor)}"
+        )
 
     def save(self, obj):
         if self.has_saved:
@@ -282,7 +315,8 @@ def chunked_cross_entropy(
 
         # chunk cross entropy
         logit_chunks = [
-            logit_chunk.reshape(-1, logit_chunk.size(-1)) for logit_chunk in logits
+            logit_chunk.reshape(-1, logit_chunk.size(-1))
+            for logit_chunk in logits
         ]
         target_chunks = [
             target_chunk.reshape(-1)
@@ -290,9 +324,14 @@ def chunked_cross_entropy(
         ]
         loss_chunks = [
             torch.nn.functional.cross_entropy(
-                logit_chunk, target_chunk, ignore_index=ignore_index, reduction="none"
+                logit_chunk,
+                target_chunk,
+                ignore_index=ignore_index,
+                reduction="none",
             )
-            for logit_chunk, target_chunk in zip(logit_chunks, target_chunks)
+            for logit_chunk, target_chunk in zip(
+                logit_chunks, target_chunks
+            )
         ]
         non_masked_elems = (targets != ignore_index).sum()
         return torch.cat(loss_chunks).sum() / max(1, non_masked_elems)
@@ -310,7 +349,10 @@ def chunked_cross_entropy(
     target_chunks = targets.split(chunk_size)
     loss_chunks = [
         torch.nn.functional.cross_entropy(
-            logit_chunk, target_chunk, ignore_index=ignore_index, reduction="none"
+            logit_chunk,
+            target_chunk,
+            ignore_index=ignore_index,
+            reduction="none",
         )
         for logit_chunk, target_chunk in zip(logit_chunks, target_chunks)
     ]
@@ -318,12 +360,16 @@ def chunked_cross_entropy(
     return torch.cat(loss_chunks).sum() / max(1, non_masked_elems)
 
 
-def map_old_state_dict_weights(state_dict: Dict, mapping: Mapping, prefix: str) -> Dict:
+def map_old_state_dict_weights(
+    state_dict: Dict, mapping: Mapping, prefix: str
+) -> Dict:
     for checkpoint_name, attribute_name in mapping.items():
         full_checkpoint_name = prefix + checkpoint_name
         if full_checkpoint_name in state_dict:
             full_attribute_name = prefix + attribute_name
-            state_dict[full_attribute_name] = state_dict.pop(full_checkpoint_name)
+            state_dict[full_attribute_name] = state_dict.pop(
+                full_checkpoint_name
+            )
     return state_dict
 
 
@@ -346,7 +392,10 @@ def get_default_supported_precision(training: bool) -> str:
 
 
 def load_checkpoint(
-    fabric: L.Fabric, model: nn.Module, checkpoint_path: Path, strict: bool = True
+    fabric: L.Fabric,
+    model: nn.Module,
+    checkpoint_path: Path,
+    strict: bool = True,
 ) -> None:
     if isinstance(fabric.strategy, FSDPStrategy):
         fabric.load_raw(checkpoint_path, model, strict=strict)
@@ -391,11 +440,17 @@ def estimate_flops(model: "GPT", training: bool) -> int:
     ops_per_step = 3 if training else 1
     n_frozen_params = num_parameters(model, requires_grad=False)
     frozen_flops = flops_per_param(
-        model.max_seq_length, model.config.n_layer, model.config.n_embd, n_frozen_params
+        model.max_seq_length,
+        model.config.n_layer,
+        model.config.n_embd,
+        n_frozen_params,
     )
     # forward + backward
     frozen_ops_per_step = 2 if training else 1
-    return ops_per_step * trainable_flops + frozen_ops_per_step * frozen_flops
+    return (
+        ops_per_step * trainable_flops
+        + frozen_ops_per_step * frozen_flops
+    )
 
 
 class CycleIterator:
@@ -430,7 +485,9 @@ class CycleIterator:
 
 
 def sample_config(
-    choices_dict: dict, layer_sampling_scheme: str = "normal", seed: int = 0
+    choices_dict: dict,
+    layer_sampling_scheme: str = "normal",
+    seed: int = 0,
 ) -> dict:
     """Sample a configuration from a dictionary of choices.
 
@@ -443,9 +500,13 @@ def sample_config(
     sampled_dict = {}
     r = random.Random(seed)
     # sample embed dim -> held constant throughout transformer
-    sampled_dict["sample_embed_dim"] = r.choice(choices_dict["embed_dim_choices"])
+    sampled_dict["sample_embed_dim"] = r.choice(
+        choices_dict["embed_dim_choices"]
+    )
     # sample number of layers
-    sampled_dict["sample_n_layer"] = r.choice(choices_dict["n_layer_choices"])
+    sampled_dict["sample_n_layer"] = r.choice(
+        choices_dict["n_layer_choices"]
+    )
     # sample layer indices
     max_layer = max(choices_dict["n_layer_choices"])
     sampled_dict["sample_layer_indices"] = []
@@ -465,17 +526,23 @@ def sample_config(
             sampled_dict["sample_layer_indices"][-1] = max_layer - 1
         else:
             increment_floor = max_layer // sampled_dict["sample_n_layer"]
-            increment_ceil = int(np.ceil(max_layer / sampled_dict["sample_n_layer"]))
+            increment_ceil = int(
+                np.ceil(max_layer / sampled_dict["sample_n_layer"])
+            )
             sampled_dict["sample_layer_indices"] = [
                 0 for _ in range(sampled_dict["sample_n_layer"])
             ]
             counter_layer = 0
             for i in range(sampled_dict["sample_n_layer"]):
                 if counter_layer < (max_layer // 2):
-                    sampled_dict["sample_layer_indices"][i] = counter_layer
+                    sampled_dict["sample_layer_indices"][i] = (
+                        counter_layer
+                    )
                     counter_layer += increment_ceil
                 else:
-                    sampled_dict["sample_layer_indices"][i] = counter_layer
+                    sampled_dict["sample_layer_indices"][i] = (
+                        counter_layer
+                    )
                     counter_layer += increment_floor
 
             sampled_dict["sample_layer_indices"][0] = 0
@@ -487,7 +554,8 @@ def sample_config(
     ]
     # sample mlp ratio
     sampled_dict["sample_mlp_ratio"] = [
-        r.choice(choices_dict["mlp_ratio_choices"]) for _ in range(max_layer)
+        r.choice(choices_dict["mlp_ratio_choices"])
+        for _ in range(max_layer)
     ]
     # sample bias
     sampled_dict["sample_bias"] = r.choice(choices_dict["bias_choices"])
@@ -508,13 +576,17 @@ def sample_config_max(
     """
     sampled_dict = {}
     # sample embed dim -> held constant throughout transformer
-    sampled_dict["sample_embed_dim"] = max(choices_dict["embed_dim_choices"])
+    sampled_dict["sample_embed_dim"] = max(
+        choices_dict["embed_dim_choices"]
+    )
     # sample number of layers
     sampled_dict["sample_n_layer"] = max(choices_dict["n_layer_choices"])
     # sample layer indices
     max_layer = max(choices_dict["n_layer_choices"])
     sampled_dict["sample_layer_indices"] = []
-    sampled_dict["sample_layer_indices"] = list(range(sampled_dict["sample_n_layer"]))
+    sampled_dict["sample_layer_indices"] = list(
+        range(sampled_dict["sample_n_layer"])
+    )
 
     # sample number of heads
     sampled_dict["sample_n_head"] = [
@@ -543,13 +615,17 @@ def sample_config_min(
     """
     sampled_dict = {}
     # sample embed dim -> held constant throughout transformer
-    sampled_dict["sample_embed_dim"] = min(choices_dict["embed_dim_choices"])
+    sampled_dict["sample_embed_dim"] = min(
+        choices_dict["embed_dim_choices"]
+    )
     # sample number of layers
     sampled_dict["sample_n_layer"] = min(choices_dict["n_layer_choices"])
     # sample layer indices
     max_layer = min(choices_dict["n_layer_choices"])
     sampled_dict["sample_layer_indices"] = []
-    sampled_dict["sample_layer_indices"] = list(range(sampled_dict["sample_n_layer"]))
+    sampled_dict["sample_layer_indices"] = list(
+        range(sampled_dict["sample_n_layer"])
+    )
 
     # sample number of heads
     sampled_dict["sample_n_head"] = [
@@ -578,13 +654,17 @@ def sample_config_mid(
     """
     sampled_dict = {}
     # sample embed dim -> held constant throughout transformer
-    sampled_dict["sample_embed_dim"] = choices_dict["embed_dim_choices"][1]
+    sampled_dict["sample_embed_dim"] = choices_dict["embed_dim_choices"][
+        1
+    ]
     # sample number of layers
     sampled_dict["sample_n_layer"] = choices_dict["n_layer_choices"][1]
     # sample layer indices
     max_layer = choices_dict["n_layer_choices"][1]
     sampled_dict["sample_layer_indices"] = []
-    sampled_dict["sample_layer_indices"] = list(range(sampled_dict["sample_n_layer"]))
+    sampled_dict["sample_layer_indices"] = list(
+        range(sampled_dict["sample_n_layer"])
+    )
 
     # sample number of heads
     sampled_dict["sample_n_head"] = [

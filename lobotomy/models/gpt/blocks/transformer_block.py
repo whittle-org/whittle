@@ -2,10 +2,13 @@ from typing import Optional, Union
 
 import litgpt
 from litgpt import Config
-from lobotomy.models.gpt.blocks.causal_self_attention import CausalSelfAttention
-from lobotomy.modules.rmsnorm import RMSNorm
+
+from lobotomy.models.gpt.blocks.causal_self_attention import (
+    CausalSelfAttention,
+)
+from lobotomy.models.gpt.blocks.mlp import GemmaMLP, GptNeoxMLP, LLaMAMLP
 from lobotomy.modules.layernorm import LayerNorm
-from lobotomy.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP, GemmaMLP
+from lobotomy.modules.rmsnorm import RMSNorm
 
 
 class Block(litgpt.model.Block):
@@ -18,7 +21,9 @@ class Block(litgpt.model.Block):
                 " (non-parallel residual and shared attention norm)."
             )
 
-        self.norm_1 = self.norm_class()(config.n_embd, eps=config.norm_eps)
+        self.norm_1 = self.norm_class()(
+            config.n_embd, eps=config.norm_eps
+        )
         self.attn = CausalSelfAttention(config)
         self.norm_2: Optional[Union[LayerNorm, RMSNorm]] = (
             None
@@ -47,7 +52,9 @@ class Block(litgpt.model.Block):
         elif self.config.mlp_class_name == "GptNeoxMLP":
             return GptNeoxMLP
         else:
-            raise ValueError(f"Unknown MLP class: {self.config._mlp_class}")
+            raise ValueError(
+                f"Unknown MLP class: {self.config._mlp_class}"
+            )
 
     def set_sub_network(
         self,
@@ -59,12 +66,21 @@ class Block(litgpt.model.Block):
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
-        self.norm_1.set_sub_network(self.sub_network_n_embd, sample_random_indices)
-        self.attn.set_sub_network(
-            self.sub_network_n_embd, self.sub_network_num_heads, sample_random_indices
+        self.norm_1.set_sub_network(
+            self.sub_network_n_embd, sample_random_indices
         )
-        if not self.config.shared_attention_norm and self.norm_2 is not None:
-            self.norm_2.set_sub_network(self.sub_network_n_embd, sample_random_indices)
+        self.attn.set_sub_network(
+            self.sub_network_n_embd,
+            self.sub_network_num_heads,
+            sample_random_indices,
+        )
+        if (
+            not self.config.shared_attention_norm
+            and self.norm_2 is not None
+        ):
+            self.norm_2.set_sub_network(
+                self.sub_network_n_embd, sample_random_indices
+            )
         self.mlp.set_sub_network(
             self.sub_network_n_embd,
             self.sub_network_intermediate_size,

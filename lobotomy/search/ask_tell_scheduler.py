@@ -1,7 +1,7 @@
-from typing import Dict
 import datetime
+from typing import Dict
 
-from syne_tune.backend.trial_status import Trial, Status, TrialResult
+from syne_tune.backend.trial_status import Status, Trial, TrialResult
 from syne_tune.optimizer.scheduler import TrialScheduler
 
 
@@ -41,7 +41,9 @@ class AskTellScheduler:
             status=Status.completed,
             training_end_time=datetime.datetime.now(),
         )
-        self.bscheduler.on_trial_complete(trial=trial, result=experiment_result)
+        self.bscheduler.on_trial_complete(
+            trial=trial, result=experiment_result
+        )
         self.completed_experiments[trial_result.trial_id] = trial_result
 
     def best_trial(self, metris: str) -> TrialResult:

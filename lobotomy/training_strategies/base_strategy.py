@@ -1,7 +1,9 @@
-from lobotomy.sampling.random_sampler import RandomSampler
 from typing import Callable, Optional
-from lobotomy.loss import DistillLoss
+
 import torch
+
+from lobotomy.loss import DistillLoss
+from lobotomy.sampling.random_sampler import RandomSampler
 
 
 class BaseTrainingStrategy(object):

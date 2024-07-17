@@ -1,8 +1,8 @@
 import torch
 from litgpt import Config
-from lobotomy.models.gpt.blocks import Block
 from litgpt.model import Block as LitBlock
 from litgpt.model import build_mask_cache, build_rope_cache
+from lobotomy.models.gpt.blocks import Block
 
 
 def test_block():
@@ -17,20 +17,32 @@ def test_block():
     config.max_seq_len = 512
     config.rotary_percentage = 0.25
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
-    cos, sin = build_rope_cache(config.max_seq_len, n_elem=config.rope_n_elem)
+    cos, sin = build_rope_cache(
+        config.max_seq_len, n_elem=config.rope_n_elem
+    )
 
     block = Block(config)
     input = torch.rand(8, 512, 64)
     mask = build_mask_cache(512)
-    block.attn.attn.weight.data = torch.ones_like(block.attn.attn.weight.data)
+    block.attn.attn.weight.data = torch.ones_like(
+        block.attn.attn.weight.data
+    )
     block.attn.attn.bias.data = torch.ones_like(block.attn.attn.bias.data)
     block.attn.proj.bias.data = torch.ones_like(block.attn.proj.bias.data)
-    block.attn.proj.weight.data = torch.ones_like(block.attn.proj.weight.data)
-    block.mlp.fc_1.weight.data = torch.ones_like(block.mlp.fc_1.weight.data)
+    block.attn.proj.weight.data = torch.ones_like(
+        block.attn.proj.weight.data
+    )
+    block.mlp.fc_1.weight.data = torch.ones_like(
+        block.mlp.fc_1.weight.data
+    )
     block.mlp.fc_1.bias.data = torch.ones_like(block.mlp.fc_1.bias.data)
-    block.mlp.fc_2.weight.data = torch.ones_like(block.mlp.fc_2.weight.data)
+    block.mlp.fc_2.weight.data = torch.ones_like(
+        block.mlp.fc_2.weight.data
+    )
     block.mlp.fc_2.bias.data = torch.ones_like(block.mlp.fc_2.bias.data)
-    block.mlp.proj.weight.data = torch.ones_like(block.mlp.proj.weight.data)
+    block.mlp.proj.weight.data = torch.ones_like(
+        block.mlp.proj.weight.data
+    )
     block.mlp.proj.bias.data = torch.ones_like(block.mlp.proj.bias.data)
     block.reset_super_network()
     out_large = block(input, cos, sin, mask)
@@ -44,16 +56,36 @@ def test_block():
     assert out_small.shape == (8, 512, 32)
 
     lit_block = LitBlock(config)
-    lit_block.attn.attn.weight.data = torch.ones_like(lit_block.attn.attn.weight.data)
-    lit_block.attn.attn.bias.data = torch.ones_like(lit_block.attn.attn.bias.data)
-    lit_block.attn.proj.bias.data = torch.ones_like(lit_block.attn.proj.bias.data)
-    lit_block.attn.proj.weight.data = torch.ones_like(lit_block.attn.proj.weight.data)
-    lit_block.mlp.fc_1.weight.data = torch.ones_like(lit_block.mlp.fc_1.weight.data)
-    lit_block.mlp.fc_1.bias.data = torch.ones_like(lit_block.mlp.fc_1.bias.data)
-    lit_block.mlp.fc_2.weight.data = torch.ones_like(lit_block.mlp.fc_2.weight.data)
-    lit_block.mlp.fc_2.bias.data = torch.ones_like(lit_block.mlp.fc_2.bias.data)
-    lit_block.mlp.proj.weight.data = torch.ones_like(lit_block.mlp.proj.weight.data)
-    lit_block.mlp.proj.bias.data = torch.ones_like(lit_block.mlp.proj.bias.data)
+    lit_block.attn.attn.weight.data = torch.ones_like(
+        lit_block.attn.attn.weight.data
+    )
+    lit_block.attn.attn.bias.data = torch.ones_like(
+        lit_block.attn.attn.bias.data
+    )
+    lit_block.attn.proj.bias.data = torch.ones_like(
+        lit_block.attn.proj.bias.data
+    )
+    lit_block.attn.proj.weight.data = torch.ones_like(
+        lit_block.attn.proj.weight.data
+    )
+    lit_block.mlp.fc_1.weight.data = torch.ones_like(
+        lit_block.mlp.fc_1.weight.data
+    )
+    lit_block.mlp.fc_1.bias.data = torch.ones_like(
+        lit_block.mlp.fc_1.bias.data
+    )
+    lit_block.mlp.fc_2.weight.data = torch.ones_like(
+        lit_block.mlp.fc_2.weight.data
+    )
+    lit_block.mlp.fc_2.bias.data = torch.ones_like(
+        lit_block.mlp.fc_2.bias.data
+    )
+    lit_block.mlp.proj.weight.data = torch.ones_like(
+        lit_block.mlp.proj.weight.data
+    )
+    lit_block.mlp.proj.bias.data = torch.ones_like(
+        lit_block.mlp.proj.bias.data
+    )
     out_lit_large = lit_block(input, cos, sin, mask)
     assert torch.all(out_lit_large == out_large)
 

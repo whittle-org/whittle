@@ -1,7 +1,5 @@
 import torch
-
 from litgpt.config import Config
-
 from lobotomy.models.gpt import GPT
 from lobotomy.models.gpt.extract import extract_sub_network
 
@@ -17,9 +15,12 @@ def test_extract_sub_network() -> None:
     super_network.eval()
     super_network.set_sub_network(
         sub_network_n_embd=sub_network_config.n_embd,
-        sub_network_intermediate_size=[sub_network_config.intermediate_size]
+        sub_network_intermediate_size=[
+            sub_network_config.intermediate_size
+        ]
         * sub_network_config.n_layer,
-        sub_network_num_heads=[sub_network_config.n_head] * sub_network_config.n_layer,
+        sub_network_num_heads=[sub_network_config.n_head]
+        * sub_network_config.n_layer,
         sub_network_n_layers=sub_network_config.n_layer,
     )
 
@@ -30,5 +31,6 @@ def test_extract_sub_network() -> None:
     out_super_net = super_network(input).detach()
     out_sub_net = sub_network(input).detach()
     assert torch.all(
-        torch.round(out_sub_net, decimals=9) == torch.round(out_super_net, decimals=9)
+        torch.round(out_sub_net, decimals=9)
+        == torch.round(out_super_net, decimals=9)
     )

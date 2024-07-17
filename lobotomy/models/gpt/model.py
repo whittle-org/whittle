@@ -5,19 +5,18 @@ https://github.com/EleutherAI/gpt-neox/tree/main/megatron/model.
 """
 
 from typing import Any, Optional, Tuple
-from typing_extensions import Self
 
 import torch
 import torch.nn as nn
-
 from litgpt import Config
 from litgpt.model import build_rope_cache
+from typing_extensions import Self
 
 from lobotomy.models.gpt.blocks import Block
 from lobotomy.modules.embedding import Embedding
+from lobotomy.modules.layernorm import LayerNorm
 from lobotomy.modules.linear import Linear
 from lobotomy.modules.rmsnorm import RMSNorm
-from lobotomy.modules.layernorm import LayerNorm
 
 
 class GPT(nn.Module):
@@ -27,12 +26,16 @@ class GPT(nn.Module):
         self.config = config
 
         self.lm_head = Linear(
-            config.n_embd, config.padded_vocab_size, bias=config.lm_head_bias
+            config.n_embd,
+            config.padded_vocab_size,
+            bias=config.lm_head_bias,
         )
         self.transformer = nn.ModuleDict(
             dict(
                 wte=Embedding(config.padded_vocab_size, config.n_embd),
-                h=nn.ModuleList(Block(config) for i in range(config.n_layer)),
+                h=nn.ModuleList(
+                    Block(config) for i in range(config.n_layer)
+                ),
                 ln_f=self.norm_class(config.n_embd, eps=config.norm_eps),
             )
         )
@@ -126,7 +129,10 @@ class GPT(nn.Module):
         self.transformer.ln_f.set_sub_network(
             self.sub_network_n_embd, sample_random_indices
         )
-        if sample_random_indices and sub_network_n_layers < self.config.n_layer:
+        if (
+            sample_random_indices
+            and sub_network_n_layers < self.config.n_layer
+        ):
             self.random_layers = torch.randperm(self.config.n_layer)[
                 :sub_network_n_layers
             ]
@@ -142,13 +148,18 @@ class GPT(nn.Module):
                 sample_random_indices,
             )
         self.lm_head.set_sub_network(
-            sub_network_n_embd, self.config.padded_vocab_size, sample_random_indices
+            sub_network_n_embd,
+            self.config.padded_vocab_size,
+            sample_random_indices,
         )
 
     def select_sub_network(self, config):
         self.set_sub_network(
             config["embed_dim"],
-            [config["mlp_ratio"] * config["embed_dim"] for i in range(config["depth"])],
+            [
+                config["mlp_ratio"] * config["embed_dim"]
+                for i in range(config["depth"])
+            ],
             [config["num_heads"] for i in range(config["depth"])],
             config["depth"],
         )
@@ -187,10 +198,12 @@ class GPT(nn.Module):
                 f"Cannot forward sequence of length {T}, max seq length is only {self.max_seq_length}."
             )
 
-        x = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
+        x = self.transformer.wte(
+            idx
+        )  # token embeddings of shape (b, t, n_embd)
         if self.config.scale_embeddings:
-            x = x * (
-                self.sub_network_n_embd**0.5
+            x = (
+                x * (self.sub_network_n_embd**0.5)
             )  # TODO: forward is only implemented due to change in this line
         for i, j in enumerate(self.random_layers):
             block = self.transformer.h[j]
@@ -200,7 +213,10 @@ class GPT(nn.Module):
                         T,
                         n_elem=int(
                             self.config.rotary_percentage
-                            * (self.sub_network_n_embd // self.sub_network_num_heads[i])
+                            * (
+                                self.sub_network_n_embd
+                                // self.sub_network_num_heads[i]
+                            )
                         ),
                     )
                 else:
@@ -208,16 +224,24 @@ class GPT(nn.Module):
                         T,
                         n_elem=int(
                             self.config.rotary_percentage
-                            * (self.sub_network_n_embd // self.sub_network_num_heads)
+                            * (
+                                self.sub_network_n_embd
+                                // self.sub_network_num_heads
+                            )
                         ),
                     )
             else:
                 cos, sin = build_rope_cache(
                     T,
-                    n_elem=int(self.config.rotary_percentage * (self.config.head_size)),
+                    n_elem=int(
+                        self.config.rotary_percentage
+                        * (self.config.head_size)
+                    ),
                 )
 
-            cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
+            cos, sin, mask = self.process_rope_cache(
+                cos, sin, input_pos, T
+            )
 
             x = block(x, cos, sin, mask, input_pos)
         x = self.transformer.ln_f(x)
@@ -241,13 +265,22 @@ class GPT(nn.Module):
         # initialize the kv cache for all blocks
         for block in self.transformer.h:
             block.attn.kv_cache = block.attn.build_kv_cache(
-                batch_size, max_seq_length, rope_cache_length, device, dtype
+                batch_size,
+                max_seq_length,
+                rope_cache_length,
+                device,
+                dtype,
             )
 
-        if self.mask_cache is None or self.mask_cache.size(3) != self.max_seq_length:
+        if (
+            self.mask_cache is None
+            or self.mask_cache.size(3) != self.max_seq_length
+        ):
             # passing `attn_mask` to SDPA disables the flash implementation. since we only need the mask
             # for the kv-cache support (only during inference), we only create it in that situation
-            self.mask_cache = build_mask_cache(self.max_seq_length, device)
+            self.mask_cache = build_mask_cache(
+                self.max_seq_length, device
+            )
 
     def clear_kv_cache(self) -> None:
         self.mask_cache = None
@@ -258,5 +291,7 @@ class GPT(nn.Module):
 def build_mask_cache(
     max_seq_length: int, device: Optional[torch.device] = None
 ) -> torch.Tensor:
-    ones = torch.ones((max_seq_length, max_seq_length), device=device, dtype=torch.bool)
+    ones = torch.ones(
+        (max_seq_length, max_seq_length), device=device, dtype=torch.bool
+    )
     return torch.tril(ones).unsqueeze(0).unsqueeze(0)

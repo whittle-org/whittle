@@ -1,21 +1,27 @@
-import torch
-from lobotomy.models.gpt.blocks import CausalSelfAttention
-from litgpt.model import CausalSelfAttention as LitCausalSelfAttention
-from litgpt import Config
-from litgpt.model import build_mask_cache, build_rope_cache
 import pytest
+import torch
+from litgpt import Config
+from litgpt.model import CausalSelfAttention as LitCausalSelfAttention
+from litgpt.model import build_mask_cache, build_rope_cache
+from lobotomy.models.gpt.blocks import CausalSelfAttention
 
 attention_configs = {
     "mha_fix_head_size": {
-        "config": Config(n_embd=128, n_head=16, n_query_groups=16, head_size=64),
+        "config": Config(
+            n_embd=128, n_head=16, n_query_groups=16, head_size=64
+        ),
         "fix_head_size": True,
     },
     "gqa_fix_head_size": {
-        "config": Config(n_embd=128, n_head=16, n_query_groups=2, head_size=64),
+        "config": Config(
+            n_embd=128, n_head=16, n_query_groups=2, head_size=64
+        ),
         "fix_head_size": True,
     },
     "mqa_fix_head_size": {
-        "config": Config(n_embd=128, n_head=16, n_query_groups=1, head_size=64),
+        "config": Config(
+            n_embd=128, n_head=16, n_query_groups=1, head_size=64
+        ),
         "fix_head_size": True,
     },
     "mha_flexible_head_size": {
@@ -35,26 +41,36 @@ attention_configs = {
 
 def init_attention(config):
     attention = CausalSelfAttention(config)
-    attention.attn.weight.data = torch.ones_like(attention.attn.weight.data)
+    attention.attn.weight.data = torch.ones_like(
+        attention.attn.weight.data
+    )
     attention.attn.bias.data = torch.ones_like(attention.attn.bias.data)
     attention.proj.bias.data = torch.ones_like(attention.proj.bias.data)
-    attention.proj.weight.data = torch.ones_like(attention.proj.weight.data)
+    attention.proj.weight.data = torch.ones_like(
+        attention.proj.weight.data
+    )
     return attention
 
 
 def init_lit_attention(config):
     attention = LitCausalSelfAttention(config)
-    attention.attn.weight.data = torch.ones_like(attention.attn.weight.data)
+    attention.attn.weight.data = torch.ones_like(
+        attention.attn.weight.data
+    )
     attention.attn.bias.data = torch.ones_like(attention.attn.bias.data)
     attention.proj.bias.data = torch.ones_like(attention.proj.bias.data)
-    attention.proj.weight.data = torch.ones_like(attention.proj.weight.data)
+    attention.proj.weight.data = torch.ones_like(
+        attention.proj.weight.data
+    )
     return attention
 
 
 @pytest.mark.parametrize("attention_config", attention_configs.keys())
 def test_attention(attention_config):
     config = attention_configs[attention_config]["config"]
-    config.fix_head_size = attention_configs[attention_config]["fix_head_size"]
+    config.fix_head_size = attention_configs[attention_config][
+        "fix_head_size"
+    ]
     config.max_seq_len = 512
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
 
@@ -74,10 +90,14 @@ def test_attention(attention_config):
     out_lit_large = lit_attention(input, mask=mask, cos=cos, sin=sin)
 
     attention.set_sub_network(
-        sub_network_n_embd=config.n_embd // 2, sub_network_n_head=config.n_head // 4
+        sub_network_n_embd=config.n_embd // 2,
+        sub_network_n_head=config.n_head // 4,
     )
     cos, sin = build_rope_cache(
-        seq_len, n_elem=int(config.rotary_percentage * attention.sub_network_head_size)
+        seq_len,
+        n_elem=int(
+            config.rotary_percentage * attention.sub_network_head_size
+        ),
     )
     out_small = attention(
         input[:, :, : config.n_embd // 2], mask=mask, cos=cos, sin=sin

@@ -1,8 +1,5 @@
 import torch
 import torch.nn as nn
-
-from syne_tune.config_space import randint
-
 from lobotomy.modules import Linear
 
 

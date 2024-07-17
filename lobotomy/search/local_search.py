@@ -1,13 +1,12 @@
-import numpy as np
 import logging
 from copy import deepcopy
-from typing import Optional, List, Dict, Any, Union
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
 
+import numpy as np
+from syne_tune.config_space import Domain
 from syne_tune.optimizer.schedulers import FIFOScheduler
 from syne_tune.optimizer.schedulers.searchers import StochasticSearcher
-from syne_tune.config_space import Domain
-
 
 logger = logging.getLogger(__name__)
 
@@ -111,9 +110,13 @@ class LocalSearch(StochasticSearcher):
             }
         else:
             if self._mode == "min":
-                self._metric_op = dict(zip(self._metric, [1.0] * len(self._metric)))
+                self._metric_op = dict(
+                    zip(self._metric, [1.0] * len(self._metric))
+                )
             elif self._mode == "max":
-                self._metric_op = dict(zip(self._metric, [-1.0] * len(self._metric)))
+                self._metric_op = dict(
+                    zip(self._metric, [-1.0] * len(self._metric))
+                )
 
     def _sample_random_neighbour(self, start_point):
         # get actual hyperparameters from the search space
@@ -144,14 +147,16 @@ class LocalSearch(StochasticSearcher):
     def is_efficient(self, costs):
         is_efficient = np.ones(costs.shape[0], dtype=bool)
         for i, c in enumerate(costs):
-            is_efficient[i] = np.all(np.any(costs[:i] > c, axis=1)) and np.all(
-                np.any(costs[i + 1 :] > c, axis=1)
-            )
+            is_efficient[i] = np.all(
+                np.any(costs[:i] > c, axis=1)
+            ) and np.all(np.any(costs[i + 1 :] > c, axis=1))
 
         return is_efficient
 
     def dominates(self, incumbent, neighbour):
-        return np.all(neighbour <= incumbent) * np.any(neighbour < incumbent)
+        return np.all(neighbour <= incumbent) * np.any(
+            neighbour < incumbent
+        )
 
     def get_config(self, **kwargs) -> Optional[dict]:
         config = self._next_initial_config()
@@ -173,10 +178,17 @@ class LocalSearch(StochasticSearcher):
             for metric in self._metric
         }
 
-    def _update(self, trial_id: int, config: Dict[str, Any], result: Dict[str, Any]):
+    def _update(
+        self,
+        trial_id: int,
+        config: Dict[str, Any],
+        result: Dict[str, Any],
+    ):
         # assume that the new point is in the Pareto Front
         element = PopulationElement(
-            trial_id=trial_id, config=config, result=self._metric_dict(result)
+            trial_id=trial_id,
+            config=config,
+            result=self._metric_dict(result),
         )
 
         if len(self._pareto_front) == 0:
@@ -186,7 +198,10 @@ class LocalSearch(StochasticSearcher):
         pareto_front = deepcopy(self._pareto_front)
         pareto_front.append(element)
         costs = np.array(
-            [[v for v in element.result.values()] for element in pareto_front]
+            [
+                [v for v in element.result.values()]
+                for element in pareto_front
+            ]
         )
 
         # check for Pareto efficiency
@@ -212,11 +227,10 @@ class LocalSearch(StochasticSearcher):
 
 
 if __name__ == "__main__":
-    from transformers import AutoConfig
-
     from nas_fine_tuning.sampling import SmallSearchSpace
-    from syne_tune.tuner import Trial
     from syne_tune.config_space import Categorical
+    from syne_tune.tuner import Trial
+    from transformers import AutoConfig
 
     config = AutoConfig.from_pretrained("bert-base-cased")
     ss = SmallSearchSpace(config)
@@ -249,5 +263,6 @@ if __name__ == "__main__":
         # ls._update(trial_id=i, config=config, result={'a': np.random.rand(), 'b':np.random.rand()})
         result = {"a": np.random.rand(), "b": np.random.rand()}
         ls.on_trial_result(
-            Trial(trial_id=i, config=trial.config, creation_time=None), result=result
+            Trial(trial_id=i, config=trial.config, creation_time=None),
+            result=result,
         )

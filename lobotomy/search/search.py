@@ -3,8 +3,8 @@ from typing import Optional
 
 import numpy as np
 
-from lobotomy.search.baselines import MethodArguments, methods
 from lobotomy.search.ask_tell_scheduler import AskTellScheduler
+from lobotomy.search.baselines import MethodArguments, methods
 from lobotomy.search.multi_objective import get_pareto_optimal
 
 
@@ -56,7 +56,8 @@ def multi_objective_search(
         )
 
         scheduler.tell(
-            trial_suggestion, {"objective_1": objective_1, "objective_2": objective_2}
+            trial_suggestion,
+            {"objective_1": objective_1, "objective_2": objective_2},
         )
 
         # bookkeeping

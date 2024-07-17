@@ -1,6 +1,8 @@
 import numpy as np
 
-from lobotomy.training_strategies.base_strategy import BaseTrainingStrategy
+from lobotomy.training_strategies.base_strategy import (
+    BaseTrainingStrategy,
+)
 
 
 class RandomLinearStrategy(BaseTrainingStrategy):
@@ -8,7 +10,12 @@ class RandomLinearStrategy(BaseTrainingStrategy):
     Random linear strategy.
     """
 
-    def __init__(self, total_number_of_steps: int, random_samples: int = 1, **kwargs):
+    def __init__(
+        self,
+        total_number_of_steps: int,
+        random_samples: int = 1,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.random_samples = random_samples
         self.total_number_of_steps = total_number_of_steps

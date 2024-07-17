@@ -1,8 +1,8 @@
-from lobotomy.models.gpt import GPT
-from litgpt import Config
-import torch
 import pytest
+import torch
+from litgpt import Config
 from litgpt.model import GPT as LitGPT
+from lobotomy.models.gpt import GPT
 
 
 @pytest.mark.parametrize("sample_random_indices", [True, False])
@@ -24,24 +24,52 @@ def test_gpt(sample_random_indices):
     config.lm_head_bias = True
     config.fix_head_size = False
     gpt = GPT(config)
-    gpt.transformer.wte.weight.data = torch.ones_like(gpt.transformer.wte.weight.data)
+    gpt.transformer.wte.weight.data = torch.ones_like(
+        gpt.transformer.wte.weight.data
+    )
     gpt.lm_head.weight.data = torch.ones_like(gpt.lm_head.weight.data)
     gpt.lm_head.bias.data = torch.ones_like(gpt.lm_head.bias.data)
-    gpt.transformer.ln_f.weight.data = torch.ones_like(gpt.transformer.ln_f.weight.data)
+    gpt.transformer.ln_f.weight.data = torch.ones_like(
+        gpt.transformer.ln_f.weight.data
+    )
 
     for block in gpt.transformer.h:
-        block.attn.attn.weight.data = torch.ones_like(block.attn.attn.weight.data)
-        block.attn.attn.bias.data = torch.ones_like(block.attn.attn.bias.data)
-        block.attn.proj.bias.data = torch.ones_like(block.attn.proj.bias.data)
-        block.attn.proj.weight.data = torch.ones_like(block.attn.proj.weight.data)
-        block.mlp.fc_1.weight.data = torch.ones_like(block.mlp.fc_1.weight.data)
-        block.mlp.fc_1.bias.data = torch.ones_like(block.mlp.fc_1.bias.data)
-        block.mlp.fc_2.weight.data = torch.ones_like(block.mlp.fc_2.weight.data)
-        block.mlp.fc_2.bias.data = torch.ones_like(block.mlp.fc_2.bias.data)
-        block.mlp.proj.weight.data = torch.ones_like(block.mlp.proj.weight.data)
-        block.mlp.proj.bias.data = torch.ones_like(block.mlp.proj.bias.data)
-        block.norm_1.weight.data = torch.ones_like(block.norm_1.weight.data)
-        block.norm_2.weight.data = torch.ones_like(block.norm_2.weight.data)
+        block.attn.attn.weight.data = torch.ones_like(
+            block.attn.attn.weight.data
+        )
+        block.attn.attn.bias.data = torch.ones_like(
+            block.attn.attn.bias.data
+        )
+        block.attn.proj.bias.data = torch.ones_like(
+            block.attn.proj.bias.data
+        )
+        block.attn.proj.weight.data = torch.ones_like(
+            block.attn.proj.weight.data
+        )
+        block.mlp.fc_1.weight.data = torch.ones_like(
+            block.mlp.fc_1.weight.data
+        )
+        block.mlp.fc_1.bias.data = torch.ones_like(
+            block.mlp.fc_1.bias.data
+        )
+        block.mlp.fc_2.weight.data = torch.ones_like(
+            block.mlp.fc_2.weight.data
+        )
+        block.mlp.fc_2.bias.data = torch.ones_like(
+            block.mlp.fc_2.bias.data
+        )
+        block.mlp.proj.weight.data = torch.ones_like(
+            block.mlp.proj.weight.data
+        )
+        block.mlp.proj.bias.data = torch.ones_like(
+            block.mlp.proj.bias.data
+        )
+        block.norm_1.weight.data = torch.ones_like(
+            block.norm_1.weight.data
+        )
+        block.norm_2.weight.data = torch.ones_like(
+            block.norm_2.weight.data
+        )
 
     gpt.reset_super_network()
     input = torch.randint(0, 512, (8, 512))
@@ -101,20 +129,46 @@ def test_gpt(sample_random_indices):
     lit_gpt.lm_head.weight.data = gpt.lm_head.weight.data
     lit_gpt.lm_head.bias.data = gpt.lm_head.bias.data
     lit_gpt.transformer.wte.weight.data = gpt.transformer.wte.weight.data
-    lit_gpt.transformer.ln_f.weight.data = gpt.transformer.ln_f.weight.data
+    lit_gpt.transformer.ln_f.weight.data = (
+        gpt.transformer.ln_f.weight.data
+    )
     for block in lit_gpt.transformer.h:
-        block.attn.attn.weight.data = torch.ones_like(block.attn.attn.weight.data)
-        block.attn.attn.bias.data = torch.ones_like(block.attn.attn.bias.data)
-        block.attn.proj.bias.data = torch.ones_like(block.attn.proj.bias.data)
-        block.attn.proj.weight.data = torch.ones_like(block.attn.proj.weight.data)
-        block.mlp.fc_1.weight.data = torch.ones_like(block.mlp.fc_1.weight.data)
-        block.mlp.fc_1.bias.data = torch.ones_like(block.mlp.fc_1.bias.data)
-        block.mlp.fc_2.weight.data = torch.ones_like(block.mlp.fc_2.weight.data)
-        block.mlp.fc_2.bias.data = torch.ones_like(block.mlp.fc_2.bias.data)
-        block.mlp.proj.weight.data = torch.ones_like(block.mlp.proj.weight.data)
-        block.mlp.proj.bias.data = torch.ones_like(block.mlp.proj.bias.data)
-        block.norm_1.weight.data = torch.ones_like(block.norm_1.weight.data)
-        block.norm_2.weight.data = torch.ones_like(block.norm_2.weight.data)
+        block.attn.attn.weight.data = torch.ones_like(
+            block.attn.attn.weight.data
+        )
+        block.attn.attn.bias.data = torch.ones_like(
+            block.attn.attn.bias.data
+        )
+        block.attn.proj.bias.data = torch.ones_like(
+            block.attn.proj.bias.data
+        )
+        block.attn.proj.weight.data = torch.ones_like(
+            block.attn.proj.weight.data
+        )
+        block.mlp.fc_1.weight.data = torch.ones_like(
+            block.mlp.fc_1.weight.data
+        )
+        block.mlp.fc_1.bias.data = torch.ones_like(
+            block.mlp.fc_1.bias.data
+        )
+        block.mlp.fc_2.weight.data = torch.ones_like(
+            block.mlp.fc_2.weight.data
+        )
+        block.mlp.fc_2.bias.data = torch.ones_like(
+            block.mlp.fc_2.bias.data
+        )
+        block.mlp.proj.weight.data = torch.ones_like(
+            block.mlp.proj.weight.data
+        )
+        block.mlp.proj.bias.data = torch.ones_like(
+            block.mlp.proj.bias.data
+        )
+        block.norm_1.weight.data = torch.ones_like(
+            block.norm_1.weight.data
+        )
+        block.norm_2.weight.data = torch.ones_like(
+            block.norm_2.weight.data
+        )
     out_lit_large = lit_gpt(input)
     assert torch.all(out_lit_large == out_large)
 
@@ -127,7 +181,9 @@ def test_gpt(sample_random_indices):
     lit_gpt_small.lm_head.weight.data = torch.ones_like(
         lit_gpt_small.lm_head.weight.data
     )
-    lit_gpt_small.lm_head.bias.data = torch.ones_like(lit_gpt_small.lm_head.bias.data)
+    lit_gpt_small.lm_head.bias.data = torch.ones_like(
+        lit_gpt_small.lm_head.bias.data
+    )
     lit_gpt_small.transformer.wte.weight.data = torch.ones_like(
         lit_gpt_small.transformer.wte.weight.data
     )
@@ -135,15 +191,35 @@ def test_gpt(sample_random_indices):
         lit_gpt_small.transformer.ln_f.weight.data
     )
     for block in lit_gpt_small.transformer.h:
-        block.attn.attn.weight.data = torch.ones_like(block.attn.attn.weight.data)
-        block.attn.attn.bias.data = torch.ones_like(block.attn.attn.bias.data)
-        block.attn.proj.bias.data = torch.ones_like(block.attn.proj.bias.data)
-        block.attn.proj.weight.data = torch.ones_like(block.attn.proj.weight.data)
-        block.mlp.fc_1.weight.data = torch.ones_like(block.mlp.fc_1.weight.data)
-        block.mlp.fc_1.bias.data = torch.ones_like(block.mlp.fc_1.bias.data)
-        block.mlp.fc_2.weight.data = torch.ones_like(block.mlp.fc_2.weight.data)
-        block.mlp.fc_2.bias.data = torch.ones_like(block.mlp.fc_2.bias.data)
-        block.mlp.proj.weight.data = torch.ones_like(block.mlp.proj.weight.data)
-        block.mlp.proj.bias.data = torch.ones_like(block.mlp.proj.bias.data)
+        block.attn.attn.weight.data = torch.ones_like(
+            block.attn.attn.weight.data
+        )
+        block.attn.attn.bias.data = torch.ones_like(
+            block.attn.attn.bias.data
+        )
+        block.attn.proj.bias.data = torch.ones_like(
+            block.attn.proj.bias.data
+        )
+        block.attn.proj.weight.data = torch.ones_like(
+            block.attn.proj.weight.data
+        )
+        block.mlp.fc_1.weight.data = torch.ones_like(
+            block.mlp.fc_1.weight.data
+        )
+        block.mlp.fc_1.bias.data = torch.ones_like(
+            block.mlp.fc_1.bias.data
+        )
+        block.mlp.fc_2.weight.data = torch.ones_like(
+            block.mlp.fc_2.weight.data
+        )
+        block.mlp.fc_2.bias.data = torch.ones_like(
+            block.mlp.fc_2.bias.data
+        )
+        block.mlp.proj.weight.data = torch.ones_like(
+            block.mlp.proj.weight.data
+        )
+        block.mlp.proj.bias.data = torch.ones_like(
+            block.mlp.proj.bias.data
+        )
     out_lit_small = lit_gpt_small(input)
     assert torch.all(out_lit_small == out_small)
