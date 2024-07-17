@@ -103,3 +103,7 @@ line-ending = "auto"
 # This is currently disabled by default, but it is planned for this
 # to be opt-out in the future.
 docstring-code-format = false
+
+[tool.ruff.lint.isort]
+known-first-party = ["lobotomy", "examples"]
+extra-standard-library = ["typing_extensions"]
