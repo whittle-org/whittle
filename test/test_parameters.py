@@ -3,10 +3,6 @@ from litgpt.config import Config
 from lobotomy.metrics.parameters import (
     compute_parameters,
     compute_parameters_sub_network_gpt,
-    params_attention_layer,
-    params_layer_norm,
-    params_linear_layer,
-    params_embedding_layer,
 )
 from lobotomy.models.gpt import GPT
 from test.test_training_strategies import MLP
