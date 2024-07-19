@@ -36,7 +36,6 @@ def params_attention_layer(attention: CausalSelfAttention):
 
 
 def compute_parameters_sub_network_gpt(model: GPT):
-
     """
     Computes parameters of the current sub-network of a GPT mmodel. Make sure to set the sub-network before
     calling this function.
