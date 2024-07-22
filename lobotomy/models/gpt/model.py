@@ -202,6 +202,7 @@ class GPT(nn.Module):
                             self.config.rotary_percentage
                             * (self.sub_network_n_embd // self.sub_network_num_heads[i])
                         ),
+                        device=idx.device
                     )
                 else:
                     cos, sin = build_rope_cache(
@@ -210,11 +211,13 @@ class GPT(nn.Module):
                             self.config.rotary_percentage
                             * (self.sub_network_n_embd // self.sub_network_num_heads)
                         ),
+                        device=idx.device
                     )
             else:
                 cos, sin = build_rope_cache(
                     T,
                     n_elem=int(self.config.rotary_percentage * (self.config.head_size)),
+                    device=idx.device
                 )
 
             cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
