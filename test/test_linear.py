@@ -1,5 +1,5 @@
 import torch
-from lobotomy.modules.linear import Linear
+from whittle.modules.linear import Linear
 
 
 def test_linear():

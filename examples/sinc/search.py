@@ -7,7 +7,7 @@ from pathlib import Path
 from torch.utils.data import DataLoader
 
 from syne_tune.config_space import randint
-from lobotomy.search import multi_objective_search
+from whittle.search import multi_objective_search
 from examples.sinc.estimate_efficiency import compute_mac_linear_layer
 
 from sinc_nas import validate, f

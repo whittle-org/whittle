@@ -10,8 +10,8 @@ from pathlib import Path
 from torch.utils.data import DataLoader
 from syne_tune.config_space import randint
 from syne_tune.report import Reporter
-from lobotomy.training_strategies import SandwichStrategy
-from lobotomy.sampling.random_sampler import RandomSampler
+from whittle.training_strategies import SandwichStrategy
+from whittle.sampling.random_sampler import RandomSampler
 
 from model import MLP
 

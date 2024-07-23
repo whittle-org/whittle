@@ -1,4 +1,4 @@
-# Lobotomy
+# whittle
 
 A framework for two-stage neural architecture search (NAS) and structural pruning on language models.
 
@@ -15,8 +15,8 @@ A framework for two-stage neural architecture search (NAS) and structural prunin
 
 ```sh
 curl -sSL https://install.python-poetry.org | python3 -
-git clone git@github.com:aaronkl/lobotomy.git
-cd ./lobotomy
+git clone git@github.com:aaronkl/whittle.git
+cd ./whittle
 poetry install
 poetry shell
 ```
@@ -24,7 +24,7 @@ poetry shell
 ## Structure
 
 ```markdown
-lobotomy/
+whittle/
 ├── extract_subnetworks.py
 ├── __init__.py
 ├── metrics

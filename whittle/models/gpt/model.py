@@ -13,11 +13,11 @@ import torch.nn as nn
 from litgpt import Config
 from litgpt.model import build_rope_cache
 
-from lobotomy.models.gpt.blocks import Block
-from lobotomy.modules.embedding import Embedding
-from lobotomy.modules.linear import Linear
-from lobotomy.modules.rmsnorm import RMSNorm
-from lobotomy.modules.layernorm import LayerNorm
+from whittle.models.gpt.blocks import Block
+from whittle.modules.embedding import Embedding
+from whittle.modules.linear import Linear
+from whittle.modules.rmsnorm import RMSNorm
+from whittle.modules.layernorm import LayerNorm
 
 
 class GPT(nn.Module):

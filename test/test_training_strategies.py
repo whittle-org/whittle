@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional
 
 from syne_tune.config_space import randint, choice
-from lobotomy.loss import DistillLoss
-from lobotomy.training_strategies import (
+from whittle.loss import DistillLoss
+from whittle.training_strategies import (
     SandwichStrategy,
     RandomStrategy,
     StandardStrategy,
@@ -12,9 +12,9 @@ from lobotomy.training_strategies import (
     ATS,
 )
 from litgpt import Config
-from lobotomy.models.gpt import GPT
-from lobotomy.sampling.random_sampler import RandomSampler
-from lobotomy.modules.linear import Linear
+from whittle.models.gpt import GPT
+from whittle.sampling.random_sampler import RandomSampler
+from whittle.modules.linear import Linear
 
 
 methods = [

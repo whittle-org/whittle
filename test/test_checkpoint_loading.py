@@ -5,7 +5,7 @@ import pathlib
 from litgpt import Config
 from litgpt.model import GPT as LitGPT
 from litgpt.scripts.download import download_from_hub
-from lobotomy.models.gpt.model import GPT as LobotomyGPT
+from whittle.models.gpt.model import GPT as whittleGPT
 
 
 @pytest.fixture(scope="session")
@@ -31,7 +31,7 @@ def test_checkpoint_loading(checkpoint_dir):
     # litgpt download --repo_id stabilityai/stablelm-base-alpha-3b
     config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
     config.fix_head_size = False
-    model = LobotomyGPT(config)  # .cuda()
+    model = whittleGPT(config)  # .cuda()
     model.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
     # test output
     model.eval()
@@ -43,5 +43,5 @@ def test_checkpoint_loading(checkpoint_dir):
         config.n_layer,
     )
 
-    output_lobotomy = model(input_ids)
-    assert torch.allclose(output_lit, output_lobotomy)
+    output_whittle = model(input_ids)
+    assert torch.allclose(output_lit, output_whittle)

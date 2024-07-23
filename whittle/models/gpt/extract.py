@@ -1,6 +1,6 @@
 from collections import OrderedDict
 
-from lobotomy.models.gpt import GPT
+from whittle.models.gpt import GPT
 
 
 def extract_sub_network(model, sub_network_config):

@@ -1,4 +1,4 @@
-from lobotomy.models.gpt import GPT
+from whittle.models.gpt import GPT
 from litgpt import Config
 import torch
 import pytest

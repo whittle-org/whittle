@@ -1,5 +1,5 @@
 import torch
-from lobotomy.models.gpt.blocks import CausalSelfAttention
+from whittle.models.gpt.blocks import CausalSelfAttention
 from litgpt.model import CausalSelfAttention as LitCausalSelfAttention
 from litgpt import Config
 from litgpt.model import build_mask_cache, build_rope_cache
