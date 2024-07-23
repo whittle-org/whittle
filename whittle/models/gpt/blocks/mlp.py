@@ -3,7 +3,7 @@ from typing import Optional
 import torch
 import litgpt
 from litgpt import Config
-from lobotomy.modules import Linear
+from whittle.modules import Linear
 
 
 class GptNeoxMLP(litgpt.model.GptNeoxMLP):

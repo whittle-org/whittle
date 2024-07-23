@@ -1,5 +1,5 @@
 import torch
-from lobotomy.models.gpt.blocks import GptNeoxMLP, LLaMAMLP, GemmaMLP
+from whittle.models.gpt.blocks import GptNeoxMLP, LLaMAMLP, GemmaMLP
 from litgpt.model import (
     GptNeoxMLP as LitGptNeoxMLP,
     LLaMAMLP as LitLLaMAMLP,

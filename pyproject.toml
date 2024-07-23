@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "lobotomy"
+name = "whittle"
 version = "0.0.1"
 description = "Two-stage weight sharing neural architecture search."
 authors = ["Aaron Klein"]

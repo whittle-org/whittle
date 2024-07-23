@@ -1,6 +1,6 @@
 import torch
 
-from lobotomy.modules.embedding import Embedding
+from whittle.modules.embedding import Embedding
 
 
 def test_embedding():

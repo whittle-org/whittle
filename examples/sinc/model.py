@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from syne_tune.config_space import randint
 
-from lobotomy.modules import Linear
+from whittle.modules import Linear
 
 
 class MLP(nn.Module):

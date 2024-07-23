@@ -1,6 +1,6 @@
 import torch
 from litgpt import Config
-from lobotomy.models.gpt.blocks import Block
+from whittle.models.gpt.blocks import Block
 from litgpt.model import Block as LitBlock
 from litgpt.model import build_mask_cache, build_rope_cache
 

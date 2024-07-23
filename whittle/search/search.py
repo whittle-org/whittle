@@ -3,9 +3,9 @@ from typing import Optional
 
 import numpy as np
 
-from lobotomy.search.baselines import MethodArguments, methods
-from lobotomy.search.ask_tell_scheduler import AskTellScheduler
-from lobotomy.search.multi_objective import get_pareto_optimal
+from whittle.search.baselines import MethodArguments, methods
+from whittle.search.ask_tell_scheduler import AskTellScheduler
+from whittle.search.multi_objective import get_pareto_optimal
 
 
 def multi_objective_search(

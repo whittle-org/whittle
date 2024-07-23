@@ -1,4 +1,4 @@
-from lobotomy.training_strategies.base_strategy import BaseTrainingStrategy
+from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 
 
 class StandardStrategy(BaseTrainingStrategy):

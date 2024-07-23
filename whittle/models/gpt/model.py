@@ -13,11 +13,11 @@ import torch.nn as nn
 from litgpt import Config
 from litgpt.model import build_rope_cache
 
-from lobotomy.models.gpt.blocks import Block
-from lobotomy.modules.embedding import Embedding
-from lobotomy.modules.linear import Linear
-from lobotomy.modules.rmsnorm import RMSNorm
-from lobotomy.modules.layernorm import LayerNorm
+from whittle.models.gpt.blocks import Block
+from whittle.modules.embedding import Embedding
+from whittle.modules.linear import Linear
+from whittle.modules.rmsnorm import RMSNorm
+from whittle.modules.layernorm import LayerNorm
 
 
 class GPT(nn.Module):
@@ -97,7 +97,7 @@ class GPT(nn.Module):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def rope_cache(
-        self, device: Optional[torch.device] = None
+            self, device: Optional[torch.device] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         return build_rope_cache(
             seq_len=self.max_seq_length,
@@ -108,12 +108,12 @@ class GPT(nn.Module):
         )
 
     def set_sub_network(
-        self,
-        sub_network_n_embd: int,
-        sub_network_intermediate_size: list,
-        sub_network_num_heads: list,
-        sub_network_n_layers: int,
-        sample_random_indices: bool = False,
+            self,
+            sub_network_n_embd: int,
+            sub_network_intermediate_size: list,
+            sub_network_num_heads: list,
+            sub_network_n_layers: int,
+            sample_random_indices: bool = False,
     ) -> None:
         self.sample_random_indices = sample_random_indices
         self.sub_network_n_embd = sub_network_n_embd
@@ -128,8 +128,8 @@ class GPT(nn.Module):
         )
         if sample_random_indices and sub_network_n_layers < self.config.n_layer:
             self.random_layers = torch.randperm(self.config.n_layer)[
-                :sub_network_n_layers
-            ]
+                                 :sub_network_n_layers
+                                 ]
         else:
             self.random_layers = list(range(self.sub_network_n_layers))
 
@@ -179,7 +179,7 @@ class GPT(nn.Module):
         return cos, sin, mask
 
     def forward(
-        self, idx: torch.Tensor, input_pos: Optional[torch.Tensor] = None
+            self, idx: torch.Tensor, input_pos: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         T = idx.size(1)
         if self.max_seq_length < T:
@@ -190,7 +190,7 @@ class GPT(nn.Module):
         x = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
         if self.config.scale_embeddings:
             x = x * (
-                self.sub_network_n_embd**0.5
+                    self.sub_network_n_embd ** 0.5
             )  # TODO: forward is only implemented due to change in this line
         for i, j in enumerate(self.random_layers):
             block = self.transformer.h[j]
@@ -228,11 +228,11 @@ class GPT(nn.Module):
         return cls(Config.from_name(name, **kwargs))
 
     def set_kv_cache(
-        self,
-        batch_size: int,
-        rope_cache_length: Optional[int] = None,
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
+            self,
+            batch_size: int,
+            rope_cache_length: Optional[int] = None,
+            device: Optional[torch.device] = None,
+            dtype: Optional[torch.dtype] = None,
     ) -> None:
         if rope_cache_length is None:
             rope_cache_length = self.cos.size(-1)
@@ -256,7 +256,7 @@ class GPT(nn.Module):
 
 
 def build_mask_cache(
-    max_seq_length: int, device: Optional[torch.device] = None
+        max_seq_length: int, device: Optional[torch.device] = None
 ) -> torch.Tensor:
     ones = torch.ones((max_seq_length, max_seq_length), device=device, dtype=torch.bool)
     return torch.tril(ones).unsqueeze(0).unsqueeze(0)
