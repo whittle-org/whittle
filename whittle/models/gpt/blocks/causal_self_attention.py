@@ -4,7 +4,7 @@ from litgpt import Config
 from typing import Optional
 import math
 from litgpt.model import KVCache, apply_rope
-from lobotomy.modules import Linear
+from whittle.modules import Linear
 
 
 class CausalSelfAttention(nn.Module):

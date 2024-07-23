@@ -26,8 +26,8 @@ from transformers import (
     set_seed,
 )
 
-from lobotomy.sampling import RandomSampler
-from lobotomy.training_strategies import SandwichStrategy
+from whittle.sampling import RandomSampler
+from whittle.training_strategies import SandwichStrategy
 
 from search_spaces import (
     FullSearchSpace,

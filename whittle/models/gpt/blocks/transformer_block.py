@@ -2,10 +2,10 @@ from typing import Optional, Union
 
 import litgpt
 from litgpt import Config
-from lobotomy.models.gpt.blocks.causal_self_attention import CausalSelfAttention
-from lobotomy.modules.rmsnorm import RMSNorm
-from lobotomy.modules.layernorm import LayerNorm
-from lobotomy.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP, GemmaMLP
+from whittle.models.gpt.blocks.causal_self_attention import CausalSelfAttention
+from whittle.modules.rmsnorm import RMSNorm
+from whittle.modules.layernorm import LayerNorm
+from whittle.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP, GemmaMLP
 
 
 class Block(litgpt.model.Block):

@@ -13,11 +13,11 @@ import torch.nn as nn
 from litgpt import Config
 from litgpt.model import build_rope_cache
 
-from lobotomy.models.gpt.blocks import Block
-from lobotomy.modules.embedding import Embedding
-from lobotomy.modules.linear import Linear
-from lobotomy.modules.rmsnorm import RMSNorm
-from lobotomy.modules.layernorm import LayerNorm
+from whittle.models.gpt.blocks import Block
+from whittle.modules.embedding import Embedding
+from whittle.modules.linear import Linear
+from whittle.modules.rmsnorm import RMSNorm
+from whittle.modules.layernorm import LayerNorm
 
 
 class GPT(nn.Module):
@@ -202,6 +202,7 @@ class GPT(nn.Module):
                             self.config.rotary_percentage
                             * (self.sub_network_n_embd // self.sub_network_num_heads[i])
                         ),
+                        device=idx.device,
                     )
                 else:
                     cos, sin = build_rope_cache(
@@ -210,11 +211,13 @@ class GPT(nn.Module):
                             self.config.rotary_percentage
                             * (self.sub_network_n_embd // self.sub_network_num_heads)
                         ),
+                        device=idx.device,
                     )
             else:
                 cos, sin = build_rope_cache(
                     T,
                     n_elem=int(self.config.rotary_percentage * (self.config.head_size)),
+                    device=idx.device,
                 )
 
             cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)

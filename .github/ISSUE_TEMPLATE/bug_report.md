@@ -28,7 +28,7 @@ If applicable, add screenshots to help explain your problem.
 - OS: [e.g. Ubuntu, OSX, Windows]
 - Environment: [e.g. system, conda, virtualenv]
 - Python version:
-- lobotomy version / commit hash
+- whittle version / commit hash
 
 **Additional context**
 Add any other context about the problem here.

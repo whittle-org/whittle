@@ -1,6 +1,6 @@
-from lobotomy.sampling.random_sampler import RandomSampler
+from whittle.sampling.random_sampler import RandomSampler
 from typing import Callable, Optional
-from lobotomy.loss import DistillLoss
+from whittle.loss import DistillLoss
 import torch
 
 

@@ -21,7 +21,7 @@ from transformers import (
 from evaluate import load
 from functools import partial
 
-from lobotomy.search import multi_objective_search
+from whittle.search import multi_objective_search
 
 from bert import SuperNetBertForSequenceClassification
 from estimate_efficency import compute_parameters

@@ -2,8 +2,8 @@ import torch
 
 from litgpt.config import Config
 
-from lobotomy.models.gpt import GPT
-from lobotomy.models.gpt.extract import extract_sub_network
+from whittle.models.gpt import GPT
+from whittle.models.gpt.extract import extract_sub_network
 
 
 def test_extract_sub_network() -> None:

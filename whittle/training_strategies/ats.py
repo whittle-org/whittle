@@ -1,45 +1,40 @@
-import numpy as np
-
-from lobotomy.training_strategies.base_strategy import BaseTrainingStrategy
+from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 
 
-class RandomLinearStrategy(BaseTrainingStrategy):
+class ATS(BaseTrainingStrategy):
     """
-    Random linear strategy.
+    ATS strategy.
 
-    Updates `random_samples` randomly sampled sub-network with probability `p` or the super-network with `1 - p`. `p`
-    linearly increases with the step count.
+    Follows the approach by Mohtashami et al. and updates a set of randomly sampled sub-networks if
+    if the current step is even, otherwise it updates the super-network.
 
     refs:
-        Structural Pruning of Pre-trained Language Models via Neural Architecture Search
-        Aaron Klein, Jacek Golebiowski, Xingchen Ma, Valerio Perrone, Cedric Archambeau
-        https://arxiv.org/abs/2405.02267
-
-        Understanding and Simplifying One-Shot Architecture Search
-        Gabriel Bender, Pieter-Jan Kindermans, Barret Zoph, Vijay Vasudevan, Quoc Le
-        International Conference on Machine Learning (ICML) 2018
-        https://proceedings.mlr.press/v80/bender18a/bender18a.pdf
+        Masked Training of Neural Networks with Partial Gradients
+        Amirkeivan Mohtashami, Martin Jaggi, Sebastian Stich
+        Proceedings of The 25th International Conference on Artificial Intelligence and Statistics
+        https://arxiv.org/abs/2106.08895
     """
 
-    def __init__(self, total_number_of_steps: int, random_samples: int = 1, **kwargs):
+    def __init__(self, random_samples: int = 1, **kwargs):
         """
-        Initialises a `RandomLinearStrategy`
+        Initialises an `ATS` strategy.
 
         Args:
-            total_number_of_steps: the number of steps the optimization runs for
             random_samples: the number of randomly sampled sub-networks to sample and update in each step
             **kwargs: kwargs of `BaseTrainingStrategy`
         """
         super().__init__(**kwargs)
         self.random_samples = random_samples
-        self.total_number_of_steps = total_number_of_steps
         self.current_step = 0
-        self.rate = np.linspace(0.0, 1, total_number_of_steps)
 
     def __call__(self, model, inputs, outputs, **kwargs):
+        """
+        Updates a set of randomly sampled sub-networks if the current step is odd. Else, it updates the
+        super-network.
+        """
         total_loss = 0
         y_supernet = model(inputs).detach()
-        if np.random.rand() <= self.rate[self.current_step]:
+        if self.current_step % 2 == 0:
             # update random sub-networks
             for i in range(self.random_samples):
                 config = self.sampler.sample()
