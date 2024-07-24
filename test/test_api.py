@@ -170,8 +170,8 @@ def test_api(checkpoint_dir, out_dir):
     )
     with open(str(out_dir / "results.json"), "r") as f:
         results = json.load(f)
-    acc_api = results["results"]["hellaswag"]["acc,none"]
-    stderr_api = results["results"]["hellaswag"]["acc_stderr,none"]
+    acc_api = results["results"]["logiqa"]["acc,none"]
+    stderr_api = results["results"]["logiqa"]["acc_stderr,none"]
     import litgpt.eval.evaluate as module
 
     module.convert_and_evaluate(
@@ -186,7 +186,7 @@ def test_api(checkpoint_dir, out_dir):
     )
     with open(str(out_dir / "results.json"), "r") as f:
         results = json.load(f)
-    acc_lit = results["results"]["hellaswag"]["acc,none"]
-    stderr_lit = results["results"]["hellaswag"]["acc_stderr,none"]
+    acc_lit = results["results"]["logiqa"]["acc,none"]
+    stderr_lit = results["results"]["logiqa"]["acc_stderr,none"]
     assert acc_api == acc_lit
     assert stderr_api == stderr_lit
