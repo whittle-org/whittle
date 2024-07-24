@@ -10,7 +10,10 @@ from whittle.eval.whittle_llms import WhittleLM
 from whittle.eval.utils import convert_and_evaluate
 from litgpt.scripts.download import download_from_hub
 import pytest 
-
+from lm_eval import tasks
+from lm_eval.api.instance import Instance
+import json
+import shutil
 @pytest.fixture(scope="session")
 def checkpoint_dir(tmp_path_factory):
     # img = compute_expensive_image()
@@ -18,7 +21,14 @@ def checkpoint_dir(tmp_path_factory):
     download_from_hub(repo_id="EleutherAI/pythia-70m", checkpoint_dir=checkpoint_dir)
     return pathlib.Path(checkpoint_dir) / "EleutherAI" / "pythia-70m"
 
-def test_api(checkpoint_dir):
+@pytest.fixture(scope="session")
+def out_dir(tmp_path_factory):
+    # img = compute_expensive_image()
+    out_dir = tmp_path_factory.getbasetemp()
+
+    return pathlib.Path(out_dir) / "out_dir"
+
+def test_api(checkpoint_dir, out_dir):
     torch.use_deterministic_algorithms(True)
     config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
     config.fix_head_size = True
@@ -32,8 +42,7 @@ def test_api(checkpoint_dir):
     #model = LitGPT(config)
     gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
     eval_gpt = WhittleLM(pretrained=gpt,dtype="float32")
-    from lm_eval import tasks
-    from lm_eval.api.instance import Instance
+
     task_manager = tasks.TaskManager()
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     task_list = task_manager.load_task_or_group(["arc_easy", "gsm8k", "wikitext"])
@@ -120,14 +129,13 @@ def test_api(checkpoint_dir):
     res = eval_gpt.loglikelihood(MULTIPLE_CH)
     _RES, _res = MULTIPLE_CH_RES, [r[0] for r in res]
     # log samples to CI
-    dir_path = Path("test_logs")
+    dir_path = out_dir
     dir_path.mkdir(parents=True, exist_ok=True)
 
     file_path = dir_path / f"outputs_log_{version_minor}.txt"
     file_path = file_path.resolve()
     with open(file_path, "w", encoding="utf-8") as f:
         f.write("\n".join(str(x) for x in _res))
-    #print(_res)
     assert np.allclose(_res, _RES, atol=1e-2)
     # check indices for Multiple Choice
     argmax_RES, argmax_res = (
@@ -136,7 +144,6 @@ def test_api(checkpoint_dir):
     )
     res = eval_gpt.loglikelihood_rolling(ROLLING)
     assert np.allclose(res, ROLLING_RES, atol=1e-1)
-    #print(argmax_res)
     TEST_STRING = "foo bar"
     res = eval_gpt.tok_encode(TEST_STRING)
     assert res == [12110, 2534]
@@ -145,37 +152,48 @@ def test_api(checkpoint_dir):
     res = eval_gpt.tok_batch_encode([TEST_STRING, "bar foo"])[0].tolist()
     assert res == [[12110, 2534], [2009, 17374]]
     context = eval_gpt.tok_batch_encode([TEST_STRING])[0]
-    #print(context)
     res = eval_gpt._model_generate(context, max_length=10, stop=["\n\n"])[0]
-    #print(res)
     res = eval_gpt.tok_decode(res)
-    #print(res)
     encoded_res = eval_gpt.tok_encode("foo bar\n<bazhang>!info bar")
-    #print(encoded_res)
     assert res == "foo bar\n<bazhang>!info bar"
-    print("Gnerate until", generate_until)
     res = eval_gpt.generate_until(generate_until)
-    #print(res)
     assert res == generate_until_RES
     assert (argmax_RES == argmax_res).all()
     convert_and_evaluate(
                 gpt,
-                out_dir="out_dir",
+                out_dir=out_dir,
                 device=None,
                 dtype=torch.float32,
-                limit=30,
+                limit=10,
                 tasks="hellaswag",
                 batch_size=1,  # Test for non-positive integer
             )
+    with open(str(out_dir / "results.json"), "r") as f:
+         results = json.load(f)
+    acc_api = results["results"][
+                    "hellaswag"
+                ]["acc,none"]
+    stderr_api = results["results"][
+                    "hellaswag"
+                ]["acc_stderr,none"]
     import litgpt.eval.evaluate as module
-
     module.convert_and_evaluate(
                 checkpoint_dir,
-                out_dir="out_dir",
+                out_dir=out_dir,
                 device=None,
                 dtype=torch.float32,
-                limit=30,
+                limit=10,
                 tasks="hellaswag",
                 force_conversion=True,
                 batch_size=1,  # Test for non-positive integer
             )
+    with open(str(out_dir / "results.json"), "r") as f:
+         results = json.load(f)
+    acc_lit = results["results"][
+                    "hellaswag"
+                ]["acc,none"]
+    stderr_lit = results["results"][
+                    "hellaswag"
+                ]["acc_stderr,none"]
+    assert acc_api == acc_lit
+    assert stderr_api == stderr_lit
