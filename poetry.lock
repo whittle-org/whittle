@@ -1814,7 +1814,7 @@ torch = "*"
 
 [[package]]
 name = "litgpt"
-version = "0.4.2"
+version = "*"
 description = "Hackable implementation of state-of-the-art open-source LLMs"
 optional = false
 python-versions = "*"
