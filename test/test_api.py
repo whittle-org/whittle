@@ -2,7 +2,6 @@ import torch
 from litgpt import Config
 from whittle.models.gpt import GPT
 import sys
-import os
 import numpy as np
 import pathlib
 from whittle.eval.whittle_llms import WhittleLM
@@ -30,36 +29,23 @@ def out_dir(tmp_path_factory):
     return pathlib.Path(out_dir) / "out_dir"
 
 
-def test_api(checkpoint_dir, out_dir):
+class Test_WhittleLM:
     torch.use_deterministic_algorithms(True)
-    config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-    config.fix_head_size = True
-    config.model_type = "gpt"
-    config.tie_embeddings = False
-    gpt = GPT(config)
-    gpt.device = "cpu"
-    gpt.name_or_path = "EleutherAI/pythia-70m"
-
-    # model = LitGPT(config)
-    gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
-    eval_gpt = WhittleLM(pretrained=gpt, dtype="float32")
-
     task_manager = tasks.TaskManager()
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
     task_list = task_manager.load_task_or_group(["arc_easy", "gsm8k", "wikitext"])
-    multiple_choice_task = task_list["arc_easy"]
+    version_minor = sys.version_info.minor
+    multiple_choice_task = task_list["arc_easy"]  # type: ignore
     multiple_choice_task.build_all_requests(limit=10, rank=0, world_size=1)
     MULTIPLE_CH: list[Instance] = multiple_choice_task.instances
     generate_until_task = task_list["gsm8k"]  # type: ignore
     generate_until_task._config.generation_kwargs["max_gen_toks"] = 10
     generate_until_task.set_fewshot_seed(1234)  # fewshot random generator seed
-    rng = torch.Generator(device="cpu")
-    rng.manual_seed(15485863)
     generate_until_task.build_all_requests(limit=10, rank=0, world_size=1)
     generate_until: list[Instance] = generate_until_task.instances
     rolling_task = task_list["wikitext"]  # type: ignore
     rolling_task.build_all_requests(limit=10, rank=0, world_size=1)
     ROLLING: list[Instance] = rolling_task.instances
+    TEST_STRING = "foo bar"
     MULTIPLE_CH_RES = [
         -41.902435302734375,
         -42.939308166503906,
@@ -126,67 +112,168 @@ def test_api(checkpoint_dir, out_dir):
         -45969.47155761719,
         -7158.90625,
     ]
-    version_minor = sys.version_info.minor
-    res = eval_gpt.loglikelihood(MULTIPLE_CH)
-    _RES, _res = MULTIPLE_CH_RES, [r[0] for r in res]
-    # log samples to CI
-    dir_path = out_dir
-    dir_path.mkdir(parents=True, exist_ok=True)
 
-    file_path = dir_path / f"outputs_log_{version_minor}.txt"
-    file_path = file_path.resolve()
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(str(x) for x in _res))
-    assert np.allclose(_res, _RES, atol=1e-2)
-    # check indices for Multiple Choice
-    argmax_RES, argmax_res = (
-        np.argmax(np.array(_RES).reshape(-1, 4), axis=1),
-        np.argmax(np.array(_res).reshape(-1, 4), axis=1),
-    )
-    res = eval_gpt.loglikelihood_rolling(ROLLING)
-    assert np.allclose(res, ROLLING_RES, atol=1e-1)
-    TEST_STRING = "foo bar"
-    res = eval_gpt.tok_encode(TEST_STRING)
-    assert res == [12110, 2534]
-    res = eval_gpt.tok_decode([12110, 2534])
-    assert res == TEST_STRING
-    res = eval_gpt.tok_batch_encode([TEST_STRING, "bar foo"])[0].tolist()
-    assert res == [[12110, 2534], [2009, 17374]]
-    context = eval_gpt.tok_batch_encode([TEST_STRING])[0]
-    res = eval_gpt._model_generate(context, max_length=10, stop=["\n\n"])[0]
-    res = eval_gpt.tok_decode(res)
-    assert res == "foo bar\n<bazhang>!info bar"
-    res = eval_gpt.generate_until(generate_until)
-    assert res == generate_until_RES
-    assert (argmax_RES == argmax_res).all()
-    convert_and_evaluate(
-        gpt,
-        out_dir=out_dir,
-        device=None,
-        dtype=torch.float32,
-        limit=10,
-        tasks="logiqa",
-        batch_size=1,  # Test for non-positive integer
-    )
-    with open(str(out_dir / "results.json"), "r") as f:
-        results = json.load(f)
-    acc_api = results["results"]["logiqa"]["acc,none"]
-    stderr_api = results["results"]["logiqa"]["acc_stderr,none"]
-    import litgpt.eval.evaluate as module
+    def test_logliklihood(self, checkpoint_dir, out_dir) -> None:
+        config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
+        config.fix_head_size = True
+        config.model_type = "gpt"
+        config.tie_embeddings = False
+        gpt = GPT(config)
+        gpt.device = "cpu"
+        gpt.name_or_path = "EleutherAI/pythia-70m"
 
-    module.convert_and_evaluate(
-        checkpoint_dir,
-        out_dir=out_dir,
-        device=None,
-        dtype=torch.float32,
-        limit=10,
-        tasks="logiqa",
-        force_conversion=True,
-        batch_size=1,  # Test for non-positive integer
-    )
-    with open(str(out_dir / "results.json"), "r") as f:
-        results = json.load(f)
-    acc_lit = results["results"]["logiqa"]["acc,none"]
-    stderr_lit = results["results"]["logiqa"]["acc_stderr,none"]
-    assert acc_api == acc_lit
-    assert stderr_api == stderr_lit
+        # model = LitGPT(config)
+        gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
+        LM = WhittleLM(pretrained=gpt, dtype="float32")
+        res = LM.loglikelihood(self.MULTIPLE_CH)
+        _RES, _res = self.MULTIPLE_CH_RES, [r[0] for r in res]
+        # log samples to CI
+        dir_path = out_dir
+        dir_path.mkdir(parents=True, exist_ok=True)
+
+        file_path = dir_path / f"outputs_log_{self.version_minor}.txt"
+        file_path = file_path.resolve()
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(str(x) for x in _res))
+        assert np.allclose(_res, _RES, atol=1e-2)
+        # check indices for Multiple Choice
+        argmax_RES, argmax_res = (
+            np.argmax(np.array(_RES).reshape(-1, 4), axis=1),
+            np.argmax(np.array(_res).reshape(-1, 4), axis=1),
+        )
+        assert (argmax_RES == argmax_res).all()
+
+    def test_generate_until(self, checkpoint_dir) -> None:
+        config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
+        config.fix_head_size = True
+        config.model_type = "gpt"
+        config.tie_embeddings = False
+        gpt = GPT(config)
+        gpt.device = "cpu"
+        gpt.name_or_path = "EleutherAI/pythia-70m"
+
+        # model = LitGPT(config)
+        gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
+        LM = WhittleLM(pretrained=gpt, dtype="float32")
+        res = LM.generate_until(self.generate_until)
+        assert res == self.generate_until_RES
+
+    def test_logliklihood_rolling(self, checkpoint_dir) -> None:
+        config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
+        config.fix_head_size = True
+        config.model_type = "gpt"
+        config.tie_embeddings = False
+        gpt = GPT(config)
+        gpt.device = "cpu"
+        gpt.name_or_path = "EleutherAI/pythia-70m"
+
+        # model = LitGPT(config)
+        gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
+        LM = WhittleLM(pretrained=gpt, dtype="float32")
+        res = LM.loglikelihood_rolling(self.ROLLING)
+        assert np.allclose(res, self.ROLLING_RES, atol=1e-1)
+
+    def test_toc_encode(self, checkpoint_dir) -> None:
+        config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
+        config.fix_head_size = True
+        config.model_type = "gpt"
+        config.tie_embeddings = False
+        gpt = GPT(config)
+        gpt.device = "cpu"
+        gpt.name_or_path = "EleutherAI/pythia-70m"
+
+        # model = LitGPT(config)
+        gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
+        LM = WhittleLM(pretrained=gpt, dtype="float32")
+        res = LM.tok_encode(self.TEST_STRING)
+        assert res == [12110, 2534]
+
+    def test_toc_decode(self, checkpoint_dir) -> None:
+        config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
+        config.fix_head_size = True
+        config.model_type = "gpt"
+        config.tie_embeddings = False
+        gpt = GPT(config)
+        gpt.device = "cpu"
+        gpt.name_or_path = "EleutherAI/pythia-70m"
+
+        # model = LitGPT(config)
+        gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
+        LM = WhittleLM(pretrained=gpt, dtype="float32")
+        res = LM.tok_decode([12110, 2534])
+        assert res == self.TEST_STRING
+
+    def test_batch_encode(self, checkpoint_dir) -> None:
+        config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
+        config.fix_head_size = True
+        config.model_type = "gpt"
+        config.tie_embeddings = False
+        gpt = GPT(config)
+        gpt.device = "cpu"
+        gpt.name_or_path = "EleutherAI/pythia-70m"
+
+        # model = LitGPT(config)
+        gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
+        LM = WhittleLM(pretrained=gpt, dtype="float32")
+        res = LM.tok_batch_encode([self.TEST_STRING, "bar foo"])[0].tolist()
+        assert res == [[12110, 2534], [2009, 17374]]
+
+    def test_model_generate(self, checkpoint_dir) -> None:
+        config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
+        config.fix_head_size = True
+        config.model_type = "gpt"
+        config.tie_embeddings = False
+        gpt = GPT(config)
+        gpt.device = "cpu"
+        gpt.name_or_path = "EleutherAI/pythia-70m"
+
+        # model = LitGPT(config)
+        gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
+        LM = WhittleLM(pretrained=gpt, dtype="float32")
+        context = LM.tok_batch_encode([self.TEST_STRING])[0]
+        res = LM._model_generate(context, max_length=10, stop=["\n\n"])
+        res = LM.tok_decode(res[0])
+        assert res == "foo bar\n<bazhang>!info bar"
+
+    def test_evaluate(self, checkpoint_dir, out_dir):
+        config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
+        config.fix_head_size = True
+        config.model_type = "gpt"
+        config.tie_embeddings = False
+        gpt = GPT(config)
+        gpt.device = "cpu"
+        gpt.name_or_path = "EleutherAI/pythia-70m"
+
+        # model = LitGPT(config)
+        gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
+        convert_and_evaluate(
+            gpt,
+            out_dir=out_dir,
+            device=None,
+            dtype=torch.float32,
+            limit=10,
+            tasks="logiqa",
+            batch_size=1,  # Test for non-positive integer
+        )
+        with open(str(out_dir / "results.json"), "r") as f:
+            results = json.load(f)
+        acc_api = results["results"]["logiqa"]["acc,none"]
+        stderr_api = results["results"]["logiqa"]["acc_stderr,none"]
+        import litgpt.eval.evaluate as module
+
+        module.convert_and_evaluate(
+            checkpoint_dir,
+            out_dir=out_dir,
+            device=None,
+            dtype=torch.float32,
+            limit=10,
+            tasks="logiqa",
+            force_conversion=True,
+            batch_size=1,  # Test for non-positive integer
+        )
+        with open(str(out_dir / "results.json"), "r") as f:
+            results = json.load(f)
+        acc_lit = results["results"]["logiqa"]["acc,none"]
+        stderr_lit = results["results"]["logiqa"]["acc_stderr,none"]
+        assert acc_api == acc_lit
+        assert stderr_api == stderr_lit
