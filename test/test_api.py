@@ -5,15 +5,15 @@ import sys
 import os
 import numpy as np
 import pathlib
-from pathlib import Path
 from whittle.eval.whittle_llms import WhittleLM
 from whittle.eval.utils import convert_and_evaluate
 from litgpt.scripts.download import download_from_hub
-import pytest 
+import pytest
 from lm_eval import tasks
 from lm_eval.api.instance import Instance
 import json
-import shutil
+
+
 @pytest.fixture(scope="session")
 def checkpoint_dir(tmp_path_factory):
     # img = compute_expensive_image()
@@ -21,12 +21,14 @@ def checkpoint_dir(tmp_path_factory):
     download_from_hub(repo_id="EleutherAI/pythia-70m", checkpoint_dir=checkpoint_dir)
     return pathlib.Path(checkpoint_dir) / "EleutherAI" / "pythia-70m"
 
+
 @pytest.fixture(scope="session")
 def out_dir(tmp_path_factory):
     # img = compute_expensive_image()
     out_dir = tmp_path_factory.getbasetemp()
 
     return pathlib.Path(out_dir) / "out_dir"
+
 
 def test_api(checkpoint_dir, out_dir):
     torch.use_deterministic_algorithms(True)
@@ -37,16 +39,15 @@ def test_api(checkpoint_dir, out_dir):
     gpt = GPT(config)
     gpt.device = "cpu"
     gpt.name_or_path = "EleutherAI/pythia-70m"
-    
-    
-    #model = LitGPT(config)
+
+    # model = LitGPT(config)
     gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
-    eval_gpt = WhittleLM(pretrained=gpt,dtype="float32")
+    eval_gpt = WhittleLM(pretrained=gpt, dtype="float32")
 
     task_manager = tasks.TaskManager()
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     task_list = task_manager.load_task_or_group(["arc_easy", "gsm8k", "wikitext"])
-    multiple_choice_task = task_list["arc_easy"] 
+    multiple_choice_task = task_list["arc_easy"]
     multiple_choice_task.build_all_requests(limit=10, rank=0, world_size=1)
     MULTIPLE_CH: list[Instance] = multiple_choice_task.instances
     generate_until_task = task_list["gsm8k"]  # type: ignore
@@ -154,46 +155,38 @@ def test_api(checkpoint_dir, out_dir):
     context = eval_gpt.tok_batch_encode([TEST_STRING])[0]
     res = eval_gpt._model_generate(context, max_length=10, stop=["\n\n"])[0]
     res = eval_gpt.tok_decode(res)
-    encoded_res = eval_gpt.tok_encode("foo bar\n<bazhang>!info bar")
     assert res == "foo bar\n<bazhang>!info bar"
     res = eval_gpt.generate_until(generate_until)
     assert res == generate_until_RES
     assert (argmax_RES == argmax_res).all()
     convert_and_evaluate(
-                gpt,
-                out_dir=out_dir,
-                device=None,
-                dtype=torch.float32,
-                limit=10,
-                tasks="hellaswag",
-                batch_size=1,  # Test for non-positive integer
-            )
+        gpt,
+        out_dir=out_dir,
+        device=None,
+        dtype=torch.float32,
+        limit=10,
+        tasks="hellaswag",
+        batch_size=1,  # Test for non-positive integer
+    )
     with open(str(out_dir / "results.json"), "r") as f:
-         results = json.load(f)
-    acc_api = results["results"][
-                    "hellaswag"
-                ]["acc,none"]
-    stderr_api = results["results"][
-                    "hellaswag"
-                ]["acc_stderr,none"]
+        results = json.load(f)
+    acc_api = results["results"]["hellaswag"]["acc,none"]
+    stderr_api = results["results"]["hellaswag"]["acc_stderr,none"]
     import litgpt.eval.evaluate as module
+
     module.convert_and_evaluate(
-                checkpoint_dir,
-                out_dir=out_dir,
-                device=None,
-                dtype=torch.float32,
-                limit=10,
-                tasks="hellaswag",
-                force_conversion=True,
-                batch_size=1,  # Test for non-positive integer
-            )
+        checkpoint_dir,
+        out_dir=out_dir,
+        device=None,
+        dtype=torch.float32,
+        limit=10,
+        tasks="hellaswag",
+        force_conversion=True,
+        batch_size=1,  # Test for non-positive integer
+    )
     with open(str(out_dir / "results.json"), "r") as f:
-         results = json.load(f)
-    acc_lit = results["results"][
-                    "hellaswag"
-                ]["acc,none"]
-    stderr_lit = results["results"][
-                    "hellaswag"
-                ]["acc_stderr,none"]
+        results = json.load(f)
+    acc_lit = results["results"]["hellaswag"]["acc,none"]
+    stderr_lit = results["results"]["hellaswag"]["acc_stderr,none"]
     assert acc_api == acc_lit
     assert stderr_api == stderr_lit

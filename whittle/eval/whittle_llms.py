@@ -1,9 +1,7 @@
 import copy
-import os
 from datetime import timedelta
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple, Union
-import pathlib 
 import torch
 import torch.nn.functional as F
 import transformers
@@ -32,20 +30,22 @@ from lm_eval.models.utils import (
     clear_torch_cache,
     get_dtype,
     pad_and_concat,
-    stop_sequences_criteria,
 )
-import pytest 
 from litgpt.generate.base import generate
 from whittle.models.gpt import GPT
+from transformers import PreTrainedTokenizerBase
+from transformers.configuration_utils import PretrainedConfig
+
 eval_logger = utils.eval_logger
 
+
 def _get_accelerate_args(
-    device_map_option: Optional[str] = "auto",
-    max_memory_per_gpu: Optional[Union[int, str]] = None,
-    max_cpu_memory: Optional[Union[int, str]] = None,
-    offload_folder: Optional[str] = "./offload",
-    gpus: Optional[int] = None,
-) -> dict:
+    device_map_option="auto",
+    max_memory_per_gpu=None,
+    max_cpu_memory=None,
+    offload_folder="./offload",
+    gpus=None,
+):
     """Returns the kwargs needed to apply `accelerate` in `AutoModel.from_pretrained`."""
     max_memory = {}
     if max_memory_per_gpu is not None:
@@ -62,6 +62,7 @@ def _get_accelerate_args(
     args["device_map"] = device_map_option
     args["offload_folder"] = offload_folder
     return args
+
 
 def configure_pad_token(
     tokenizer: "PreTrainedTokenizerBase",
@@ -117,7 +118,7 @@ class WhittleLM(TemplateLM):
     Supports data-parallel multi-GPU with HF Accelerate.
     """
 
-    AUTO_MODEL_CLASS = None
+    AUTO_MODEL_CLASS = transformers.AutoModelForCausalLM
     _DEFAULT_MAX_LENGTH = 2048
 
     def __init__(
@@ -126,7 +127,7 @@ class WhittleLM(TemplateLM):
         backend: Optional[Literal["default", "causal", "seq2seq"]] = "default",
         # override whether the model should be treated as decoder-only (causal) or encoder-decoder (seq2seq)
         revision: Optional[str] = "main",
-        subfolder: Optional[str] = None,
+        subfolder=None,
         tokenizer: Optional[
             Union[
                 str,
@@ -136,11 +137,11 @@ class WhittleLM(TemplateLM):
         ] = None,
         truncation: Optional[bool] = False,
         logits_cache: bool = True,
-        max_length: Optional[int] = None,
-        device: Optional[str] = "cuda",
-        dtype: Optional[Union[str, torch.dtype]] = "auto",
-        batch_size: Optional[Union[int, str]] = 1,
-        max_batch_size: Optional[int] = 64,
+        max_length=None,
+        device="cuda",
+        dtype="auto",
+        batch_size=1,
+        max_batch_size=64,
         trust_remote_code: Optional[bool] = False,
         use_fast_tokenizer: Optional[bool] = True,
         add_bos_token: Optional[bool] = False,
@@ -148,10 +149,10 @@ class WhittleLM(TemplateLM):
         # arguments used for splitting a model across GPUs naively.
         # only used if `parallelize=True`.
         parallelize: Optional[bool] = False,
-        device_map_option: Optional[str] = "auto",
-        max_memory_per_gpu: Optional[Union[int, str]] = None,
-        max_cpu_memory: Optional[Union[int, str]] = None,
-        offload_folder: Optional[Union[str, os.PathLike]] = "./offload",
+        device_map_option="auto",
+        max_memory_per_gpu=None,
+        max_cpu_memory=None,
+        offload_folder="./offload",
         # PEFT, delta weights and quantization options
         peft: Optional[str] = None,
         delta: Optional[str] = None,
@@ -311,8 +312,8 @@ class WhittleLM(TemplateLM):
         self.delta = delta
         self.peft = peft
         self.revision = revision
-        self.batch_schedule = 1
-        self.batch_sizes = {}
+        self.batch_schedule: float = 1
+        self.batch_sizes: Dict = {}
         self.max_batch_size = max_batch_size
 
         if str(batch_size).startswith("auto"):
@@ -455,7 +456,7 @@ class WhittleLM(TemplateLM):
         self,
         config: Union[transformers.PretrainedConfig, transformers.AutoConfig],
         backend: Optional[Literal["default", "causal", "seq2seq"]] = "default",
-        trust_remote_code: Optional[bool] = False,
+        trust_remote_code=False,
     ) -> None:
         """
         Helper method during initialization.
@@ -506,8 +507,8 @@ class WhittleLM(TemplateLM):
     def _get_config(
         self,
         pretrained: str,
-        revision: str = "main",
-        trust_remote_code: bool = False,
+        revision="main",
+        trust_remote_code=False,
     ) -> None:
         self._config = transformers.AutoConfig.from_pretrained(
             pretrained,
@@ -519,17 +520,17 @@ class WhittleLM(TemplateLM):
         self,
         pretrained: str,
         revision: Optional[str] = "main",
-        dtype: Optional[Union[str, torch.dtype]] = "auto",
+        dtype="auto",
         trust_remote_code: Optional[bool] = False,
         # arguments used for splitting a model across GPUs naively.
         # only used if `parallelize=True`.
         # (accelerate naive PP (device_map) options)
         parallelize: Optional[bool] = False,
         gpus: Optional[int] = None,
-        device_map_option: Optional[str] = "auto",
-        max_memory_per_gpu: Optional[Union[int, str]] = None,
-        max_cpu_memory: Optional[Union[int, str]] = None,
-        offload_folder: Optional[str] = "./offload",
+        device_map_option="auto",
+        max_memory_per_gpu=None,
+        max_cpu_memory=None,
+        offload_folder="./offload",
         # PEFT, delta weights and quantization options
         peft: Optional[str] = None,
         delta: Optional[str] = None,
@@ -785,10 +786,10 @@ class WhittleLM(TemplateLM):
 
     def tok_batch_encode(
         self,
-        strings: List[str],
-        padding_side: str = "left",
-        left_truncate_len: int = None,
-        truncation: bool = False,
+        strings,
+        padding_side="left",
+        left_truncate_len=None,
+        truncation=False,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         # encode a batch of strings. converts to tensors and pads automatically, unlike tok_encode.
         old_padding_side = self.tokenizer.padding_side
@@ -853,39 +854,38 @@ class WhittleLM(TemplateLM):
         do_sample = generation_kwargs.get("do_sample", None)
 
         # The temperature has to be a strictly positive float -- if it is 0.0, use greedy decoding strategies
-        #print(generation_kwargs)
+        # print(generation_kwargs)
         if generation_kwargs.get("temperature") == 0.0 and do_sample is None:
             generation_kwargs["do_sample"] = do_sample = False
-        # build stopping criteria
-        stopping_criteria = stop_sequences_criteria(
-            self.tokenizer, stop, context.shape[1], context.shape[0]
-        )
         first_turn = self.model.mask_cache is None
 
-        if  first_turn or max_length > self.model.max_seq_length:
-           self.model.max_seq_length = max_length
-           self.model.set_kv_cache(batch_size=1)
-        #print(generation_kwargs)
+        if first_turn or max_length > self.model.max_seq_length:
+            self.model.max_seq_length = max_length
+            self.model.set_kv_cache(batch_size=1)
+        # print(generation_kwargs)
         outputs = []
         for i in range(context.shape[0]):
-            
-            outputs.append(generate(
-                model=self.model,
-                prompt=torch.squeeze(context[i]),
-                max_returned_tokens=max_length,
-                temperature = temperature,
-                top_k = generation_kwargs.get("top_k"),
-                top_p = generation_kwargs.get("top_p") if generation_kwargs.get("top_p") is not None else 0.0,
-                eos_id = generation_kwargs.get("eos_token_id")
-                #pad_token_id=self.tokenizer.pad_token_id,
-                #use_cache=True,
-                #**generation_kwargs,
-            ).data.numpy())
-        #print(outputs)
+            outputs.append(
+                generate(
+                    model=self.model,
+                    prompt=torch.squeeze(context[i]),
+                    max_returned_tokens=max_length,
+                    temperature=temperature,
+                    top_k=generation_kwargs.get("top_k"),
+                    top_p=generation_kwargs.get("top_p")
+                    if generation_kwargs.get("top_p") is not None
+                    else 0.0,
+                    eos_id=generation_kwargs.get("eos_token_id"),
+                    # pad_token_id=self.tokenizer.pad_token_id,
+                    # use_cache=True,
+                    # **generation_kwargs,
+                ).data.numpy()
+            )
+        # print(outputs)
         return torch.tensor(outputs)
 
     def _select_cont_toks(
-        self, logits: torch.Tensor, contlen: int = None, inplen: int = None
+        self, logits: torch.Tensor, contlen=None, inplen=None
     ) -> torch.Tensor:
         if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM:
             assert (
@@ -984,9 +984,9 @@ class WhittleLM(TemplateLM):
     def _loglikelihood_tokens(
         self,
         requests: List[Tuple[Tuple[str, str], List[int], List[int]]],
-        disable_tqdm: bool = False,
-        override_bs: int = None,
-    ) -> List[Tuple[float, bool]]:
+        disable_tqdm=False,
+        override_bs=None,
+    ):
         # TODO: implement some kind of efficient-request-middleware that lumps together requests with the same context
         res = []
 
@@ -1052,8 +1052,8 @@ class WhittleLM(TemplateLM):
             conts = []
             encoder_attns = []
 
-            padding_len_inp = None
-            padding_len_cont = None
+            padding_len_inp = 0
+            padding_len_cont = 0
             # because vectorizing is annoying, we first convert each (context, continuation) pair to padded
             # tensors, then we pack them together into a batch, call the model, and then pick it all apart
             # again because vectorizing is annoying
@@ -1201,7 +1201,8 @@ class WhittleLM(TemplateLM):
         self, requests: List[Instance], disable_tqdm: bool = False
     ) -> List[str]:
         res = []
-        #print(requests)
+
+        # print(requests)
         def _collate(req: Tuple[str, dict]):
             """Defines the key for the sorted method"""
             # the negative sign on len(toks) sorts descending - this has a few advantages:
@@ -1252,7 +1253,7 @@ class WhittleLM(TemplateLM):
         chunks = re_ords.get_batched(n=batch_size, batch_fn=batch_fn)
         for chunk in chunks:
             contexts, all_gen_kwargs = zip(*chunk)
-            #print(contexts)
+            # print(contexts)
             # we assume all gen kwargs in the batch are the same
             # this is safe to assume because the `grouper` object ensures it.
             gen_kwargs = all_gen_kwargs[0]
@@ -1297,7 +1298,7 @@ class WhittleLM(TemplateLM):
                 kwargs["max_length"] = context_enc.shape[1] + max_gen_toks
 
             # perform batched generation
-            #print(context_enc)
+            # print(context_enc)
             cont = self._model_generate(
                 context=context_enc,
                 attention_mask=attn_masks,
@@ -1358,7 +1359,7 @@ class WhittleLM(TemplateLM):
             else:
                 return ""
 
-        def get_model_sha(pretrained: str, revision: str) -> str:
+        def get_model_sha(pretrained, revision) -> str:
             try:
                 model_info = HfApi().model_info(repo_id=pretrained, revision=revision)
                 return model_info.sha
@@ -1379,4 +1380,3 @@ class WhittleLM(TemplateLM):
         if self.delta:
             model_info["delta_sha"] = get_model_sha(self.delta, self.revision)
         return model_info
-

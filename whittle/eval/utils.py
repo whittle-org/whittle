@@ -6,8 +6,8 @@ from typing import Optional, Union
 import torch
 from whittle.models.gpt import GPT
 from whittle.eval.whittle_llms import WhittleLM
-from litgpt.scripts.convert_lit_checkpoint import convert_lit_checkpoint
-from litgpt.utils import copy_config_files, auto_download_checkpoint
+
+
 def prepare_results(results, save_filepath, print_results=True):
     from lm_eval.utils import make_table
 
@@ -16,16 +16,14 @@ def prepare_results(results, save_filepath, print_results=True):
         if "groups" in results:
             print(make_table(results, "groups"))
 
-    json_result = json.dumps(
-        results, indent=2, ensure_ascii=False, default=str
-    )
+    json_result = json.dumps(results, indent=2, ensure_ascii=False, default=str)
     save_filepath.open("w", encoding="utf-8").write(json_result)
 
 
 def convert_and_evaluate(
-    model: GPT = None,
+    model: GPT,
     tasks: Optional[str] = None,
-    out_dir: Optional[Path] = None,
+    out_dir=None,
     force_conversion: bool = False,
     num_fewshot: Optional[int] = None,
     batch_size: Union[int, str] = 1,
@@ -57,6 +55,7 @@ def convert_and_evaluate(
     """
     if tasks is None:
         from lm_eval.tasks import TaskManager
+
         taskm = TaskManager()
         print("\n".join(taskm.task_index.keys()))
         print(
@@ -69,17 +68,21 @@ def convert_and_evaluate(
 
     pprint(locals())
 
-    if not (isinstance(batch_size, int) and batch_size > 0) and not (isinstance(batch_size, str) and batch_size.startswith("auto")):
-        raise ValueError("batch_size must be a positive integer, 'auto', or in the format 'auto:N'.")
+    if not (isinstance(batch_size, int) and batch_size > 0) and not (
+        isinstance(batch_size, str) and batch_size.startswith("auto")
+    ):
+        raise ValueError(
+            "batch_size must be a positive integer, 'auto', or in the format 'auto:N'."
+        )
 
     from lm_eval import evaluator
 
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    
-
-    model = WhittleLM(pretrained=model, device=device, batch_size=batch_size, dtype=dtype)
+    model = WhittleLM(
+        pretrained=model, device=device, batch_size=batch_size, dtype=dtype
+    )
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -96,5 +99,7 @@ def convert_and_evaluate(
     )
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    save_filepath = out_dir / Path("results.json") if save_filepath is None else Path(save_filepath)
+    save_filepath = (
+        out_dir / Path("results.json") if save_filepath is None else Path(save_filepath)
+    )
     prepare_results(results, save_filepath)

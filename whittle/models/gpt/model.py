@@ -18,6 +18,7 @@ from whittle.modules.linear import Linear
 from whittle.modules.rmsnorm import RMSNorm
 from whittle.modules.layernorm import LayerNorm
 
+
 class GPT(nn.Module):
     def __init__(self, config: Config) -> None:
         super().__init__()
