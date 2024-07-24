@@ -165,7 +165,7 @@ def test_api(checkpoint_dir, out_dir):
         device=None,
         dtype=torch.float32,
         limit=10,
-        tasks="hellaswag",
+        tasks="logiqa",
         batch_size=1,  # Test for non-positive integer
     )
     with open(str(out_dir / "results.json"), "r") as f:
@@ -180,7 +180,7 @@ def test_api(checkpoint_dir, out_dir):
         device=None,
         dtype=torch.float32,
         limit=10,
-        tasks="hellaswag",
+        tasks="logiqa",
         force_conversion=True,
         batch_size=1,  # Test for non-positive integer
     )
