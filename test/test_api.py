@@ -30,7 +30,7 @@ def out_dir(tmp_path_factory):
 
 
 class Test_WhittleLM:
-    torch.use_deterministic_algorithms(True)
+    # torch.use_deterministic_algorithms(True)
     task_manager = tasks.TaskManager()
     task_list = task_manager.load_task_or_group(["arc_easy", "gsm8k", "wikitext"])
     version_minor = sys.version_info.minor
@@ -119,7 +119,7 @@ class Test_WhittleLM:
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config)
-        gpt.device = "cpu"
+        gpt.to(gpt.device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
         # model = LitGPT(config)
@@ -130,11 +130,6 @@ class Test_WhittleLM:
         # log samples to CI
         dir_path = out_dir
         dir_path.mkdir(parents=True, exist_ok=True)
-
-        file_path = dir_path / f"outputs_log_{self.version_minor}.txt"
-        file_path = file_path.resolve()
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(str(x) for x in _res))
         assert np.allclose(_res, _RES, atol=1e-2)
         # check indices for Multiple Choice
         argmax_RES, argmax_res = (
@@ -149,7 +144,7 @@ class Test_WhittleLM:
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config)
-        gpt.device = "cpu"
+        gpt.to(gpt.device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
         # model = LitGPT(config)
@@ -164,7 +159,7 @@ class Test_WhittleLM:
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config)
-        gpt.device = "cpu"
+        gpt.to(gpt.device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
         # model = LitGPT(config)
@@ -179,7 +174,7 @@ class Test_WhittleLM:
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config)
-        gpt.device = "cpu"
+        gpt.to(gpt.device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
         # model = LitGPT(config)
@@ -194,7 +189,7 @@ class Test_WhittleLM:
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config)
-        gpt.device = "cpu"
+        gpt.to(gpt.device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
         # model = LitGPT(config)
@@ -209,7 +204,7 @@ class Test_WhittleLM:
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config)
-        gpt.device = "cpu"
+        gpt.to(gpt.device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
         # model = LitGPT(config)
@@ -224,14 +219,14 @@ class Test_WhittleLM:
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config)
-        gpt.device = "cpu"
+        gpt.to(gpt.device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
         # model = LitGPT(config)
         gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
         LM = WhittleLM(pretrained=gpt, dtype="float32")
         context = LM.tok_batch_encode([self.TEST_STRING])[0]
-        res = LM._model_generate(context, max_length=10, stop=["\n\n"])
+        res = LM._model_generate(context.to(gpt.device), max_length=10, stop=["\n\n"])
         res = LM.tok_decode(res[0])
         assert res == "foo bar\n<bazhang>!info bar"
 
@@ -241,7 +236,7 @@ class Test_WhittleLM:
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config)
-        gpt.device = "cpu"
+        gpt.to(gpt.device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
         # model = LitGPT(config)
@@ -249,7 +244,7 @@ class Test_WhittleLM:
         convert_and_evaluate(
             gpt,
             out_dir=out_dir,
-            device=None,
+            device="cpu",
             dtype=torch.float32,
             limit=10,
             tasks="logiqa",
@@ -264,7 +259,7 @@ class Test_WhittleLM:
         module.convert_and_evaluate(
             checkpoint_dir,
             out_dir=out_dir,
-            device=None,
+            device="cpu",
             dtype=torch.float32,
             limit=10,
             tasks="logiqa",

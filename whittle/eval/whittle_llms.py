@@ -103,8 +103,6 @@ def configure_pad_token(
 class WhittleLM(TemplateLM):
     """
     An abstracted whittle model class. Enables usage with both models of `whittle.models.gpt.GPT`
-
-    Supports data-parallel multi-GPU with HF Accelerate.
     """
 
     AUTO_MODEL_CLASS = GPT
@@ -566,7 +564,7 @@ class WhittleLM(TemplateLM):
 
         if first_turn or max_length > self.model.max_seq_length:
             self.model.max_seq_length = max_length
-            self.model.set_kv_cache(batch_size=1)
+            self.model.set_kv_cache(batch_size=1, device=self.device)
         # print(generation_kwargs)
         outputs = []
         for i in range(context.shape[0]):
@@ -584,10 +582,12 @@ class WhittleLM(TemplateLM):
                     # pad_token_id=self.tokenizer.pad_token_id,
                     # use_cache=True,
                     # **generation_kwargs,
-                ).data.numpy()
+                )
+                .data.cpu()
+                .numpy()
             )
         # print(outputs)
-        return torch.tensor(outputs)
+        return torch.tensor(outputs).to(self.device)
 
     def _select_cont_toks(
         self, logits: torch.Tensor, contlen=None, inplen=None
