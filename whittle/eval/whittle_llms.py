@@ -1197,6 +1197,22 @@ class WhittleLM(TemplateLM):
 
         return re_ord.get_original(res)
 
+    def set_sub_network(
+        self,
+        sub_network_n_embd: int,
+        sub_network_intermediate_size: list,
+        sub_network_num_heads: list,
+        sub_network_n_layers: int,
+        sample_random_indices: bool = False,
+    ) -> None:
+        self.model.set_sub_network(
+            sub_network_n_embd=sub_network_n_embd,
+            sub_network_intermediate_size=sub_network_intermediate_size,
+            sub_network_num_heads=sub_network_num_heads,
+            sub_network_n_layers=sub_network_n_layers,
+            sample_random_indices=sample_random_indices,
+        )
+
     def generate_until(
         self, requests: List[Instance], disable_tqdm: bool = False
     ) -> List[str]:
