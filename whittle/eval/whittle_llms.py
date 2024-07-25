@@ -1,20 +1,11 @@
 import copy
-from datetime import timedelta
-from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple, Union
 import torch
 import torch.nn.functional as F
 import transformers
 from accelerate import (
-    Accelerator,
-    DistributedType,
-    InitProcessGroupKwargs,
     find_executable_batch_size,
 )
-from huggingface_hub import HfApi
-from packaging import version
-from peft import PeftModel
-from peft import __version__ as PEFT_VERSION
 from tqdm import tqdm
 from transformers.models.auto.modeling_auto import (
     MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
@@ -28,7 +19,6 @@ from lm_eval.api.registry import register_model
 from lm_eval.models.utils import (
     Collator,
     clear_torch_cache,
-    get_dtype,
     pad_and_concat,
 )
 from litgpt.generate.base import generate
@@ -112,13 +102,12 @@ def configure_pad_token(
 @register_model("whittle")
 class WhittleLM(TemplateLM):
     """
-    An abstracted Huggingface model class. Enables usage with both models of
-    `transformers.AutoModelForCausalLM` and `transformers.AutoModelForSeq2SeqLM` classes.
+    An abstracted whittle model class. Enables usage with both models of `whittle.models.gpt.GPT`
 
     Supports data-parallel multi-GPU with HF Accelerate.
     """
 
-    AUTO_MODEL_CLASS = transformers.AutoModelForCausalLM
+    AUTO_MODEL_CLASS = GPT
     _DEFAULT_MAX_LENGTH = 2048
 
     def __init__(
@@ -162,85 +151,27 @@ class WhittleLM(TemplateLM):
         super().__init__()
 
         # optionally: take in an already-initialized transformers.PreTrainedModel
-        if not isinstance(pretrained, str):
-            eval_logger.warning(
-                "`pretrained` model kwarg is not of type `str`. Many other model arguments may be ignored. Please do not launch via accelerate or use `parallelize=True` if passing an existing model this way."
-            )
-            assert not parallelize, "`parallelize=True` is not compatible with passing pre-initialized model to `pretrained`"
-            self._model = pretrained
-            self._device = self._model.device
-            self._config = self._model.config
-            gpus = 0
+        eval_logger.warning(
+            "`pretrained` model kwarg is not of type `str`. Many other model arguments may be ignored. Please do not launch via accelerate or use `parallelize=True` if passing an existing model this way."
+        )
+        assert not parallelize, "`parallelize=True` is not compatible with passing pre-initialized model to `pretrained`"
+        self._model = pretrained
+        self._device = self._model.device
+        self._config = self._model.config
 
-            if tokenizer:
-                assert isinstance(
-                    tokenizer, transformers.PreTrainedTokenizer
-                ) or isinstance(tokenizer, transformers.PreTrainedTokenizerFast)
-                self.tokenizer = tokenizer
-            else:
-                # Get tokenizer
-                model_name = self._model.name_or_path
-                self.tokenizer = transformers.AutoTokenizer.from_pretrained(
-                    model_name,
-                    revision=revision,
-                    trust_remote_code=trust_remote_code,
-                    use_fast=use_fast_tokenizer,
-                )
-
+        if tokenizer:
+            assert isinstance(
+                tokenizer, transformers.PreTrainedTokenizer
+            ) or isinstance(tokenizer, transformers.PreTrainedTokenizerFast)
+            self.tokenizer = tokenizer
         else:
-            assert isinstance(device, str)
-            assert isinstance(pretrained, str)
-            assert isinstance(batch_size, (int, str))
-
-            gpus = torch.cuda.device_count()
-            accelerator_kwargs = InitProcessGroupKwargs(timeout=timedelta(weeks=52))
-            accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
-            if accelerator.num_processes > 1:
-                self.accelerator = accelerator
-
-            if "npu" in accelerator.device.type:
-                gpus = torch.npu.device_count()
-
-            if not (parallelize or accelerator.num_processes > 1):
-                # use user-passed device
-                device_list = set(
-                    ["cuda", "cpu"]
-                    + [f"cuda:{i}" for i in range(gpus)]
-                    + ["mps", "mps:0"]
-                    + [f"npu:{i}" for i in range(gpus)]
-                )
-                if device and device in device_list:
-                    self._device = torch.device(device)
-                    eval_logger.info(f"Using device '{device}'")
-                    if device in ("mps", "mps:0") and version.parse(
-                        torch.__version__
-                    ) < version.parse("2.1"):
-                        raise RuntimeError(
-                            f"mps requires torch >= 2.1. You have {torch.__version__}"
-                        )
-                else:
-                    eval_logger.info("Device not specified")
-                    eval_logger.info(f"Cuda Available? {torch.cuda.is_available()}")
-                    self._device = (
-                        torch.device("cuda")
-                        if torch.cuda.is_available()
-                        else torch.device("cpu")
-                    )
-            else:
-                if device != "cuda":
-                    eval_logger.info(
-                        f"Using `accelerate launch` or `parallelize=True`, device '{device}' will be overridden when placing model."
-                    )
-                # TODO: include in warning that `load_in_8bit` etc. affect this too
-                self._device = torch.device(device)
-
-            # TODO: update this to be less of a hack once subfolder is fixed in HF
-            revision = revision + ("/" + subfolder if subfolder is not None else "")
-
-            self._get_config(
-                pretrained,
+            # Get tokenizer
+            model_name = self._model.name_or_path
+            self.tokenizer = transformers.AutoTokenizer.from_pretrained(
+                model_name,
                 revision=revision,
                 trust_remote_code=trust_remote_code,
+                use_fast=use_fast_tokenizer,
             )
 
         # determine which of 'causal' and 'seq2seq' backends to use
@@ -257,43 +188,10 @@ class WhittleLM(TemplateLM):
             use_fast_tokenizer=use_fast_tokenizer,
         )
 
-        # if we passed `pretrained` as a string, initialize our model now
-        if isinstance(pretrained, str):
-            self._create_model(
-                pretrained=pretrained,
-                revision=revision,
-                dtype=dtype,
-                trust_remote_code=trust_remote_code,
-                parallelize=parallelize,
-                gpus=gpus,
-                device_map_option=device_map_option,
-                max_memory_per_gpu=max_memory_per_gpu,
-                max_cpu_memory=max_cpu_memory,
-                offload_folder=offload_folder,
-                peft=peft,
-                delta=delta,
-                autogptq=autogptq,
-                **kwargs,
-            )
-
         # access self._model through self.model property outside this method
         if isinstance(self.model, torch.nn.Module):
             self.model.eval()
             self.model.tie_weights()
-
-        if isinstance(pretrained, str) and (gpus >= 1 or str(self.device) == "mps"):
-            # TODO: can remove this whole snippet except in the mps case, perhaps?
-            if not (parallelize or autogptq or hasattr(self, "accelerator")):
-                # place model onto device requested manually,
-                # if not using HF Accelerate or device_map
-                # or any other option that preloads model onto device
-                try:
-                    self.model.to(self.device)
-                except ValueError:
-                    eval_logger.debug(
-                        "Failed to place model onto specified device. This may be because the model is quantized via `bitsandbytes` or `device_map` is provided. If the desired GPU is being used, this message is safe to ignore."
-                    )
-
         self.truncation = truncation
         self.logits_cache = logits_cache
         self.vocab_size = self.tokenizer.vocab_size
@@ -323,57 +221,12 @@ class WhittleLM(TemplateLM):
         else:
             self.batch_size_per_gpu = int(batch_size)
 
-        if isinstance(pretrained, str):
-            # multigpu data-parallel support when launched with accelerate
-            if gpus > 1:
-                if parallelize:
-                    if accelerator.num_processes > 1:
-                        raise RuntimeError(
-                            "Attempted to use both a HF Accelerate `device_map` and to launch via `accelerate launch`. If this is the case, please either remove `parallelize=True` from --model_args or launch outside of the Accelerate launcher."
-                        )
-                    else:
-                        pass
-                elif accelerator.num_processes == 1:
-                    # if we aren't launching via accelerate, ditch
-                    self._rank = 0
-                    self._world_size = 1
-                else:
-                    if gpus > accelerator.num_processes:
-                        eval_logger.warning(
-                            "WARNING: The number of total system GPUs does not match the number of spawned processes. "
-                            "If you would like to use data parallelism, please launch the script "
-                            "with 'accelerate launch *script*'. "
-                            f"Current run will proceed with {accelerator.num_processes} devices."
-                        )
-                    assert (
-                        accelerator.distributed_type
-                        in [
-                            DistributedType.FSDP,
-                            DistributedType.MULTI_GPU,
-                            DistributedType.MULTI_NPU,
-                        ]
-                    ), "Unsupported distributed type provided. Only DDP and FSDP are supported."
-                    if accelerator.distributed_type == DistributedType.FSDP:
-                        self._model = accelerator.prepare(self.model)
-                    else:
-                        self._model = accelerator.prepare_model(
-                            self.model, evaluation_mode=True
-                        )
-                    self._device = torch.device(f"{accelerator.device}")
-                    self.accelerator = accelerator
-
-                    if self.accelerator.is_local_main_process:
-                        eval_logger.info(f"Using {gpus} devices with data parallelism")
-
-                    self._rank = self.accelerator.local_process_index
-                    self._world_size = self.accelerator.num_processes
-        else:
-            # if a PreTrainedModel was passed into HFLM, we forgo distributed setup.
-            eval_logger.warning(
-                "Passed an already-initialized model through `pretrained`, assuming single-process call to evaluate() or custom distributed integration"
-            )
-            self._rank = 0
-            self._world_size = 1
+        # if a PreTrainedModel was passed into HFLM, we forgo distributed setup.
+        eval_logger.warning(
+            "Passed an already-initialized model through `pretrained`, assuming single-process call to evaluate() or custom distributed integration"
+        )
+        self._rank = 0
+        self._world_size = 1
 
         self.custom_prefix_token_id = prefix_token_id
         if prefix_token_id is not None:
@@ -468,7 +321,7 @@ class WhittleLM(TemplateLM):
         if backend != "default":
             # if we've settled on non-default backend, use that manually
             if backend == "causal":
-                self.AUTO_MODEL_CLASS = transformers.AutoModelForCausalLM
+                self.AUTO_MODEL_CLASS = GPT
             elif backend == "seq2seq":
                 self.AUTO_MODEL_CLASS = transformers.AutoModelForSeq2SeqLM
             eval_logger.info(
@@ -487,7 +340,7 @@ class WhittleLM(TemplateLM):
             elif (
                 getattr(self.config, "model_type") in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
             ):
-                self.AUTO_MODEL_CLASS = transformers.AutoModelForCausalLM
+                self.AUTO_MODEL_CLASS = GPT
             else:
                 if not trust_remote_code:
                     eval_logger.warning(
@@ -495,161 +348,13 @@ class WhittleLM(TemplateLM):
                     This is expected if your model requires `trust_remote_code=True` but may be an error otherwise."
                     )
                 # if model type is neither in HF transformers causal or seq2seq model registries
-                # then we default to AutoModelForCausalLM
-                self.AUTO_MODEL_CLASS = transformers.AutoModelForCausalLM
+                # then we default to GPT
+                self.AUTO_MODEL_CLASS = GPT
 
         assert self.AUTO_MODEL_CLASS in [
-            transformers.AutoModelForCausalLM,
+            GPT,
             transformers.AutoModelForSeq2SeqLM,
         ]
-        return None
-
-    def _get_config(
-        self,
-        pretrained: str,
-        revision="main",
-        trust_remote_code=False,
-    ) -> None:
-        self._config = transformers.AutoConfig.from_pretrained(
-            pretrained,
-            revision=revision,
-            trust_remote_code=trust_remote_code,
-        )
-
-    def _create_model(
-        self,
-        pretrained: str,
-        revision: Optional[str] = "main",
-        dtype="auto",
-        trust_remote_code: Optional[bool] = False,
-        # arguments used for splitting a model across GPUs naively.
-        # only used if `parallelize=True`.
-        # (accelerate naive PP (device_map) options)
-        parallelize: Optional[bool] = False,
-        gpus: Optional[int] = None,
-        device_map_option="auto",
-        max_memory_per_gpu=None,
-        max_cpu_memory=None,
-        offload_folder="./offload",
-        # PEFT, delta weights and quantization options
-        peft: Optional[str] = None,
-        delta: Optional[str] = None,
-        autogptq: Optional[Union[bool, str]] = False,
-        **kwargs,
-    ) -> None:
-        """
-        Initializes an HF or HF-compatible PreTrainedModel from scratch
-        inside HFLM, using the kwargs passed into self.__init__().
-
-        Also handles functionality such as AutoGPTQ usage and PEFT wrapping.
-
-        For future similar extensions to AutoGPTQ that are not core to HF's ecosystem,
-        (such as PyTorch models that are nearly, but not quite, fully mirroring
-        HF's public interface relied on in this HFLM class)
-        please consider subclassing HFLM and overriding this and other methods as needed.
-        """
-
-        model_kwargs = kwargs if kwargs else {}
-
-        if parallelize:
-            model_kwargs.update(
-                _get_accelerate_args(
-                    device_map_option,  # TODO: phase out device_map_option?
-                    max_memory_per_gpu,
-                    max_cpu_memory,
-                    offload_folder,
-                    gpus,
-                )
-            )
-        elif "device_map" not in model_kwargs:
-            # set a device_map to initialize model on the right GPU.
-            # this is needed because it seems that the default behavior
-            # for quantized models now seems to be device_map="auto"
-            # which breaks data-parallel mode.
-            if hasattr(self, "accelerator"):
-                model_kwargs.update({"device_map": {"": f"{self.accelerator.device}"}})
-            else:
-                model_kwargs.update({"device_map": {"": str(self.device)}})
-
-        if not autogptq:
-            if model_kwargs.get("load_in_4bit", None):
-                assert (
-                    transformers.__version__ >= "4.30.0"
-                ), "load_in_4bit requires transformers >= 4.30.0"
-            if transformers.__version__ >= "4.30.0":
-                if model_kwargs.get("load_in_4bit", None):
-                    if model_kwargs.get("bnb_4bit_compute_dtype", None):
-                        model_kwargs["bnb_4bit_compute_dtype"] = get_dtype(
-                            model_kwargs["bnb_4bit_compute_dtype"]
-                        )
-            self._model = self.AUTO_MODEL_CLASS.from_pretrained(
-                pretrained,
-                revision=revision,
-                torch_dtype=get_dtype(dtype),
-                trust_remote_code=trust_remote_code,
-                **model_kwargs,
-            )
-        else:
-            try:
-                from auto_gptq import AutoGPTQForCausalLM
-            except ModuleNotFoundError:
-                raise Exception(
-                    "Tried to load auto_gptq, but auto-gptq is not installed ",
-                    "please install auto-gptq via pip install lm-eval[gptq] or pip install -e .[gptq]",
-                )
-
-            self._model = AutoGPTQForCausalLM.from_quantized(
-                pretrained,
-                trust_remote_code=trust_remote_code,
-                model_basename=None if autogptq is True else Path(autogptq).stem,
-                use_safetensors=True
-                if autogptq is True
-                else autogptq.endswith(".safetensors"),
-                **model_kwargs,
-            )
-
-        if peft and delta:
-            raise ValueError(
-                "Cannot use both 'peft' and 'delta' options at the same time."
-            )
-
-        if peft:
-            if model_kwargs.get("load_in_4bit", None):
-                if version.parse(PEFT_VERSION) < version.parse("0.4.0"):
-                    raise AssertionError("load_in_4bit requires peft >= 0.4.0")
-            if self._model.config.vocab_size != len(self.tokenizer):
-                # resize model for LoRAs with added tokens
-                self._model.resize_token_embeddings(len(self.tokenizer))
-                eval_logger.info(
-                    f"Model config indicates vocab_size='{self._model.config.vocab_size}', but found tokenizer with vocab size '{len(self.tokenizer)}'. Resizing model embedding layer..."
-                )
-            self._model = PeftModel.from_pretrained(
-                self._model, peft, revision=revision
-            )
-        elif delta:
-            if autogptq:
-                eval_logger.warning(
-                    "Delta weights might trigger unexpected behavior when used with AutoGPTQ."
-                )
-            _model_delta = self.AUTO_MODEL_CLASS.from_pretrained(
-                delta,
-                revision=revision,
-                torch_dtype=get_dtype(dtype),
-                trust_remote_code=trust_remote_code,
-                **model_kwargs,
-            )
-            for name, param in self._model.state_dict().items():
-                try:
-                    param.data += _model_delta.state_dict()[name]
-                except KeyError:
-                    raise KeyError(f"Delta model is missing weights for layer: {name}")
-                except Exception as e:
-                    raise RuntimeError(
-                        f"Failed to add delta weights to layer {name}. Error: {e}"
-                    )
-
-            del _model_delta
-
         return None
 
     def _create_tokenizer(
@@ -768,7 +473,7 @@ class WhittleLM(TemplateLM):
 
         # by default for CausalLM - false or self.add_bos_token is set
         if add_special_tokens is None:
-            if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM:
+            if self.AUTO_MODEL_CLASS == GPT:
                 special_tokens_kwargs = {
                     "add_special_tokens": False or self.add_bos_token
                 }
@@ -796,7 +501,7 @@ class WhittleLM(TemplateLM):
         self.tokenizer.padding_side = padding_side
 
         add_special_tokens = {}
-        if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM:
+        if self.AUTO_MODEL_CLASS == GPT:
             add_special_tokens = {"add_special_tokens": False or self.add_bos_token}
 
         encoding = self.tokenizer(
@@ -841,7 +546,7 @@ class WhittleLM(TemplateLM):
                     input_ids=inps, attention_mask=attn_mask, labels=labels
                 )
             else:
-                assert self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM
+                assert self.AUTO_MODEL_CLASS == GPT
                 return self.model(inps)
 
     def _model_generate(self, context, max_length, stop, **generation_kwargs):
@@ -887,7 +592,7 @@ class WhittleLM(TemplateLM):
     def _select_cont_toks(
         self, logits: torch.Tensor, contlen=None, inplen=None
     ) -> torch.Tensor:
-        if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM:
+        if self.AUTO_MODEL_CLASS == GPT:
             assert (
                 contlen and inplen
             ), "Must pass input len and cont. len to select scored logits for causal LM"
@@ -1014,8 +719,7 @@ class WhittleLM(TemplateLM):
             requests,
             sort_fn=_collate,
             group_by="contexts"
-            if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM
-            and self.logits_cache
+            if self.AUTO_MODEL_CLASS == GPT and self.logits_cache
             else None,
             group_fn=_lookup_one_token_cont,
         )
@@ -1072,7 +776,7 @@ class WhittleLM(TemplateLM):
                 # cont_toks      4 5 6 7 8 9      [:, -len(continuation_enc):, :self.vocab_size] slice
 
                 # when too long to fit in context, truncate from the left
-                if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM:
+                if self.AUTO_MODEL_CLASS == GPT:
                     inp = torch.tensor(
                         (context_enc + continuation_enc)[-(self.max_length + 1) :][:-1],
                         dtype=torch.long,
@@ -1119,7 +823,7 @@ class WhittleLM(TemplateLM):
 
             # create encoder attn mask and batched conts, if seq2seq
             call_kwargs = {}
-            if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM:
+            if self.AUTO_MODEL_CLASS == GPT:
                 batched_inps = pad_and_concat(
                     padding_len_inp, inps, padding_side="right"
                 )  # [batch, padding_len_inp]
@@ -1154,7 +858,7 @@ class WhittleLM(TemplateLM):
                 # from prompt/prefix tuning tokens, if applicable
                 ctx_len = (
                     inplen + (logits.shape[0] - padding_len_inp)
-                    if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM
+                    if self.AUTO_MODEL_CLASS == GPT
                     else None
                 )
                 logits = self._select_cont_toks(logits, contlen=contlen, inplen=ctx_len)
@@ -1325,7 +1029,7 @@ class WhittleLM(TemplateLM):
             cont_toks_list = cont.tolist()
             for cont_toks, context in zip(cont_toks_list, contexts):
                 # discard context + left-padding toks if using causal decoder-only LM
-                if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM:
+                if self.AUTO_MODEL_CLASS == GPT:
                     cont_toks = cont_toks[context_enc.shape[1] :]
 
                 s = self.tok_decode(cont_toks)
@@ -1355,44 +1059,3 @@ class WhittleLM(TemplateLM):
         return self.tokenizer.apply_chat_template(
             chat_history, tokenize=False, add_generation_prompt=True
         )
-
-    def get_model_info(self) -> dict:
-        """
-        Method to get Hugging Face model information for experiment reproducibility.
-        """
-
-        def get_model_num_params(model) -> int:
-            if hasattr(model, "num_parameters"):
-                return model.num_parameters()
-            if hasattr(model, "parameters"):
-                return sum(p.numel() for p in model.parameters())
-            else:
-                return -1
-
-        def get_model_dtype(model) -> str:
-            if hasattr(model, "dtype"):
-                return model.dtype
-            else:
-                return ""
-
-        def get_model_sha(pretrained, revision) -> str:
-            try:
-                model_info = HfApi().model_info(repo_id=pretrained, revision=revision)
-                return model_info.sha
-            except Exception as e:
-                eval_logger.warn(
-                    f"Failed to get model SHA for {pretrained} at revision {revision}. Error: {e}"
-                )
-                return ""
-
-        model_info = {
-            "model_num_parameters": get_model_num_params(self._model),
-            "model_dtype": get_model_dtype(self._model),
-            "model_revision": self.revision,
-            "model_sha": get_model_sha(self.pretrained, self.revision),
-        }
-        if self.peft:
-            model_info["peft_sha"] = get_model_sha(self.peft, self.revision)
-        if self.delta:
-            model_info["delta_sha"] = get_model_sha(self.delta, self.revision)
-        return model_info
