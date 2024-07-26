@@ -1,12 +1,13 @@
 import copy
 from typing import Dict, List, Literal, Optional, Tuple, Union
+from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 import transformers
 from accelerate import (
     find_executable_batch_size,
 )
-from tqdm import tqdm
+
 from transformers.models.auto.modeling_auto import (
     MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
     MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
