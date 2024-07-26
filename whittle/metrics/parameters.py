@@ -3,6 +3,7 @@ from whittle.models.gpt.blocks import CausalSelfAttention
 from whittle.modules.embedding import Embedding
 from whittle.modules.linear import Linear
 from whittle.modules.layernorm import LayerNorm
+from whittle.modules.rmsnorm import RMSNorm
 
 
 def compute_parameters(model):
@@ -14,6 +15,10 @@ def params_linear_layer(layer: Linear):
     if layer.use_bias:
         params += layer.sub_network_out_features
     return params
+
+
+def params_rmsnorm(rmsnorm: RMSNorm):
+    return rmsnorm.sub_network_in_features
 
 
 def params_embedding_layer(embedding: Embedding):
