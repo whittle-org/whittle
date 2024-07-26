@@ -14,7 +14,7 @@ matplotlib = "^3.9.0"
 transformers = "^4.42.3"
 typing-extensions = "^4.12.2"
 torch = ">=2.2.0"
-litgpt = { extras = ["all"], version = "^0.4.2" }
+litgpt = { extras = ["all"], version = "0.4.5" }
 syne-tune = { extras = ["moo"], version = "^0.13.0" }
 torchvision = "^0.18.1"
 

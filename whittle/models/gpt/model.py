@@ -12,7 +12,6 @@ import torch.nn as nn
 
 from litgpt import Config
 from litgpt.model import build_rope_cache
-
 from whittle.models.gpt.blocks import Block
 from whittle.modules.embedding import Embedding
 from whittle.modules.linear import Linear
@@ -25,7 +24,7 @@ class GPT(nn.Module):
         super().__init__()
         assert config.padded_vocab_size is not None
         self.config = config
-
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.lm_head = Linear(
             config.n_embd, config.padded_vocab_size, bias=config.lm_head_bias
         )
@@ -48,6 +47,9 @@ class GPT(nn.Module):
         self.cos: torch.Tensor
         self.sin: torch.Tensor
         self.random_layers = list(range(self.config.n_layer))
+        self.config.is_encoder_decoder = False
+        self.main_input_name = "input_pos"
+        self._supports_cache_class = True
         # self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
 
     @property
@@ -95,6 +97,10 @@ class GPT(nn.Module):
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
+    def tie_weights(self) -> None:
+        if self.config.tie_embeddings:
+            self.transformer.wte.weight = self.lm_head.weight
 
     def rope_cache(
         self, device: Optional[torch.device] = None
@@ -197,27 +203,27 @@ class GPT(nn.Module):
             if not self.config.fix_head_size:
                 if isinstance(self.sub_network_num_heads, list):
                     cos, sin = build_rope_cache(
-                        T,
+                        seq_len=self.max_seq_length,
                         n_elem=int(
                             self.config.rotary_percentage
                             * (self.sub_network_n_embd // self.sub_network_num_heads[i])
                         ),
-                        device=idx.device,
+                        device=self.device,
                     )
                 else:
                     cos, sin = build_rope_cache(
-                        T,
+                        seq_len=self.max_seq_length,
                         n_elem=int(
                             self.config.rotary_percentage
                             * (self.sub_network_n_embd // self.sub_network_num_heads)
                         ),
-                        device=idx.device,
+                        device=self.device,
                     )
             else:
                 cos, sin = build_rope_cache(
-                    T,
+                    seq_len=self.max_seq_length,
                     n_elem=int(self.config.rotary_percentage * (self.config.head_size)),
-                    device=idx.device,
+                    device=self.device,
                 )
 
             cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
