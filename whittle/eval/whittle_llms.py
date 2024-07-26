@@ -22,9 +22,9 @@ from lm_eval.models.utils import (
     pad_and_concat,
 )
 from litgpt.generate.base import generate
-from whittle.models.gpt import GPT
 from transformers import PreTrainedTokenizerBase
 from transformers.configuration_utils import PretrainedConfig
+from whittle.models.gpt import GPT
 
 eval_logger = utils.eval_logger
 

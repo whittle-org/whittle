@@ -1,16 +1,18 @@
 import torch
 from litgpt import Config
-from whittle.models.gpt import GPT
-import sys
-import numpy as np
-import pathlib
-from whittle.eval.whittle_llms import WhittleLM
-from whittle.eval.utils import convert_and_evaluate
 from litgpt.scripts.download import download_from_hub
 import pytest
 from lm_eval import tasks
 from lm_eval.api.instance import Instance
 import json
+import sys
+import numpy as np
+import pathlib
+
+from whittle.models.gpt import GPT
+
+from whittle.eval.whittle_llms import WhittleLM
+from whittle.eval.utils import convert_and_evaluate
 
 
 @pytest.fixture(scope="session")
