@@ -6,6 +6,7 @@ import pytest
 import torch
 from litgpt import Config
 from litgpt.scripts.download import download_from_hub
+import litgpt.eval.evaluate as module
 from lm_eval import tasks
 from lm_eval.api.instance import Instance
 
@@ -15,12 +16,62 @@ from whittle.eval.whittle_llms import WhittleLM
 from whittle.eval.utils import convert_and_evaluate
 
 
+def copy_subnetwork_weights(sub_network, super_network):
+    """
+    Copies weights from the sub_network to the super_network.
+
+    Parameters:
+    - sub_network: the smaller neural network with the weights to copy.
+    - super_network: the larger neural network to which weights will be copied.
+    """
+
+    # Ensure both networks are in evaluation mode to avoid any changes in weights during copying.
+    sub_network.eval()
+    super_network.eval()
+
+    # Get the state dictionaries of both networks
+    sub_state_dict = sub_network.state_dict()
+    super_state_dict = super_network.state_dict()
+
+    # Iterate over the subnetwork's state dictionary and copy weights to the supernetwork
+    for layer_name, sub_weight in sub_state_dict.items():
+        if layer_name in super_state_dict:
+            super_weight = super_state_dict[layer_name]
+
+            # Ensure the subnetwork's weight can fit into the supernetwork's weight tensor
+            if sub_weight.size() == super_weight.size():
+                super_state_dict[layer_name] = sub_weight
+            else:
+                # Copy the sub_weight values into the corresponding part of super_weight
+                if len(sub_weight.shape) == 1:
+                    super_weight[0 : sub_weight.shape[0]] = sub_weight
+                elif len(sub_weight.shape) == 2:
+                    super_weight[0 : sub_weight.shape[0], 0 : sub_weight.shape[1]] = (
+                        sub_weight
+                    )
+                super_state_dict[layer_name] = super_weight
+        else:
+            raise KeyError(f"Layer {layer_name} not found in super-network.")
+
+    # Load the modified state dictionary back into the supernetwork
+    super_network.load_state_dict(super_state_dict)
+    return super_network
+
+
 @pytest.fixture(scope="session")
 def checkpoint_dir(tmp_path_factory):
     # img = compute_expensive_image()
     checkpoint_dir = tmp_path_factory.getbasetemp()
     download_from_hub(repo_id="EleutherAI/pythia-70m", checkpoint_dir=checkpoint_dir)
     return pathlib.Path(checkpoint_dir) / "EleutherAI" / "pythia-70m"
+
+
+@pytest.fixture(scope="session")
+def checkpoint_dir_14m(tmp_path_factory):
+    # img = compute_expensive_image()
+    checkpoint_dir = tmp_path_factory.getbasetemp()
+    download_from_hub(repo_id="EleutherAI/pythia-14m", checkpoint_dir=checkpoint_dir)
+    return pathlib.Path(checkpoint_dir) / "EleutherAI" / "pythia-14m"
 
 
 @pytest.fixture(scope="session")
@@ -256,10 +307,69 @@ class Test_WhittleLM:
             results = json.load(f)
         acc_api = results["results"]["logiqa"]["acc,none"]
         stderr_api = results["results"]["logiqa"]["acc_stderr,none"]
-        import litgpt.eval.evaluate as module
 
         module.convert_and_evaluate(
             checkpoint_dir,
+            out_dir=out_dir,
+            device="cpu",
+            dtype=torch.float32,
+            limit=10,
+            tasks="logiqa",
+            force_conversion=True,
+            batch_size=1,  # Test for non-positive integer
+        )
+        with open(str(out_dir / "results.json"), "r") as f:
+            results = json.load(f)
+        acc_lit = results["results"]["logiqa"]["acc,none"]
+        stderr_lit = results["results"]["logiqa"]["acc_stderr,none"]
+        assert acc_api == acc_lit
+        assert stderr_api == stderr_lit
+
+    def test_compare_litgpt(self, checkpoint_dir, checkpoint_dir_14m, out_dir):
+        torch.manual_seed(0)
+        config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
+        config.fix_head_size = True
+        config.model_type = "gpt"
+        config.tie_embeddings = False
+        gpt = GPT(config)
+        gpt.to(gpt.device)
+        gpt.name_or_path = "EleutherAI/pythia-70m"
+        gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
+        config_14m = Config.from_file(str(checkpoint_dir_14m / "model_config.yaml"))
+        config_14m.fix_head_size = True
+        config_14m.model_type = "gpt"
+        config_14m.tie_embeddings = False
+        gpt_14m = GPT(config_14m)
+        gpt_14m.to(gpt_14m.device)
+        gpt_14m.name_or_path = "EleutherAI/pythia-14m"
+        gpt_14m.load_state_dict(torch.load(str(checkpoint_dir_14m / "lit_model.pth")))
+        gpt = copy_subnetwork_weights(gpt_14m, gpt)
+        gpt.max_seq_length = config_14m.block_size
+        gpt.set_sub_network(
+            sub_network_n_embd=config_14m.n_embd,
+            sub_network_intermediate_size=[config_14m.intermediate_size]
+            * config_14m.n_layer,
+            sub_network_num_heads=[config_14m.n_head] * config_14m.n_layer,
+            sub_network_n_layers=config_14m.n_layer,
+            sub_network_query_groups=config_14m.n_query_groups,
+            sub_network_head_size=config_14m.head_size,
+        )
+        convert_and_evaluate(
+            gpt,
+            out_dir=out_dir,
+            device="cpu",
+            dtype=torch.float32,
+            limit=10,
+            tasks="logiqa",
+            batch_size=1,  # Test for non-positive integer
+        )
+        with open(str(out_dir / "results.json"), "r") as f:
+            results = json.load(f)
+        acc_api = results["results"]["logiqa"]["acc,none"]
+        stderr_api = results["results"]["logiqa"]["acc_stderr,none"]
+
+        module.convert_and_evaluate(
+            checkpoint_dir_14m,
             out_dir=out_dir,
             device="cpu",
             dtype=torch.float32,
