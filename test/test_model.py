@@ -9,14 +9,14 @@ from litgpt.model import GPT as LitGPT
 def test_gpt(sample_random_indices):
     torch.manual_seed(0)
     config = Config()
-    config.padded_vocab_size = 512
+    config.padded_vocab_size = 128
     config.n_embd = 64
     config.intermediate_size = 64 * 4
     config.n_head = 8
     config.n_query_groups = 4
     config.head_size = 8
     config.n_layer = 2
-    config.block_size = 512
+    config.block_size = 128
     config.norm_class_name = "RMSNorm"
     config.mlp_class_name = "LLaMAMLP"
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
@@ -46,9 +46,9 @@ def test_gpt(sample_random_indices):
         block.norm_2.weight.data = torch.randn_like(block.norm_2.weight.data)
 
     gpt.reset_super_network()
-    input = torch.randint(0, 512, (1, 512))
+    input = torch.randint(0, 64, (1, 64))
     out_large = gpt(input)
-    assert out_large.shape == (1, 512, 512)
+    assert out_large.shape == (1, 64, 128)
 
     lit_gpt = LitGPT(config)
     lit_gpt.lm_head.weight.data = gpt.lm_head.weight.data
@@ -86,42 +86,42 @@ def test_gpt(sample_random_indices):
             gpt.transformer.wte.random_indices
             == torch.tensor(
                 [
-                    21,
-                    63,
+                    29,
+                    39,
+                    57,
                     10,
-                    43,
-                    44,
-                    14,
-                    59,
-                    3,
-                    36,
-                    55,
-                    11,
-                    40,
-                    5,
-                    27,
-                    45,
-                    0,
-                    17,
-                    41,
-                    33,
-                    25,
-                    50,
-                    60,
-                    12,
+                    15,
                     20,
-                    52,
+                    13,
+                    33,
+                    35,
+                    45,
+                    50,
                     24,
-                    47,
-                    58,
-                    38,
-                    32,
-                    26,
+                    37,
+                    23,
+                    51,
+                    46,
+                    4,
+                    36,
+                    63,
+                    19,
                     61,
+                    21,
+                    9,
+                    49,
+                    28,
+                    48,
+                    59,
+                    38,
+                    17,
+                    60,
+                    34,
+                    32,
                 ]
             )
         )
-    assert out_small.shape == (1, 512, 512)
+    assert out_small.shape == (1, 64, 128)
     config.n_embd = 32
     config.n_head = 4
     config.n_query_groups = 2

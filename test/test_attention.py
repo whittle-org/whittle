@@ -7,27 +7,27 @@ import pytest
 
 attention_configs = {
     "mha_fix_head_size": {
-        "config": Config(n_embd=128, n_head=16, n_query_groups=16, head_size=64),
+        "config": Config(n_embd=64, n_head=16, n_query_groups=16, head_size=64),
         "fix_head_size": True,
     },
     "gqa_fix_head_size": {
-        "config": Config(n_embd=128, n_head=16, n_query_groups=2, head_size=64),
+        "config": Config(n_embd=64, n_head=16, n_query_groups=2, head_size=64),
         "fix_head_size": True,
     },
     "mqa_fix_head_size": {
-        "config": Config(n_embd=128, n_head=16, n_query_groups=1, head_size=64),
+        "config": Config(n_embd=64, n_head=16, n_query_groups=1, head_size=64),
         "fix_head_size": True,
     },
     "mha_flexible_head_size": {
-        "config": Config(n_embd=128, n_head=16, n_query_groups=16),
+        "config": Config(n_embd=64, n_head=16, n_query_groups=16),
         "fix_head_size": False,
     },
     "gqa_flexible_head_size": {
-        "config": Config(n_embd=128, n_head=16, n_query_groups=2),
+        "config": Config(n_embd=64, n_head=16, n_query_groups=2),
         "fix_head_size": False,
     },
     "mqa_flexible_head_size": {
-        "config": Config(n_embd=128, n_head=16, n_query_groups=1),
+        "config": Config(n_embd=64, n_head=16, n_query_groups=1),
         "fix_head_size": False,
     },
 }

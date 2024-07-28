@@ -88,14 +88,14 @@ def test_integration_training_strategies_gpt(strategy, kd_loss):
     )
 
     config = Config()
-    config.padded_vocab_size = 512
+    config.padded_vocab_size = 128
     config.n_embd = 32
     config.intermediate_size = 32 * 2
     config.n_head = 4
     config.n_query_groups = 4
     config.head_size = 8
     config.n_layer = 2
-    config.block_size = 512
+    config.block_size = 128
     config.norm_class_name = "RMSNorm"
     config.mlp_class_name = "LLaMAMLP"
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
@@ -103,7 +103,7 @@ def test_integration_training_strategies_gpt(strategy, kd_loss):
     config.lm_head_bias = True
     config.fix_head_size = True
     gpt = GPT(config)
-    inputs = torch.randint(0, 512, (1, 512))
-    outputs = torch.randn([1, 512, 512])
+    inputs = torch.randint(0, 128, (1, 128))
+    outputs = torch.randn([1, 128, 128])
     loss = update_op(gpt, inputs, outputs)
     assert isinstance(loss, float)
