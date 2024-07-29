@@ -155,7 +155,6 @@ class CausalSelfAttention(nn.Module):
         k = k.reshape(B, -1, T, self.sub_network_head_size)
         v = v.reshape(B, -1, T, self.sub_network_head_size)
         rope_n_elem = int(self.sub_network_head_size * self.config.rotary_percentage)
-        # cos, sin = build_rope_cache(seq_len=T, n_elem=rope_n_elem,device=q.device)
         q_roped = apply_rope(q[..., :rope_n_elem], cos, sin)
         k_roped = apply_rope(k[..., :rope_n_elem], cos, sin)
         q = torch.cat((q_roped, q[..., rope_n_elem:]), dim=-1)
