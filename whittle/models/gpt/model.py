@@ -50,6 +50,7 @@ class GPT(nn.Module):
         self.config.is_encoder_decoder = False
         self.main_input_name = "input_pos"
         self._supports_cache_class = True
+        self.sub_network_head_size = None
         # self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
 
     @property
@@ -119,9 +120,12 @@ class GPT(nn.Module):
         sub_network_intermediate_size: list,
         sub_network_num_heads: list,
         sub_network_n_layers: int,
+        sub_network_query_groups=None,
+        sub_network_head_size=None,
         sample_random_indices: bool = False,
     ) -> None:
         self.sample_random_indices = sample_random_indices
+        self.sub_network_head_size = sub_network_head_size
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
@@ -145,6 +149,8 @@ class GPT(nn.Module):
                 sub_network_n_embd,
                 sub_network_intermediate_size[i],
                 sub_network_num_heads[i],
+                sub_network_query_groups,
+                sub_network_head_size,
                 sample_random_indices,
             )
         self.lm_head.set_sub_network(
@@ -220,11 +226,22 @@ class GPT(nn.Module):
                         device=self.device,
                     )
             else:
-                cos, sin = build_rope_cache(
-                    seq_len=self.max_seq_length,
-                    n_elem=int(self.config.rotary_percentage * (self.config.head_size)),
-                    device=self.device,
-                )
+                if self.sub_network_head_size is None:
+                    cos, sin = build_rope_cache(
+                        seq_len=self.max_seq_length,
+                        n_elem=int(
+                            self.config.rotary_percentage * (self.config.head_size)
+                        ),
+                        device=self.device,
+                    )
+                else:
+                    cos, sin = build_rope_cache(
+                        seq_len=self.max_seq_length,
+                        n_elem=int(
+                            self.config.rotary_percentage * (self.sub_network_head_size)
+                        ),
+                        device=self.device,
+                    )
 
             cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
 

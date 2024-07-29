@@ -54,6 +54,8 @@ class Block(litgpt.model.Block):
         sub_network_n_embd: int,
         sub_network_intermediate_size: int,
         sub_network_num_heads: int,
+        sub_network_query_groups=None,
+        sub_network_head_size=None,
         sample_random_indices: bool = False,
     ) -> None:
         self.sub_network_n_embd = sub_network_n_embd
@@ -61,7 +63,11 @@ class Block(litgpt.model.Block):
         self.sub_network_num_heads = sub_network_num_heads
         self.norm_1.set_sub_network(self.sub_network_n_embd, sample_random_indices)
         self.attn.set_sub_network(
-            self.sub_network_n_embd, self.sub_network_num_heads, sample_random_indices
+            self.sub_network_n_embd,
+            self.sub_network_num_heads,
+            sub_network_query_groups,
+            sub_network_head_size,
+            sample_random_indices,
         )
         if not self.config.shared_attention_norm and self.norm_2 is not None:
             self.norm_2.set_sub_network(self.sub_network_n_embd, sample_random_indices)

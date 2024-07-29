@@ -39,20 +39,29 @@ class CausalSelfAttention(nn.Module):
         self,
         sub_network_n_embd: int,
         sub_network_n_head: int,
+        sub_network_query_groups=None,
+        sub_network_head_size=None,
         sample_random_indices: bool = False,
     ):
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_n_head = sub_network_n_head
-        if self.config.n_query_groups == 1:
-            self.sub_network_query_groups = 1
-        elif self.sub_network_n_head % self.config.n_query_groups == 0:
-            self.sub_network_query_groups = self.config.n_query_groups
+        if sub_network_query_groups is None:
+            if self.config.n_query_groups == 1:
+                self.sub_network_query_groups = 1
+            elif self.sub_network_n_head % self.config.n_query_groups == 0:
+                self.sub_network_query_groups = self.config.n_query_groups
+            else:
+                self.sub_network_query_groups = self.sub_network_n_head // (
+                    self.config.n_head // self.config.n_query_groups
+                )
         else:
-            self.sub_network_query_groups = self.sub_network_n_head // (
-                self.config.n_head // self.config.n_query_groups
-            )
+            self.sub_network_query_groups = sub_network_query_groups
         if self.config.fix_head_size:
-            self.sub_network_head_size = self.config.head_size
+            if sub_network_head_size is None:
+                self.sub_network_head_size = self.config.head_size
+            else:
+                self.sub_network_head_size = sub_network_head_size
+
         else:
             self.sub_network_head_size = (
                 self.sub_network_n_embd // self.sub_network_n_head
@@ -70,8 +79,8 @@ class CausalSelfAttention(nn.Module):
             self.sub_network_n_embd,
             sample_random_indices,
         )
-        self.sub_network_q_per_kv = (
-            self.sub_network_n_head // self.sub_network_query_groups
+        self.sub_network_q_per_kv = self.sub_network_n_head // float(
+            self.sub_network_query_groups
         )
 
     def reset_super_network(self):
@@ -104,7 +113,6 @@ class CausalSelfAttention(nn.Module):
             T,
             C,
         ) = x.size()  # batch size, sequence length, embedding dimensionality (n_embd)
-
         qkv = self.attn(x)
         # assemble into a number of query groups to support MHA, MQA and GQA together (see `config.n_query_groups`)
         q_per_kv = self.sub_network_n_head // self.sub_network_query_groups
@@ -156,7 +164,6 @@ class CausalSelfAttention(nn.Module):
             if not isinstance(self.kv_cache, KVCache):
                 raise TypeError("You need to call `gpt.set_kv_cache()`")
             k, v = self.kv_cache(input_pos, k, v)
-
         y = self.scaled_dot_product_attention(q, k, v, mask)
         y = y.reshape(
             B, T, self.sub_network_head_size * self.sub_network_n_head

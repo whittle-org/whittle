@@ -35,19 +35,35 @@ attention_configs = {
 
 def init_attention(config):
     attention = CausalSelfAttention(config)
-    attention.attn.weight.data = torch.ones_like(attention.attn.weight.data)
-    attention.attn.bias.data = torch.ones_like(attention.attn.bias.data)
-    attention.proj.bias.data = torch.ones_like(attention.proj.bias.data)
-    attention.proj.weight.data = torch.ones_like(attention.proj.weight.data)
+    torch.manual_seed(0)
+    attention.attn.weight.data = torch.randn_like(attention.attn.weight.data)
+    attention.attn.bias.data = torch.randn_like(attention.attn.bias.data)
+    attention.proj.bias.data = torch.randn_like(attention.proj.bias.data)
+    attention.proj.weight.data = torch.randn_like(attention.proj.weight.data)
     return attention
 
 
 def init_lit_attention(config):
     attention = LitCausalSelfAttention(config)
-    attention.attn.weight.data = torch.ones_like(attention.attn.weight.data)
-    attention.attn.bias.data = torch.ones_like(attention.attn.bias.data)
-    attention.proj.bias.data = torch.ones_like(attention.proj.bias.data)
-    attention.proj.weight.data = torch.ones_like(attention.proj.weight.data)
+    torch.manual_seed(0)
+    attention.attn.weight.data = torch.randn_like(attention.attn.weight.data)
+    attention.attn.bias.data = torch.randn_like(attention.attn.bias.data)
+    attention.proj.bias.data = torch.randn_like(attention.proj.bias.data)
+    attention.proj.weight.data = torch.randn_like(attention.proj.weight.data)
+    return attention
+
+
+def init_lit_small_attention(config, base_attention):
+    attention = LitCausalSelfAttention(config)
+    torch.manual_seed(0)
+    slices = tuple(slice(0, s) for s in attention.attn.weight.data.size())
+    attention.attn.weight.data = base_attention.attn.weight.data[slices]
+    slices = tuple(slice(0, s) for s in attention.attn.bias.data.size())
+    attention.attn.bias.data = base_attention.attn.bias.data[slices]
+    slices = tuple(slice(0, s) for s in attention.proj.bias.data.size())
+    attention.proj.bias.data = base_attention.proj.bias.data[slices]
+    slices = tuple(slice(0, s) for s in attention.proj.weight.data.size())
+    attention.proj.weight.data = base_attention.proj.weight.data[slices]
     return attention
 
 
@@ -95,7 +111,7 @@ def test_attention(attention_config):
     config.head_size = attention.sub_network_head_size
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
 
-    lit_attention_small = init_lit_attention(config)
+    lit_attention_small = init_lit_small_attention(config, lit_attention)
 
     out_lit_small = lit_attention_small(
         input[:, :, : config.n_embd], mask=mask, cos=cos, sin=sin
