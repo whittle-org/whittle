@@ -1,6 +1,9 @@
 from litgpt.config import Config
 
-from whittle.metrics.parameters import compute_parameters, compute_parameters_sub_network_gpt
+from whittle.metrics.parameters import (
+    compute_parameters,
+    compute_parameters_sub_network_gpt,
+)
 from whittle.models.gpt import GPT
 
 from test.test_training_strategies import MLP
