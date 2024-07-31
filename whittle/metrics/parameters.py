@@ -1,9 +1,12 @@
+import torch.nn as nn
+
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import CausalSelfAttention
 from whittle.modules.embedding import Embedding
 from whittle.modules.linear import Linear
 from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
+from whittle.models.gpt.blocks import GptNeoxMLP, GemmaMLP, LLaMAMLP
 
 
 def compute_parameters(model):
@@ -40,6 +43,20 @@ def params_attention_layer(attention: CausalSelfAttention):
     return n_attention
 
 
+def params_mlp(mlp: nn.Module):
+    layers = []
+    if isinstance(mlp, GptNeoxMLP):
+        layers = [mlp.proj, mlp.fc]
+
+    elif isinstance(mlp, LLaMAMLP) or isinstance(mlp, GemmaMLP):
+        layers = [mlp.proj, mlp.fc_1, mlp.fc_2]
+
+    num_params = 0
+    for layer in layers:
+        num_params += params_linear_layer(layer)
+    return num_params
+
+
 def compute_parameters_sub_network_gpt(model: GPT):
     """
     Computes parameters of the current sub-network of a GPT mmodel. Make sure to set the sub-network before
@@ -58,12 +75,12 @@ def compute_parameters_sub_network_gpt(model: GPT):
     num_params = 0
     num_params += params_linear_layer(model.lm_head)
     num_params += params_embedding_layer(model.transformer.wte)
-    for block in model.transformer.h:
+    for i in range(model.sub_network_n_layers):
+        block = model.transformer.h[i]
         num_params += params_layer_norm(block.norm_1)
-
+        num_params += params_mlp(block.mlp)
         num_params += params_attention_layer(block.attn)
-        num_params += params_linear_layer(block.mlp.fc)
-        num_params += params_linear_layer(block.mlp.proj)
+
         num_params += params_layer_norm(block.norm_2)
     num_params += params_layer_norm(model.transformer.ln_f)
     return num_params
