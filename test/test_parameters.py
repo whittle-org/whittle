@@ -12,6 +12,7 @@ from test.test_training_strategies import MLP
 
 
 mlp_types = ["GptNeoxMLP", "LLaMAMLP", "GemmaMLP"]
+norm_types = ["LayerNorm", "RMSNorm"]
 
 
 def test_compute_parameters():
@@ -20,7 +21,8 @@ def test_compute_parameters():
 
 
 @pytest.mark.parametrize("mlp_type", mlp_types)
-def test_compute_parameters_sub_network(mlp_type):
+@pytest.mark.parametrize("norm_type", norm_types)
+def test_compute_parameters_sub_network(mlp_type, norm_type):
     config = Config()
     config.padded_vocab_size = 512
     config.n_embd = 64
@@ -35,6 +37,7 @@ def test_compute_parameters_sub_network(mlp_type):
     config.lm_head_bias = True
     config.fix_head_size = True
     config.mlp_class_name = mlp_type
+    config.norm_class_name = norm_type
 
     gpt = GPT(config)
 

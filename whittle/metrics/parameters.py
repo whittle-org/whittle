@@ -1,3 +1,5 @@
+import logging
+
 import torch.nn as nn
 
 from whittle.models.gpt import GPT
@@ -20,16 +22,20 @@ def params_linear_layer(layer: Linear):
     return params
 
 
-def params_rmsnorm(rmsnorm: RMSNorm):
-    return rmsnorm.sub_network_in_features
-
-
 def params_embedding_layer(embedding: Embedding):
     return embedding.num_embeddings * embedding.sub_network_embedding_dim
 
 
-def params_layer_norm(layer_norm: LayerNorm):
-    return 2 * layer_norm.sub_network_in_features
+def params_layer_normalization(normalization_layer: nn.Module):
+    if isinstance(normalization_layer, LayerNorm):
+        return 2 * normalization_layer.sub_network_in_features
+    elif isinstance(normalization_layer, RMSNorm):
+        return normalization_layer.sub_network_in_features
+    else:
+        logging.error(
+            f"Normalization layer type: {type(normalization_layer)} not supported!"
+        )
+        raise
 
 
 def params_attention_layer(attention: CausalSelfAttention):
@@ -77,10 +83,10 @@ def compute_parameters_sub_network_gpt(model: GPT):
     num_params += params_embedding_layer(model.transformer.wte)
     for i in range(model.sub_network_n_layers):
         block = model.transformer.h[i]
-        num_params += params_layer_norm(block.norm_1)
         num_params += params_mlp(block.mlp)
         num_params += params_attention_layer(block.attn)
 
-        num_params += params_layer_norm(block.norm_2)
-    num_params += params_layer_norm(model.transformer.ln_f)
+        num_params += params_layer_normalization(block.norm_1)
+        num_params += params_layer_normalization(block.norm_2)
+    num_params += params_layer_normalization(model.transformer.ln_f)
     return num_params
