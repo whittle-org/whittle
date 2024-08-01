@@ -1,21 +1,22 @@
+from __future__ import annotations
+
 import pytest
 import torch.nn as nn
 import torch.nn.functional
-
-from syne_tune.config_space import randint, choice
-from whittle.loss import DistillLoss
-from whittle.training_strategies import (
-    SandwichStrategy,
-    RandomStrategy,
-    StandardStrategy,
-    RandomLinearStrategy,
-    ATS,
-)
 from litgpt import Config
-from whittle.models.gpt import GPT
-from whittle.sampling.random_sampler import RandomSampler
-from whittle.modules.linear import Linear
+from syne_tune.config_space import choice, randint
 
+from whittle.loss import DistillLoss
+from whittle.models.gpt import GPT
+from whittle.modules.linear import Linear
+from whittle.sampling.random_sampler import RandomSampler
+from whittle.training_strategies import (
+    ATS,
+    RandomLinearStrategy,
+    RandomStrategy,
+    SandwichStrategy,
+    StandardStrategy,
+)
 
 methods = [
     SandwichStrategy,

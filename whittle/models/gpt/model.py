@@ -4,19 +4,21 @@ Based on the nanoGPT implementation: https://github.com/karpathy/nanoGPT and
 https://github.com/EleutherAI/gpt-neox/tree/main/megatron/model.
 """
 
+from __future__ import annotations
+
 from typing import Any, Optional, Tuple
 from typing_extensions import Self
 
 import torch
 import torch.nn as nn
-
 from litgpt import Config
 from litgpt.model import build_rope_cache
+
 from whittle.models.gpt.blocks import Block
 from whittle.modules.embedding import Embedding
+from whittle.modules.layernorm import LayerNorm
 from whittle.modules.linear import Linear
 from whittle.modules.rmsnorm import RMSNorm
-from whittle.modules.layernorm import LayerNorm
 
 
 class GPT(nn.Module):

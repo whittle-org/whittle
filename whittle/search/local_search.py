@@ -1,13 +1,14 @@
-import numpy as np
+from __future__ import annotations
+
 import logging
 from copy import deepcopy
-from typing import Optional, List, Dict, Any, Union
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
 
+import numpy as np
+from syne_tune.config_space import Domain
 from syne_tune.optimizer.schedulers import FIFOScheduler
 from syne_tune.optimizer.schedulers.searchers import StochasticSearcher
-from syne_tune.config_space import Domain
-
 
 logger = logging.getLogger(__name__)
 
@@ -212,11 +213,10 @@ class LocalSearch(StochasticSearcher):
 
 
 if __name__ == "__main__":
-    from transformers import AutoConfig
-
     from nas_fine_tuning.sampling import SmallSearchSpace
-    from syne_tune.tuner import Trial
     from syne_tune.config_space import Categorical
+    from syne_tune.tuner import Trial
+    from transformers import AutoConfig
 
     config = AutoConfig.from_pretrained("bert-base-cased")
     ss = SmallSearchSpace(config)

@@ -2,8 +2,11 @@
 
 """Utility functions for training and inference."""
 
+from __future__ import annotations
+
 import math
 import pickle
+import random
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -12,24 +15,23 @@ from typing import (
     Any,
     Dict,
     Iterable,
+    Iterator,
     List,
     Mapping,
     Optional,
     TypeVar,
     Union,
-    Iterator,
 )
+from typing_extensions import Self
 
 import lightning as L
+import numpy as np
 import torch
 import torch.nn as nn
-import random
 import torch.utils._device
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities.load import _lazy_load as lazy_load
 from torch.serialization import normalize_storage_type
-from typing_extensions import Self
-import numpy as np
 
 if TYPE_CHECKING:
     from gpt.model import GPT

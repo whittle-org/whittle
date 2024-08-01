@@ -21,7 +21,7 @@ torchvision = "^0.18.1"
 [tool.poetry.dev-dependencies]
 pre-commit = "^3.7.1"
 pytest = "^8.2.2"
-
+ruff = "^0.5.5"
 
 [build-system]
 requires = ["poetry-core"]
@@ -97,3 +97,11 @@ line-ending = "auto"
 # This is currently disabled by default, but it is planned for this
 # to be opt-out in the future.
 docstring-code-format = false
+
+[tool.ruff.lint.isort]
+known-first-party = ["whittle", "examples", "sinc"]
+no-lines-before = ["future"]
+required-imports = ["from __future__ import annotations"]
+combine-as-imports = true
+extra-standard-library = ["typing_extensions"]
+force-wrap-aliases = true

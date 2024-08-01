@@ -1,7 +1,9 @@
-import torch
-import torch.nn.functional as F
+from __future__ import annotations
 
 from typing import Optional
+
+import torch
+import torch.nn.functional as F
 
 
 class Embedding(torch.nn.Embedding):

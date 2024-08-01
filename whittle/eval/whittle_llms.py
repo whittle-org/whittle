@@ -1,18 +1,15 @@
+from __future__ import annotations
+
 import copy
 from typing import Dict, List, Literal, Optional, Tuple, Union
-from tqdm import tqdm
+
 import torch
 import torch.nn.functional as F
 import transformers
 from accelerate import (
     find_executable_batch_size,
 )
-
-from transformers.models.auto.modeling_auto import (
-    MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
-    MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
-)
-
+from litgpt.generate.base import generate
 from lm_eval import utils
 from lm_eval.api.instance import Instance
 from lm_eval.api.model import TemplateLM
@@ -22,9 +19,14 @@ from lm_eval.models.utils import (
     clear_torch_cache,
     pad_and_concat,
 )
-from litgpt.generate.base import generate
+from tqdm import tqdm
 from transformers import PreTrainedTokenizerBase
 from transformers.configuration_utils import PretrainedConfig
+from transformers.models.auto.modeling_auto import (
+    MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
+    MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
+)
+
 from whittle.models.gpt import GPT
 
 eval_logger = utils.eval_logger

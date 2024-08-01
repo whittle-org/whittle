@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import torch
-from whittle.models.gpt.blocks import GptNeoxMLP, LLaMAMLP, GemmaMLP
+from litgpt import Config
 from litgpt.model import (
+    GemmaMLP as LitGemmaMLP,
     GptNeoxMLP as LitGptNeoxMLP,
     LLaMAMLP as LitLLaMAMLP,
-    GemmaMLP as LitGemmaMLP,
 )
-from litgpt import Config
+
+from whittle.models.gpt.blocks import GemmaMLP, GptNeoxMLP, LLaMAMLP
 
 
 def test_GptNeoxMLP():

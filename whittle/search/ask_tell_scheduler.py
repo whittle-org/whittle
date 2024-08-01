@@ -1,7 +1,9 @@
-from typing import Dict
-import datetime
+from __future__ import annotations
 
-from syne_tune.backend.trial_status import Trial, Status, TrialResult
+import datetime
+from typing import Dict
+
+from syne_tune.backend.trial_status import Status, Trial, TrialResult
 from syne_tune.optimizer.scheduler import TrialScheduler
 
 

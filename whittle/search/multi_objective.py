@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 
 
@@ -7,7 +9,7 @@ def get_pareto_optimal(costs: np.ndarray):
     :param costs: (n_points, m_cost_values) array
     :return: (n_points, 1) indicator if point is on pareto front or not.
     """
-    assert type(costs) == np.ndarray
+    assert isinstance(costs, np.ndarray)
     assert costs.ndim == 2
 
     # first assume all points are pareto optimal

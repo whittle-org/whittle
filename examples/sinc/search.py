@@ -1,18 +1,18 @@
-import numpy as np
-import torch
-import matplotlib.pyplot as plt
+from __future__ import annotations
 
 from argparse import ArgumentParser
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from model import MLP
+from syne_tune.config_space import randint
 from torch.utils.data import DataLoader
 
-from syne_tune.config_space import randint
-from whittle.search import multi_objective_search
 from examples.sinc.estimate_efficiency import compute_mac_linear_layer
-
-from sinc_nas import validate, f
-from model import MLP
-
+from examples.sinc.sinc_nas import f, validate
+from whittle.search import multi_objective_search
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -48,13 +48,14 @@ if __name__ == "__main__":
     model = MLP(input_dim=1, hidden_dim=args.hidden_dim, device=device)
 
     path = (
-        Path(args.st_checkpoint_dir)
-        / f"{args.training_strategy}_model_{args.hidden_dim}.pt"
+            Path(args.st_checkpoint_dir)
+            / f"{args.training_strategy}_model_{args.hidden_dim}.pt"
     )
     checkpoint = torch.load(path)
     model.load_state_dict(checkpoint["state"])
     model = model.to(device)
     model.eval()
+
 
     def objective(config):
         model.select_sub_network(config)
@@ -74,6 +75,7 @@ if __name__ == "__main__":
         model.reset_super_network()
 
         return mac, loss
+
 
     results = multi_objective_search(
         objective,

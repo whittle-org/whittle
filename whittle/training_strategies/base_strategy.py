@@ -1,7 +1,11 @@
-from whittle.sampling.random_sampler import RandomSampler
+from __future__ import annotations
+
 from typing import Callable, Optional
-from whittle.loss import DistillLoss
+
 import torch
+
+from whittle.loss import DistillLoss
+from whittle.sampling.random_sampler import RandomSampler
 
 
 class BaseTrainingStrategy(object):

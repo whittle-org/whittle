@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 from typing import Optional, Union
 
 import litgpt
 from litgpt import Config
+
 from whittle.models.gpt.blocks.causal_self_attention import CausalSelfAttention
-from whittle.modules.rmsnorm import RMSNorm
+from whittle.models.gpt.blocks.mlp import GemmaMLP, GptNeoxMLP, LLaMAMLP
 from whittle.modules.layernorm import LayerNorm
-from whittle.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP, GemmaMLP
+from whittle.modules.rmsnorm import RMSNorm
 
 
 class Block(litgpt.model.Block):

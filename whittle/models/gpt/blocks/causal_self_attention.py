@@ -1,9 +1,13 @@
+from __future__ import annotations
+
+import math
+from typing import Optional
+
 import torch
 import torch.nn as nn
 from litgpt import Config
-from typing import Optional
-import math
 from litgpt.model import KVCache, apply_rope
+
 from whittle.modules import Linear
 
 

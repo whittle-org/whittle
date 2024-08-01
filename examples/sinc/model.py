@@ -1,7 +1,7 @@
+from __future__ import annotations
+
 import torch
 import torch.nn as nn
-
-from syne_tune.config_space import randint
 
 from whittle.modules import Linear
 

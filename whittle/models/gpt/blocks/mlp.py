@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from typing import Optional
 
-import torch
 import litgpt
+import torch
 from litgpt import Config
+
 from whittle.modules import Linear
 
 

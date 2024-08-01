@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 import json
 import os
 from pathlib import Path
 from pprint import pprint
 from typing import Optional, Union
+
 import torch
-from whittle.models.gpt import GPT
+
 from whittle.eval.whittle_llms import WhittleLM
+from whittle.models.gpt import GPT
 
 
 def prepare_results(results, save_filepath, print_results=True):

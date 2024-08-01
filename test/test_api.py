@@ -1,19 +1,21 @@
+from __future__ import annotations
+
 import json
-import sys
-import numpy as np
 import pathlib
+import sys
+
+import litgpt.eval.evaluate as module
+import numpy as np
 import pytest
 import torch
 from litgpt import Config
 from litgpt.scripts.download import download_from_hub
-import litgpt.eval.evaluate as module
 from lm_eval import tasks
 from lm_eval.api.instance import Instance
 
-from whittle.models.gpt import GPT
-
-from whittle.eval.whittle_llms import WhittleLM
 from whittle.eval.utils import convert_and_evaluate
+from whittle.eval.whittle_llms import WhittleLM
+from whittle.models.gpt import GPT
 
 
 def copy_subnetwork_weights(sub_network, super_network):

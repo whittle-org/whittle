@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 from collections import OrderedDict
+from copy import deepcopy
 
 import torch
 import torch.nn as nn
-from copy import deepcopy
 
 
 class IdentityAttention(nn.Module):
@@ -148,6 +150,7 @@ def get_final_bert_model(original_model, new_model_config):
 if __name__ == "__main__":
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
     from transformers.models.bert.modeling_bert import BertConfig
+
     from benchmarks.plm_pruning.mask import mask_bert
 
     model_type = "bert-base-uncased"
