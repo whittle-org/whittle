@@ -4973,4 +4973,8 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9, <3.12"
+<<<<<<< HEAD
 content-hash = "9c63d1fb927da0ca7d43b0f199f0cfde45b8e690c996b028c4d103bccb3e408c"
+=======
+content-hash = "050c57101ec9dc1b406110870af4f67dc9760498a105b6fb115b30bf2646b024"
+>>>>>>> 898fa1a (ci: Update lock file)
