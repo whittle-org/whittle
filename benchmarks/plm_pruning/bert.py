@@ -12,7 +12,7 @@ from search_spaces import (
 )
 
 
-class BERTSuperNetMixin(object):
+class BERTSuperNetMixin:
     search_space = None
     handles = None
 

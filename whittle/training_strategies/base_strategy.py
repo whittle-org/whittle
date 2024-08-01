@@ -4,7 +4,7 @@ from whittle.loss import DistillLoss
 import torch
 
 
-class BaseTrainingStrategy(object):
+class BaseTrainingStrategy:
     """
     Base Training Strategy.
 

@@ -8,7 +8,7 @@ from transformers import AutoTokenizer, DataCollatorWithPadding, default_data_co
 logger = logging.getLogger(__name__)
 
 
-class DataWrapper(object):
+class DataWrapper:
     def __init__(self, training_args, model_args, data_args):
         self.training_args = training_args
         self.model_args = model_args
