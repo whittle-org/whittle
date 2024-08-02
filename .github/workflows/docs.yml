@@ -1,0 +1,25 @@
+name: Unit Tests
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          cache: 'pip'
+      - name: Install
+        run: pip install ".[dev]"
+      - name: Run mkdocs
+        # You can include `--strict` to treat warnings as errors
+        # Advised if you can sort out the typing issues
+        run: mkdocs build --clean
