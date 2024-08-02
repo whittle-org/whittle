@@ -26,4 +26,4 @@ logging.getLogger("torch._dynamo.variables.torch").addFilter(
 logging.getLogger("torch.distributed.fsdp._optim_utils").disabled = True
 logging.getLogger("torch.distributed.fsdp._debug_utils").disabled = True
 
-__all__ = ["GPT", "Config", "Tokenizer"]
+__all__ = ["GPT", "Config"]
