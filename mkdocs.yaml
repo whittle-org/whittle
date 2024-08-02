@@ -173,3 +173,4 @@ nav:
   - Home: "index.md"
     # Auto generated with docs/api_generator.py
   - API: "api/"
+  - Contributing: "contributing.md"
