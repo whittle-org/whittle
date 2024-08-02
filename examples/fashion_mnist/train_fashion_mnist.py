@@ -76,15 +76,14 @@ def train(
         f1, f2 = model.sample_f_in()
         # Do a forward pass
 
-        match training_scheme:
-            case "standard":
-                output = model(data)
-            case "sampling":
-                output = model.forward_dense_lottery(data, f1, f2)
-            case "sandwich":
-                output, loss = sandwich_update(model, data, criterion, target)
-            case _:
-                raise ValueError(f"Unknown train_scheme: {training_scheme}")
+        if training_scheme == "standard":
+            output = model(data)
+        elif training_scheme == "sampling":
+            output = model.forward_dense_lottery(data, f1, f2)
+        elif training_scheme == "sandwich":
+            output, loss = sandwich_update(model, data, criterion, target)
+        else:
+            raise ValueError(f"Unknown train_scheme: {training_scheme}")
 
         # Calculate the loss
         if training_scheme != "sandwich":
