@@ -40,11 +40,22 @@ homepage = "https://github.com/whittle-org/whittle"
 
 [project.optional-dependencies]
 dev = [
+  # -- deploy --
+  "build",
+  # -- ci --
   "pre-commit",
   "pytest>=8",
-  "build",
   "ruff",
   "mypy",
+  # -- docs --
+  "mike",
+  "mkdocs",
+  "mkdocs-material",
+  "mkdocs-autorefs",
+  "mkdocs-gen-files",
+  "mkdocs-literate-nav",
+  "mkdocstrings[python]",
+  "black",  # Allows mkdocstrings to do formatting...
 ]
 
 [tool.setuptools.packages.find]
