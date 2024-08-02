@@ -58,9 +58,9 @@ def _get_accelerate_args(
 
 
 def configure_pad_token(
-    tokenizer: "PreTrainedTokenizerBase",
-    model_config: Optional["PretrainedConfig"] = None,
-) -> "PreTrainedTokenizerBase":
+    tokenizer: PreTrainedTokenizerBase,
+    model_config: Optional[PretrainedConfig] = None,
+) -> PreTrainedTokenizerBase:
     """
     This function checks if the (Hugging Face) tokenizer has a padding token and sets it if not present.
     Some tokenizers require special handling.

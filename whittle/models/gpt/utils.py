@@ -34,7 +34,7 @@ from lightning.fabric.utilities.load import _lazy_load as lazy_load
 from torch.serialization import normalize_storage_type
 
 if TYPE_CHECKING:
-    from gpt.model import GPT
+    from whittle.models.gpt.model import GPT
 
 
 def find_multiple(n: int, k: int) -> int:
@@ -371,7 +371,7 @@ def flops_per_param(
     return flops_per_seq + attn_flops_per_seq
 
 
-def estimate_flops(model: "GPT", training: bool) -> int:
+def estimate_flops(model: GPT, training: bool) -> int:
     """Measures estimated FLOPs for MFU.
 
     Refs:

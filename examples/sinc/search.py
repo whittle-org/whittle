@@ -48,14 +48,13 @@ if __name__ == "__main__":
     model = MLP(input_dim=1, hidden_dim=args.hidden_dim, device=device)
 
     path = (
-            Path(args.st_checkpoint_dir)
-            / f"{args.training_strategy}_model_{args.hidden_dim}.pt"
+        Path(args.st_checkpoint_dir)
+        / f"{args.training_strategy}_model_{args.hidden_dim}.pt"
     )
     checkpoint = torch.load(path)
     model.load_state_dict(checkpoint["state"])
     model = model.to(device)
     model.eval()
-
 
     def objective(config):
         model.select_sub_network(config)
@@ -75,7 +74,6 @@ if __name__ == "__main__":
         model.reset_super_network()
 
         return mac, loss
-
 
     results = multi_objective_search(
         objective,
