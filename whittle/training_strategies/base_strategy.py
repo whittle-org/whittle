@@ -8,7 +8,7 @@ from whittle.loss import DistillLoss
 from whittle.sampling.random_sampler import RandomSampler
 
 
-class BaseTrainingStrategy(object):
+class BaseTrainingStrategy:
     """
     Base Training Strategy.
 

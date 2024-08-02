@@ -6,7 +6,7 @@ import numpy as np
 from syne_tune.config_space import Categorical, Domain
 
 
-class RandomSampler(object):
+class RandomSampler:
     def __init__(self, config_space: Dict, seed: Optional[int] = None):
         self.config_space = config_space
         self.rng = np.random.RandomState(seed)
