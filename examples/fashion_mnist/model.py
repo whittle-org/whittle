@@ -1,9 +1,11 @@
-from typing import Optional
+from __future__ import annotations
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from whittle.modules import Linear
 
 # TODO: move this later to sth like train_fashion_mnist.py
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -11,14 +13,16 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class LeNet(nn.Module):
     def __init__(self):
-        super(LeNet, self).__init__()
+        super().__init__()
         # 1 input image channel, 6 output channels, 5x5 square conv kernel
-        self.fc_base = torch.nn.Linear(28 * 28, 256)
-        self.fc1 = nn.Linear(256, 120)  # 5x5 image dimension
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
+        self.fc_base = Linear(28 * 28, 256)
+        self.fc1 = Linear(256, 120)  # 5x5 image dimension
+        self.fc2 = Linear(120, 84)
+        self.fc3 = Linear(84, 10)
 
-    def forward_dense_lottery(self, x, fc1_out, fc2_out, sample_last: Optional[bool] = False):
+    def forward_dense_lottery(
+        self, x, fc1_out, fc2_out, sample_last: bool | None = False
+    ):
         x = x.reshape(x.shape[0], -1)
         x = self.fc_base(x)
         x = F.relu(x)
@@ -29,12 +33,28 @@ class LeNet(nn.Module):
             start1 = 0
             start2 = 0
         # TODO: refactor this into a function since it is used in forward_dense_random_ind
-        x = F.linear(x, weight=self.fc1.weight[start1:start1 + fc1_out, :], bias=self.fc1.bias[start1:start1 + fc1_out])
+
+        # x = self.fc1.set_sub_network(sub_network_in_features=)
+        x = F.linear(
+            x,
+            weight=self.fc1.weight[start1 : start1 + fc1_out, :],
+            bias=self.fc1.bias[start1 : start1 + fc1_out],
+        )
         x = F.relu(x)
-        x = F.linear(x, weight=self.fc2.weight[start2:start2 + fc2_out, start1:start1 + fc1_out],
-                     bias=self.fc2.bias[start2:start2 + fc2_out])
+
+        x = F.linear(
+            x,
+            weight=self.fc2.weight[
+                start2 : start2 + fc2_out, start1 : start1 + fc1_out
+            ],
+            bias=self.fc2.bias[start2 : start2 + fc2_out],
+        )
         x = F.relu(x)
-        x = F.linear(x, weight=self.fc3.weight[:, start2:start2 + fc2_out], bias=self.fc3.bias)
+
+        x = F.linear(
+            x, weight=self.fc3.weight[:, start2 : start2 + fc2_out], bias=self.fc3.bias
+        )
+
         return x
 
     @staticmethod
@@ -43,14 +63,14 @@ class LeNet(nn.Module):
 
     def forward_dense_random_neurons(self, x, fc1_out, fc2_out, seed=1234):
         """
-        # TODO: replace these individual forwards with calls to lobotomy.modules.Linear 
-        
+        # TODO: replace these individual forwards with calls to lobotomy.modules.Linear
+
         Randomly samples a subset of neurons from each layer (i.e., a sub-network) and computes the forward pass.
         Args:
             x: input tensor
-            fc1_out: 
-            fc2_out: 
-            seed: 
+            fc1_out:
+            fc2_out:
+            seed:
 
         Returns:
 
@@ -65,7 +85,11 @@ class LeNet(nn.Module):
         x = F.relu(x)
         x = F.linear(x, weight=self.fc1.weight[fc1_ids, :], bias=self.fc1.bias[fc1_ids])
         x = F.relu(x)
-        x = F.linear(x, weight=self.fc2.weight[fc2_ids, :][:, fc1_ids], bias=self.fc2.bias[fc2_ids])
+        x = F.linear(
+            x,
+            weight=self.fc2.weight[fc2_ids, :][:, fc1_ids],
+            bias=self.fc2.bias[fc2_ids],
+        )
         x = F.relu(x)
         x = F.linear(x, weight=self.fc3.weight[:, fc2_ids], bias=self.fc3.bias)
         return x
@@ -74,14 +98,26 @@ class LeNet(nn.Module):
         x = x.reshape(x.shape[0], -1)
         x = self.fc_base(x)
         x = F.relu(x)
-        x = F.linear(x, weight=self.fc1.weight[start_id_fc1:fc1_out + start_id_fc1, :],
-                     bias=self.fc1.bias[start_id_fc1:start_id_fc1 + fc1_out])
+        x = F.linear(
+            x,
+            weight=self.fc1.weight[start_id_fc1 : fc1_out + start_id_fc1, :],
+            bias=self.fc1.bias[start_id_fc1 : start_id_fc1 + fc1_out],
+        )
         x = F.relu(x)
-        x = F.linear(x,
-                     weight=self.fc2.weight[start_id_fc2:start_id_fc2 + fc2_out, start_id_fc1:start_id_fc1 + fc1_out],
-                     bias=self.fc2.bias[start_id_fc2:fc2_out + start_id_fc2])
+        x = F.linear(
+            x,
+            weight=self.fc2.weight[
+                start_id_fc2 : start_id_fc2 + fc2_out,
+                start_id_fc1 : start_id_fc1 + fc1_out,
+            ],
+            bias=self.fc2.bias[start_id_fc2 : fc2_out + start_id_fc2],
+        )
         x = F.relu(x)
-        x = F.linear(x, weight=self.fc3.weight[:, start_id_fc2:fc2_out + start_id_fc2], bias=self.fc3.bias)
+        x = F.linear(
+            x,
+            weight=self.fc3.weight[:, start_id_fc2 : fc2_out + start_id_fc2],
+            bias=self.fc3.bias,
+        )
         return x
 
     @staticmethod
@@ -97,24 +133,48 @@ class LeNet(nn.Module):
 
     def forward_sparse_lottery(self, x, fc1_out, fc2_out):
         if self.training:
-            mask_fc1, mask_fc1_bias, mask_fc2, mask_fc2_bias, mask_fc3, mask_fc3_bias = self.sample_masks_sparse(
-                fc1_out, fc2_out)
+            (
+                mask_fc1,
+                mask_fc1_bias,
+                mask_fc2,
+                mask_fc2_bias,
+                mask_fc3,
+                mask_fc3_bias,
+            ) = self.sample_masks_sparse(fc1_out, fc2_out)
         else:
-            mask_fc1, mask_fc1_bias, mask_fc2, mask_fc2_bias, mask_fc3, mask_fc3_bias = self.sample_masks_sparse_mag(
-                fc1_out, fc2_out)
+            (
+                mask_fc1,
+                mask_fc1_bias,
+                mask_fc2,
+                mask_fc2_bias,
+                mask_fc3,
+                mask_fc3_bias,
+            ) = self.sample_masks_sparse_mag(fc1_out, fc2_out)
         x = x.reshape(x.shape[0], -1)
         x = self.fc_base(x)
         x = F.relu(x)
-        x = F.linear(x, weight=self.fc1.weight * mask_fc1, bias=self.fc1.bias * mask_fc1_bias)
+        x = F.linear(
+            x, weight=self.fc1.weight * mask_fc1, bias=self.fc1.bias * mask_fc1_bias
+        )
         x = F.relu(x)
-        x = F.linear(x, weight=self.fc2.weight * mask_fc2, bias=self.fc2.bias * mask_fc2_bias)
+        x = F.linear(
+            x, weight=self.fc2.weight * mask_fc2, bias=self.fc2.bias * mask_fc2_bias
+        )
         x = F.relu(x)
-        x = F.linear(x, weight=self.fc3.weight * mask_fc3, bias=self.fc3.bias * mask_fc3_bias)
+        x = F.linear(
+            x, weight=self.fc3.weight * mask_fc3, bias=self.fc3.bias * mask_fc3_bias
+        )
         return x
 
     def forward_sparse_dense_lottery(self, x, fc1_out, fc2_out):
-        weights_dense_fc1, weights_dense_fc2, weights_dense_fc3, bias_dense_fc1, bias_dense_fc2, bias_dense_fc3 = self.sample_sparse_dense_weights(
-            fc1_out, fc2_out)
+        (
+            weights_dense_fc1,
+            weights_dense_fc2,
+            weights_dense_fc3,
+            bias_dense_fc1,
+            bias_dense_fc2,
+            bias_dense_fc3,
+        ) = self.sample_sparse_dense_weights(fc1_out, fc2_out)
         # print(weights_dense_fc1)
         x = x.reshape(x.shape[0], -1)
         x = self.fc_base(x)
@@ -159,22 +219,32 @@ class LeNet(nn.Module):
         mask_fc3_bias = torch.zeros_like(self.fc3.bias)
 
         # TODO: understand what's happening here
-        indices_fc1 = torch.randperm(mask_fc1.shape[0] * mask_fc1.shape[1])[:fc1_out * 256]
+        indices_fc1 = torch.randperm(mask_fc1.shape[0] * mask_fc1.shape[1])[
+            : fc1_out * 256
+        ]
         indices_fc1 = torch.stack([indices_fc1 // 256, indices_fc1 % 256], dim=1)
         mask_fc1[indices_fc1[:, 0], indices_fc1[:, 1]] = 1
 
         indices_fc1_bias = torch.randperm(mask_fc1_bias.shape[0])[:fc1_out]
         mask_fc1_bias[indices_fc1_bias] = 1
 
-        indices_fc2 = torch.randperm(mask_fc2.shape[0] * mask_fc2.shape[1])[:fc1_out * fc2_out]
-        indices_fc2 = torch.stack([indices_fc2 // mask_fc2.shape[1], indices_fc2 % mask_fc2.shape[1]], dim=1)
+        indices_fc2 = torch.randperm(mask_fc2.shape[0] * mask_fc2.shape[1])[
+            : fc1_out * fc2_out
+        ]
+        indices_fc2 = torch.stack(
+            [indices_fc2 // mask_fc2.shape[1], indices_fc2 % mask_fc2.shape[1]], dim=1
+        )
         mask_fc2[indices_fc2[:, 0], indices_fc2[:, 1]] = 1
 
         indices_fc2_bias = torch.randperm(mask_fc2_bias.shape[0])[:fc2_out]
         mask_fc2_bias[indices_fc2_bias] = 1
 
-        indices_fc3 = torch.randperm(mask_fc3.shape[0] * mask_fc3.shape[1])[:10 * fc2_out]
-        indices_fc3 = torch.stack([indices_fc3 // mask_fc3.shape[1], indices_fc3 % mask_fc3.shape[1]], dim=1)
+        indices_fc3 = torch.randperm(mask_fc3.shape[0] * mask_fc3.shape[1])[
+            : 10 * fc2_out
+        ]
+        indices_fc3 = torch.stack(
+            [indices_fc3 // mask_fc3.shape[1], indices_fc3 % mask_fc3.shape[1]], dim=1
+        )
         mask_fc3[indices_fc3[:, 0], indices_fc3[:, 1]] = 1
 
         indices_fc3_bias = torch.randperm(mask_fc3_bias.shape[0])
@@ -186,7 +256,9 @@ class LeNet(nn.Module):
         # Helper function to create a mask based on weight magnitude
         def create_mask(weight, n_ones):
             flattened_weights = weight.view(-1)
-            threshold = torch.topk(flattened_weights.abs(), n_ones, largest=True).values[-1]
+            threshold = torch.topk(
+                flattened_weights.abs(), n_ones, largest=True
+            ).values[-1]
             mask = (weight.abs() >= threshold).float()
             return mask
 
@@ -210,11 +282,23 @@ class LeNet(nn.Module):
 
     def sample_sparse_dense_weights(self, fc1_out, fc2_out):
         if self.training:
-            mask_fc1, mask_fc1_bias, mask_fc2, mask_fc2_bias, mask_fc3, mask_fc3_bias = self.sample_masks_sparse(
-                fc1_out, fc2_out)
+            (
+                mask_fc1,
+                mask_fc1_bias,
+                mask_fc2,
+                mask_fc2_bias,
+                mask_fc3,
+                mask_fc3_bias,
+            ) = self.sample_masks_sparse(fc1_out, fc2_out)
         else:
-            mask_fc1, mask_fc1_bias, mask_fc2, mask_fc2_bias, mask_fc3, mask_fc3_bias = self.sample_masks_sparse_mag(
-                fc1_out, fc2_out)
+            (
+                mask_fc1,
+                mask_fc1_bias,
+                mask_fc2,
+                mask_fc2_bias,
+                mask_fc3,
+                mask_fc3_bias,
+            ) = self.sample_masks_sparse_mag(fc1_out, fc2_out)
 
         weights_dense_fc1 = self.fc1.weight[mask_fc1 != 0].reshape(fc1_out, 256)
         weights_dense_fc2 = self.fc2.weight[mask_fc2 != 0].reshape(fc2_out, fc1_out)
@@ -222,7 +306,14 @@ class LeNet(nn.Module):
         bias_dense_fc1 = self.fc1.bias[mask_fc1_bias != 0].reshape(fc1_out)
         bias_dense_fc2 = self.fc2.bias[mask_fc2_bias != 0].reshape(fc2_out)
         bias_dense_fc3 = self.fc3.bias[mask_fc3_bias != 0].reshape(10)
-        return weights_dense_fc1, weights_dense_fc2, weights_dense_fc3, bias_dense_fc1, bias_dense_fc2, bias_dense_fc3
+        return (
+            weights_dense_fc1,
+            weights_dense_fc2,
+            weights_dense_fc3,
+            bias_dense_fc1,
+            bias_dense_fc2,
+            bias_dense_fc3,
+        )
 
     def forward(self, x):
         x = x.reshape(x.shape[0], -1)
