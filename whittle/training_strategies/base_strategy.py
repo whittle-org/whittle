@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Callable
 
 import torch
 
@@ -19,7 +19,7 @@ class BaseTrainingStrategy:
         self,
         sampler: RandomSampler,
         loss_function: Callable,
-        kd_loss: Optional[DistillLoss] = None,
+        kd_loss: DistillLoss | None = None,
         device: str = "cuda",
         **kwargs,
     ):

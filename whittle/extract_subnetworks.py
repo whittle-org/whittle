@@ -10,7 +10,7 @@ import torch.nn as nn
 class IdentityAttention(nn.Module):
     def __init__(self, model_type=None):
         self.model_type = model_type
-        super(IdentityAttention, self).__init__()
+        super().__init__()
 
     def forward(self, *input, **kwargs):
         if self.model_type == "distilbert-base-cased":
@@ -22,7 +22,7 @@ class IdentityAttention(nn.Module):
 class IdentityFFN(nn.Module):
     def __init__(self, model_type=None):
         self.model_type = model_type
-        super(IdentityFFN, self).__init__()
+        super().__init__()
 
     def forward(self, hidden_states):
         return hidden_states
@@ -31,7 +31,7 @@ class IdentityFFN(nn.Module):
 class IdentityOutput(nn.Module):
     def __init__(self, model_type=None):
         self.model_type = model_type
-        super(IdentityOutput, self).__init__()
+        super().__init__()
 
     def forward(self, hidden_states, input_tensor):
         return hidden_states

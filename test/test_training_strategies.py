@@ -42,7 +42,7 @@ sampler_gpt = RandomSampler(config_space=search_space_gpt, seed=42)
 
 class MLP(nn.Module):
     def __init__(self, input_dim):
-        super(MLP, self).__init__()
+        super().__init__()
         self.input_dim = input_dim
         self.hidden_dim = 64
         self.input = Linear(input_dim, self.hidden_dim)

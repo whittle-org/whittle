@@ -8,7 +8,7 @@ from whittle.modules import Linear
 
 class MLP(nn.Module):
     def __init__(self, input_dim, hidden_dim=200, device="cuda"):
-        super(MLP, self).__init__()
+        super().__init__()
 
         self.hidden_dim = hidden_dim
         self.input_layer = Linear(input_dim, hidden_dim)

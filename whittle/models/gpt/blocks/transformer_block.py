@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional, Union
 
 import litgpt
 from litgpt import Config
@@ -23,7 +22,7 @@ class Block(litgpt.model.Block):
 
         self.norm_1 = self.norm_class()(config.n_embd, eps=config.norm_eps)
         self.attn = CausalSelfAttention(config)
-        self.norm_2: Optional[Union[LayerNorm, RMSNorm]] = (
+        self.norm_2: LayerNorm | RMSNorm | None = (
             None
             if config.shared_attention_norm
             else self.norm_class()(config.n_embd, eps=config.norm_eps)

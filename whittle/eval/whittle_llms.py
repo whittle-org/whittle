@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Literal
 
 import torch
 import torch.nn.functional as F
@@ -59,7 +59,7 @@ def _get_accelerate_args(
 
 def configure_pad_token(
     tokenizer: PreTrainedTokenizerBase,
-    model_config: Optional[PretrainedConfig] = None,
+    model_config: PretrainedConfig | None = None,
 ) -> PreTrainedTokenizerBase:
     """
     This function checks if the (Hugging Face) tokenizer has a padding token and sets it if not present.
@@ -114,39 +114,36 @@ class WhittleLM(TemplateLM):
     def __init__(
         self,
         pretrained: GPT,
-        backend: Optional[Literal["default", "causal", "seq2seq"]] = "default",
+        backend: Literal["default", "causal", "seq2seq"] | None = "default",
         # override whether the model should be treated as decoder-only (causal) or encoder-decoder (seq2seq)
-        revision: Optional[str] = "main",
+        revision: str | None = "main",
         subfolder=None,
-        tokenizer: Optional[
-            Union[
-                str,
-                transformers.PreTrainedTokenizer,
-                transformers.PreTrainedTokenizerFast,
-            ]
-        ] = None,
-        truncation: Optional[bool] = False,
+        tokenizer: str
+        | transformers.PreTrainedTokenizer
+        | transformers.PreTrainedTokenizerFast
+        | None = None,
+        truncation: bool | None = False,
         logits_cache: bool = True,
         max_length=None,
         device="cuda",
         dtype="auto",
         batch_size=1,
         max_batch_size=64,
-        trust_remote_code: Optional[bool] = False,
-        use_fast_tokenizer: Optional[bool] = True,
-        add_bos_token: Optional[bool] = False,
-        prefix_token_id: Optional[int] = None,
+        trust_remote_code: bool | None = False,
+        use_fast_tokenizer: bool | None = True,
+        add_bos_token: bool | None = False,
+        prefix_token_id: int | None = None,
         # arguments used for splitting a model across GPUs naively.
         # only used if `parallelize=True`.
-        parallelize: Optional[bool] = False,
+        parallelize: bool | None = False,
         device_map_option="auto",
         max_memory_per_gpu=None,
         max_cpu_memory=None,
         offload_folder="./offload",
         # PEFT, delta weights and quantization options
-        peft: Optional[str] = None,
-        delta: Optional[str] = None,
-        autogptq: Optional[Union[bool, str]] = False,
+        peft: str | None = None,
+        delta: str | None = None,
+        autogptq: bool | str | None = False,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -212,7 +209,7 @@ class WhittleLM(TemplateLM):
         self.peft = peft
         self.revision = revision
         self.batch_schedule: float = 1
-        self.batch_sizes: Dict = {}
+        self.batch_sizes: dict = {}
         self.max_batch_size = max_batch_size
 
         if str(batch_size).startswith("auto"):
@@ -308,8 +305,8 @@ class WhittleLM(TemplateLM):
 
     def _get_backend(
         self,
-        config: Union[transformers.PretrainedConfig, transformers.AutoConfig],
-        backend: Optional[Literal["default", "causal", "seq2seq"]] = "default",
+        config: transformers.PretrainedConfig | transformers.AutoConfig,
+        backend: Literal["default", "causal", "seq2seq"] | None = "default",
         trust_remote_code=False,
     ) -> None:
         """
@@ -360,17 +357,14 @@ class WhittleLM(TemplateLM):
 
     def _create_tokenizer(
         self,
-        pretrained: Union[str, transformers.PreTrainedModel],
-        tokenizer: Optional[
-            Union[
-                str,
-                transformers.PreTrainedTokenizer,
-                transformers.PreTrainedTokenizerFast,
-            ]
-        ],
-        revision: Optional[str] = "main",
-        trust_remote_code: Optional[bool] = False,
-        use_fast_tokenizer: Optional[bool] = True,
+        pretrained: str | transformers.PreTrainedModel,
+        tokenizer: str
+        | transformers.PreTrainedTokenizer
+        | transformers.PreTrainedTokenizerFast
+        | None,
+        revision: str | None = "main",
+        trust_remote_code: bool | None = False,
+        use_fast_tokenizer: bool | None = True,
     ) -> None:
         """
         Helper method during initialization.
@@ -466,7 +460,7 @@ class WhittleLM(TemplateLM):
 
     def tok_encode(
         self, string: str, left_truncate_len=None, add_special_tokens=None
-    ) -> List[int]:
+    ) -> list[int]:
         """ """
         # default for None - empty dict, use predefined tokenizer param
         # used for all models except for CausalLM or predefined value
@@ -496,7 +490,7 @@ class WhittleLM(TemplateLM):
         padding_side="left",
         left_truncate_len=None,
         truncation=False,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         # encode a batch of strings. converts to tensors and pads automatically, unlike tok_encode.
         old_padding_side = self.tokenizer.padding_side
         self.tokenizer.padding_side = padding_side
@@ -613,8 +607,8 @@ class WhittleLM(TemplateLM):
         return logits
 
     def loglikelihood_rolling(
-        self, requests: List[Instance], disable_tqdm: bool = False
-    ) -> List[float]:
+        self, requests: list[Instance], disable_tqdm: bool = False
+    ) -> list[float]:
         loglikelihoods = []
 
         adaptive_batch_size = None
@@ -691,14 +685,14 @@ class WhittleLM(TemplateLM):
 
     def _loglikelihood_tokens(
         self,
-        requests: List[Tuple[Tuple[str, str], List[int], List[int]]],
+        requests: list[tuple[tuple[str, str], list[int], list[int]]],
         disable_tqdm=False,
         override_bs=None,
     ):
         # TODO: implement some kind of efficient-request-middleware that lumps together requests with the same context
         res = []
 
-        def _collate(req: Tuple[Tuple[str, str], List[int], List[int]]):
+        def _collate(req: tuple[tuple[str, str], list[int], list[int]]):
             """Defines the key for the sorted method"""
             # the negative sign on len(toks) sorts descending - this has a few advantages:
             # - time estimates will always be over not underestimates, which is more useful for planning
@@ -710,7 +704,7 @@ class WhittleLM(TemplateLM):
             toks = req[1] + req[2]
             return -len(toks), tuple(toks)
 
-        def _lookup_one_token_cont(req: Tuple[Tuple[str, str], List[int], List[int]]):
+        def _lookup_one_token_cont(req: tuple[tuple[str, str], list[int], list[int]]):
             """Defines the key to group and lookup one-token continuations"""
             # Use with group_by="contexts" (optional)"
             # allows for the creation of a lookup, so we can reuse logits in case of one-token continuations.
@@ -921,12 +915,12 @@ class WhittleLM(TemplateLM):
         )
 
     def generate_until(
-        self, requests: List[Instance], disable_tqdm: bool = False
-    ) -> List[str]:
+        self, requests: list[Instance], disable_tqdm: bool = False
+    ) -> list[str]:
         res = []
 
         # print(requests)
-        def _collate(req: Tuple[str, dict]):
+        def _collate(req: tuple[str, dict]):
             """Defines the key for the sorted method"""
             # the negative sign on len(toks) sorts descending - this has a few advantages:
             # - time estimates will always be over not underestimates, which is more useful for planning
@@ -1055,7 +1049,7 @@ class WhittleLM(TemplateLM):
 
         return res
 
-    def apply_chat_template(self, chat_history: List[Dict[str, str]]) -> str:
+    def apply_chat_template(self, chat_history: list[dict[str, str]]) -> str:
         """
         Method to apply a chat template to a list of chat history between user and model.
         """

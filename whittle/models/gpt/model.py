@@ -6,7 +6,7 @@ https://github.com/EleutherAI/gpt-neox/tree/main/megatron/model.
 
 from __future__ import annotations
 
-from typing import Any, Optional, Tuple
+from typing import Any
 from typing_extensions import Self
 
 import torch
@@ -39,7 +39,7 @@ class GPT(nn.Module):
         )
         self.max_layer = config.n_layer
         self.max_seq_length = self.config.block_size
-        self.mask_cache: Optional[torch.Tensor] = None
+        self.mask_cache: torch.Tensor | None = None
 
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
@@ -106,8 +106,8 @@ class GPT(nn.Module):
             self.transformer.wte.weight = self.lm_head.weight
 
     def rope_cache(
-        self, device: Optional[torch.device] = None
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        self, device: torch.device | None = None
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         return build_rope_cache(
             seq_len=self.max_seq_length,
             n_elem=self.config.rope_n_elem,
@@ -193,7 +193,7 @@ class GPT(nn.Module):
         return cos, sin, mask
 
     def forward(
-        self, idx: torch.Tensor, input_pos: Optional[torch.Tensor] = None
+        self, idx: torch.Tensor, input_pos: torch.Tensor | None = None
     ) -> torch.Tensor:
         T = idx.size(1)
         if self.max_seq_length < T:
@@ -258,9 +258,9 @@ class GPT(nn.Module):
     def set_kv_cache(
         self,
         batch_size: int,
-        rope_cache_length: Optional[int] = None,
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
+        rope_cache_length: int | None = None,
+        device: torch.device | None = None,
+        dtype: torch.dtype | None = None,
     ) -> None:
         if rope_cache_length is None:
             rope_cache_length = self.cos.size(-1)
@@ -284,7 +284,7 @@ class GPT(nn.Module):
 
 
 def build_mask_cache(
-    max_seq_length: int, device: Optional[torch.device] = None
+    max_seq_length: int, device: torch.device | None = None
 ) -> torch.Tensor:
     ones = torch.ones((max_seq_length, max_seq_length), device=device, dtype=torch.bool)
     return torch.tril(ones).unsqueeze(0).unsqueeze(0)

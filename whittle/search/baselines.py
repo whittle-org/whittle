@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict
 
 from syne_tune.config_space import Categorical, Domain
 from syne_tune.optimizer.baselines import (
@@ -65,7 +64,7 @@ def get_mid_point(config_space):
 
 @dataclass
 class MethodArguments:
-    config_space: Dict
+    config_space: dict
     metrics: list
     mode: list
     random_seed: int

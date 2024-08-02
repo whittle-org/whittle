@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -23,7 +22,7 @@ class CausalSelfAttention(nn.Module):
             config.head_size * config.n_head, config.n_embd, bias=config.bias
         )
         # disabled by default
-        self.kv_cache: Optional[KVCache] = None
+        self.kv_cache: KVCache | None = None
         self.config = config
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -106,8 +105,8 @@ class CausalSelfAttention(nn.Module):
         x: torch.Tensor,
         cos: torch.Tensor,
         sin: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
-        input_pos: Optional[torch.Tensor] = None,
+        mask: torch.Tensor | None = None,
+        input_pos: torch.Tensor | None = None,
     ) -> torch.Tensor:
         assert (
             self.sub_network_n_embd is not None
@@ -180,7 +179,7 @@ class CausalSelfAttention(nn.Module):
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
+        mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         scale = 1.0 / math.sqrt(self.sub_network_head_size)
         y = torch.nn.functional.scaled_dot_product_attention(
@@ -192,10 +191,10 @@ class CausalSelfAttention(nn.Module):
         self,
         batch_size: int,
         max_seq_length: int,
-        rope_cache_length: Optional[int] = None,
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
-    ) -> "KVCache":
+        rope_cache_length: int | None = None,
+        device: torch.device | None = None,
+        dtype: torch.dtype | None = None,
+    ) -> KVCache:
         heads = 1 if self.config.n_query_groups == 1 else self.config.n_head
         v_shape = (batch_size, heads, max_seq_length, self.config.head_size)
         if rope_cache_length is None:

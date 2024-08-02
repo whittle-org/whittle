@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from typing import Optional
 
 import numpy as np
 
@@ -15,8 +14,8 @@ def multi_objective_search(
     search_space: dict,
     search_strategy: str = "random_search",
     num_samples: int = 100,
-    objective_kwargs: Optional[dict] = None,
-    seed: Optional[int] = None,
+    objective_kwargs: dict | None = None,
+    seed: int | None = None,
 ):
     """
     Search for the Pareto optimal sub-networks.

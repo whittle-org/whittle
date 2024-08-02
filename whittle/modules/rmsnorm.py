@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
 
 import torch
 
@@ -25,7 +24,7 @@ class RMSNorm(torch.nn.Module):
         self.eps = eps
         self.dim = dim
         self.add_unit_offset = add_unit_offset
-        self.sub_network_in_features: Optional[int] = in_features
+        self.sub_network_in_features: int | None = in_features
         self.random_indices = torch.arange(self.in_features)
 
     def set_sub_network(

@@ -305,7 +305,7 @@ class Test_WhittleLM:
             tasks="logiqa",
             batch_size=1,  # Test for non-positive integer
         )
-        with open(str(out_dir / "results.json"), "r") as f:
+        with open(str(out_dir / "results.json")) as f:
             results = json.load(f)
         acc_api = results["results"]["logiqa"]["acc,none"]
         stderr_api = results["results"]["logiqa"]["acc_stderr,none"]
@@ -320,7 +320,7 @@ class Test_WhittleLM:
             force_conversion=True,
             batch_size=1,  # Test for non-positive integer
         )
-        with open(str(out_dir / "results.json"), "r") as f:
+        with open(str(out_dir / "results.json")) as f:
             results = json.load(f)
         acc_lit = results["results"]["logiqa"]["acc,none"]
         stderr_lit = results["results"]["logiqa"]["acc_stderr,none"]
@@ -365,7 +365,7 @@ class Test_WhittleLM:
             tasks="logiqa",
             batch_size=1,  # Test for non-positive integer
         )
-        with open(str(out_dir / "results.json"), "r") as f:
+        with open(str(out_dir / "results.json")) as f:
             results = json.load(f)
         acc_api = results["results"]["logiqa"]["acc,none"]
         stderr_api = results["results"]["logiqa"]["acc_stderr,none"]
@@ -380,7 +380,7 @@ class Test_WhittleLM:
             force_conversion=True,
             batch_size=1,  # Test for non-positive integer
         )
-        with open(str(out_dir / "results.json"), "r") as f:
+        with open(str(out_dir / "results.json")) as f:
             results = json.load(f)
         acc_lit = results["results"]["logiqa"]["acc,none"]
         stderr_lit = results["results"]["logiqa"]["acc_stderr,none"]

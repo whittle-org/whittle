@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
 
 import torch
 import torch.nn.functional as F
@@ -11,8 +10,8 @@ class Embedding(torch.nn.Embedding):
         self,
         num_embeddings: int,
         embedding_dim: int,
-        padding_idx: Optional[int] = None,
-        max_norm: Optional[float] = None,
+        padding_idx: int | None = None,
+        max_norm: float | None = None,
         norm_type: float = 2.0,
         scale_grad_by_freq: bool = False,
         sparse: bool = False,
@@ -32,7 +31,7 @@ class Embedding(torch.nn.Embedding):
         )
 
         # the embedding dimensionality of the current sub-network
-        self.sub_network_embedding_dim: Optional[int] = embedding_dim
+        self.sub_network_embedding_dim: int | None = embedding_dim
         self.random_indices = torch.arange(self.sub_network_embedding_dim)
 
     def set_sub_network(
