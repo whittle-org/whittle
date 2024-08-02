@@ -25,5 +25,3 @@ jobs:
       - name: Run sinc example
         run: |
           poetry run python examples/sinc/sinc_nas.py
-          export PYTHONPATH=.
-          poetry run python examples/sinc/search.py

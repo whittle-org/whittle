@@ -6,12 +6,12 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from model import MLP
 from syne_tune.config_space import randint
 from torch.utils.data import DataLoader
 
-from examples.sinc.estimate_efficiency import compute_mac_linear_layer
-from examples.sinc.sinc_nas import f, validate
+from .model import MLP
+from .estimate_efficiency import compute_mac_linear_layer
+from .sinc_nas import f, validate
 from whittle.search import multi_objective_search
 
 if __name__ == "__main__":
