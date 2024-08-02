@@ -12,6 +12,12 @@ cd whittle
 pip install -e ".[dev]"  # Install what's here (the `.` part) and install the extra dev dependancies
 ```
 
+Setup `pre-commit` to run on every commit
+
+```bash
+pre-commit install
+```
+
 ## Testing
 
 ```bash
