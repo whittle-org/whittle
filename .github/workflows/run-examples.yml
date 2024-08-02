@@ -27,3 +27,4 @@ jobs:
       - name: Run sinc example
         run: |
           python -m examples.sinc.sinc_nas
+          python -m examples.sinc.search
