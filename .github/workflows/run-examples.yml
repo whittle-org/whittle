@@ -28,3 +28,5 @@ jobs:
         run: |
           python -m examples.sinc.sinc_nas
           python -m examples.sinc.search
+      - name: Run fashion MNIST example
+        run: python -m examples.fashion_mnist.train_fashion_mnist.py
