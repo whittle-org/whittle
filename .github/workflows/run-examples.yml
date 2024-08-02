@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         # Run in all these versions of Python
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: [ "3.9", "3.10", "3.11" ]
     steps:
       - uses: actions/checkout@v4
       - name: Install poetry
@@ -25,5 +25,4 @@ jobs:
       - name: Run sinc example
         run: |
           poetry run python examples/sinc/sinc_nas.py
-          export PYTHONPATH=.
           poetry run python examples/sinc/search.py
