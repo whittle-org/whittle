@@ -11,7 +11,6 @@ from whittle.metrics.parameters import (
 from whittle.models.gpt import GPT
 
 from test.test_training_strategies import MLP
-from whittle.metrics.parameters import compute_parameters
 
 
 mlp_types = ["GptNeoxMLP", "LLaMAMLP", "GemmaMLP"]
