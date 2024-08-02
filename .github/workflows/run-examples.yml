@@ -26,4 +26,4 @@ jobs:
         run: pip install .
       - name: Run sinc example
         run: |
-          python examples/sinc/sinc_nas.py
+          python -m examples.sinc.sinc_nas
