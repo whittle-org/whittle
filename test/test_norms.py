@@ -1,5 +1,6 @@
-import torch
+from __future__ import annotations
 
+import torch
 from litgpt.model import RMSNorm
 
 from whittle.modules.layernorm import LayerNorm as LayerNormSuper

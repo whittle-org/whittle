@@ -1,11 +1,13 @@
-from typing import Optional, Union
+from __future__ import annotations
+
 
 import litgpt
 from litgpt import Config
+
 from whittle.models.gpt.blocks.causal_self_attention import CausalSelfAttention
-from whittle.modules.rmsnorm import RMSNorm
+from whittle.models.gpt.blocks.mlp import GemmaMLP, GptNeoxMLP, LLaMAMLP
 from whittle.modules.layernorm import LayerNorm
-from whittle.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP, GemmaMLP
+from whittle.modules.rmsnorm import RMSNorm
 
 
 class Block(litgpt.model.Block):
@@ -20,7 +22,7 @@ class Block(litgpt.model.Block):
 
         self.norm_1 = self.norm_class()(config.n_embd, eps=config.norm_eps)
         self.attn = CausalSelfAttention(config)
-        self.norm_2: Optional[Union[LayerNorm, RMSNorm]] = (
+        self.norm_2: LayerNorm | RMSNorm | None = (
             None
             if config.shared_attention_norm
             else self.norm_class()(config.n_embd, eps=config.norm_eps)

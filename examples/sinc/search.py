@@ -1,18 +1,18 @@
-import numpy as np
-import torch
-import matplotlib.pyplot as plt
+from __future__ import annotations
 
 from argparse import ArgumentParser
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from syne_tune.config_space import randint
 from torch.utils.data import DataLoader
 
-from syne_tune.config_space import randint
+from .model import MLP
+from .estimate_efficiency import compute_mac_linear_layer
+from .sinc_nas import f, validate
 from whittle.search import multi_objective_search
-from examples.sinc.estimate_efficiency import compute_mac_linear_layer
-
-from sinc_nas import validate, f
-from model import MLP
-
 
 if __name__ == "__main__":
     parser = ArgumentParser()

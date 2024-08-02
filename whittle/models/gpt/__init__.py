@@ -1,12 +1,13 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
+from __future__ import annotations
 
-import re
 import logging
-
-from whittle.models.gpt.model import GPT
-from litgpt import Config
+import re
 
 from lightning_utilities.core.imports import RequirementCache
+from litgpt import Config
+
+from whittle.models.gpt.model import GPT
 
 _LIGHTNING_AVAILABLE = RequirementCache("lightning>=2.2.0.dev0")
 if not bool(_LIGHTNING_AVAILABLE):

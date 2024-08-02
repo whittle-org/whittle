@@ -1,21 +1,22 @@
+from __future__ import annotations
+
 import pytest
 import torch.nn as nn
 import torch.nn.functional
-
-from syne_tune.config_space import randint, choice
-from whittle.loss import DistillLoss
-from whittle.training_strategies import (
-    SandwichStrategy,
-    RandomStrategy,
-    StandardStrategy,
-    RandomLinearStrategy,
-    ATS,
-)
 from litgpt import Config
-from whittle.models.gpt import GPT
-from whittle.sampling.random_sampler import RandomSampler
-from whittle.modules.linear import Linear
+from syne_tune.config_space import choice, randint
 
+from whittle.loss import DistillLoss
+from whittle.models.gpt import GPT
+from whittle.modules.linear import Linear
+from whittle.sampling.random_sampler import RandomSampler
+from whittle.training_strategies import (
+    ATS,
+    RandomLinearStrategy,
+    RandomStrategy,
+    SandwichStrategy,
+    StandardStrategy,
+)
 
 methods = [
     SandwichStrategy,
@@ -41,7 +42,7 @@ sampler_gpt = RandomSampler(config_space=search_space_gpt, seed=42)
 
 class MLP(nn.Module):
     def __init__(self, input_dim):
-        super(MLP, self).__init__()
+        super().__init__()
         self.input_dim = input_dim
         self.hidden_dim = 64
         self.input = Linear(input_dim, self.hidden_dim)

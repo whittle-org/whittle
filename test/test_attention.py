@@ -1,9 +1,15 @@
-import torch
-from whittle.models.gpt.blocks import CausalSelfAttention
-from litgpt.model import CausalSelfAttention as LitCausalSelfAttention
-from litgpt import Config
-from litgpt.model import build_mask_cache, build_rope_cache
+from __future__ import annotations
+
 import pytest
+import torch
+from litgpt import Config
+from litgpt.model import (
+    CausalSelfAttention as LitCausalSelfAttention,
+    build_mask_cache,
+    build_rope_cache,
+)
+
+from whittle.models.gpt.blocks import CausalSelfAttention
 
 attention_configs = {
     "mha_fix_head_size": {

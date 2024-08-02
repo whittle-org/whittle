@@ -2,37 +2,33 @@
 
 """Utility functions for training and inference."""
 
+from __future__ import annotations
+
 import math
 import pickle
+import random
 import sys
 from io import BytesIO
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
     TypeVar,
-    Union,
-    Iterator,
 )
+from collections.abc import Iterable, Iterator, Mapping
+from typing_extensions import Self
 
 import lightning as L
+import numpy as np
 import torch
 import torch.nn as nn
-import random
 import torch.utils._device
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities.load import _lazy_load as lazy_load
 from torch.serialization import normalize_storage_type
-from typing_extensions import Self
-import numpy as np
 
 if TYPE_CHECKING:
-    from gpt.model import GPT
+    from whittle.models.gpt.model import GPT
 
 
 def find_multiple(n: int, k: int) -> int:
@@ -42,7 +38,7 @@ def find_multiple(n: int, k: int) -> int:
     return n + k - (n % k)
 
 
-def num_parameters(module: nn.Module, requires_grad: Optional[bool] = None) -> int:
+def num_parameters(module: nn.Module, requires_grad: bool | None = None) -> int:
     total = 0
     for p in module.parameters():
         if requires_grad is None or p.requires_grad == requires_grad:
@@ -259,7 +255,7 @@ T = TypeVar("T")
 
 
 def chunked_cross_entropy(
-    logits: Union[torch.Tensor, List[torch.Tensor]],
+    logits: torch.Tensor | list[torch.Tensor],
     targets: torch.Tensor,
     chunk_size: int = 128,
     ignore_index: int = -1,
@@ -318,7 +314,7 @@ def chunked_cross_entropy(
     return torch.cat(loss_chunks).sum() / max(1, non_masked_elems)
 
 
-def map_old_state_dict_weights(state_dict: Dict, mapping: Mapping, prefix: str) -> Dict:
+def map_old_state_dict_weights(state_dict: dict, mapping: Mapping, prefix: str) -> dict:
     for checkpoint_name, attribute_name in mapping.items():
         full_checkpoint_name = prefix + checkpoint_name
         if full_checkpoint_name in state_dict:
@@ -369,7 +365,7 @@ def flops_per_param(
     return flops_per_seq + attn_flops_per_seq
 
 
-def estimate_flops(model: "GPT", training: bool) -> int:
+def estimate_flops(model: GPT, training: bool) -> int:
     """Measures estimated FLOPs for MFU.
 
     Refs:
@@ -413,7 +409,7 @@ class CycleIterator:
     def __init__(self, iterable: Iterable) -> None:
         self.iterable = iterable
         self.epoch = 0
-        self._iterator: Optional[Iterator] = None
+        self._iterator: Iterator | None = None
 
     def __next__(self) -> Any:
         if self._iterator is None:

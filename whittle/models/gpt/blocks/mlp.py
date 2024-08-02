@@ -1,8 +1,10 @@
-from typing import Optional
+from __future__ import annotations
 
-import torch
+
 import litgpt
+import torch
 from litgpt import Config
+
 from whittle.modules import Linear
 
 
@@ -55,8 +57,8 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         self.proj = Linear(config.intermediate_size, config.n_embd, bias=config.bias)
         self.in_features = config.n_embd
         self.intermediate_size = config.intermediate_size
-        self.sub_network_n_embd: Optional[int] = None
-        self.sub_network_intermediate_size: Optional[int] = None
+        self.sub_network_n_embd: int | None = None
+        self.sub_network_intermediate_size: int | None = None
         self.config = config
 
     def set_sub_network(
