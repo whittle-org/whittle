@@ -22,6 +22,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
       - name: Install
-        run: pip install .
+        run: pip install ".[dev]"
       - name: Run pytest
         run: pytest -vvv
