@@ -1,9 +1,10 @@
-import torch
+from __future__ import annotations
 
+import torch
 from litgpt.config import Config
 
-from lobotomy.models.gpt import GPT
-from lobotomy.models.gpt.extract import extract_sub_network
+from whittle.models.gpt import GPT
+from whittle.models.gpt.extract import extract_sub_network
 
 
 def test_extract_sub_network() -> None:
@@ -12,6 +13,7 @@ def test_extract_sub_network() -> None:
 
     super_network = GPT(config)
     sub_network_config = Config.from_name("pythia-14m")
+    sub_network_config.fix_head_size = False
 
     super_network.eval()
     super_network.set_sub_network(

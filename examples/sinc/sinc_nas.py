@@ -1,17 +1,20 @@
-import os
+from __future__ import annotations
+
 import json
+import os
 from argparse import ArgumentParser
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-from torch.utils.data import DataLoader
+from syne_tune.config_space import randint
 from syne_tune.report import Reporter
+from torch.utils.data import DataLoader
 
-from lobotomy.training_strategies import SandwichStrategy
-from lobotomy.sampling.random_sampler import RandomSampler
-from model import MLP, search_space
+from .model import MLP
+from whittle.sampling.random_sampler import RandomSampler
+from whittle.training_strategies import SandwichStrategy
 
 report = Reporter()
 
@@ -53,7 +56,7 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    search_space = {"num_units": randint(1, args.hidden_dim)}
     rng = np.random.RandomState(args.seed)
     os.makedirs(args.st_checkpoint_dir, exist_ok=True)
     num_data_points = 500
