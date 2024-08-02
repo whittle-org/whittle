@@ -1,7 +1,11 @@
 name: Run Examples
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 on:
+  workflow_dispatch:
   push:
-    branches: [ main, examples ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 jobs:
@@ -13,15 +17,13 @@ jobs:
         python-version: [ "3.9", "3.10", "3.11" ]
     steps:
       - uses: actions/checkout@v4
-      - name: Install poetry
-        run: pipx install poetry
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'poetry'
-      - name: Install dependencies with poetry
-        run: poetry install
+          cache: 'pip'
+      - name: Install
+        run: pip install .
       - name: Run sinc example
         run: |
-          poetry run python examples/sinc/sinc_nas.py
+          python examples/sinc/sinc_nas.py

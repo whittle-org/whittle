@@ -12,9 +12,10 @@ from syne_tune.config_space import randint
 from syne_tune.report import Reporter
 from torch.utils.data import DataLoader
 
-from .model import MLP
 from whittle.sampling.random_sampler import RandomSampler
 from whittle.training_strategies import SandwichStrategy
+
+from .model import MLP
 
 report = Reporter()
 
