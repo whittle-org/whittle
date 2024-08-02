@@ -24,4 +24,4 @@ jobs:
       - name: Install
         run: pip install .
       - name: Run pytest
-        run: poetry run pytest -vvv
+        run: pytest -vvv
