@@ -1,15 +1,29 @@
-from typing import Literal
-from argparse import ArgumentParser
+from __future__ import annotations
 
+import json
+import os
+from argparse import ArgumentParser
+from pathlib import Path
+from typing import Callable
+
+import numpy as np
 import pandas as pd
-from tabulate import tabulate
 import torch
 import torch.nn as nn
+from syne_tune.config_space import randint
+from syne_tune.report import Reporter
+from tabulate import tabulate
 from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 
 from examples.fashion_mnist.model import LeNet
+from whittle.sampling.random_sampler import RandomSampler
+from whittle.training_strategies import (
+    RandomStrategy,
+    SandwichStrategy,
+    StandardStrategy,
+)
 
 
 def correct(output: torch.Tensor, target: torch.Tensor) -> int:
@@ -19,100 +33,8 @@ def correct(output: torch.Tensor, target: torch.Tensor) -> int:
     return correct_ones.sum().item()
 
 
-def sandwich_update(
-    model: LeNet,
-    batch: torch.Tensor,
-    criterion: nn.CrossEntropyLoss,
-    target: torch.Tensor,
-):
-    """Performs one sandwich rule update."""
-    f1, f2 = model.sample_max()
-    output = model.forward_dense_lottery(batch, f1, f2)
-    loss = criterion(output, target)
-    loss.backward()
-
-    f1, f2 = model.sample_min()
-    output = model.forward_dense_lottery(batch, f1, f2)
-    loss = criterion(output, target)
-    loss.backward()
-
-    f1, f2 = model.sample_dense_dims()
-    output = model.forward_dense_lottery(batch, f1, f2)
-    loss = criterion(output, target)
-    loss.backward()
-
-    f1, f2 = model.sample_dense_dims()
-    output = model.forward_dense_lottery(batch, f1, f2)
-    loss = criterion(output, target)
-    loss.backward()
-
-    return output, loss
-
-
-def train(
-    dataloader: DataLoader,
-    model: LeNet,
-    criterion: nn.CrossEntropyLoss,
-    optimizer: torch.optim.Optimizer,
-    device: torch.device,
-    training_scheme: Literal[
-        "sampling",
-        "standard",
-        "sandwich",
-    ] = "sampling",
-):
-    """Trains the model for one epoch with the given training scheme."""
-    model.train()
-
-    num_batches = len(dataloader)
-    num_items = len(dataloader.dataset)
-
-    total_loss = 0.0
-    total_correct = 0
-    for data, target in dataloader:
-        # Copy data and targets to GPU
-        data = data.to(device)
-        target = target.to(device)
-        f1, f2 = model.sample_f_in()
-        # Do a forward pass
-
-        if training_scheme == "standard":
-            output = model(data)
-        elif training_scheme == "sampling":
-            output = model.forward_dense_lottery(data, f1, f2)
-        elif training_scheme == "sandwich":
-            output, loss = sandwich_update(model, data, criterion, target)
-        else:
-            raise ValueError(f"Unknown train_scheme: {training_scheme}")
-
-        # Calculate the loss
-        if training_scheme != "sandwich":
-            loss = criterion(output, target)
-        total_loss += loss
-
-        # Count number of correct digits
-        total_correct += correct(output, target)
-
-        # Backpropagation
-        if training_scheme != "sandwich":
-            loss.backward()
-
-        optimizer.step()
-        optimizer.zero_grad()
-
-    train_loss = total_loss / num_batches
-    accuracy = total_correct / num_items
-    print(
-        f"Training scheme: {training_scheme}, Average loss: {train_loss:7f}, accuracy: {accuracy:.2%}"
-    )
-
-
 def test(
-    test_loader: DataLoader,
-    model: LeNet,
-    criterion: nn.CrossEntropyLoss,
-    f1_out: int,
-    f2_out: int,
+    model: LeNet, test_loader: DataLoader, criterion: Callable, device: torch.device
 ):
     model.eval()
 
@@ -127,7 +49,7 @@ def test(
             data = data.to(device)
             target = target.to(device)
 
-            output = model.forward_dense_lottery(x=data, fc1_out=f1_out, fc2_out=f2_out)
+            output = model.forward(x=data)
             # Calculate the loss
             loss = criterion(output, target)
             test_loss += loss.item()
@@ -143,86 +65,151 @@ def test(
 
 
 if __name__ == "__main__":
+    report = Reporter()
+
     parser = ArgumentParser()
-    parser.add_argument("--batch_size", type=int, default=1024)
-    parser.add_argument("--epochs", type=int, default=5)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    args = parser.parse_args()
+    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--learning_rate", type=float, default=1e-3)
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--fc1_out", type=int, default=120)
+    parser.add_argument("--fc2_out", type=int, default=84)
+    parser.add_argument("--training_strategy", type=str, default="sandwich")
+    parser.add_argument("--st_checkpoint_dir", type=str, default="./checkpoints")
+    parser.add_argument("--seed", type=int, default=42)
+    args, _ = parser.parse_known_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    criterion = nn.CrossEntropyLoss()
-
-    model_standard = LeNet().to(device)
-    model_sampling = LeNet().to(device)
-    model_sandwich = LeNet().to(device)
-
-    optimizer_standard = torch.optim.Adam(model_standard.parameters(), lr=args.lr)
-    optimizer_sampling = torch.optim.Adam(model_sampling.parameters(), lr=args.lr)
-    optimizer_sandwich = torch.optim.Adam(model_sandwich.parameters(), lr=args.lr)
-
-    batch_size = args.batch_size
-
     train_loader = DataLoader(
         dataset=datasets.FashionMNIST(
             ".", train=True, download=True, transform=ToTensor()
         ),
-        batch_size=batch_size,
+        batch_size=args.batch_size,
         shuffle=True,
     )
     test_loader = DataLoader(
         dataset=datasets.FashionMNIST(".", train=False, transform=ToTensor()),
-        batch_size=batch_size,
+        batch_size=args.batch_size,
         shuffle=False,
     )
 
+    model = LeNet(fc1_out=args.fc1_out, fc2_out=args.fc2_out).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+
+    search_space = {
+        "fc1_out": randint(1, args.fc1_out),
+        "fc2_out": randint(1, args.fc2_out),
+    }
+
+    os.makedirs(args.st_checkpoint_dir, exist_ok=True)
+    current_best = None
+    lc_valid = []
+    lc_train = []
+
+    sampler = RandomSampler(search_space, seed=args.seed)
+    training_strategies = {
+        "standard": StandardStrategy(
+            sampler=sampler, loss_function=nn.functional.cross_entropy
+        ),
+        "sandwich": SandwichStrategy(
+            sampler=sampler, loss_function=nn.functional.cross_entropy
+        ),
+        "random": RandomStrategy(
+            random_samples=2, sampler=sampler, loss_function=nn.functional.cross_entropy
+        ),
+    }
+    update_op = training_strategies[args.training_strategy]
+
     for epoch in range(args.epochs):
-        print(f"Training epoch: {epoch + 1}")
-        train(
-            dataloader=train_loader,
-            model=model_standard,
-            criterion=criterion,
-            optimizer=optimizer_standard,
+        train_loss = 0
+        model.train()
+
+        for batch_idx, batch in enumerate(train_loader):
+            x, y = batch
+            x = x.to(device)
+            y = y.to(device)
+
+            optimizer.zero_grad()
+            loss = update_op(model, x, y)
+            train_loss += loss
+            optimizer.step()
+            scheduler.step()
+
+        valid_acc, valid_loss = test(
+            model=model,
+            test_loader=test_loader,
+            criterion=torch.nn.functional.cross_entropy,
             device=device,
-            training_scheme="standard",
         )
-        train(
-            dataloader=train_loader,
-            model=model_sampling,
-            criterion=criterion,
-            optimizer=optimizer_sampling,
-            device=device,
-            training_scheme="sampling",
+
+        lc_train.append(float(train_loss))
+        lc_valid.append(float(valid_loss))
+        if np.isnan(valid_loss):
+            valid_loss = 1000000
+
+        report(
+            epoch=epoch + 1,
+            train_loss=train_loss,
+            valid_loss=valid_loss,
+            valid_acc=valid_acc,
+            num_params=sum(p.numel() for p in model.parameters() if p.requires_grad),
         )
-        train(
-            dataloader=train_loader,
-            model=model_sandwich,
-            criterion=criterion,
-            optimizer=optimizer_sandwich,
-            device=device,
-            training_scheme="sandwich",
-        )
+
+        if current_best is None or current_best >= valid_loss:
+            current_best = valid_loss
+            if args.st_checkpoint_dir is not None:
+                os.makedirs(args.st_checkpoint_dir, exist_ok=True)
+                checkpoint = {
+                    "state": model.state_dict(),
+                    "config": {"fc1_out": args.fc1_out, "fc2_out": args.fc2_out},
+                }
+                torch.save(
+                    checkpoint,
+                    Path(args.st_checkpoint_dir)
+                    / f"{args.training_strategy}_model_{args.fc1_out}_{args.fc2_out}.pt",
+                )
+
+                history = {"train_loss": lc_train, "valid_loss": lc_valid}
+                json.dump(
+                    history,
+                    open(
+                        Path(args.st_checkpoint_dir)
+                        / f"{args.training_strategy}_history_{args.fc1_out}_{args.fc2_out}.json",
+                        "w",
+                    ),
+                )
 
     lottery_grid = [[25, 25], [50, 50], [120, 84]]
-    training_schemes = ["standard", "sampling", "sandwich"]
-    lottery_dense = {scheme: {} for scheme in training_schemes}
+    lottery_dense = {scheme: {} for scheme in [args.training_strategy]}
     for k in lottery_grid:
-        for scheme in training_schemes:
-            if scheme == "standard":
-                model = model_standard
-            elif scheme == "sampling":
-                model = model_sampling
-            else:
-                model = model_sandwich
-
+        for scheme in [args.training_strategy]:
             acc, loss = test(
-                test_loader,
-                model,
-                criterion,
-                f1_out=k[0],
-                f2_out=k[1],
+                model=model,
+                test_loader=test_loader,
+                criterion=torch.nn.functional.cross_entropy,
+                device=device,
             )
             lottery_dense[scheme][f"{str(k[0] * k[1])}_accuracy"] = acc
             lottery_dense[scheme][f"{str(k[0] * k[1])}_loss"] = loss
 
     df = pd.DataFrame(lottery_dense)
     print(tabulate(df, headers="keys", tablefmt="pipe", floatfmt=".4f"))
+
+    #
+    # # num_layers, num_units, num_heads
+    #
+    # if args.do_plot:
+    #     import matplotlib.pyplot as plt
+    #
+    #     plt.scatter(train_data[:, 0], train_data[:, 1], label="Train")
+    #     plt.scatter(valid_data[:, 0], valid_data[:, 1], label="Valid")
+    #     model.eval()
+    #     y_hat = model(valid_data[:, 0].reshape(-1, 1)).detach().numpy()
+    #     plt.scatter(valid_data[:, 0], y_hat, label="predicted")
+    #     plt.legend()
+    #     plt.show()
+    #     plt.plot(lc_train, label="train")
+    #     plt.plot(lc_valid, label="valid")
+    #     plt.yscale("log")
+    #     plt.legend()
+    #     plt.show()
