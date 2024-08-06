@@ -1,8 +1,11 @@
-from whittle.models.gpt import GPT
-from litgpt import Config
-import torch
+from __future__ import annotations
+
 import pytest
+import torch
+from litgpt import Config
 from litgpt.model import GPT as LitGPT
+
+from whittle.models.gpt import GPT
 
 
 @pytest.mark.parametrize("sample_random_indices", [False, True])

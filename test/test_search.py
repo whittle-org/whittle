@@ -1,7 +1,9 @@
-import pytest
-import numpy as np
+from __future__ import annotations
 
+import numpy as np
+import pytest
 from syne_tune.config_space import randint
+
 from whittle.search import multi_objective_search
 from whittle.search.baselines import methods
 

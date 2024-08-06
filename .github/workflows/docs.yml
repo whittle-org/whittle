@@ -1,4 +1,4 @@
-name: Unit Tests
+name: docs
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -10,18 +10,16 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        # Run in all these versions of Python
-        python-version: ["3.9", "3.10", "3.11"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.9"
           cache: 'pip'
       - name: Install
         run: pip install ".[dev]"
-      - name: Run pytest
-        run: pytest -vvv
+      - name: Run mkdocs
+        # You can include `--strict` to treat warnings as errors
+        # Advised if you can sort out the typing issues
+        run: mkdocs build --clean

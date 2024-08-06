@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import json
 import os
 from pathlib import Path
 from pprint import pprint
-from typing import Optional, Union
+
 import torch
-from whittle.models.gpt import GPT
+
 from whittle.eval.whittle_llms import WhittleLM
+from whittle.models.gpt import GPT
 
 
 def prepare_results(results, save_filepath, print_results=True):
@@ -22,17 +25,17 @@ def prepare_results(results, save_filepath, print_results=True):
 
 def convert_and_evaluate(
     model: GPT,
-    tasks: Optional[str] = None,
+    tasks: str | None = None,
     out_dir=None,
     force_conversion: bool = False,
-    num_fewshot: Optional[int] = None,
-    batch_size: Union[int, str] = 1,
-    device: Optional[str] = None,
-    dtype: Optional[Union[str, torch.dtype]] = None,
-    limit: Optional[float] = None,
+    num_fewshot: int | None = None,
+    batch_size: int | str = 1,
+    device: str | None = None,
+    dtype: str | torch.dtype | None = None,
+    limit: float | None = None,
     seed: int = 1234,
-    save_filepath: Optional[Path] = None,
-    access_token: Optional[str] = None,
+    save_filepath: Path | None = None,
+    access_token: str | None = None,
 ) -> None:
     """Evaluate a model with the LM Evaluation Harness.
 

@@ -4,7 +4,7 @@ import torch
 from syne_tune.config_space import randint, choice, Domain, ordinal
 
 
-class SearchSpace(object):
+class SearchSpace:
     """
     Setting the mask to 1 means we keep the corresponding head / unit
     """

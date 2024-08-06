@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy

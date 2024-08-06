@@ -1,10 +1,14 @@
-from whittle.sampling.random_sampler import RandomSampler
-from typing import Callable, Optional
-from whittle.loss import DistillLoss
+from __future__ import annotations
+
+from typing import Callable
+
 import torch
 
+from whittle.loss import DistillLoss
+from whittle.sampling.random_sampler import RandomSampler
 
-class BaseTrainingStrategy(object):
+
+class BaseTrainingStrategy:
     """
     Base Training Strategy.
 
@@ -15,7 +19,7 @@ class BaseTrainingStrategy(object):
         self,
         sampler: RandomSampler,
         loss_function: Callable,
-        kd_loss: Optional[DistillLoss] = None,
+        kd_loss: DistillLoss | None = None,
         device: str = "cuda",
         **kwargs,
     ):

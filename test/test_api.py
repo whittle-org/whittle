@@ -1,19 +1,21 @@
+from __future__ import annotations
+
 import json
-import sys
-import numpy as np
 import pathlib
+import sys
+
+import litgpt.eval.evaluate as module
+import numpy as np
 import pytest
 import torch
 from litgpt import Config
 from litgpt.scripts.download import download_from_hub
-import litgpt.eval.evaluate as module
 from lm_eval import tasks
 from lm_eval.api.instance import Instance
 
-from whittle.models.gpt import GPT
-
-from whittle.eval.whittle_llms import WhittleLM
 from whittle.eval.utils import convert_and_evaluate
+from whittle.eval.whittle_llms import WhittleLM
+from whittle.models.gpt import GPT
 
 
 def copy_subnetwork_weights(sub_network, super_network):
@@ -303,7 +305,7 @@ class Test_WhittleLM:
             tasks="logiqa",
             batch_size=1,  # Test for non-positive integer
         )
-        with open(str(out_dir / "results.json"), "r") as f:
+        with open(str(out_dir / "results.json")) as f:
             results = json.load(f)
         acc_api = results["results"]["logiqa"]["acc,none"]
         stderr_api = results["results"]["logiqa"]["acc_stderr,none"]
@@ -318,7 +320,7 @@ class Test_WhittleLM:
             force_conversion=True,
             batch_size=1,  # Test for non-positive integer
         )
-        with open(str(out_dir / "results.json"), "r") as f:
+        with open(str(out_dir / "results.json")) as f:
             results = json.load(f)
         acc_lit = results["results"]["logiqa"]["acc,none"]
         stderr_lit = results["results"]["logiqa"]["acc_stderr,none"]
@@ -363,7 +365,7 @@ class Test_WhittleLM:
             tasks="logiqa",
             batch_size=1,  # Test for non-positive integer
         )
-        with open(str(out_dir / "results.json"), "r") as f:
+        with open(str(out_dir / "results.json")) as f:
             results = json.load(f)
         acc_api = results["results"]["logiqa"]["acc,none"]
         stderr_api = results["results"]["logiqa"]["acc_stderr,none"]
@@ -378,7 +380,7 @@ class Test_WhittleLM:
             force_conversion=True,
             batch_size=1,  # Test for non-positive integer
         )
-        with open(str(out_dir / "results.json"), "r") as f:
+        with open(str(out_dir / "results.json")) as f:
             results = json.load(f)
         acc_lit = results["results"]["logiqa"]["acc,none"]
         stderr_lit = results["results"]["logiqa"]["acc_stderr,none"]

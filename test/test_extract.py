@@ -1,5 +1,6 @@
-import torch
+from __future__ import annotations
 
+import torch
 from litgpt.config import Config
 
 from whittle.models.gpt import GPT

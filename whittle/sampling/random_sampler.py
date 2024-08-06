@@ -1,12 +1,12 @@
-from typing import Dict, Optional
+from __future__ import annotations
+
 
 import numpy as np
+from syne_tune.config_space import Categorical, Domain
 
-from syne_tune.config_space import Domain, Categorical
 
-
-class RandomSampler(object):
-    def __init__(self, config_space: Dict, seed: Optional[int] = None):
+class RandomSampler:
+    def __init__(self, config_space: dict, seed: int | None = None):
         self.config_space = config_space
         self.rng = np.random.RandomState(seed)
 

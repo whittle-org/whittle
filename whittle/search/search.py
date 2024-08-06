@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import time
-from typing import Optional
 
 import numpy as np
 
-from whittle.search.baselines import MethodArguments, methods
 from whittle.search.ask_tell_scheduler import AskTellScheduler
+from whittle.search.baselines import MethodArguments, methods
 from whittle.search.multi_objective import get_pareto_optimal
 
 
@@ -13,8 +14,8 @@ def multi_objective_search(
     search_space: dict,
     search_strategy: str = "random_search",
     num_samples: int = 100,
-    objective_kwargs: Optional[dict] = None,
-    seed: Optional[int] = None,
+    objective_kwargs: dict | None = None,
+    seed: int | None = None,
 ):
     """
     Search for the Pareto optimal sub-networks.

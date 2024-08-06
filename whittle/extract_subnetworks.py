@@ -1,14 +1,16 @@
+from __future__ import annotations
+
 from collections import OrderedDict
+from copy import deepcopy
 
 import torch
 import torch.nn as nn
-from copy import deepcopy
 
 
 class IdentityAttention(nn.Module):
     def __init__(self, model_type=None):
         self.model_type = model_type
-        super(IdentityAttention, self).__init__()
+        super().__init__()
 
     def forward(self, *input, **kwargs):
         if self.model_type == "distilbert-base-cased":
@@ -20,7 +22,7 @@ class IdentityAttention(nn.Module):
 class IdentityFFN(nn.Module):
     def __init__(self, model_type=None):
         self.model_type = model_type
-        super(IdentityFFN, self).__init__()
+        super().__init__()
 
     def forward(self, hidden_states):
         return hidden_states
@@ -29,7 +31,7 @@ class IdentityFFN(nn.Module):
 class IdentityOutput(nn.Module):
     def __init__(self, model_type=None):
         self.model_type = model_type
-        super(IdentityOutput, self).__init__()
+        super().__init__()
 
     def forward(self, hidden_states, input_tensor):
         return hidden_states
@@ -148,6 +150,7 @@ def get_final_bert_model(original_model, new_model_config):
 if __name__ == "__main__":
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
     from transformers.models.bert.modeling_bert import BertConfig
+
     from benchmarks.plm_pruning.mask import mask_bert
 
     model_type = "bert-base-uncased"

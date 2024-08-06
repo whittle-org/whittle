@@ -1,10 +1,13 @@
-import pytest
-import torch
+from __future__ import annotations
+
 import pathlib
 
+import pytest
+import torch
 from litgpt import Config
 from litgpt.model import GPT as LitGPT
 from litgpt.scripts.download import download_from_hub
+
 from whittle.models.gpt.model import GPT as whittleGPT
 
 

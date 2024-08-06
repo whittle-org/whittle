@@ -1,19 +1,21 @@
-import os
+from __future__ import annotations
 
-import numpy as np
 import json
-import torch
-import torch.nn as nn
-
+import os
 from argparse import ArgumentParser
 from pathlib import Path
-from torch.utils.data import DataLoader
+
+import numpy as np
+import torch
+import torch.nn as nn
 from syne_tune.config_space import randint
 from syne_tune.report import Reporter
-from whittle.training_strategies import SandwichStrategy
-from whittle.sampling.random_sampler import RandomSampler
+from torch.utils.data import DataLoader
 
-from model import MLP
+from whittle.sampling.random_sampler import RandomSampler
+from whittle.training_strategies import SandwichStrategy
+
+from .model import MLP
 
 report = Reporter()
 

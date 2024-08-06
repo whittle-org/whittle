@@ -1,13 +1,14 @@
-import numpy as np
+from __future__ import annotations
+
 import logging
 from copy import deepcopy
-from typing import Optional, List, Dict, Any, Union
 from dataclasses import dataclass
+from typing import Any
 
+import numpy as np
+from syne_tune.config_space import Domain
 from syne_tune.optimizer.schedulers import FIFOScheduler
 from syne_tune.optimizer.schedulers.searchers import StochasticSearcher
-from syne_tune.config_space import Domain
-
 
 logger = logging.getLogger(__name__)
 
@@ -45,15 +46,15 @@ class LS(FIFOScheduler):
 
     def __init__(
         self,
-        config_space: Dict[str, Any],
-        metric: List[str],
-        mode: Union[List[str], str] = "min",
-        start_point: Optional[Dict[str, Any]] = None,
-        random_seed: Optional[int] = None,
-        points_to_evaluate: Optional[List[dict]] = None,
+        config_space: dict[str, Any],
+        metric: list[str],
+        mode: list[str] | str = "min",
+        start_point: dict[str, Any] | None = None,
+        random_seed: int | None = None,
+        points_to_evaluate: list[dict] | None = None,
         **kwargs,
     ):
-        super(LS, self).__init__(
+        super().__init__(
             config_space=config_space,
             metric=metric,
             mode=mode,
@@ -76,10 +77,10 @@ class LocalSearch(StochasticSearcher):
     def __init__(
         self,
         config_space,
-        metric: Union[List[str], str],
-        points_to_evaluate: Optional[List[dict]] = None,
-        start_point: Optional[Dict] = None,
-        mode: Union[List[str], str] = "min",
+        metric: list[str] | str,
+        points_to_evaluate: list[dict] | None = None,
+        start_point: dict | None = None,
+        mode: list[str] | str = "min",
         **kwargs,
     ):
         if start_point is None:
@@ -90,22 +91,22 @@ class LocalSearch(StochasticSearcher):
         else:
             self.start_point = start_point
 
-        self._pareto_front: List[PopulationElement] = []
+        self._pareto_front: list[PopulationElement] = []
 
         if points_to_evaluate is None:
             points_to_evaluate = [self.start_point]
         else:
             points_to_evaluate.append(self.start_point)
 
-        super(LocalSearch, self).__init__(
+        super().__init__(
             config_space,
             metric,
             mode=mode,
             points_to_evaluate=points_to_evaluate,
             **kwargs,
         )
-        if isinstance(self._mode, List):
-            self._metric_op: Dict[str, Any] = {
+        if isinstance(self._mode, list):
+            self._metric_op: dict[str, Any] = {
                 metric: 1 if mode == "min" else -1
                 for metric, mode in zip(metric, self._mode)
             }
@@ -153,7 +154,7 @@ class LocalSearch(StochasticSearcher):
     def dominates(self, incumbent, neighbour):
         return np.all(neighbour <= incumbent) * np.any(neighbour < incumbent)
 
-    def get_config(self, **kwargs) -> Optional[dict]:
+    def get_config(self, **kwargs) -> dict | None:
         config = self._next_initial_config()
         if config is not None:
             return config
@@ -167,13 +168,13 @@ class LocalSearch(StochasticSearcher):
 
         return config
 
-    def _metric_dict(self, reported_results: Dict) -> Dict:
+    def _metric_dict(self, reported_results: dict) -> dict:
         return {
             metric: reported_results[metric] * self._metric_op[metric]
             for metric in self._metric
         }
 
-    def _update(self, trial_id: int, config: Dict[str, Any], result: Dict[str, Any]):
+    def _update(self, trial_id: int, config: dict[str, Any], result: dict[str, Any]):
         # assume that the new point is in the Pareto Front
         element = PopulationElement(
             trial_id=trial_id, config=config, result=self._metric_dict(result)
@@ -207,16 +208,15 @@ class LocalSearch(StochasticSearcher):
         ), "This searcher requires TrialSchedulerWithSearcher scheduler"
         super().configure_scheduler(scheduler)
 
-    def clone_from_state(self, state: Dict[str, Any]):
+    def clone_from_state(self, state: dict[str, Any]):
         raise NotImplementedError
 
 
 if __name__ == "__main__":
-    from transformers import AutoConfig
-
     from nas_fine_tuning.sampling import SmallSearchSpace
-    from syne_tune.tuner import Trial
     from syne_tune.config_space import Categorical
+    from syne_tune.tuner import Trial
+    from transformers import AutoConfig
 
     config = AutoConfig.from_pretrained("bert-base-cased")
     ss = SmallSearchSpace(config)
