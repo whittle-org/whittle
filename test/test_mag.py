@@ -26,6 +26,7 @@ def test_weight_magnitude():
     gpt.lm_head.weight.data = torch.ones_like(gpt.lm_head.weight.data)
     gpt.lm_head.bias.data = torch.ones_like(gpt.lm_head.bias.data)
     gpt.transformer.ln_f.weight.data = torch.ones_like(gpt.transformer.ln_f.weight.data)
+    gpt.transformer.ln_f.bias.data = torch.ones_like(gpt.transformer.ln_f.bias.data)
 
     for block in gpt.transformer.h:
         block.attn.attn.weight.data = torch.ones_like(block.attn.attn.weight.data)
@@ -38,7 +39,8 @@ def test_weight_magnitude():
         block.mlp.proj.bias.data = torch.ones_like(block.mlp.proj.bias.data)
         block.norm_1.weight.data = torch.ones_like(block.norm_1.weight.data)
         block.norm_2.weight.data = torch.ones_like(block.norm_2.weight.data)
-
+        block.norm_1.bias.data = torch.ones_like(block.norm_1.bias.data)
+        block.norm_2.bias.data = torch.ones_like(block.norm_2.bias.data)
     mag_super = weight_magnitude(gpt)
 
     num_params_super = sum(p.numel() for p in gpt.parameters() if p.requires_grad)
@@ -47,11 +49,11 @@ def test_weight_magnitude():
 
     sub_network_config = {
         "sub_network_n_embd": 256,
-        "sub_network_intermediate_size": [1024] * 3,
-        "sub_network_num_heads": [4] * 3,
-        "sub_network_n_layers": 3,
+        "sub_network_intermediate_size": [1024] * 1,
+        "sub_network_num_heads": [4] * 1,
+        "sub_network_n_layers": 1,
     }
     gpt.set_sub_network(**sub_network_config)
     mag_sub_network = weight_magnitude(gpt)
 
-    assert mag_sub_network > mag_super
+    assert mag_sub_network < mag_super
