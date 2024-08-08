@@ -25,7 +25,7 @@ def test_block():
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
     cos, sin = build_rope_cache(config.max_seq_len, n_elem=config.rope_n_elem)
 
-    block = Block(config)
+    block = Block(config, 0)
     input = torch.rand(8, 512, 64)
     mask = build_mask_cache(512)
     block.attn.attn.weight.data = torch.ones_like(block.attn.attn.weight.data)
@@ -49,7 +49,7 @@ def test_block():
     out_small = block(input[:, :, :32], cos, sin, mask)
     assert out_small.shape == (8, 512, 32)
 
-    lit_block = LitBlock(config)
+    lit_block = LitBlock(config, 0)
     lit_block.attn.attn.weight.data = torch.ones_like(lit_block.attn.attn.weight.data)
     lit_block.attn.attn.bias.data = torch.ones_like(lit_block.attn.attn.bias.data)
     lit_block.attn.proj.bias.data = torch.ones_like(lit_block.attn.proj.bias.data)
@@ -67,7 +67,7 @@ def test_block():
     config.n_head = 4
     config.n_query_groups = 2
     config.intermediate_size = 32 * 4
-    lit_block_small = LitBlock(config)
+    lit_block_small = LitBlock(config, 0)
     lit_block_small.attn.attn.weight.data = torch.ones_like(
         lit_block_small.attn.attn.weight.data
     )

@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import torch.nn as nn
 
 import litgpt
 from litgpt import Config
@@ -11,8 +11,8 @@ from whittle.modules.rmsnorm import RMSNorm
 
 
 class Block(litgpt.model.Block):
-    def __init__(self, config: Config) -> None:
-        super().__init__(config)
+    def __init__(self, config: Config, idx: int) -> None:
+        super().__init__(config, idx)
         self.config = config
         if not config.parallel_residual and config.shared_attention_norm:
             raise NotImplementedError(
@@ -21,7 +21,12 @@ class Block(litgpt.model.Block):
             )
 
         self.norm_1 = self.norm_class()(config.n_embd, eps=config.norm_eps)
-        self.attn = CausalSelfAttention(config)
+        self.post_attention_norm = (
+            self.norm_class()(config.n_embd, eps=config.norm_eps)
+            if config.post_attention_norm
+            else nn.Identity()
+        )
+        self.attn = CausalSelfAttention(config, idx)
         self.norm_2: LayerNorm | RMSNorm | None = (
             None
             if config.shared_attention_norm
@@ -71,6 +76,12 @@ class Block(litgpt.model.Block):
             sub_network_head_size,
             sample_random_indices,
         )
+        if isinstance(self.post_attention_norm, LayerNorm) or isinstance(
+            self.post_attention_norm, RMSNorm
+        ):
+            self.post_attention_norm.set_sub_network(
+                self.sub_network_n_embd, sample_random_indices
+            )
         if not self.config.shared_attention_norm and self.norm_2 is not None:
             self.norm_2.set_sub_network(self.sub_network_n_embd, sample_random_indices)
         self.mlp.set_sub_network(
