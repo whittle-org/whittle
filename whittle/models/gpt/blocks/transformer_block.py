@@ -11,8 +11,8 @@ from whittle.modules.rmsnorm import RMSNorm
 
 
 class Block(litgpt.model.Block):
-    def __init__(self, config: Config) -> None:
-        super().__init__(config)
+    def __init__(self, config: Config, idx: int) -> None:
+        super().__init__(config,idx)
         self.config = config
         if not config.parallel_residual and config.shared_attention_norm:
             raise NotImplementedError(
@@ -21,7 +21,7 @@ class Block(litgpt.model.Block):
             )
 
         self.norm_1 = self.norm_class()(config.n_embd, eps=config.norm_eps)
-        self.attn = CausalSelfAttention(config)
+        self.attn = CausalSelfAttention(config, idx)
         self.norm_2: LayerNorm | RMSNorm | None = (
             None
             if config.shared_attention_norm

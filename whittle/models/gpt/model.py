@@ -33,7 +33,7 @@ class GPT(nn.Module):
         self.transformer = nn.ModuleDict(
             dict(
                 wte=Embedding(config.padded_vocab_size, config.n_embd),
-                h=nn.ModuleList(Block(config) for i in range(config.n_layer)),
+                h=nn.ModuleList(Block(config,i) for i in range(config.n_layer)),
                 ln_f=self.norm_class(config.n_embd, eps=config.norm_eps),
             )
         )

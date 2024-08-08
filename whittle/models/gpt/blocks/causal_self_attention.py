@@ -11,7 +11,7 @@ from whittle.modules import Linear
 
 
 class CausalSelfAttention(nn.Module):
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, block_idx: int) -> None:
         super().__init__()
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
@@ -25,7 +25,10 @@ class CausalSelfAttention(nn.Module):
         self.kv_cache: KVCache | None = None
         self.config = config
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-
+        self.apply_sliding_window_attention = (
+            config.sliding_window_size is not None and
+            block_idx % config.sliding_window_layer_placing == 0
+        )
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_n_head = self.config.n_head

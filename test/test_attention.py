@@ -40,7 +40,7 @@ attention_configs = {
 
 
 def init_attention(config):
-    attention = CausalSelfAttention(config)
+    attention = CausalSelfAttention(config,0)
     torch.manual_seed(0)
     attention.attn.weight.data = torch.randn_like(attention.attn.weight.data)
     attention.attn.bias.data = torch.randn_like(attention.attn.bias.data)
@@ -50,7 +50,7 @@ def init_attention(config):
 
 
 def init_lit_attention(config):
-    attention = LitCausalSelfAttention(config)
+    attention = LitCausalSelfAttention(config,0)
     torch.manual_seed(0)
     attention.attn.weight.data = torch.randn_like(attention.attn.weight.data)
     attention.attn.bias.data = torch.randn_like(attention.attn.bias.data)
@@ -60,7 +60,7 @@ def init_lit_attention(config):
 
 
 def init_lit_small_attention(config, base_attention):
-    attention = LitCausalSelfAttention(config)
+    attention = LitCausalSelfAttention(config,0)
     torch.manual_seed(0)
     slices = tuple(slice(0, s) for s in attention.attn.weight.data.size())
     attention.attn.weight.data = base_attention.attn.weight.data[slices]
