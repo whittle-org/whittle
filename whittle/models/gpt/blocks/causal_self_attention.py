@@ -26,8 +26,8 @@ class CausalSelfAttention(nn.Module):
         self.config = config
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.apply_sliding_window_attention = (
-            config.sliding_window_size is not None and
-            block_idx % config.sliding_window_layer_placing == 0
+            config.sliding_window_size is not None
+            and block_idx % config.sliding_window_layer_placing == 0
         )
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
@@ -171,6 +171,25 @@ class CausalSelfAttention(nn.Module):
             if not isinstance(self.kv_cache, KVCache):
                 raise TypeError("You need to call `gpt.set_kv_cache()`")
             k, v = self.kv_cache(input_pos, k, v)
+        if self.apply_sliding_window_attention:
+            """
+                  Global Window              Sliding window             Sliding window
+                  attention mask      +            bias          =      attention mask
+            ┌────────────────────────┐  ┌───────────────────────┐  ┌─────────────────────────┐
+            │ True False False False │  │ True  True  True True │  │ True  False False False │
+            │ True True  False False │  │ True  True  True True │  │ True  True  False False │
+            │ True True  True  False │  │ False True  True True │  │ False True  True  False │
+            │ True True  True  True  │  │ False False True True │  │ False False True  True  │
+            └────────────────────────┘  └───────────────────────┘  └─────────────────────────┘
+            """
+            if mask is None:
+                mask = torch.ones(T, T, dtype=q.dtype, device=q.device).triu(diagonal=1)
+                mask.masked_fill_(mask.bool(), float("-inf"))
+            sliding_window_bias = torch.ones_like(mask).tril(
+                diagonal=-self.config.sliding_window_size
+            )
+            sliding_window_bias.masked_fill_(sliding_window_bias.bool(), float("-inf"))
+            mask += sliding_window_bias
         y = self.scaled_dot_product_attention(q, k, v, mask)
         y = y.reshape(
             B, T, self.sub_network_head_size * self.sub_network_n_head

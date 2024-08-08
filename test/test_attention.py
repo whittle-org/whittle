@@ -12,6 +12,17 @@ from litgpt.model import (
 from whittle.models.gpt.blocks import CausalSelfAttention
 
 attention_configs = {
+    "mha_fix_head_size_sliding": {
+        "config": Config(
+            n_embd=64,
+            n_head=16,
+            n_query_groups=16,
+            head_size=64,
+            sliding_window_size=256,
+            sliding_window_layer_placing="interleaved",
+        ),
+        "fix_head_size": True,
+    },
     "mha_fix_head_size": {
         "config": Config(n_embd=64, n_head=16, n_query_groups=16, head_size=64),
         "fix_head_size": True,
@@ -40,7 +51,7 @@ attention_configs = {
 
 
 def init_attention(config):
-    attention = CausalSelfAttention(config,0)
+    attention = CausalSelfAttention(config, 2)
     torch.manual_seed(0)
     attention.attn.weight.data = torch.randn_like(attention.attn.weight.data)
     attention.attn.bias.data = torch.randn_like(attention.attn.bias.data)
@@ -50,7 +61,7 @@ def init_attention(config):
 
 
 def init_lit_attention(config):
-    attention = LitCausalSelfAttention(config,0)
+    attention = LitCausalSelfAttention(config, 2)
     torch.manual_seed(0)
     attention.attn.weight.data = torch.randn_like(attention.attn.weight.data)
     attention.attn.bias.data = torch.randn_like(attention.attn.bias.data)
@@ -60,7 +71,7 @@ def init_lit_attention(config):
 
 
 def init_lit_small_attention(config, base_attention):
-    attention = LitCausalSelfAttention(config,0)
+    attention = LitCausalSelfAttention(config, 2)
     torch.manual_seed(0)
     slices = tuple(slice(0, s) for s in attention.attn.weight.data.size())
     attention.attn.weight.data = base_attention.attn.weight.data[slices]
