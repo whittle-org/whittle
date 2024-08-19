@@ -204,9 +204,36 @@ class CausalSelfAttention(nn.Module):
         mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         scale = 1.0 / math.sqrt(self.sub_network_head_size)
-        y = torch.nn.functional.scaled_dot_product_attention(
-            q, k, v, attn_mask=mask, dropout_p=0.0, scale=scale, is_causal=mask is None
-        )
+        # with softcapping we cannot use SDPA
+        if self.config.attention_logit_softcapping is not None:
+            scale = 1.0 / math.sqrt(
+                self.config.attention_scores_scalar or self.sub_network_head_size
+            )
+            scores = q @ k.mT * scale
+            scores = (
+                torch.tanh(scores / self.config.attention_logit_softcapping)
+                * self.config.attention_logit_softcapping
+            )
+            if mask is None:
+                mask = torch.ones(
+                    q.size(2), q.size(2), dtype=q.dtype, device=q.device
+                ).triu(diagonal=1)
+                mask.masked_fill_(mask.bool(), torch.finfo(q.dtype).min)
+            scores = scores + mask
+            scores = torch.nn.functional.softmax(scores, dim=-1, dtype=torch.float).to(
+                dtype=q.dtype
+            )
+            y = scores @ v
+        else:
+            y = torch.nn.functional.scaled_dot_product_attention(
+                q,
+                k,
+                v,
+                attn_mask=mask,
+                dropout_p=0.0,
+                scale=scale,
+                is_causal=mask is None,
+            )
         return y.transpose(1, 2)
 
     def build_kv_cache(

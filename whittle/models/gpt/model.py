@@ -249,7 +249,13 @@ class GPT(nn.Module):
 
             x = block(x, cos, sin, mask, input_pos)
         x = self.transformer.ln_f(x)
-        return self.lm_head(x)  # (b, t, vocab_size)
+        x = self.lm_head(x)  # (b, t, vocab_size)
+        if self.config.final_logit_softcapping is not None:
+            x = (
+                torch.tanh(x / self.config.final_logit_softcapping)
+                * self.config.final_logit_softcapping
+            )
+        return x
 
     @classmethod
     def from_name(cls, name: str, **kwargs: Any) -> Self:

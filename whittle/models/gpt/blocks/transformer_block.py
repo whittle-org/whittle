@@ -33,7 +33,11 @@ class Block(litgpt.model.Block):
             else self.norm_class()(config.n_embd, eps=config.norm_eps)
         )
         self.mlp = self.mlp_class()(config)
-
+        self.post_mlp_norm = (
+            self.norm_class()(config.n_embd, eps=config.norm_eps)
+            if config.post_mlp_norm
+            else nn.Identity()
+        )
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_intermediate_size = self.config.intermediate_size
@@ -89,6 +93,12 @@ class Block(litgpt.model.Block):
             self.sub_network_intermediate_size,
             sample_random_indices,
         )
+        if isinstance(self.post_mlp_norm, LayerNorm) or isinstance(
+            self.post_mlp_norm, RMSNorm
+        ):
+            self.post_mlp_norm.set_sub_network(
+                self.sub_network_n_embd, sample_random_indices
+            )
 
     def reset_super_network(self):
         self.sub_network_n_embd = self.config.n_embd
@@ -99,3 +109,11 @@ class Block(litgpt.model.Block):
         if not self.config.shared_attention_norm:
             self.norm_2.reset_super_network()
         self.mlp.reset_super_network()
+        if isinstance(self.post_attention_norm, LayerNorm) or isinstance(
+            self.post_attention_norm, RMSNorm
+        ):
+            self.post_attention_norm.reset_super_network()
+        if isinstance(self.post_mlp_norm, LayerNorm) or isinstance(
+            self.post_mlp_norm, RMSNorm
+        ):
+            self.post_mlp_norm.reset_super_network()
