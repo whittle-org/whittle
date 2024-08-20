@@ -13,6 +13,7 @@ class LeNet(nn.Module):
     def __init__(self, fc1_out: int, fc2_out: int, fc_base_out: int | None = 128):
         super().__init__()
         # FIXME: (fixup comment) 1 input image channel, 6 output channels, 5x5 square conv kernel
+        self.fc_base_out = fc_base_out
         self.fc_base = Linear(28 * 28, fc_base_out, bias=True)
         self.fc1 = Linear(fc_base_out, fc1_out, bias=True)  # 5x5 image dimension
         self.fc2 = Linear(fc1_out, fc2_out, bias=True)
@@ -31,7 +32,7 @@ class LeNet(nn.Module):
         fc2_out = config["fc2_out"]
 
         self.fc1.set_sub_network(
-            sub_network_in_features=256, sub_network_out_features=fc1_out
+            sub_network_in_features=self.fc_base_out, sub_network_out_features=fc1_out
         )
         self.fc2.set_sub_network(
             sub_network_in_features=fc1_out,

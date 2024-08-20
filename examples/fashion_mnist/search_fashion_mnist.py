@@ -13,7 +13,7 @@ from torchvision import datasets
 from torchvision.transforms import ToTensor
 
 from examples.fashion_mnist.model import LeNet
-from examples.fashion_mnist.train_fashion_mnist import test
+from examples.fashion_mnist.train_fashion_mnist import validate
 from whittle.search import multi_objective_search
 
 
@@ -26,7 +26,7 @@ def objective(
 ) -> tuple[int, float]:
     model.select_sub_network(config=config)
 
-    _, loss = test(
+    _, loss = validate(
         test_loader=test_loader,
         model=model,
         criterion=torch.nn.functional.cross_entropy,
@@ -94,11 +94,19 @@ if __name__ == "__main__":
 
     idx = np.array(results["is_pareto_optimal"])
     if args.do_plot:
-        plt.scatter(costs[idx, 0], costs[idx, 1], color="red", label="Pareto optimal")
+        plt.scatter(
+            costs[idx, 0],
+            costs[idx, 1],
+            color="red",
+            label="Pareto optimal",
+            s=100,
+        )
 
-        plt.xlabel("mac")
-        plt.ylabel("Validation loss")
+        plt.xlabel("MACs")
+        plt.ylabel("Validation Loss")
         plt.xscale("log")
         plt.grid(linewidth="1", alpha=0.4)
-        plt.title("Pareto front for Sinc NAS")
-        plt.savefig("pareto_front.png")
+        plt.title("Pareto front for Fashion MNIST")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig("pareto_front.png", dpi=300)

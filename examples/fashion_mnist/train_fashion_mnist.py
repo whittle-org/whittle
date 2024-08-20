@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from typing import Callable
 
+from tqdm import trange
 import numpy as np
 import pandas as pd
 import torch
@@ -33,7 +34,7 @@ def correct(output: torch.Tensor, target: torch.Tensor) -> int:
     return correct_ones.sum().item()
 
 
-def test(
+def validate(
     model: LeNet, test_loader: DataLoader, criterion: Callable, device: torch.device
 ):
     model.eval()
@@ -70,7 +71,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--fc1_out", type=int, default=120)
     parser.add_argument("--fc2_out", type=int, default=84)
     parser.add_argument("--training_strategy", type=str, default="sandwich")
@@ -79,6 +80,7 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     train_loader = DataLoader(
         dataset=datasets.FashionMNIST(
             ".", train=True, download=True, transform=ToTensor()
@@ -120,7 +122,7 @@ if __name__ == "__main__":
     }
     update_op = training_strategies[args.training_strategy]
 
-    for epoch in range(args.epochs):
+    for epoch in trange(args.epochs, desc=f"Training with {args.training_strategy}"):
         train_loss = 0
         model.train()
 
@@ -135,7 +137,7 @@ if __name__ == "__main__":
             optimizer.step()
             scheduler.step()
 
-        valid_acc, valid_loss = test(
+        valid_acc, valid_loss = validate(
             model=model,
             test_loader=test_loader,
             criterion=torch.nn.functional.cross_entropy,
@@ -180,36 +182,20 @@ if __name__ == "__main__":
                 )
 
     lottery_grid = [[25, 25], [50, 50], [120, 84]]
-    lottery_dense = {scheme: {} for scheme in [args.training_strategy]}
-    for k in lottery_grid:
-        for scheme in [args.training_strategy]:
-            acc, loss = test(
-                model=model,
-                test_loader=test_loader,
-                criterion=torch.nn.functional.cross_entropy,
-                device=device,
-            )
-            lottery_dense[scheme][f"{str(k[0] * k[1])}_accuracy"] = acc
-            lottery_dense[scheme][f"{str(k[0] * k[1])}_loss"] = loss
-
-    df = pd.DataFrame(lottery_dense)
-    print(tabulate(df, headers="keys", tablefmt="pipe", floatfmt=".4f"))
-
-    #
-    # # num_layers, num_units, num_heads
-    #
-    # if args.do_plot:
-    #     import matplotlib.pyplot as plt
-    #
-    #     plt.scatter(train_data[:, 0], train_data[:, 1], label="Train")
-    #     plt.scatter(valid_data[:, 0], valid_data[:, 1], label="Valid")
-    #     model.eval()
-    #     y_hat = model(valid_data[:, 0].reshape(-1, 1)).detach().numpy()
-    #     plt.scatter(valid_data[:, 0], y_hat, label="predicted")
-    #     plt.legend()
-    #     plt.show()
-    #     plt.plot(lc_train, label="train")
-    #     plt.plot(lc_valid, label="valid")
-    #     plt.yscale("log")
-    #     plt.legend()
-    #     plt.show()
+    df = pd.DataFrame(
+        {"fc1_out": [], "fc2_out": [], "accuracy": [], "loss": []},
+    )
+    for i, k in enumerate(lottery_grid):
+        config = {"fc1_out": k[0], "fc2_out": k[1]}
+        model.select_sub_network(config=config)
+        acc, loss = validate(
+            model=model,
+            test_loader=test_loader,
+            criterion=torch.nn.functional.cross_entropy,
+            device=device,
+        )
+        df.loc[i] = [*list(config.values()), acc, loss]
+    df = df.astype(
+        {"fc1_out": "str", "fc2_out": "str", "accuracy": "float", "loss": "float"}
+    )
+    print(tabulate(df, headers="keys", tablefmt="pipe", floatfmt=".2f"))
