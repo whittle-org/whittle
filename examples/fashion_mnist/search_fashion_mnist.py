@@ -83,7 +83,7 @@ if __name__ == "__main__":
         search_space,
         objective_kwargs={"model": model, "device": device},
         search_strategy=args.search_strategy,
-        num_samples=33,
+        num_samples=20,
         seed=42,
     )
 
