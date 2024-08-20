@@ -14,7 +14,7 @@ dependencies = [
   "typing-extensions",
   "torch>=2",
   "transformers>=4",
-  "litgpt[all]",
+  "litgpt[all]==0.4.10",
   "syne-tune[moo]>=0.13",
   "torchvision>=0.18",
 ]
