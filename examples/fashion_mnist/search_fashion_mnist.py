@@ -47,10 +47,8 @@ def objective(
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=128)
-    parser.add_argument("--learning_rate", type=float, default=1e-3)
-    parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--fc1_out", type=int, default=120)
-    parser.add_argument("--fc2_out", type=int, default=84)
+    parser.add_argument("--fc1_out", type=int, default=32)
+    parser.add_argument("--fc2_out", type=int, default=16)
     parser.add_argument("--training_strategy", type=str, default="sandwich")
     parser.add_argument("--search_strategy", type=str, default="random_search")
     parser.add_argument("--do_plot", type=bool, default=True)
@@ -85,21 +83,21 @@ if __name__ == "__main__":
         search_space,
         objective_kwargs={"model": model, "device": device},
         search_strategy=args.search_strategy,
-        num_samples=100,
+        num_samples=33,
         seed=42,
     )
 
     costs = np.array(results["costs"])
-    plt.scatter(costs[:, 0], costs[:, 1], color="black", label="sub-networks")
 
     idx = np.array(results["is_pareto_optimal"])
     if args.do_plot:
+        plt.scatter(costs[:, 0], costs[:, 1], color="black", label="sub-networks", s=30)
         plt.scatter(
             costs[idx, 0],
             costs[idx, 1],
             color="red",
             label="Pareto optimal",
-            s=100,
+            s=50,
         )
 
         plt.xlabel("MACs")

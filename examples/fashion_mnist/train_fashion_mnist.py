@@ -14,7 +14,7 @@ import torch.nn as nn
 from syne_tune.config_space import randint
 from syne_tune.report import Reporter
 from tabulate import tabulate
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 
@@ -69,22 +69,31 @@ if __name__ == "__main__":
     report = Reporter()
 
     parser = ArgumentParser()
-    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
-    parser.add_argument("--epochs", type=int, default=3)
-    parser.add_argument("--fc1_out", type=int, default=120)
-    parser.add_argument("--fc2_out", type=int, default=84)
+    parser.add_argument("--epochs", type=int, default=12)
+    parser.add_argument("--fc1_out", type=int, default=32)
+    parser.add_argument("--fc2_out", type=int, default=16)
     parser.add_argument("--training_strategy", type=str, default="sandwich")
     parser.add_argument("--st_checkpoint_dir", type=str, default="./checkpoints")
+    parser.add_argument("--num_train_samples", type=int, default=20000)
     parser.add_argument("--seed", type=int, default=42)
     args, _ = parser.parse_known_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    full_dataset = datasets.FashionMNIST(
+        ".", train=True, download=True, transform=ToTensor()
+    )
+
+    # Split the dataset
+    train_dataset, _ = random_split(
+        full_dataset,
+        [args.num_train_samples, len(full_dataset) - args.num_train_samples],
+    )
+
     train_loader = DataLoader(
-        dataset=datasets.FashionMNIST(
-            ".", train=True, download=True, transform=ToTensor()
-        ),
+        dataset=train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
     )
@@ -181,7 +190,7 @@ if __name__ == "__main__":
                     ),
                 )
 
-    lottery_grid = [[25, 25], [50, 50], [120, 84]]
+    lottery_grid = [[4, 4], [8, 8], [32, 16]]
     df = pd.DataFrame(
         {"fc1_out": [], "fc2_out": [], "accuracy": [], "loss": []},
     )
