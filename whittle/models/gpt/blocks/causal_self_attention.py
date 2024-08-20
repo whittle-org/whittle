@@ -23,12 +23,12 @@ class CausalSelfAttention(nn.Module):
         )
         # disabled by default
         self.kv_cache: KVCache | None = None
-        self.config = config
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.apply_sliding_window_attention = (
             config.sliding_window_size is not None
             and block_idx % config.sliding_window_layer_placing == 0
         )
+        self.config = config
+        # self.device = "cuda" if torch.cuda.is_available() else "cpu"
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_n_head = self.config.n_head
@@ -40,6 +40,7 @@ class CausalSelfAttention(nn.Module):
         self.sub_network_q_per_kv = (
             self.sub_network_n_head // self.sub_network_query_groups
         )
+        self.sub_attention_scaler = self.config.attention_scores_scalar
 
     def set_sub_network(
         self,
@@ -88,6 +89,12 @@ class CausalSelfAttention(nn.Module):
         self.sub_network_q_per_kv = self.sub_network_n_head // float(
             self.sub_network_query_groups
         )
+        if self.config.attention_scores_scalar:
+            self.sub_attention_scaler = (
+                self.sub_network_n_embd // self.sub_network_n_head
+            )
+        else:
+            self.sub_attention_scaler = self.config.attention_scores_scalar
 
     def reset_super_network(self):
         self.sub_network_n_embd = self.config.n_embd
@@ -102,6 +109,7 @@ class CausalSelfAttention(nn.Module):
         )
         self.attn.reset_super_network()
         self.proj.reset_super_network()
+        self.sub_attention_scaler = self.config.attention_scores_scalar
 
     def forward(
         self,
@@ -203,11 +211,11 @@ class CausalSelfAttention(nn.Module):
         v: torch.Tensor,
         mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        scale = 1.0 / math.sqrt(self.sub_network_head_size)
+        scale = 1.0 / math.sqrt(self.sub_attention_scaler or self.sub_network_head_size)
         # with softcapping we cannot use SDPA
         if self.config.attention_logit_softcapping is not None:
             scale = 1.0 / math.sqrt(
-                self.config.attention_scores_scalar or self.sub_network_head_size
+                self.sub_attention_scaler or self.sub_network_head_size
             )
             scores = q @ k.mT * scale
             scores = (

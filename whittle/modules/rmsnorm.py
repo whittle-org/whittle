@@ -52,9 +52,12 @@ class RMSNorm(torch.nn.Module):
         # NOTE: the original RMSNorm paper implementation is not equivalent
         norm_x = torch.mean(x * x, dim=self.dim, keepdim=True)
         x_normed = x * torch.rsqrt(norm_x + self.eps)
-        if self.add_unit_offset:
-            return x_normed * (1.0 + self.weight[self.random_indices])
-        return (self.weight[self.random_indices] * x_normed).to(dtype=dtype)
+        weight = (
+            (1 + self.weight[self.random_indices])
+            if self.add_unit_offset
+            else self.weight[self.random_indices]
+        )
+        return (x_normed * weight.float()).to(dtype=dtype)
 
     def reset_parameters(self) -> None:
         torch.nn.init.ones_(self.weight)

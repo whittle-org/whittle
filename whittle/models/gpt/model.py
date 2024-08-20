@@ -5,6 +5,7 @@ https://github.com/EleutherAI/gpt-neox/tree/main/megatron/model.
 """
 
 from __future__ import annotations
+from functools import partial
 
 from typing import Any
 from typing_extensions import Self
@@ -33,7 +34,9 @@ class GPT(nn.Module):
         self.transformer = nn.ModuleDict(
             dict(
                 wte=Embedding(config.padded_vocab_size, config.n_embd),
-                h=nn.ModuleList(Block(config, i) for i in range(config.n_layer)),
+                h=nn.ModuleList(
+                    Block(config, block_idx) for block_idx in range(config.n_layer)
+                ),
                 ln_f=self.norm_class(config.n_embd, eps=config.norm_eps),
             )
         )
@@ -59,7 +62,7 @@ class GPT(nn.Module):
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
         if self.config.norm_class_name == "RMSNorm":
-            return RMSNorm
+            return partial(RMSNorm, add_unit_offset="Gemma" in self.config.name)
         return LayerNorm
 
     @property
@@ -203,9 +206,7 @@ class GPT(nn.Module):
 
         x = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
         if self.config.scale_embeddings:
-            x = x * (
-                self.sub_network_n_embd**0.5
-            )  # TODO: forward is only implemented due to change in this line
+            x = x * torch.tensor(self.config.n_embd**0.5, dtype=x.dtype)
         for i, j in enumerate(self.random_layers):
             block = self.transformer.h[j]
             if not self.config.fix_head_size:
@@ -264,14 +265,15 @@ class GPT(nn.Module):
     def set_kv_cache(
         self,
         batch_size: int,
+        max_seq_length: int | None = None,
         rope_cache_length: int | None = None,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
         if rope_cache_length is None:
             rope_cache_length = self.cos.size(-1)
-        max_seq_length = self.max_seq_length
-
+        if max_seq_length is None:
+            max_seq_length = self.max_seq_length
         # initialize the kv cache for all blocks
         for block in self.transformer.h:
             block.attn.kv_cache = block.attn.build_kv_cache(
@@ -285,8 +287,8 @@ class GPT(nn.Module):
 
     def clear_kv_cache(self) -> None:
         self.mask_cache = None
-        # for block in self.transformer.h:
-        #    block.attn.kv_cache = None
+        for block in self.transformer.h:
+            block.attn.kv_cache = None
 
 
 def build_mask_cache(

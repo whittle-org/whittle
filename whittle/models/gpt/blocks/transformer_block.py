@@ -1,4 +1,5 @@
 from __future__ import annotations
+from functools import partial
 import torch.nn as nn
 
 import litgpt
@@ -11,8 +12,8 @@ from whittle.modules.rmsnorm import RMSNorm
 
 
 class Block(litgpt.model.Block):
-    def __init__(self, config: Config, idx: int) -> None:
-        super().__init__(config, idx)
+    def __init__(self, config: Config, block_idx: int) -> None:
+        super().__init__(config, block_idx)
         self.config = config
         if not config.parallel_residual and config.shared_attention_norm:
             raise NotImplementedError(
@@ -21,12 +22,12 @@ class Block(litgpt.model.Block):
             )
 
         self.norm_1 = self.norm_class()(config.n_embd, eps=config.norm_eps)
+        self.attn = CausalSelfAttention(config, block_idx)
         self.post_attention_norm = (
             self.norm_class()(config.n_embd, eps=config.norm_eps)
             if config.post_attention_norm
             else nn.Identity()
         )
-        self.attn = CausalSelfAttention(config, idx)
         self.norm_2: LayerNorm | RMSNorm | None = (
             None
             if config.shared_attention_norm
@@ -46,7 +47,7 @@ class Block(litgpt.model.Block):
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
         if self.config.norm_class_name == "RMSNorm":
-            return RMSNorm
+            return partial(RMSNorm, add_unit_offset="Gemma" in self.config.name)
         return LayerNorm
 
     def mlp_class(self):
