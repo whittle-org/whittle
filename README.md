@@ -4,69 +4,10 @@ A framework for two-stage neural architecture search (NAS) and structural prunin
 
 ## Setup
 
-1. clone this repository
-2. Install [poetry](https://python-poetry.org/docs/#installation)
-3. Make sure to add poetry to your `PATH`
-4. `cd` into the directory of the repository
-5. Install dependencies with `poetry install`
-6. Activate the environment with `poetry shell`
+1. clone this repository: `git clone git@github.com:whittle-org/whittle.git`
+2. `cd` into the repository: `cd whittle`
+3. Create a new conda environment and activate: `conda create -n whittle python=3.11 -y && conda activate whittle`
+4. Install the dependencies: `pip install .`
 
 `Note: the library supports and is tested for python 3.9 to 3.11`
-
-```sh
-curl -sSL https://install.python-poetry.org | python3 -
-git clone git@github.com:aaronkl/whittle.git
-cd ./whittle
-poetry install
-poetry shell
-```
-
-## Structure
-
-```markdown
-whittle/
-├── extract_subnetworks.py
-├── __init__.py
-├── metrics
-│ ├── parameters.py
-├── models
-│ ├── gpt
-│ │ ├── blocks
-│ │ │ ├── causal_self_attention.py
-│ │ │ ├── __init__.py
-│ │ │ ├── mlp.py
-│ │ │ └── transformer_block.py
-│ │ ├── extract.py
-│ │ ├── __init__.py
-│ │ ├── model.py
-│ │ └── utils.py
-│ └── __init__.py
-├── modules
-│ ├── embedding.py
-│ ├── __init__.py
-│ ├── layernorm.py
-│ ├── linear.py
-│ └── rmsnorm.py
-├── sampling
-│ ├── __init__.py
-│ └── random_sampler.py
-├── search
-│ ├── ask_tell_scheduler.py
-│ ├── baselines.py
-│ ├── __init__.py
-│ ├── local_search.py
-│ ├── multi_objective.py
-│ └── search.py
-├── training_strategies
-│ ├── ats.py
-│ ├── base_strategy.py
-│ ├── __init__.py
-│ ├── random_linear.py
-│ ├── random.py
-│ ├── sandwich.py
-│ ├── sandwich_kd.py
-│ └── standard.py
-└── utils
-└── __init__.py
-```
 
