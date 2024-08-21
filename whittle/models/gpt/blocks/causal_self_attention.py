@@ -28,7 +28,6 @@ class CausalSelfAttention(nn.Module):
             and block_idx % config.sliding_window_layer_placing == 0
         )
         self.config = config
-        # self.device = "cuda" if torch.cuda.is_available() else "cpu"
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_n_head = self.config.n_head
