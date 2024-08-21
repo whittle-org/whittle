@@ -17,7 +17,7 @@ class SandwichStrategy(BaseTrainingStrategy):
         https://arxiv.org/abs/1903.05134
     """
 
-    def __init__(self, random_samples=2, **kwargs):
+    def __init__(self, random_samples: int = 2, **kwargs):
         """
         Initialises a `SandwichStrategy`
 
@@ -42,7 +42,7 @@ class SandwichStrategy(BaseTrainingStrategy):
             model.select_sub_network(config)
             y_hat = model(inputs)
             if self.kd_loss is not None:
-                loss = self.kd_loss(y_hat, outputs, y_supernet.detach())
+                loss = self.kd_loss(y_hat, outputs, y_supernet)
             else:
                 loss = self.loss_function(y_hat, outputs)
             loss.backward()
@@ -54,7 +54,7 @@ class SandwichStrategy(BaseTrainingStrategy):
         model.select_sub_network(config)
         y_hat = model(inputs)
         if self.kd_loss is not None:
-            loss = self.kd_loss(y_hat, outputs, y_supernet.detach())
+            loss = self.kd_loss(y_hat, outputs, y_supernet)
         else:
             loss = self.loss_function(y_hat, outputs)
         loss.backward()

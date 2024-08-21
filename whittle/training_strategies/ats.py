@@ -35,7 +35,7 @@ class ATS(BaseTrainingStrategy):
         super-network.
         """
         total_loss = 0
-        y_supernet = model(inputs).detach()
+        y_supernet = model(inputs)
         if self.current_step % 2 == 0:
             # update random sub-networks
             for i in range(self.random_samples):
