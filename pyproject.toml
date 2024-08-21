@@ -74,6 +74,9 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.dynamic]
+version = {attr = "package.__version__"}
+
 [tool.ruff]
 target-version = "py39"  # Match lowest supported
 # Exclude a variety of commonly ignored directories.
