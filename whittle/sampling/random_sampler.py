@@ -8,7 +8,7 @@ from syne_tune.config_space import Categorical, Domain
 class RandomSampler:
     def __init__(self, config_space: dict, seed: int | None = None):
         self.config_space = config_space
-        self.rng = np.random.default_rng(seed)
+        self.rng = np.random.RandomState(seed)
 
     def sample(self):
         config = {}
