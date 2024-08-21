@@ -182,3 +182,48 @@ def test_gpt(sample_random_indices):
         ]
     out_lit_small = lit_gpt_small(input)
     assert torch.allclose(out_lit_small, out_small, atol=1e-3)
+
+
+def copy_weights(model_source, model_target):
+    for (_, p1), (_, p2) in zip(
+        model_source.named_parameters(), model_target.named_parameters()
+    ):
+        p1.data = p2.data
+
+
+def test_llama_3_1():
+    config_llama = Config.from_name(
+        "Llama-3-8B",
+        n_layer=2,
+        n_embd=32,
+        intermediate_size=86,
+        padded_vocab_size=10000,
+    )
+    config_llama.fix_head_size = True
+    lit_model = LitGPT(config_llama)
+    whittle_model = GPT(config_llama)
+    copy_weights(lit_model, whittle_model)
+    x = torch.tensor([[9856, 23, 491, 1536, 304]], dtype=torch.int32)
+    whittle_out = whittle_model(x)
+    lit_out = lit_model(x)
+    assert torch.allclose(whittle_out, lit_out, atol=1e-3)
+
+
+def test_gemma_2():
+    config_gemma = Config.from_name(
+        "gemma-2-9b",
+        block_size=6,
+        sliding_window_size=3,
+        n_layer=2,
+        n_embd=32,
+        intermediate_size=86,
+    )
+    config_gemma.fix_head_size = True
+    print(config_gemma)
+    lit_model = LitGPT(config_gemma)
+    whittle_model = GPT(config_gemma)
+    copy_weights(lit_model, whittle_model)
+    x = torch.tensor([[9856, 23, 491, 1536, 304, 1234]], dtype=torch.int32)
+    whittle_out = whittle_model(x)
+    lit_out = lit_model(x)
+    assert torch.allclose(whittle_out, lit_out, atol=1e-3)

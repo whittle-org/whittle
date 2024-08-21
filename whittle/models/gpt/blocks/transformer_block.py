@@ -1,5 +1,6 @@
 from __future__ import annotations
-
+from functools import partial
+import torch.nn as nn
 
 import litgpt
 from litgpt import Config
@@ -11,8 +12,8 @@ from whittle.modules.rmsnorm import RMSNorm
 
 
 class Block(litgpt.model.Block):
-    def __init__(self, config: Config) -> None:
-        super().__init__(config)
+    def __init__(self, config: Config, block_idx: int) -> None:
+        super().__init__(config, block_idx)
         self.config = config
         if not config.parallel_residual and config.shared_attention_norm:
             raise NotImplementedError(
@@ -21,14 +22,23 @@ class Block(litgpt.model.Block):
             )
 
         self.norm_1 = self.norm_class()(config.n_embd, eps=config.norm_eps)
-        self.attn = CausalSelfAttention(config)
+        self.attn = CausalSelfAttention(config, block_idx)
+        self.post_attention_norm = (
+            self.norm_class()(config.n_embd, eps=config.norm_eps)
+            if config.post_attention_norm
+            else nn.Identity()
+        )
         self.norm_2: LayerNorm | RMSNorm | None = (
             None
             if config.shared_attention_norm
             else self.norm_class()(config.n_embd, eps=config.norm_eps)
         )
         self.mlp = self.mlp_class()(config)
-
+        self.post_mlp_norm = (
+            self.norm_class()(config.n_embd, eps=config.norm_eps)
+            if config.post_mlp_norm
+            else nn.Identity()
+        )
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_intermediate_size = self.config.intermediate_size
@@ -37,7 +47,7 @@ class Block(litgpt.model.Block):
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
         if self.config.norm_class_name == "RMSNorm":
-            return RMSNorm
+            return partial(RMSNorm, add_unit_offset="Gemma" in self.config.name)
         return LayerNorm
 
     def mlp_class(self):
@@ -71,6 +81,12 @@ class Block(litgpt.model.Block):
             sub_network_head_size,
             sample_random_indices,
         )
+        if isinstance(self.post_attention_norm, LayerNorm) or isinstance(
+            self.post_attention_norm, RMSNorm
+        ):
+            self.post_attention_norm.set_sub_network(
+                self.sub_network_n_embd, sample_random_indices
+            )
         if not self.config.shared_attention_norm and self.norm_2 is not None:
             self.norm_2.set_sub_network(self.sub_network_n_embd, sample_random_indices)
         self.mlp.set_sub_network(
@@ -78,6 +94,12 @@ class Block(litgpt.model.Block):
             self.sub_network_intermediate_size,
             sample_random_indices,
         )
+        if isinstance(self.post_mlp_norm, LayerNorm) or isinstance(
+            self.post_mlp_norm, RMSNorm
+        ):
+            self.post_mlp_norm.set_sub_network(
+                self.sub_network_n_embd, sample_random_indices
+            )
 
     def reset_super_network(self):
         self.sub_network_n_embd = self.config.n_embd
@@ -88,3 +110,11 @@ class Block(litgpt.model.Block):
         if not self.config.shared_attention_norm:
             self.norm_2.reset_super_network()
         self.mlp.reset_super_network()
+        if isinstance(self.post_attention_norm, LayerNorm) or isinstance(
+            self.post_attention_norm, RMSNorm
+        ):
+            self.post_attention_norm.reset_super_network()
+        if isinstance(self.post_mlp_norm, LayerNorm) or isinstance(
+            self.post_mlp_norm, RMSNorm
+        ):
+            self.post_mlp_norm.reset_super_network()

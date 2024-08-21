@@ -11,7 +11,7 @@ from whittle.modules import Linear
 
 
 class CausalSelfAttention(nn.Module):
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, block_idx: int) -> None:
         super().__init__()
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
@@ -23,9 +23,11 @@ class CausalSelfAttention(nn.Module):
         )
         # disabled by default
         self.kv_cache: KVCache | None = None
+        self.apply_sliding_window_attention = (
+            config.sliding_window_size is not None
+            and block_idx % config.sliding_window_layer_placing == 0
+        )
         self.config = config
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_n_head = self.config.n_head
@@ -37,6 +39,7 @@ class CausalSelfAttention(nn.Module):
         self.sub_network_q_per_kv = (
             self.sub_network_n_head // self.sub_network_query_groups
         )
+        self.sub_attention_scaler = self.config.attention_scores_scalar
 
     def set_sub_network(
         self,
@@ -85,6 +88,12 @@ class CausalSelfAttention(nn.Module):
         self.sub_network_q_per_kv = self.sub_network_n_head // float(
             self.sub_network_query_groups
         )
+        if self.config.attention_scores_scalar:
+            self.sub_attention_scaler = (
+                self.sub_network_n_embd // self.sub_network_n_head
+            )
+        else:
+            self.sub_attention_scaler = self.config.attention_scores_scalar
 
     def reset_super_network(self):
         self.sub_network_n_embd = self.config.n_embd
@@ -99,6 +108,7 @@ class CausalSelfAttention(nn.Module):
         )
         self.attn.reset_super_network()
         self.proj.reset_super_network()
+        self.sub_attention_scaler = self.config.attention_scores_scalar
 
     def forward(
         self,
@@ -168,6 +178,25 @@ class CausalSelfAttention(nn.Module):
             if not isinstance(self.kv_cache, KVCache):
                 raise TypeError("You need to call `gpt.set_kv_cache()`")
             k, v = self.kv_cache(input_pos, k, v)
+        if self.apply_sliding_window_attention:
+            """
+                  Global Window              Sliding window             Sliding window
+                  attention mask      +            bias          =      attention mask
+            ┌────────────────────────┐  ┌───────────────────────┐  ┌─────────────────────────┐
+            │ True False False False │  │ True  True  True True │  │ True  False False False │
+            │ True True  False False │  │ True  True  True True │  │ True  True  False False │
+            │ True True  True  False │  │ False True  True True │  │ False True  True  False │
+            │ True True  True  True  │  │ False False True True │  │ False False True  True  │
+            └────────────────────────┘  └───────────────────────┘  └─────────────────────────┘
+            """
+            if mask is None:
+                mask = torch.ones(T, T, dtype=q.dtype, device=q.device).triu(diagonal=1)
+                mask.masked_fill_(mask.bool(), float("-inf"))
+            sliding_window_bias = torch.ones_like(mask).tril(
+                diagonal=-self.config.sliding_window_size
+            )
+            sliding_window_bias.masked_fill_(sliding_window_bias.bool(), float("-inf"))
+            mask += sliding_window_bias
         y = self.scaled_dot_product_attention(q, k, v, mask)
         y = y.reshape(
             B, T, self.sub_network_head_size * self.sub_network_n_head
@@ -181,10 +210,37 @@ class CausalSelfAttention(nn.Module):
         v: torch.Tensor,
         mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        scale = 1.0 / math.sqrt(self.sub_network_head_size)
-        y = torch.nn.functional.scaled_dot_product_attention(
-            q, k, v, attn_mask=mask, dropout_p=0.0, scale=scale, is_causal=mask is None
-        )
+        scale = 1.0 / math.sqrt(self.sub_attention_scaler or self.sub_network_head_size)
+        # with softcapping we cannot use SDPA
+        if self.config.attention_logit_softcapping is not None:
+            scale = 1.0 / math.sqrt(
+                self.sub_attention_scaler or self.sub_network_head_size
+            )
+            scores = q @ k.mT * scale
+            scores = (
+                torch.tanh(scores / self.config.attention_logit_softcapping)
+                * self.config.attention_logit_softcapping
+            )
+            if mask is None:
+                mask = torch.ones(
+                    q.size(2), q.size(2), dtype=q.dtype, device=q.device
+                ).triu(diagonal=1)
+                mask.masked_fill_(mask.bool(), torch.finfo(q.dtype).min)
+            scores = scores + mask
+            scores = torch.nn.functional.softmax(scores, dim=-1, dtype=torch.float).to(
+                dtype=q.dtype
+            )
+            y = scores @ v
+        else:
+            y = torch.nn.functional.scaled_dot_product_attention(
+                q,
+                k,
+                v,
+                attn_mask=mask,
+                dropout_p=0.0,
+                scale=scale,
+                is_causal=mask is None,
+            )
         return y.transpose(1, 2)
 
     def build_kv_cache(
