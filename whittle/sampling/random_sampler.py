@@ -8,13 +8,13 @@ from syne_tune.config_space import Categorical, Domain
 class RandomSampler:
     def __init__(self, config_space: dict, seed: int | None = None):
         self.config_space = config_space
-        self.rng = np.random.RandomState(seed)
+        self.rng = np.random.default_rng(seed)
 
     def sample(self):
         config = {}
         for hp_name, hparam in self.config_space.items():
             if isinstance(hparam, Domain):
-                config[hp_name] = hparam.sample()
+                config[hp_name] = hparam.sample(random_state=self.rng)
         return config
 
     def get_smallest_sub_network(self):
