@@ -40,7 +40,7 @@ class RandomLinearStrategy(BaseTrainingStrategy):
 
     def __call__(self, model, inputs, outputs, **kwargs):
         total_loss = 0
-        y_supernet = model(inputs).detach()
+        y_supernet = model(inputs)
         if np.random.rand() <= self.rate[self.current_step]:
             # update random sub-networks
             for i in range(self.random_samples):

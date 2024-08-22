@@ -19,7 +19,7 @@ class BaseTrainingStrategy:
         self,
         sampler: RandomSampler,
         loss_function: Callable,
-        kd_loss: DistillLoss | None = None,
+        kd_loss: Callable | None = None,
         device: str = "cuda",
         **kwargs,
     ):
@@ -35,7 +35,7 @@ class BaseTrainingStrategy:
         self.loss_function = loss_function
         self.device = device
         self.kd_loss = kd_loss
-        if self.kd_loss is not None:
+        if isinstance(self.kd_loss, DistillLoss):
             if not isinstance(loss_function, torch.nn.CrossEntropyLoss):
                 raise TypeError(
                     "KD Loss not yet supported: Expected torch.nn.CrossEntropyLoss"

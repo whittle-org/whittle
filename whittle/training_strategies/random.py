@@ -10,7 +10,7 @@ class RandomStrategy(BaseTrainingStrategy):
     Randomly samples and updates `random_samples` sub-networks in each step.
     """
 
-    def __init__(self, random_samples=1, **kwargs):
+    def __init__(self, random_samples: int = 1, **kwargs):
         """
         Initialises a `RandomStrategy`
 
@@ -24,7 +24,7 @@ class RandomStrategy(BaseTrainingStrategy):
     def __call__(self, model, inputs, outputs, **kwargs):
         """Updates randomly sampled sub-networks in each step."""
         total_loss = 0
-        y_supernet = model(inputs).detach()
+        y_supernet = model(inputs)
         for i in range(self.random_samples):
             config = self.sampler.sample()
             model.select_sub_network(config)
