@@ -49,6 +49,7 @@ dev = [
   "pytest>=8",
   "ruff",
   "mypy",
+  "commitizen",
   # -- docs --
   "mike",
   "mkdocs",
