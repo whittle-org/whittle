@@ -24,6 +24,33 @@ pre-commit install
 pytest
 ```
 
+## Conventional commits and Commitizen
+
+We use [commitizen](https://commitizen-tools.github.io/commitizen/) to manage commits.
+This enforces conventional commits.
+
+To make a commit, simply run:
+
+```bash
+cz commit
+```
+
+This will prompt you to enter a commit message and enforce conventional commit formatting.
+
+If you do not use `cz commit` or make a commit with a conventional commit message, **your PR will not pass CI**.
+
+
+## Signing commits
+
+1. [Add a SSH (or GPG) key as a signing key to you GitHub account.](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification#ssh-commit-signature-verification)
+2. [Configure `git` to use the key.](https://docs.github.com/en/authentication/managing-commit-signature-verification/telling-git-about-your-signing-key#telling-git-about-your-ssh-key)
+3. [Configure `commitizen` to use the key.](https://commitizen-tools.github.io/commitizen/config/#signing-commits)
+
+
+```bash
+cz commit
+```
+
 ## Release
 
 Update the version in `pyproject.toml` first, say to `X.Y.Z`.
