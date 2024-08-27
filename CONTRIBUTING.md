@@ -42,14 +42,14 @@ If you do not use `cz commit` or make a commit with a conventional commit messag
 
 ## Signing commits
 
+**Note**: we recommend using SSH keys for signing commits for convenience (e.g., you can use the same key for commit signing and for authentication to GitHub).
+
 1. [Add a SSH (or GPG) key as a signing key to you GitHub account.](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification#ssh-commit-signature-verification)
 2. [Configure `git` to use the key.](https://docs.github.com/en/authentication/managing-commit-signature-verification/telling-git-about-your-signing-key#telling-git-about-your-ssh-key)
-3. [Configure `commitizen` to use the key.](https://commitizen-tools.github.io/commitizen/config/#signing-commits)
 
+**Note**: if you don't configure commit signing globally, you will need to use `git commit -s`/`cz commit -s` to sign your commits.
 
-```bash
-cz commit
-```
+**Warning**: if you don't sign your commits, **your PR will not pass CI**.
 
 ## Release
 
