@@ -1,8 +1,5 @@
 ## Contributing
 
-Work In Progress.
-
-
 ## Installation
 
 ```bash
@@ -49,9 +46,7 @@ If you do not use `cz commit` or make a commit with a conventional commit messag
 
 **Note**: if you don't configure commit signing globally, you will need to use `git commit -s`/`cz commit -s` to sign your commits.
 
-**Warning**: if you don't sign your commits, **your PR will not pass CI**.
-
-## Release
+<!-- ## Release
 
 Update the version in `pyproject.toml` first, say to `X.Y.Z`.
 If you maintain a changelog, update it.
@@ -75,7 +70,7 @@ pip install twine # If not already
 rm -rf ./dist  # Remove anything currently occupying the dist folder
 python -m build --sdist  # Build a source distribution
 twine upload dist/*  # Publish to PyPI
-```
+``` -->
 
 ## Documentation
 
