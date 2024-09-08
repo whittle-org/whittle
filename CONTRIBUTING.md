@@ -1,8 +1,5 @@
 ## Contributing
 
-Work In Progress.
-
-
 ## Installation
 
 ```bash
@@ -24,7 +21,32 @@ pre-commit install
 pytest
 ```
 
-## Release
+## Conventional commits and Commitizen
+
+We use [commitizen](https://commitizen-tools.github.io/commitizen/) to manage commits.
+This enforces conventional commits.
+
+To make a commit, simply run:
+
+```bash
+cz commit
+```
+
+This will prompt you to enter a commit message and enforce conventional commit formatting.
+
+If you do not use `cz commit` or make a commit with a conventional commit message, **your PR will not pass CI**.
+
+
+## Signing commits
+
+**Note**: we recommend using SSH keys for signing commits for convenience (e.g., you can use the same key for commit signing and for authentication to GitHub).
+
+1. [Add a SSH (or GPG) key as a signing key to you GitHub account.](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification#ssh-commit-signature-verification)
+2. [Configure `git` to use the key.](https://docs.github.com/en/authentication/managing-commit-signature-verification/telling-git-about-your-signing-key#telling-git-about-your-ssh-key)
+
+**Note**: if you don't configure commit signing globally, you will need to use `git commit -s`/`cz commit -s` to sign your commits.
+
+<!-- ## Release
 
 Update the version in `pyproject.toml` first, say to `X.Y.Z`.
 If you maintain a changelog, update it.
@@ -48,7 +70,7 @@ pip install twine # If not already
 rm -rf ./dist  # Remove anything currently occupying the dist folder
 python -m build --sdist  # Build a source distribution
 twine upload dist/*  # Publish to PyPI
-```
+``` -->
 
 ## Documentation
 
