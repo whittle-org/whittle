@@ -1,13 +1,8 @@
-import math
 import numpy as np
 import matplotlib.pyplot as plt
-import pickle
 from tqdm import tqdm
 import tiktoken
-import math
-import inspect
-from syne_tune.config_space import randint, lograndint, choice
-from dataclasses import dataclass
+from syne_tune.config_space import randint
 
 import torch
 import torch.nn as nn
@@ -17,8 +12,6 @@ from whittle.sampling.random_sampler import RandomSampler
 from whittle.training_strategies.sandwich import SandwichStrategy
 
 from datasets import load_dataset
-from tqdm import tqdm
-import transformers
 
 
 def evaluate_wikitext(model, tokenizer):
@@ -33,7 +26,7 @@ def evaluate_wikitext(model, tokenizer):
     model.eval()
     for begin_loc in tqdm(range(0, seq_len, max_length)):
         end_loc = min(begin_loc + max_length, seq_len - 1)
-        trg_len = end_loc - prev_end_loc  # may be different from stride on last loop
+        _ = end_loc - prev_end_loc  # may be different from stride on last loop
         input_ids = encodings.input_ids[:, begin_loc:end_loc].to(device)
         target_ids = input_ids.clone()
         target_ids = encodings.input_ids[:, begin_loc + 1 : end_loc + 1].to(device)
@@ -132,7 +125,9 @@ def plot_losses(losses, verbosity, val_losses=None):
     plt.show()
 
 
-def get_batch(split: str, block_size: int = 8, batch_size: int = 4, device: str = None):
+def get_batch(
+    split: str, block_size: int = 8, batch_size: int = 4, device: str = "cuda"
+):
     """Gets a randomized batch from the split of data chosen.
 
     Arguments
@@ -192,7 +187,7 @@ def train_and_evaluate_model(
     num_train_steps: int = 10000,
     verbosity_len: int = 1000,
     eval_iters: int = 500,
-    plot_loss: str = True,
+    plot_loss: bool = True,
     device: str = "cpu",
     **kwargs,
 ):
@@ -223,7 +218,7 @@ def train_and_evaluate_model(
         B, T = xb.shape
         # evaluate loss on the batch
         optimizer.zero_grad(set_to_none=True)
-        loss = train_strategy(model, xb, yb.view(B * T))
+        _ = train_strategy(model, xb, yb.view(B * T))
 
         # gradient update
         optimizer.step()
@@ -245,7 +240,7 @@ def train_and_evaluate_model(
 
 
 global data, train_data, valid_data
-with open("input.txt", "r", encoding="utf-8") as f:
+with open("input.txt", encoding="utf-8") as f:
     text = f.read()
 
 # Checking all the unique characters that occur in this text
