@@ -233,7 +233,6 @@ def estimate_loss(model: nn.Module, eval_iters: int):
             X, Y = get_batch(split)
             B, T = X.shape
             # evaluate loss on the batch
-            model.reset_super_network()
             logits = model(X)
             logits = logits.view(B * T, -1)
             targets = Y.view(B * T)
@@ -293,6 +292,7 @@ def train_and_evaluate_model(
 
         # every once in a while evaluate the loss on train and val sets
         if iter % verbosity_len == 0 or iter == num_train_steps - 1:
+            model.reset_super_network()
             _losses = estimate_loss(model, eval_iters)
             train_losses.append(_losses['train'])
             valid_losses.append(_losses['valid'])
