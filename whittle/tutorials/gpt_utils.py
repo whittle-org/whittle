@@ -120,7 +120,6 @@ def encode(s):
     return [stoi[c] for c in s]
 
 
-
 def plot_losses(losses, verbosity, val_losses=None):
     # plt.clf()
     plt.plot(losses, label="train")
