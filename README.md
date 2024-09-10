@@ -25,6 +25,9 @@ git clone git@github.com:whittle-org/whittle.git
 cd whittle
 pip install -e .
 ```
+### Get started with whittle  
+
+To explore and understand different functionalities of ```whittle``` checkout [this](https://colab.research.google.com/drive/1xFhsHrqJGQnFuigLCqKHsJFLsJwksl4v?usp=sharing) colab notebook
 
 ## Projects that use whittle
 
