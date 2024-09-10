@@ -120,10 +120,6 @@ def encode(s):
     return [stoi[c] for c in s]
 
 
-# Decoder: take a list of integers, output a string
-def decode(l):
-    return "".join([itos[i] for i in l])
-
 
 def plot_losses(losses, verbosity, val_losses=None):
     # plt.clf()
@@ -135,77 +131,6 @@ def plot_losses(losses, verbosity, val_losses=None):
     plt.xlabel(f"Num steps (~{verbosity}x)")
     plt.xlim(0, len(losses))
     plt.show()
-
-
-def configure_optimizers(
-    model, weight_decay, learning_rate, betas, device_type, weight_tying
-):
-    # separate out all parameters to those that will and won't experience regularizing weight decay
-    decay = set()
-    no_decay = set()
-    whitelist_weight_modules = (torch.nn.Linear,)
-    blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
-    for mn, m in model.named_modules():
-        for pn, p in m.named_parameters():
-            fpn = "%s.%s" % (mn, pn) if mn else pn  # full param name
-            # random note: because named_modules and named_parameters are recursive
-            # we will see the same tensors p many many times. but doing it this way
-            # allows us to know which parent module any tensor p belongs to...
-            if pn.endswith("bias"):
-                # all biases will not be decayed
-                no_decay.add(fpn)
-            elif pn.endswith("weight") and isinstance(m, whitelist_weight_modules):
-                # weights of whitelist modules will be weight decayed
-                decay.add(fpn)
-            elif pn.endswith("weight") and isinstance(m, blacklist_weight_modules):
-                # weights of blacklist modules will NOT be weight decayed
-                no_decay.add(fpn)
-    # print(no_decay)
-    # print(decay)
-    # subtle: 'transformer.wte.weight' and 'lm_head.weight' are tied, so they
-    # will appear in the no_decay and decay sets respectively after the above.
-    # In addition, because named_parameters() doesn't return duplicates, it
-    # will only return the first occurence, key'd by 'transformer.wte.weight', below.
-    # so let's manually remove 'lm_head.weight' from decay set. This will include
-    # this tensor into optimization via transformer.wte.weight only, and not decayed.
-    if weight_tying:
-        decay.remove("lm_head.weight")
-
-    # validate that we considered every parameter
-    param_dict = {pn: p for pn, p in model.named_parameters()}
-    inter_params = decay & no_decay
-    union_params = decay | no_decay
-    # print(len(param_dict.keys() - union_params))
-    assert len(inter_params) == 0, (
-        "parameters %s made it into both decay/no_decay sets!" % (str(inter_params),)
-    )
-    assert len(param_dict.keys() - union_params) == 0, (
-        "parameters %s were not separated into either decay/no_decay set!"
-        % (str(param_dict.keys() - union_params),)
-    )
-
-    # create the pytorch optimizer object
-    optim_groups = [
-        {
-            "params": [param_dict[pn] for pn in sorted(list(decay))],
-            "weight_decay": weight_decay,
-        },
-        {
-            "params": [param_dict[pn] for pn in sorted(list(no_decay))],
-            "weight_decay": 0.0,
-        },
-    ]
-    # new PyTorch nightly has a new 'fused' option for AdamW that is much faster
-    use_fused = (device_type == "cuda") and (
-        "fused" in inspect.signature(torch.optim.AdamW).parameters
-    )
-    print(f"using fused AdamW: {use_fused}")
-    extra_args = dict(fused=True) if use_fused else dict()
-    optimizer = torch.optim.AdamW(
-        optim_groups, lr=learning_rate, betas=betas, **extra_args
-    )
-
-    return optimizer
 
 
 def get_batch(split: str, block_size: int = 8, batch_size: int = 4, device: str = None):
@@ -318,20 +243,6 @@ def train_and_evaluate_model(
 
     if plot_loss:
         plot_losses(train_losses, verbosity_len, valid_losses)
-
-
-def get_lr(it):
-    # 1) linear warmup for warmup_iters steps
-    if it < warmup_iters:
-        return learning_rate * it / warmup_iters
-    # 2) if it > lr_decay_iters, return min learning rate
-    if it > lr_decay_iters:
-        return min_lr
-    # 3) in between, use cosine decay down to min learning rate
-    decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
-    assert 0 <= decay_ratio <= 1
-    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
-    return min_lr + coeff * (learning_rate - min_lr)
 
 
 global data, train_data, valid_data
