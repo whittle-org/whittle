@@ -40,12 +40,17 @@ def params_layer_normalization(normalization_layer: nn.Module):
 
 
 def params_attention_layer(attention: CausalSelfAttention):
-    # TODO: generalize to QHA
     dmodel = attention.sub_network_n_embd
     dhead = attention.sub_network_head_size
     num_heads = attention.sub_network_n_head
-    n_attention = (dmodel * dhead + dhead) * num_heads * 3
-    n_attention += dmodel * dmodel + dmodel  # output
+    num_query_groups = attention.sub_network_query_groups
+    qkv_dim = (num_heads + 2 * num_query_groups) * dhead
+    n_attention = dmodel * qkv_dim
+    if attention.attn.use_bias:
+        n_attention += qkv_dim
+    n_attention += dmodel * dmodel  # output
+    if attention.proj.use_bias:
+        n_attention += dmodel
 
     return n_attention
 
@@ -86,6 +91,11 @@ def compute_parameters_sub_network_gpt(model: GPT):
         block = model.transformer.h[i]
         num_params += params_mlp(block.mlp)
         num_params += params_attention_layer(block.attn)
+
+        num_params += params_layer_normalization(block.norm_1)
+        num_params += params_layer_normalization(block.norm_2)
+    num_params += params_layer_normalization(model.transformer.ln_f)
+    return num_params
 
         num_params += params_layer_normalization(block.norm_1)
         num_params += params_layer_normalization(block.norm_2)
