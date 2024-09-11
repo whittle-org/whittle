@@ -96,8 +96,3 @@ def compute_parameters_sub_network_gpt(model: GPT):
         num_params += params_layer_normalization(block.norm_2)
     num_params += params_layer_normalization(model.transformer.ln_f)
     return num_params
-
-        num_params += params_layer_normalization(block.norm_1)
-        num_params += params_layer_normalization(block.norm_2)
-    num_params += params_layer_normalization(model.transformer.ln_f)
-    return num_params
