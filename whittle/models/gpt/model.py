@@ -43,7 +43,7 @@ class GPT(nn.Module):
         self.max_layer = config.n_layer
         self.max_seq_length = self.config.block_size
         self.mask_cache: torch.Tensor | None = None
-        self.intermediate_activations = {}
+        self.intermediate_out = {}
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_intermediate_size = self.config.intermediate_size
@@ -128,6 +128,10 @@ class GPT(nn.Module):
         sub_network_query_groups=None,
         sub_network_head_size=None,
         sample_random_indices: bool = False,
+        index_mlp=None,
+        index_head=None,
+        index_emb=None,
+        index_block=None,
     ) -> None:
         self.sample_random_indices = sample_random_indices
         self.sub_network_head_size = sub_network_head_size
@@ -141,12 +145,18 @@ class GPT(nn.Module):
         self.transformer.ln_f.set_sub_network(
             self.sub_network_n_embd, sample_random_indices
         )
-        if sample_random_indices and sub_network_n_layers < self.config.n_layer:
-            self.random_layers = torch.randperm(self.config.n_layer)[
-                :sub_network_n_layers
-            ]
+        if index_block is not None:
+            self.random_layers = []
+            for i in range(self.sub_network_n_layers):
+                if index_block != i:
+                    self.random_layers.append(i)
         else:
-            self.random_layers = list(range(self.sub_network_n_layers))
+            if sample_random_indices and sub_network_n_layers < self.config.n_layer:
+                self.random_layers = torch.randperm(self.config.n_layer)[
+                    :sub_network_n_layers
+                ]
+            else:
+                self.random_layers = list(range(self.sub_network_n_layers))
 
         for i, j in enumerate(self.random_layers):
             block = self.transformer.h[j]
@@ -157,6 +167,7 @@ class GPT(nn.Module):
                 sub_network_query_groups,
                 sub_network_head_size,
                 sample_random_indices,
+                index_mlp=index_mlp,
             )
         self.lm_head.set_sub_network(
             sub_network_n_embd, self.config.padded_vocab_size, sample_random_indices
