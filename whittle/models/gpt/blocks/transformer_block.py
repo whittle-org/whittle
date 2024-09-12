@@ -118,3 +118,46 @@ class Block(litgpt.model.Block):
             self.post_mlp_norm, RMSNorm
         ):
             self.post_mlp_norm.reset_super_network()
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        cos: torch.Tensor,
+        sin: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+        input_pos: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Non-parallel residual       Parallel residual
+           ┌─ x                     ┌─ x ──────────────────┐             Note: if `shared_attention_norm` is True,
+           │  ↓                     │  ↓                   ↓                   the output from `norm_1` is reused
+           │  norm_1                │  norm_1  ───────►    norm_2
+           │  ↓                     │  ↓                   ↓
+           │  attn                  │  attn                MLP
+           │  ↓                     │  ↓                   ↓
+           |  post_attn_norm        |  post_attn_norm      post_mlp_norm
+           |  ↓                     |  ↓                   ↓
+        ┌─ └► +                     └► + ◄─────────────────┘
+        |     ↓
+        │     norm_2
+        │     ↓
+        │     MLP
+        │     ↓
+        |     post_mlp_norm
+        |     ↓
+        └───► +
+        """
+
+        x_normed = self.norm_1(x)
+        attention_output_base = self.attn(x_normed, cos, sin, mask, input_pos)
+        attention_output = self.post_attention_norm(attention_output_base)
+
+        if self.config.parallel_residual:
+            x_normed = x_normed if self.config.shared_attention_norm else self.norm_2(x)
+            mlp_out = self.mlp(x_normed)
+            x = mlp_out + attention_output + x
+        else:
+            x = attention_output + x
+            mlp_out = self.mlp(self.norm_2(x))
+            x = self.post_mlp_norm(mlp_out) + x
+        return x, attention_output_base, mlp_out

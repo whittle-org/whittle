@@ -43,7 +43,7 @@ class GPT(nn.Module):
         self.max_layer = config.n_layer
         self.max_seq_length = self.config.block_size
         self.mask_cache: torch.Tensor | None = None
-
+        self.intermediate_activations = {}
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_intermediate_size = self.config.intermediate_size
@@ -248,8 +248,12 @@ class GPT(nn.Module):
 
             cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
 
-            x = block(x, cos, sin, mask, input_pos)
+            x, attention_out, mlp_out = block(x, cos, sin, mask, input_pos)
+            self.intermediate_out[f"block_{j}"] = x.detach()
+            self.intermediate_out[f"attn_{j}"] = attention_out.detach()
+            self.intermediate_out[f"mlp_{j}"] = mlp_out.detach()
         x = self.transformer.ln_f(x)
+        self.intermediate_out[f"ln_f"] = x.detach()
         x = self.lm_head(x)  # (b, t, vocab_size)
         if self.config.final_logit_softcapping is not None:
             x = (
