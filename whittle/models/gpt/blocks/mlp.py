@@ -51,6 +51,11 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         self.fc.reset_super_network()
         self.proj.reset_super_network()
 
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x_fc = self.fc(x)
+        x = torch.nn.functional.gelu(x_fc, approximate=self.config.gelu_approximate)
+        return self.proj(x), x_fc
+
 
 class LLaMAMLP(litgpt.model.LLaMAMLP):
     def __init__(self, config: Config) -> None:
@@ -97,6 +102,12 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         self.fc_2.reset_super_network()
         self.proj.reset_super_network()
 
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x_fc_1 = self.fc_1(x)
+        x_fc_2 = self.fc_2(x)
+        x = torch.nn.functional.silu(x_fc_1) * x_fc_2
+        return self.proj(x), x_fc_1
+
 
 class GemmaMLP(LLaMAMLP):
     def __init__(self, config: Config) -> None:
@@ -109,4 +120,4 @@ class GemmaMLP(LLaMAMLP):
             torch.nn.functional.gelu(x_fc_1, approximate=self.config.gelu_approximate)
             * x_fc_2
         )
-        return self.proj(x)
+        return self.proj(x), x_fc_1

@@ -259,12 +259,21 @@ class GPT(nn.Module):
 
             cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
 
-            x, attention_out, mlp_out = block(x, cos, sin, mask, input_pos)
+            x, attention_out, mlp_out, norm1, norm2 = block(
+                x, cos, sin, mask, input_pos
+            )
             self.intermediate_out[f"block_{j}"] = x.detach()
-            self.intermediate_out[f"attn_{j}"] = attention_out.detach()
+            self.intermediate_out[f"attn_{j}"] = [
+                attention_out[0].detach(),
+                attention_out[1].detach(),
+                attention_out[2].detach(),
+                attention_out[3],
+            ]
             self.intermediate_out[f"mlp_{j}"] = mlp_out.detach()
+            self.intermediate_out[f"norm1_{j}"] = norm1.detach()
+            self.intermediate_out[f"norm2_{j}"] = norm2.detach()
         x = self.transformer.ln_f(x)
-        self.intermediate_out[f"ln_f"] = x.detach()
+        self.intermediate_out[f"norm_f"] = x.detach()
         x = self.lm_head(x)  # (b, t, vocab_size)
         if self.config.final_logit_softcapping is not None:
             x = (

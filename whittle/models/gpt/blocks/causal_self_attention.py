@@ -48,6 +48,7 @@ class CausalSelfAttention(nn.Module):
         sub_network_query_groups=None,
         sub_network_head_size=None,
         sample_random_indices: bool = False,
+        index_head=None,
     ):
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_n_head = sub_network_n_head
@@ -201,7 +202,7 @@ class CausalSelfAttention(nn.Module):
         y = y.reshape(
             B, T, self.sub_network_head_size * self.sub_network_n_head
         )  # re-assemble all head outputs side by side
-        return self.proj(y)
+        return self.proj(y), [q, k, v, mask]
 
     def scaled_dot_product_attention(
         self,

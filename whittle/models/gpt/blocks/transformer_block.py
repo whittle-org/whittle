@@ -154,15 +154,18 @@ class Block(litgpt.model.Block):
         """
 
         x_normed = self.norm_1(x)
-        attention_output_base = self.attn(x_normed, cos, sin, mask, input_pos)
-        attention_output = self.post_attention_norm(attention_output_base)
+        attention_output, before_proj = self.attn(x_normed, cos, sin, mask, input_pos)
+        attention_output = self.post_attention_norm(attention_output)
 
         if self.config.parallel_residual:
-            x_normed = x_normed if self.config.shared_attention_norm else self.norm_2(x)
-            mlp_out = self.mlp(x_normed)
+            x_normed_2 = (
+                x_normed if self.config.shared_attention_norm else self.norm_2(x)
+            )
+            mlp_out, fc = self.mlp(x_normed_2)
             x = mlp_out + attention_output + x
         else:
             x = attention_output + x
-            mlp_out = self.mlp(self.norm_2(x))
+            x_normed_2 = self.norm_2(x)
+            mlp_out, fc = self.mlp(x_normed_2)
             x = self.post_mlp_norm(mlp_out) + x
-        return x, attention_output_base, mlp_out
+        return x, before_proj, fc, x_normed, x_normed_2
