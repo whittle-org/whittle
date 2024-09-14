@@ -128,9 +128,6 @@ class GPT(nn.Module):
         sub_network_query_groups=None,
         sub_network_head_size=None,
         sample_random_indices: bool = False,
-        index_mlp=None,
-        index_head=None,
-        index_emb=None,
         index_block=None,
     ) -> None:
         self.sample_random_indices = sample_random_indices
@@ -167,7 +164,6 @@ class GPT(nn.Module):
                 sub_network_query_groups,
                 sub_network_head_size,
                 sample_random_indices,
-                index_mlp=index_mlp,
             )
         self.lm_head.set_sub_network(
             sub_network_n_embd, self.config.padded_vocab_size, sample_random_indices

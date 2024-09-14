@@ -29,8 +29,6 @@ class Linear(nn.Linear):
         sub_network_in_features: int,
         sub_network_out_features: int,
         sample_random_indices: bool = False,
-        index_in=None,
-        index_out=None,
     ):
         self.sub_network_in_features = sub_network_in_features
         self.sub_network_out_features = sub_network_out_features
@@ -40,10 +38,6 @@ class Linear(nn.Linear):
             self.random_indices_in_features = torch.randperm(self.in_features)[
                 : self.sub_network_in_features
             ]
-        if index_out is not None:
-            self.random_indices_out_features = torch.tensor(index_out)
-        if index_in is not None:
-            self.random_indices_in_features = torch.tensor(index_in)
         if sample_random_indices and self.sub_network_out_features < self.out_features:
             self.random_indices_out_features = torch.randperm(self.out_features)[
                 : self.sub_network_out_features

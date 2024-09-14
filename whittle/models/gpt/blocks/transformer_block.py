@@ -69,10 +69,6 @@ class Block(litgpt.model.Block):
         sub_network_query_groups=None,
         sub_network_head_size=None,
         sample_random_indices: bool = False,
-        index_mlp=None,
-        index_head=None,
-        index_emb=None,
-        index_block=None,
     ) -> None:
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
@@ -97,7 +93,6 @@ class Block(litgpt.model.Block):
             self.sub_network_n_embd,
             self.sub_network_intermediate_size,
             sample_random_indices,
-            index=index_mlp,
         )
         if isinstance(self.post_mlp_norm, LayerNorm) or isinstance(
             self.post_mlp_norm, RMSNorm
