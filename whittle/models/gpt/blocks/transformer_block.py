@@ -153,9 +153,7 @@ class Block(litgpt.model.Block):
         attention_output = self.post_attention_norm(attention_output)
 
         if self.config.parallel_residual:
-            x_normed_2 = (
-                x_normed if self.config.shared_attention_norm else self.norm_2(x)
-            )
+            x_normed_2 = x_normed if self.config.shared_attention_norm else self.norm_2(x)
             mlp_out, fc = self.mlp(x_normed_2)
             x = mlp_out + attention_output + x
         else:

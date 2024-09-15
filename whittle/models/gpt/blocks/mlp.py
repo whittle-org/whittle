@@ -50,8 +50,10 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x_fc = self.fc(x)
+        #print("Sum after fc", torch.sum(x_fc))
         x = torch.nn.functional.gelu(x_fc, approximate=self.config.gelu_approximate)
-        return self.proj(x), x_fc
+        #print("Sum after proj", torch.sum(self.proj(x)))
+        return self.proj(x), x_fc 
 
 
 class LLaMAMLP(litgpt.model.LLaMAMLP):
@@ -104,7 +106,6 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         x_fc_2 = self.fc_2(x)
         x = torch.nn.functional.silu(x_fc_1) * x_fc_2
         return self.proj(x), x_fc_1
-
 
 class GemmaMLP(LLaMAMLP):
     def __init__(self, config: Config) -> None:

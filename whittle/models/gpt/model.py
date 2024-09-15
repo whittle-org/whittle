@@ -128,7 +128,8 @@ class GPT(nn.Module):
         sub_network_query_groups=None,
         sub_network_head_size=None,
         sample_random_indices: bool = False,
-        index_block=None,
+        index_block = None,
+        random_layers = None
     ) -> None:
         self.sample_random_indices = sample_random_indices
         self.sub_network_head_size = sub_network_head_size
@@ -145,8 +146,10 @@ class GPT(nn.Module):
         if index_block is not None:
             self.random_layers = []
             for i in range(self.sub_network_n_layers):
-                if index_block != i:
+                if index_block != i :
                     self.random_layers.append(i)
+        elif random_layers is not None:
+            self.random_layers = random_layers
         else:
             if sample_random_indices and sub_network_n_layers < self.config.n_layer:
                 self.random_layers = torch.randperm(self.config.n_layer)[
@@ -163,7 +166,7 @@ class GPT(nn.Module):
                 sub_network_num_heads[i],
                 sub_network_query_groups,
                 sub_network_head_size,
-                sample_random_indices,
+                sample_random_indices
             )
         self.lm_head.set_sub_network(
             sub_network_n_embd, self.config.padded_vocab_size, sample_random_indices
@@ -188,6 +191,7 @@ class GPT(nn.Module):
             block = self.transformer.h[i]
             block.reset_super_network()
         self.lm_head.reset_super_network()
+        self.random_layers = list(range(self.config.n_layer))
 
     def process_rope_cache(self, cos, sin, input_pos, T):
         if input_pos is not None:  # use the kv cache
@@ -212,6 +216,7 @@ class GPT(nn.Module):
             )
 
         x = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
+        #print("Sum after emb", torch.sum(x))
         if self.config.scale_embeddings:
             x = x * torch.tensor(self.config.n_embd**0.5, dtype=x.dtype)
         for i, j in enumerate(self.random_layers):
@@ -255,22 +260,17 @@ class GPT(nn.Module):
 
             cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
 
-            x, attention_out, mlp_out, norm1, norm2 = block(
-                x, cos, sin, mask, input_pos
-            )
+            x, attention_out, mlp_out, norm1, norm2 = block(x, cos, sin, mask, input_pos)
             self.intermediate_out[f"block_{j}"] = x.detach()
-            self.intermediate_out[f"attn_{j}"] = [
-                attention_out[0].detach(),
-                attention_out[1].detach(),
-                attention_out[2].detach(),
-                attention_out[3],
-            ]
+            self.intermediate_out[f"attn_{j}"] = [attention_out[0].detach(),attention_out[1].detach(),attention_out[2].detach(),attention_out[3]]
             self.intermediate_out[f"mlp_{j}"] = mlp_out.detach()
             self.intermediate_out[f"norm1_{j}"] = norm1.detach()
             self.intermediate_out[f"norm2_{j}"] = norm2.detach()
+            #print("Sum after block", torch.sum(x))
         x = self.transformer.ln_f(x)
         self.intermediate_out[f"norm_f"] = x.detach()
         x = self.lm_head(x)  # (b, t, vocab_size)
+        #print("Sum after head", torch.sum(x))
         if self.config.final_logit_softcapping is not None:
             x = (
                 torch.tanh(x / self.config.final_logit_softcapping)
