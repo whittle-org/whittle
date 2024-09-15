@@ -181,6 +181,7 @@ class GPT(nn.Module):
             block = self.transformer.h[i]
             block.reset_super_network()
         self.lm_head.reset_super_network()
+        self.random_layers = list(range(self.config.n_layer))
 
     def process_rope_cache(self, cos, sin, input_pos, T):
         if input_pos is not None:  # use the kv cache
