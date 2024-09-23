@@ -9,6 +9,7 @@ import transformers
 from accelerate import (
     find_executable_batch_size,
 )
+from litgpt.generate.base import sample_top_p
 from litgpt.generate.base import generate
 from lm_eval import utils
 from lm_eval.api.instance import Instance
@@ -562,7 +563,7 @@ class WhittleLM(TemplateLM):
         if first_turn or max_length > self.model.max_seq_length:
             self.model.max_seq_length = max_length
             self.model.set_kv_cache(batch_size=1, device=self.device)
-        # print(generation_kwargs)
+        print(generation_kwargs)
         outputs = []
         for i in range(context.shape[0]):
             outputs.append(
@@ -839,11 +840,16 @@ class WhittleLM(TemplateLM):
                     "attn_mask": batched_encoder_mask,
                     "labels": batched_conts,
                 }
-
-            multi_logits = F.log_softmax(
-                self._model_call(batched_inps, **call_kwargs), dim=-1
-            )  # [batch, padding_length (inp or cont), vocab]
-
+            if model.name.startswith("Llama-3.1"):
+                multi_logits = F.log_softmax(
+                    self._model_call(batched_inps, **call_kwargs), dim=-1
+                )/0.6  # [batch, padding_length (inp or cont), vocab]
+                multi_logits = sample_top_p(multi_logits, 0.9)
+            else:
+                multi_logits = F.log_softmax(
+                    self._model_call(batched_inps, **call_kwargs), dim=-1
+                 ) # [batch, padding_length (inp or cont), vocab]
+                      
             for (request_str, ctx_tokens, _), logits, inplen, cont_toks in zip(
                 chunk, multi_logits, inplens, cont_toks_list
             ):
@@ -1056,3 +1062,4 @@ class WhittleLM(TemplateLM):
         return self.tokenizer.apply_chat_template(
             chat_history, tokenize=False, add_generation_prompt=True
         )
+
