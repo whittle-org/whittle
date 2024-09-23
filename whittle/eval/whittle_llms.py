@@ -840,11 +840,12 @@ class WhittleLM(TemplateLM):
                     "attn_mask": batched_encoder_mask,
                     "labels": batched_conts,
                 }
-            if self.model.name.startswith("Llama-3.1"):
+            if self.model.config.name.startswith("Llama-3.1"):
+                multi_logits = self._model_call(batched_inps, **call_kwargs)/0.6
                 multi_logits = F.log_softmax(
-                    self._model_call(batched_inps, **call_kwargs), dim=-1
-                )/0.6  # [batch, padding_length (inp or cont), vocab]
-                multi_logits = sample_top_p(multi_logits, 0.9)
+                    multi_logits, dim=-1
+                )  # [batch, padding_length (inp or cont), vocab]
+                
             else:
                 multi_logits = F.log_softmax(
                     self._model_call(batched_inps, **call_kwargs), dim=-1
@@ -1062,4 +1063,5 @@ class WhittleLM(TemplateLM):
         return self.tokenizer.apply_chat_template(
             chat_history, tokenize=False, add_generation_prompt=True
         )
+
 
