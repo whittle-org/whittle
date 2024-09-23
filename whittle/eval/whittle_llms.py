@@ -840,7 +840,7 @@ class WhittleLM(TemplateLM):
                     "attn_mask": batched_encoder_mask,
                     "labels": batched_conts,
                 }
-            if model.name.startswith("Llama-3.1"):
+            if self.model.name.startswith("Llama-3.1"):
                 multi_logits = F.log_softmax(
                     self._model_call(batched_inps, **call_kwargs), dim=-1
                 )/0.6  # [batch, padding_length (inp or cont), vocab]
