@@ -283,7 +283,7 @@ class Test_WhittleLM:
         context = LM.tok_batch_encode([self.TEST_STRING])[0]
         res = LM._model_generate(context.to(gpt.device), max_length=10, stop=["\n\n"])
         res = LM.tok_decode(res[0])
-        assert res == "foo bar\n<bazhang>!info bar"
+        assert res == "foo bar\n<bazhang> !info bar"
 
     def test_evaluate(self, checkpoint_dir, out_dir):
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
