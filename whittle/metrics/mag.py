@@ -50,6 +50,8 @@ def weight_magnitude_mlp(mlp):
 
 
 def weight_magnitude_layer_norm(layer):
+    if layer is None:
+        return 0
     if isinstance(layer, LayerNorm):
         n = layer.sub_network_in_features
         mag = torch.sum(torch.abs(layer.weight[:n]))

@@ -28,6 +28,8 @@ def params_embedding_layer(embedding: Embedding):
 
 
 def params_layer_normalization(normalization_layer: nn.Module):
+    if normalization_layer is None:
+        return 0
     if isinstance(normalization_layer, LayerNorm):
         return 2 * normalization_layer.sub_network_in_features
     elif isinstance(normalization_layer, RMSNorm):
