@@ -14,6 +14,7 @@ import torch
 import torch.nn as nn
 from litgpt import Config
 from litgpt.model import build_rope_cache
+from litgpt.model import batched_index_select
 from whittle.models.gpt.blocks import Block
 from whittle.modules.embedding import Embedding
 from whittle.modules.layernorm import LayerNorm
@@ -202,8 +203,8 @@ class GPT(torch.nn.Module):
             block = self.transformer.h[j]
             block.set_sub_network(
                 sub_network_n_embd,
-                sub_network_intermediate_size[i],
-                sub_network_num_heads[i],
+                sub_network_intermediate_size[j],
+                sub_network_num_heads[j],
                 sub_network_query_groups,
                 sub_network_head_size,
                 sample_random_indices,
@@ -235,11 +236,15 @@ class GPT(torch.nn.Module):
 
     def process_rope_cache(self, cos, sin, input_pos, T):
         if input_pos is not None:  # use the kv cache
-            cos = cos.index_select(0, input_pos)
-            sin = sin.index_select(0, input_pos)
+            cos = batched_index_select(self.cos, 0, input_pos)
+            sin = batched_index_select(self.sin, 0, input_pos)
             if self.mask_cache is None:
                 raise TypeError("You need to call `gpt.set_kv_cache()`")
-            mask = self.mask_cache.index_select(2, input_pos)
+            mask = batched_index_select(self.mask_cache, 2, input_pos)
+            if mask.dim() > 4:
+                # the mask cache has a batch dim of 1 in addition to the one
+                # we get if input_pos has a batch dimension
+                mask = mask.squeeze(1)
         else:
             cos = cos[:T]
             sin = sin[:T]
@@ -266,7 +271,7 @@ class GPT(torch.nn.Module):
                         seq_len=self.max_seq_length,
                         n_elem=int(
                             self.config.rotary_percentage
-                            * (self.sub_network_n_embd // self.sub_network_num_heads[i])
+                            * (self.sub_network_n_embd // self.sub_network_num_heads[j])
                         ),
                         device=self.device,
                     )
