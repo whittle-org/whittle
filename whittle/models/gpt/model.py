@@ -81,18 +81,26 @@ class GPT(torch.nn.Module):
         self._max_seq_length = value
         if not hasattr(self, "cos"):
             # first call
-            cos, sin = self.rope_cache(self._max_seq_length,self.config.rope_n_elem)
+            cos, sin = self.rope_cache(self._max_seq_length, self.config.rope_n_elem)
             self.register_buffer("cos", cos, persistent=False)
             self.register_buffer("sin", sin, persistent=False)
         # override
         elif value != self.cos.size(0):
-            self.cos, self.sin = self.rope_cache(seq_len=self._max_seq_length,n_elem=self.config.rope_n_elem,device=self.cos.device)
+            self.cos, self.sin = self.rope_cache(
+                seq_len=self._max_seq_length,
+                n_elem=self.config.rope_n_elem,
+                device=self.cos.device,
+            )
         # the mask and kv cache size will get updated on `set_kv_cache`. we cannot update it here because we don't know
         # if the kv cache is expected
 
     def reset_parameters(self) -> None:
         # Trigger resetting the rope-cache
-        self.cos, self.sin = self.rope_cache(seq_len=self._max_seq_length,n_elem=self.config.rope_n_elem,device=self.cos.device)
+        self.cos, self.sin = self.rope_cache(
+            seq_len=self._max_seq_length,
+            n_elem=self.config.rope_n_elem,
+            device=self.cos.device,
+        )
 
     def _init_weights(self, module: nn.Module) -> None:
         """Meant to be used with `gpt.apply(gpt._init_weights)`."""
@@ -108,14 +116,22 @@ class GPT(torch.nn.Module):
             self.transformer.wte.weight = self.lm_head.weight
 
     def rope_cache(
-        self, seq_len:int, n_elem:int, device: torch.device | None = None
+        self, seq_len: int, n_elem: int, device: torch.device | None = None
     ) -> tuple[torch.Tensor, torch.Tensor]:
         if self.config.rope_adjustments is None:
             extra_config = None
 
         else:
-            adjusted_params_required = ["factor", "low_freq_factor", "high_freq_factor", "original_max_seq_len"]
-            params_present = [param in self.config.rope_adjustments for param in adjusted_params_required]
+            adjusted_params_required = [
+                "factor",
+                "low_freq_factor",
+                "high_freq_factor",
+                "original_max_seq_len",
+            ]
+            params_present = [
+                param in self.config.rope_adjustments
+                for param in adjusted_params_required
+            ]
             num_params_present = sum(params_present)
 
             if num_params_present == 0:
@@ -123,14 +139,22 @@ class GPT(torch.nn.Module):
             elif num_params_present == 4:
                 # These parameters should always be used together so that we don't interfere with standard rope
                 extra_config = {
-                    "original_max_seq_len": self.config.rope_adjustments["original_max_seq_len"],
+                    "original_max_seq_len": self.config.rope_adjustments[
+                        "original_max_seq_len"
+                    ],
                     "factor": self.config.rope_adjustments["factor"],
                     "low_freq_factor": self.config.rope_adjustments["low_freq_factor"],
-                    "high_freq_factor": self.config.rope_adjustments["high_freq_factor"],
+                    "high_freq_factor": self.config.rope_adjustments[
+                        "high_freq_factor"
+                    ],
                 }
             else:
                 # Some but not all parameters are specified; raise an error
-                missing_params = [param for param, present in zip(adjusted_params_required, params_present) if not present]
+                missing_params = [
+                    param
+                    for param, present in zip(adjusted_params_required, params_present)
+                    if not present
+                ]
                 raise ValueError(
                     f"The following adjusted RoPE parameters are missing in rope_adjustments: {', '.join(missing_params)}. "
                     "All adjusted RoPE parameters must be specified together."

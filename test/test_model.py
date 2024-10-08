@@ -208,6 +208,7 @@ def test_llama_3_1():
     lit_out = lit_model(x)
     assert torch.allclose(whittle_out, lit_out, atol=1e-3)
 
+
 def test_llama_3_2():
     config_llama = Config.from_name(
         "Llama-3.2-1B",
