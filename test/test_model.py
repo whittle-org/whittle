@@ -208,6 +208,23 @@ def test_llama_3_1():
     lit_out = lit_model(x)
     assert torch.allclose(whittle_out, lit_out, atol=1e-3)
 
+def test_llama_3_2():
+    config_llama = Config.from_name(
+        "Llama-3.2-1B",
+        n_layer=2,
+        n_embd=32,
+        intermediate_size=86,
+        padded_vocab_size=10000,
+    )
+    config_llama.fix_head_size = True
+    lit_model = LitGPT(config_llama)
+    whittle_model = GPT(config_llama)
+    copy_weights(lit_model, whittle_model)
+    x = torch.tensor([[9856, 23, 491, 1536, 304]], dtype=torch.int32)
+    whittle_out = whittle_model(x)
+    lit_out = lit_model(x)
+    assert torch.allclose(whittle_out, lit_out, atol=1e-3)
+
 
 def test_gemma_2():
     config_gemma = Config.from_name(
