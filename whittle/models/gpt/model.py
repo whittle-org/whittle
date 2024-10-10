@@ -22,7 +22,7 @@ from whittle.modules.linear import Linear
 from whittle.modules.rmsnorm import RMSNorm
 
 
-class GPT(torch.nn.Module):
+class GPT(nn.Module):
     def __init__(self, config: Config) -> None:
         super().__init__()
         assert config.padded_vocab_size is not None
