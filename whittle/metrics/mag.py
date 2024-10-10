@@ -22,7 +22,7 @@ def weight_magnitude(model: GPT):
     magnitude = 0
     magnitude += weight_magnitude_linear_layer(model.lm_head)
     magnitude += weight_magnitude_embedding(model.transformer.wte)
-    for i in model.random_layers:
+    for i in range(model.sub_network_n_layers):
         block = model.transformer.h[i]
         magnitude += weight_magnitude_layer_norm(block.norm_1)
         magnitude += weight_magnitude_attention(block.attn)

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 import torch
 from litgpt import Config
 from litgpt.model import GPT as LitGPT
@@ -8,8 +7,7 @@ from litgpt.model import GPT as LitGPT
 from whittle.models.gpt import GPT
 
 
-@pytest.mark.parametrize("sample_random_indices", [False, True])
-def test_gpt(sample_random_indices):
+def test_gpt():
     torch.manual_seed(0)
     config = Config()
     config.padded_vocab_size = 128
@@ -81,49 +79,8 @@ def test_gpt(sample_random_indices):
         sub_network_num_heads=[4 for i in range(4)],
         sub_network_n_layers=1,
         sub_network_query_groups=2,
-        sample_random_indices=sample_random_indices,
     )
     out_small = gpt(input)
-    if sample_random_indices:
-        assert torch.all(
-            gpt.transformer.wte.random_indices
-            == torch.tensor(
-                [
-                    29,
-                    39,
-                    57,
-                    10,
-                    15,
-                    20,
-                    13,
-                    33,
-                    35,
-                    45,
-                    50,
-                    24,
-                    37,
-                    23,
-                    51,
-                    46,
-                    4,
-                    36,
-                    63,
-                    19,
-                    61,
-                    21,
-                    9,
-                    49,
-                    28,
-                    48,
-                    59,
-                    38,
-                    17,
-                    60,
-                    34,
-                    32,
-                ]
-            )
-        )
     assert out_small.shape == (1, 64, 128)
     config.n_embd = 32
     config.n_head = 4
@@ -132,53 +89,58 @@ def test_gpt(sample_random_indices):
     config.n_layer = 1
     lit_gpt_small = LitGPT(config)
     lit_gpt_small.lm_head.weight.data = gpt.lm_head.weight.data[
-        gpt.lm_head.random_indices_out_features, :
-    ][:, gpt.lm_head.random_indices_in_features]
+        : gpt.lm_head.sub_network_out_features, : gpt.lm_head.sub_network_in_features
+    ]
     lit_gpt_small.lm_head.bias.data = gpt.lm_head.bias.data[:]
     lit_gpt_small.transformer.wte.weight.data = gpt.transformer.wte.weight.data[
-        :, gpt.transformer.wte.random_indices
+        :, : gpt.transformer.wte.sub_network_embedding_dim
     ]
     lit_gpt_small.transformer.ln_f.weight.data = gpt.transformer.ln_f.weight.data[
-        gpt.transformer.ln_f.random_indices
+        : gpt.transformer.ln_f.sub_network_in_features
     ]
 
     for i, block in enumerate(lit_gpt_small.transformer.h):
-        block_orig = gpt.transformer.h[gpt.random_layers[i]]
+        block_orig = gpt.transformer.h[i]
         block.attn.attn.weight.data = block_orig.attn.attn.weight.data[
-            block_orig.attn.attn.random_indices_out_features, :
-        ][:, block_orig.attn.attn.random_indices_in_features]
+            : block_orig.attn.attn.sub_network_out_features,
+            : block_orig.attn.attn.sub_network_in_features,
+        ]
         block.attn.attn.bias.data = block_orig.attn.attn.bias.data[
-            block_orig.attn.attn.random_indices_out_features
+            : block_orig.attn.attn.sub_network_out_features
         ]
         block.attn.proj.bias.data = block_orig.attn.proj.bias.data[
-            block_orig.attn.proj.random_indices_out_features
+            : block_orig.attn.proj.sub_network_out_features
         ]
         block.attn.proj.weight.data = block_orig.attn.proj.weight.data[
-            block_orig.attn.proj.random_indices_out_features, :
-        ][:, block_orig.attn.proj.random_indices_in_features]
+            : block_orig.attn.proj.sub_network_out_features,
+            : block_orig.attn.proj.sub_network_in_features,
+        ]
         block.mlp.fc_1.weight.data = block_orig.mlp.fc_1.weight.data[
-            block_orig.mlp.fc_1.random_indices_out_features, :
-        ][:, block_orig.mlp.fc_1.random_indices_in_features]
+            : block_orig.mlp.fc_1.sub_network_out_features,
+            : block_orig.mlp.fc_1.sub_network_in_features,
+        ]
         block.mlp.fc_1.bias.data = block_orig.mlp.fc_1.bias.data[
-            block_orig.mlp.fc_1.random_indices_out_features
+            : block_orig.mlp.fc_1.sub_network_out_features
         ]
         block.mlp.fc_2.weight.data = block_orig.mlp.fc_2.weight.data[
-            block_orig.mlp.fc_2.random_indices_out_features, :
-        ][:, block_orig.mlp.fc_2.random_indices_in_features]
+            : block_orig.mlp.fc_2.sub_network_out_features,
+            : block_orig.mlp.fc_2.sub_network_in_features,
+        ]
         block.mlp.fc_2.bias.data = block_orig.mlp.fc_2.bias.data[
-            block_orig.mlp.fc_2.random_indices_out_features
+            : block_orig.mlp.fc_2.sub_network_out_features
         ]
         block.mlp.proj.weight.data = block_orig.mlp.proj.weight.data[
-            block_orig.mlp.proj.random_indices_out_features, :
-        ][:, block_orig.mlp.proj.random_indices_in_features]
+            : block_orig.mlp.proj.sub_network_out_features,
+            : block_orig.mlp.proj.sub_network_in_features,
+        ]
         block.mlp.proj.bias.data = block_orig.mlp.proj.bias.data[
-            block_orig.mlp.proj.random_indices_out_features
+            : block_orig.mlp.proj.sub_network_out_features
         ]
         block.norm_1.weight.data = block_orig.norm_1.weight.data[
-            block_orig.norm_1.random_indices
+            : block_orig.norm_1.sub_network_in_features
         ]
         block.norm_2.weight.data = block_orig.norm_2.weight.data[
-            block_orig.norm_2.random_indices
+            : block_orig.norm_2.sub_network_in_features
         ]
     out_lit_small = lit_gpt_small(input)
     assert torch.allclose(out_lit_small, out_small, atol=1e-3)

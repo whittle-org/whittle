@@ -22,23 +22,16 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         self.sub_network_intermediate_size = self.intermediate_size
 
     def set_sub_network(
-        self,
-        sub_network_n_embd: int,
-        sub_network_intermediate_size: int,
-        sample_random_indices: bool = False,
+        self, sub_network_n_embd: int, sub_network_intermediate_size: int
     ):
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
 
         self.fc.set_sub_network(
-            self.sub_network_n_embd,
-            self.sub_network_intermediate_size,
-            sample_random_indices,
+            self.sub_network_n_embd, self.sub_network_intermediate_size
         )
         self.proj.set_sub_network(
-            self.sub_network_intermediate_size,
-            self.sub_network_n_embd,
-            sample_random_indices,
+            self.sub_network_intermediate_size, self.sub_network_n_embd
         )
 
     def reset_super_network(self):
@@ -62,28 +55,19 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         self.config = config
 
     def set_sub_network(
-        self,
-        sub_network_n_embd: int,
-        sub_network_intermediate_size: int,
-        sample_random_indices: bool = False,
+        self, sub_network_n_embd: int, sub_network_intermediate_size: int
     ):
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
 
         self.fc_1.set_sub_network(
-            self.sub_network_n_embd,
-            self.sub_network_intermediate_size,
-            sample_random_indices,
+            self.sub_network_n_embd, self.sub_network_intermediate_size
         )
         self.fc_2.set_sub_network(
-            self.sub_network_n_embd,
-            self.sub_network_intermediate_size,
-            sample_random_indices,
+            self.sub_network_n_embd, self.sub_network_intermediate_size
         )
         self.proj.set_sub_network(
-            self.sub_network_intermediate_size,
-            self.sub_network_n_embd,
-            sample_random_indices,
+            self.sub_network_intermediate_size, self.sub_network_n_embd
         )
 
     def reset_super_network(self):
