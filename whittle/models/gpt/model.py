@@ -51,7 +51,6 @@ class GPT(nn.Module):
         self.sub_network_n_layers = self.config.n_layer
         self.cos: torch.Tensor
         self.sin: torch.Tensor
-        self.random_layers = list(range(self.config.n_layer))
         self.config.is_encoder_decoder = False
         self.main_input_name = "input_pos"
         self._supports_cache_class = True
@@ -178,40 +177,24 @@ class GPT(nn.Module):
         sub_network_n_layers: int,
         sub_network_query_groups=None,
         sub_network_head_size=None,
-        sample_random_indices: bool = False,
     ) -> None:
-        self.sample_random_indices = sample_random_indices
         self.sub_network_head_size = sub_network_head_size
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
         self.sub_network_n_layers = sub_network_n_layers
-        self.transformer.wte.set_sub_network(
-            self.sub_network_n_embd, sample_random_indices
-        )
-        self.transformer.ln_f.set_sub_network(
-            self.sub_network_n_embd, sample_random_indices
-        )
-        if sample_random_indices and sub_network_n_layers < self.config.n_layer:
-            self.random_layers = torch.randperm(self.config.n_layer)[
-                :sub_network_n_layers
-            ]
-        else:
-            self.random_layers = list(range(self.sub_network_n_layers))
-
-        for i, j in enumerate(self.random_layers):
-            block = self.transformer.h[j]
+        self.transformer.wte.set_sub_network(self.sub_network_n_embd)
+        self.transformer.ln_f.set_sub_network(self.sub_network_n_embd)
+        for i in range(self.sub_network_n_layers):
+            block = self.transformer.h[i]
             block.set_sub_network(
                 sub_network_n_embd,
-                sub_network_intermediate_size[j],
-                sub_network_num_heads[j],
+                sub_network_intermediate_size[i],
+                sub_network_num_heads[i],
                 sub_network_query_groups,
                 sub_network_head_size,
-                sample_random_indices,
             )
-        self.lm_head.set_sub_network(
-            sub_network_n_embd, self.config.padded_vocab_size, sample_random_indices
-        )
+        self.lm_head.set_sub_network(sub_network_n_embd, self.config.padded_vocab_size)
 
     def select_sub_network(self, config):
         self.set_sub_network(
@@ -232,7 +215,6 @@ class GPT(nn.Module):
             block = self.transformer.h[i]
             block.reset_super_network()
         self.lm_head.reset_super_network()
-        self.random_layers = list(range(self.config.n_layer))
 
     def process_rope_cache(self, cos, sin, input_pos, T):
         if input_pos is not None:  # use the kv cache
@@ -263,15 +245,15 @@ class GPT(nn.Module):
         x = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
         if self.config.scale_embeddings:
             x = x * torch.tensor(self.config.n_embd**0.5, dtype=x.dtype)
-        for i, j in enumerate(self.random_layers):
-            block = self.transformer.h[j]
+        for i in range(self.sub_network_n_layers):
+            block = self.transformer.h[i]
             if not self.config.fix_head_size:
                 if isinstance(self.sub_network_num_heads, list):
                     cos, sin = self.rope_cache(
                         seq_len=self.max_seq_length,
                         n_elem=int(
                             self.config.rotary_percentage
-                            * (self.sub_network_n_embd // self.sub_network_num_heads[j])
+                            * (self.sub_network_n_embd // self.sub_network_num_heads[i])
                         ),
                         device=self.device,
                     )
