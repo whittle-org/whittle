@@ -24,10 +24,10 @@ jobs:
           cache: 'pip'
       - name: Install
         run: pip install .
-      - name: Run sinc example
+      - name: Run sine curves example
         run: |
-          python -m examples.sinc.sinc_nas
-          python -m examples.sinc.search
+          python -m examples.sine_curves.sinc_nas
+          python -m examples.sine_curves.search
       - name: Run fashion MNIST example
         run: |
           python -m examples.fashion_mnist.train_fashion_mnist
