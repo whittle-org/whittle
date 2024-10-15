@@ -22,7 +22,6 @@ report = Reporter()
 
 def f(x):
     return np.sinc(x * 10 - 5)
-    # return (x - 0.5) ** 2 + np.random.randn() * 1e-3
 
 
 def validate(model, valid_loader, device):
@@ -166,9 +165,6 @@ if __name__ == "__main__":
                     ),
                 )
 
-    #
-    # # num_layers, num_units, num_heads
-    #
     if args.do_plot:
         import matplotlib.pyplot as plt
 
