@@ -10,7 +10,11 @@ from whittle.modules import Linear
 
 class GptNeoxMLP(litgpt.model.GptNeoxMLP):
     def __init__(self, config: Config, intermediate_size: int | None = None) -> None:
+        isize = config.intermediate_size
+        config.intermediate_size = 5
         super().__init__(config)
+        config.intermediate_size = isize
+        
         intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
 
         self.fc = Linear(config.n_embd, intermediate_size, bias=config.bias)

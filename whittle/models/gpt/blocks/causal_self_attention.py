@@ -12,7 +12,12 @@ from whittle.modules import Linear
 
 class CausalSelfAttention(nn.Module):
     def __init__(self, config: Config, block_idx: int) -> None:
+        n_head = config.n_head
+        config.n_head = 1
+
         super().__init__()
+        config.n_head = n_head
+        print(n_head)
         n_head = config.n_head if isinstance(config.n_head, int) else config.n_head[block_idx]
 
         shape = (n_head + 2 * config.n_query_groups) * config.head_size

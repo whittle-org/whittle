@@ -13,7 +13,16 @@ from whittle.modules.rmsnorm import RMSNorm
 
 class Block(litgpt.model.Block):
     def __init__(self, config: Config, block_idx: int) -> None:
+        intermediate_size = config.intermediate_size
+        n_head = config.n_head
+
+        config.intermediate_size = 5
+        config.n_head = 1
+
         super().__init__(config, block_idx)
+        config.intermediate_size = intermediate_size
+        config.n_head = n_head
+
         self.config = config
         if not config.parallel_residual and config.shared_attention_norm:
             raise NotImplementedError(
