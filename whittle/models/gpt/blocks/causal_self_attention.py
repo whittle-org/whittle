@@ -13,13 +13,15 @@ from whittle.modules import Linear
 class CausalSelfAttention(nn.Module):
     def __init__(self, config: Config, block_idx: int) -> None:
         super().__init__()
-        shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
+        n_head = config.n_head if isinstance(config.n_head, int) else config.n_head[block_idx]
+
+        shape = (n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
         self.attn = Linear(config.n_embd, shape, bias=config.bias)
         # output projection
         # if `head_size` is explicitly specified in the config, `n_emd` might not be equal to `head_size * n_head`
         self.proj = Linear(
-            config.head_size * config.n_head, config.n_embd, bias=config.bias
+            config.head_size * n_head, config.n_embd, bias=config.bias
         )
         # disabled by default
         self.kv_cache: KVCache | None = None
@@ -30,10 +32,10 @@ class CausalSelfAttention(nn.Module):
         self.config = config
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
-        self.sub_network_n_head = self.config.n_head
+        self.sub_network_n_head = n_head
         self.sub_network_head_size = self.config.head_size
         self.sub_network_qkv_shape = (
-            self.config.n_head + 2 * self.config.n_query_groups
+            n_head + 2 * self.config.n_query_groups
         ) * self.config.head_size
         self.sub_network_query_groups = self.config.n_query_groups
         self.sub_network_q_per_kv = (

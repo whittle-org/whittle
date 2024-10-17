@@ -33,7 +33,12 @@ class Block(litgpt.model.Block):
             if config.shared_attention_norm
             else self.norm_class()(config.n_embd, eps=config.norm_eps)
         )
-        self.mlp = self.mlp_class()(config)
+
+        if isinstance(config.intermediate_size, int):
+            self.mlp = self.mlp_class()(config)
+        else:
+            self.mlp = self.mlp_class()(config, intermediate_size=config.intermediate_size[block_idx])
+
         self.post_mlp_norm = (
             self.norm_class()(config.n_embd, eps=config.norm_eps)
             if config.post_mlp_norm
