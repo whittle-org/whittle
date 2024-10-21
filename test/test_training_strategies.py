@@ -73,8 +73,8 @@ def test_integration_training_strategies_mlp(strategy):
     )
 
     model = MLP(5).to(device)
-    inputs = torch.rand((8, 5))
-    outputs = torch.rand((8, 1))
+    inputs = torch.rand((8, 5)).to(device)
+    outputs = torch.rand((8, 1)).to(device)
     loss = update_op(model, inputs, outputs)
     assert isinstance(loss, float)
 
@@ -108,7 +108,7 @@ def test_integration_training_strategies_gpt(strategy, kd_loss):
     config.lm_head_bias = True
     config.fix_head_size = True
     gpt = GPT(config).to(device)
-    inputs = torch.randint(0, 128, (1, 128))
-    outputs = torch.randn([1, 128, 128])
+    inputs = torch.randint(0, 128, (1, 128)).to(device)
+    outputs = torch.randn([1, 128, 128]).to(device)
     loss = update_op(gpt, inputs, outputs)
     assert isinstance(loss, float)
