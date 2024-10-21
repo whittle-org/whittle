@@ -13,7 +13,6 @@ def estimate_flops(
     use_cuda: bool = False,
     batch_size: int = 1,
     sequence_length: int = 512,
-    detailed: bool = False,
     metric: Literal["flops", "macs"] = "flops",
 ) -> float:
     """
@@ -50,8 +49,8 @@ def estimate_flops(
     flops, macs, _ = get_model_profile(
         model=model,
         args=(input_tensor,),
-        print_profile=detailed,
-        detailed=detailed,
+        print_profile=False,
+        detailed=False,
         warm_up=1,
         as_string=False,
     )

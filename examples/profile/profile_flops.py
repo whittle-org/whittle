@@ -11,6 +11,7 @@ def update_config(
     sub_network_n_embd: int,
     sub_network_intermediate_size: int,
     sub_network_num_heads: int,
+    sub_network_n_layers: int,
     sub_network_query_groups=None,
     sub_network_head_size=None,
 ):
