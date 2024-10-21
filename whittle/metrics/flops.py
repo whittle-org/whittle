@@ -16,20 +16,20 @@ def estimate_flops(
     metric: Literal["flops", "macs"] = "flops",
 ) -> float:
     """
-    Estimates the number of floating-point operations (FLOPs) for a GPT model.
+    Estimates the number of floating-point operations (FLOPs) or multiply-accumulate operations (MACs) for a GPT model.
 
-    This function uses DeepSpeed's FlopsProfiler to estimate the FLOPs of the model's forward pass.
+    This function uses DeepSpeed's FlopsProfiler to estimate the FLOPs or MACs of the model's forward pass.
     It supports both CPU and CUDA profiling.
 
     Args:
-        model (GPT): The GPT model to profile.
-        use_cuda (bool, optional): If True and CUDA is available, the model will be moved to the GPU for profiling. Defaults to False.
-        batch_size (int, optional): The batch size for the input tensor. Defaults to 1.
-        sequence_length (int, optional): The sequence length for the input tensor. Defaults to 512.
-        detailed (bool, optional): If True, prints a detailed profile of the model. Defaults to False.
+        model: The GPT model to profile.
+        use_cuda: If True and CUDA is available, the model will be moved to the GPU for profiling. Defaults to False.
+        batch_size: The batch size for the input tensor. Defaults to 1.
+        sequence_length: The sequence length for the input tensor. Defaults to 512.
+        metric: The metric to return. Either "flops" for floating-point operations or "macs" for multiply-accumulate operations. Defaults to "flops".
 
     Returns:
-        float: The estimated number of floating-point operations (FLOPs) for the model's forward pass.
+        The estimated number of floating-point operations (FLOPs) or multiply-accumulate operations (MACs) for the model's forward pass, depending on the specified metric.
     """
     if use_cuda and torch.cuda.is_available():
         model = model.cuda()
