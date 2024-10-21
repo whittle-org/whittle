@@ -1,7 +1,6 @@
 import torch
-import torch.nn as nn
 import torch.profiler
-from torch.profiler import profile, record_function, ProfilerActivity
+from torch.profiler import record_function
 
 
 # Define a sample language model (e.g., a simple RNN or transformer-based model)
@@ -49,9 +48,6 @@ def profile_model_latency(model, use_cuda=False, batch_size=8, n_samples=10):
                 _ = model(input_tensor)
                 profiler.step()
 
-    # Retrieve profiler key averages to calculate the latency
-    key_averages = profiler.key_averages()
-
     # Summing up CPU and CUDA times from the profiler using the correct methods
     cuda_time_us, cpu_time_us = get_total_cpu_gpu_runtime(profiler)
 
@@ -67,8 +63,8 @@ def update_config(
     sub_network_intermediate_size: int,
     sub_network_num_heads: int,
     sub_network_n_layers: int,
-    sub_network_query_groups: int = None,
-    sub_network_head_size: int = None,
+    sub_network_query_groups=None,
+    sub_network_head_size=None,
 ):
     config.n_embd = sub_network_n_embd
     config.intermediate_size = sub_network_intermediate_size
