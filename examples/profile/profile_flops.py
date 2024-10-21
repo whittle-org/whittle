@@ -35,16 +35,16 @@ if __name__ == "__main__":
     config.n_layer = 4
     model = LitGPT(config)
     print(
-        f"Full model cuda {estimate_flops(model, use_cuda=False, metric='flops')} flops"
+        f"Full model {estimate_flops(model=model, metric='flops')} flops"
     )
     print(
-        f"Full model cuda {estimate_flops(model, use_cuda=False, metric='macs')} macs"
+        f"Full model {estimate_flops(model=model, metric='macs')} macs"
     )
     config = update_config(config, 64, 64 * 4, 4, 2, 4)
     model = LitGPT(config)
     print(
-        f"Mini model cuda {estimate_flops(model, use_cuda=False, metric='flops')} flops"
+        f"Mini model {estimate_flops(model=model, metric='flops')} flops"
     )
     print(
-        f"Mini model cuda {estimate_flops(model, use_cuda=False, metric='macs')} macs"
+        f"Mini model {estimate_flops(model=model, metric='macs')} macs"
     )

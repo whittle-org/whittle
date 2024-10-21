@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Literal
+import os
 
 import torch
 from deepspeed.profiling.flops_profiler import get_model_profile
@@ -10,7 +11,6 @@ from whittle.models.gpt import GPT
 
 def estimate_flops(
     model: GPT,
-    use_cuda: bool = False,
     batch_size: int = 1,
     sequence_length: int = 512,
     metric: Literal["flops", "macs"] = "flops",
@@ -31,20 +31,14 @@ def estimate_flops(
     Returns:
         The estimated number of floating-point operations (FLOPs) or multiply-accumulate operations (MACs) for the model's forward pass, depending on the specified metric.
     """
-    if use_cuda and torch.cuda.is_available():
-        model = model.cuda()
-
-    elif use_cuda and not torch.cuda.is_available():
-        raise ValueError("CUDA is not available")
 
     input_tensor = torch.randint(
         0, model.config.padded_vocab_size, (batch_size, sequence_length)
     )
 
-    if use_cuda and torch.cuda.is_available():
-        input_tensor = input_tensor.cuda()
-
     model.eval()
+
+    os.environ["DS_ACCELERATOR"] = "CPU"
 
     flops, macs, _ = get_model_profile(
         model=model,
