@@ -35,6 +35,3 @@ jobs:
       - name: Run flops profiling
         run: |
           python -m examples.profile.profile_flops
-      - name: Run latency profiling
-        run: |
-          python -m examples.profile.profile_latency
