@@ -32,5 +32,9 @@ jobs:
         run: |
           python -m examples.fashion_mnist.train_fashion_mnist
           python -m examples.fashion_mnist.search_fashion_mnist
+      - name: Run flops profiling
+        run: |
           python -m examples.profile.profile_flops
+      - name: Run latency profiling
+        run: |
           python -m examples.profile.profile_latency
