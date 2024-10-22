@@ -12,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # Run in all these versions of Python
         python-version: ["3.9", "3.10", "3.11"]
     steps:
       - uses: actions/checkout@v4
@@ -20,8 +19,6 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           version: latest
-      # - name: Set up Python ${{ matrix.python-version }}
-      #   run: uv python install ${{ matrix.python-version }}
       - name: create virtual environment
         run: uv venv --python ${{ matrix.python-version }}
       - name: Install
