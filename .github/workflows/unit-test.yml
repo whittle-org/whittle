@@ -20,8 +20,10 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           version: latest
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+      # - name: Set up Python ${{ matrix.python-version }}
+      #   run: uv python install ${{ matrix.python-version }}
+      - name: create virtual environment
+        run: uv venv --python ${{ matrix.python-version }}
       - name: Install
         run: uv pip install ".[dev]"
       - name: Run pytest
