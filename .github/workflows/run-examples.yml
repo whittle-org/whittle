@@ -32,3 +32,5 @@ jobs:
         run: |
           uv run python -m examples.fashion_mnist.train_fashion_mnist
           uv run python -m examples.fashion_mnist.search_fashion_mnist
+      - name: Run flops profiling
+        run: uv run python -m examples.profile.profile_flops
