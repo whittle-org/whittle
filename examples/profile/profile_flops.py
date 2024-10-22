@@ -1,7 +1,7 @@
-from __future__ import annotations
+from __future__ import annotations  # noqa: INP001
 
 from litgpt import Config
-from litgpt.model import GPT as LitGPT
+from litgpt.model import GPT
 
 from whittle.metrics.flops import estimate_flops
 
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     config.n_embd = 128
     config.intermediate_size = 128 * 4
     config.n_layer = 4
-    model = LitGPT(config)
+    model = GPT(config)
     print(
         f"Full model {estimate_flops(model=model, metric='flops')} flops"
     )
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         f"Full model {estimate_flops(model=model, metric='macs')} macs"
     )
     config = update_config(config, 64, 64 * 4, 4, 2, 4)
-    model = LitGPT(config)
+    model = GPT(config)
     print(
         f"Mini model {estimate_flops(model=model, metric='flops')} flops"
     )
