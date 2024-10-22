@@ -28,6 +28,8 @@ def params_embedding_layer(embedding: Embedding):
 
 
 def params_layer_normalization(normalization_layer: nn.Module):
+    if normalization_layer is None:
+        return 0
     if isinstance(normalization_layer, LayerNorm):
         return 2 * normalization_layer.sub_network_in_features
     elif isinstance(normalization_layer, RMSNorm):
@@ -87,7 +89,7 @@ def compute_parameters_sub_network_gpt(model: GPT):
     num_params = 0
     num_params += params_linear_layer(model.lm_head)
     num_params += params_embedding_layer(model.transformer.wte)
-    for i in model.random_layers:
+    for i in range(model.sub_network_n_layers):
         block = model.transformer.h[i]
         num_params += params_mlp(block.mlp)
         num_params += params_attention_layer(block.attn)

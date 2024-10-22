@@ -22,7 +22,7 @@ def weight_magnitude(model: GPT):
     magnitude = 0
     magnitude += weight_magnitude_linear_layer(model.lm_head)
     magnitude += weight_magnitude_embedding(model.transformer.wte)
-    for i in model.random_layers:
+    for i in range(model.sub_network_n_layers):
         block = model.transformer.h[i]
         magnitude += weight_magnitude_layer_norm(block.norm_1)
         magnitude += weight_magnitude_attention(block.attn)
@@ -50,6 +50,8 @@ def weight_magnitude_mlp(mlp):
 
 
 def weight_magnitude_layer_norm(layer):
+    if layer is None:
+        return 0
     if isinstance(layer, LayerNorm):
         n = layer.sub_network_in_features
         mag = torch.sum(torch.abs(layer.weight[:n]))

@@ -54,7 +54,6 @@ class CausalSelfAttention(nn.Module):
         sub_network_n_head: int,
         sub_network_query_groups=None,
         sub_network_head_size=None,
-        sample_random_indices: bool = False,
     ):
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_n_head = sub_network_n_head
@@ -84,13 +83,10 @@ class CausalSelfAttention(nn.Module):
             self.sub_network_n_head + 2 * self.sub_network_query_groups
         ) * self.sub_network_head_size
 
-        self.attn.set_sub_network(
-            self.sub_network_n_embd, self.sub_network_qkv_shape, sample_random_indices
-        )
+        self.attn.set_sub_network(self.sub_network_n_embd, self.sub_network_qkv_shape)
         self.proj.set_sub_network(
             self.sub_network_head_size * self.sub_network_n_head,
             self.sub_network_n_embd,
-            sample_random_indices,
         )
         self.sub_network_q_per_kv = self.sub_network_n_head // float(
             self.sub_network_query_groups
