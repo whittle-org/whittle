@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 
 from whittle.models.gpt import GPT
+from whittle.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP
 
 
 def extract_sub_network(model, sub_network_config):
@@ -25,13 +26,31 @@ def extract_sub_network(model, sub_network_config):
         sub_network_block.attn.proj.load_state_dict(state_dict)
 
         # MLP
-        state_dict = extract_linear(block.mlp.fc)
-        sub_network_block.mlp.fc.load_state_dict(state_dict)
-
-        state_dict = extract_linear(block.mlp.proj)
-        sub_network_block.mlp.proj.load_state_dict(state_dict)
+        extract_mlp(block.mlp, sub_network_block.mlp)
 
     return sub_network
+
+
+def extract_mlp(mlp, sub_mlp):
+    if isinstance(mlp, GptNeoxMLP):
+        state_dict = extract_linear(mlp.fc)
+        sub_mlp.fc.load_state_dict(state_dict)
+
+        state_dict = extract_linear(mlp.proj)
+        sub_mlp.proj.load_state_dict(state_dict)
+    elif isinstance(mlp, LLaMAMLP):
+        state_dict = extract_linear(mlp.fc_1)
+        sub_mlp.fc_1.load_state_dict(state_dict)
+
+        state_dict = extract_linear(mlp.fc_2)
+        sub_mlp.fc_2.load_state_dict(state_dict)
+
+        state_dict = extract_linear(mlp.proj)
+        sub_mlp.proj.load_state_dict(state_dict)
+    else:
+        raise ValueError(
+            "Cannot extract MLP, supported MLP classes are GptNeoxMLP and LLaMAMLP."
+        )
 
 
 def extract_linear(super_network_linear):
