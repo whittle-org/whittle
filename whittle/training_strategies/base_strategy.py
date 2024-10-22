@@ -41,5 +41,5 @@ class BaseTrainingStrategy:
                     "KD Loss not yet supported: Expected torch.nn.CrossEntropyLoss"
                 )
 
-    def update(self, **kwargs):
+    def __call__(self, model, inputs, outputs, **kwargs):
         raise NotImplementedError
