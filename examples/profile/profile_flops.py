@@ -3,7 +3,7 @@ from __future__ import annotations  # noqa: INP001
 from litgpt import Config
 from litgpt.model import GPT
 
-from whittle.metrics.flops import estimate_flops
+from whittle.metrics.flops import flops
 
 
 def update_config(
@@ -35,16 +35,16 @@ if __name__ == "__main__":
     config.n_layer = 4
     model = GPT(config)
     print(
-        f"Full model {estimate_flops(model=model, metric='flops')} flops"
+        f"Full model {flops(model=model, metric='flops')} flops"
     )
     print(
-        f"Full model {estimate_flops(model=model, metric='macs')} macs"
+        f"Full model {flops(model=model, metric='macs')} macs"
     )
     config = update_config(config, 64, 64 * 4, 4, 2, 4)
     model = GPT(config)
     print(
-        f"Mini model {estimate_flops(model=model, metric='flops')} flops"
+        f"Mini model {flops(model=model, metric='flops')} flops"
     )
     print(
-        f"Mini model {estimate_flops(model=model, metric='macs')} macs"
+        f"Mini model {flops(model=model, metric='macs')} macs"
     )

@@ -34,16 +34,16 @@ def get_total_cpu_gpu_runtime(prof: torch.profiler.profile) -> tuple[int, int]:
     return sum_self_cpu_time_total, sum_self_cuda_time_total
 
 
-def profile_model_latency(
+def compute_latency(
     model: torch.nn.Module,
     use_cuda: bool = False,
     batch_size: int = 8,
     n_samples: int = 10,
 ) -> float:
     """
-    Profiles the latency of a PyTorch model for inference.
+    Profiles the compute_latency of a PyTorch model for inference.
 
-    This function measures the average latency of the model's forward pass over a specified number of samples
+    This function measures the average compute_latency of the model's forward pass over a specified number of samples
     using PyTorch's profiler. It supports both CPU and CUDA profiling.
 
     Args:
@@ -62,7 +62,7 @@ def profile_model_latency(
         model = model.cuda()
         input_tensor = input_tensor.cuda()
 
-    # Use PyTorch profiler to record latency
+    # Use PyTorch profiler to record compute_latency
     model.eval()
     with torch.profiler.profile(
         activities=[

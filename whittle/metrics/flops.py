@@ -9,7 +9,7 @@ from deepspeed.profiling.flops_profiler import get_model_profile
 from litgpt.model import GPT
 
 
-def estimate_flops(
+def compute_flops(
     model: GPT,
     batch_size: int = 1,
     sequence_length: int = 512,
