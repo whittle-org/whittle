@@ -77,7 +77,7 @@ def extract_norm(norm, sub_norm):
 
     # extract depending on norm type
     assert isinstance(norm, RMSNorm) or isinstance(norm, LayerNorm)
-    
+
     in_feat_sub = sub_norm.in_features
     super_state = norm.state_dict()
 
@@ -93,8 +93,9 @@ def extract_norm(norm, sub_norm):
         raise ValueError(
             "Cannot extract norm, supported norm classes are RMSNorm and LayerNorm."
         )
-    
+
     sub_norm.load_state_dict(new_state_dict)
+
 
 def extract_linear(super_network_linear):
     super_network_state = super_network_linear.state_dict()

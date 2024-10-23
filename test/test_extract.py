@@ -105,4 +105,3 @@ def make_norm_weights_random(norm):
     torch.nn.init.normal_(norm.weight)
     if isinstance(norm, LayerNorm):
         torch.nn.init.normal_(norm.bias)
-
