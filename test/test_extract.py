@@ -5,7 +5,7 @@ from litgpt.config import Config
 
 from copy import deepcopy
 from whittle.models.gpt import GPT
-from whittle.models.gpt.extract import extract_sub_network
+from whittle.models.gpt.extract import extract_sub_network, set_subnet_attention_sizes
 
 
 def test_extract_sub_network() -> None:
@@ -69,12 +69,12 @@ def test_extract_sub_network_intermediate_size() -> None:
 
 def test_extract_sub_network_n_head() -> None:
     network_config = Config.from_name("pythia-14m")
-    network_config.fix_head_size = True
-    network_config.n_query_groups = 2
+    network_config.fix_head_size = False
 
     heads = [network_config.n_head] * network_config.n_layer
     n_changes = len(heads[::2])
-    heads[::2] = [network_config.n_head // 2] * n_changes
+    heads[::2] = [3] * n_changes
+    heads[1] = 1
 
     super_network = GPT(network_config)
     super_network.eval()
@@ -88,6 +88,7 @@ def test_extract_sub_network_n_head() -> None:
 
     subnet_config = deepcopy(network_config)
     subnet_config.n_head = heads
+    set_subnet_attention_sizes(super_network, subnet_config)
 
     sub_network = GPT(subnet_config)
     sub_network = extract_sub_network(super_network, subnet_config)

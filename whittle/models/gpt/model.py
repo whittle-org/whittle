@@ -268,10 +268,12 @@ class GPT(nn.Module):
                     )
             else:
                 if self.sub_network_head_size is None:
+                    head_size = self.config.head_size
+                    head_size = head_size if isinstance(head_size, int) else head_size[i]
                     cos, sin = self.rope_cache(
                         seq_len=self.max_seq_length,
                         n_elem=int(
-                            self.config.rotary_percentage * (self.config.head_size)
+                            self.config.rotary_percentage * (head_size)
                         ),
                         device=self.device,
                     )

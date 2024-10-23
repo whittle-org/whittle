@@ -15,13 +15,19 @@ class Block(litgpt.model.Block):
     def __init__(self, config: Config, block_idx: int) -> None:
         intermediate_size = config.intermediate_size
         n_head = config.n_head
+        n_query_groups = config.n_query_groups
+        head_size = config.head_size
 
+        config.n_query_groups = 1
+        config.head_size = 1
         config.intermediate_size = 5
         config.n_head = 1
 
         super().__init__(config, block_idx)
         config.intermediate_size = intermediate_size
         config.n_head = n_head
+        config.n_query_groups = n_query_groups
+        config.head_size = head_size
 
         self.config = config
         if not config.parallel_residual and config.shared_attention_norm:

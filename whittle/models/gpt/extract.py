@@ -5,6 +5,19 @@ from collections import OrderedDict
 from whittle.models.gpt import GPT
 
 
+def set_subnet_attention_sizes(model, subnet_config):
+    n_query_groups = []
+    head_size = []
+
+    for i in range(subnet_config.n_layer):
+        block = model.transformer.h[i]
+        n_query_groups.append(block.attn.sub_network_query_groups)
+        head_size.append(block.attn.sub_network_head_size)
+
+    subnet_config.n_query_groups = n_query_groups
+    subnet_config.head_size = head_size
+
+
 def extract_sub_network(model, sub_network_config):
     sub_network = GPT(sub_network_config)
 
