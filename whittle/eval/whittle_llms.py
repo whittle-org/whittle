@@ -154,7 +154,7 @@ class WhittleLM(TemplateLM):
         )
         assert not parallelize, "`parallelize=True` is not compatible with passing pre-initialized model to `pretrained`"
         self._model = pretrained
-        self._device = self._model.device
+        self._device = device
         self._config = self._model.config
 
         if tokenizer:
