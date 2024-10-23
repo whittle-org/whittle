@@ -41,9 +41,9 @@ def compute_latency(
     n_samples: int = 10,
 ) -> float:
     """
-    Profiles the compute_latency of a PyTorch model for inference.
+    Profiles the latency of a PyTorch model for inference.
 
-    This function measures the average compute_latency of the model's forward pass over a specified number of samples
+    This function measures the average latency of the model's forward pass over a specified number of samples
     using PyTorch's profiler. It supports both CPU and CUDA profiling.
 
     Args:
