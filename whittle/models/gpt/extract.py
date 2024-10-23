@@ -49,7 +49,7 @@ def extract_mlp(mlp, sub_mlp):
         sub_mlp.proj.load_state_dict(state_dict)
     else:
         raise ValueError(
-            "Cannot extract MLP, supported MLP classes are GptNeoxMLP and LLaMAMLP."
+            "Cannot extract MLP, supported MLP classes are GptNeoxMLP, LLaMAMLP and GemmaMLP."
         )
 
 
