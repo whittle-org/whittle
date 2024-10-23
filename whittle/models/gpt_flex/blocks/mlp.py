@@ -9,13 +9,19 @@ from whittle.modules import Linear
 
 
 class GptNeoxMLP(litgpt.model.GptNeoxMLP):
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, intermediate_size: int | None = None) -> None:
+        isize = config.intermediate_size
+        config.intermediate_size = 5
         super().__init__(config)
-        self.fc = Linear(config.n_embd, config.intermediate_size, bias=config.bias)
-        self.proj = Linear(config.intermediate_size, config.n_embd, bias=config.bias)
+        config.intermediate_size = isize
+        
+        intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
+
+        self.fc = Linear(config.n_embd, intermediate_size, bias=config.bias)
+        self.proj = Linear(intermediate_size, config.n_embd, bias=config.bias)
         self.config = config
         self.in_features = config.n_embd
-        self.intermediate_size = config.intermediate_size
+        self.intermediate_size = intermediate_size
 
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.in_features
@@ -43,13 +49,14 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
 
 
 class LLaMAMLP(litgpt.model.LLaMAMLP):
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, intermediate_size: int | None = None) -> None:
         super().__init__(config)
-        self.fc_1 = Linear(config.n_embd, config.intermediate_size, bias=config.bias)
-        self.fc_2 = Linear(config.n_embd, config.intermediate_size, bias=config.bias)
-        self.proj = Linear(config.intermediate_size, config.n_embd, bias=config.bias)
+        intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
+        self.fc_1 = Linear(config.n_embd, intermediate_size, bias=config.bias)
+        self.fc_2 = Linear(config.n_embd, intermediate_size, bias=config.bias)
+        self.proj = Linear(intermediate_size, config.n_embd, bias=config.bias)
         self.in_features = config.n_embd
-        self.intermediate_size = config.intermediate_size
+        self.intermediate_size = intermediate_size
         self.sub_network_n_embd: int | None = None
         self.sub_network_intermediate_size: int | None = None
         self.config = config

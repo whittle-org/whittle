@@ -15,14 +15,14 @@ import torch.nn as nn
 from litgpt import Config
 from litgpt.model import build_rope_cache
 from litgpt.model import batched_index_select
-from whittle.models.gpt.blocks import Block
+from whittle.models.gpt_flex.blocks import BlockFlex
 from whittle.modules.embedding import Embedding
 from whittle.modules.layernorm import LayerNorm
 from whittle.modules.linear import Linear
 from whittle.modules.rmsnorm import RMSNorm
 
 
-class GPT(nn.Module):
+class GPTFlex(nn.Module):
     def __init__(self, config: Config) -> None:
         super().__init__()
         assert config.padded_vocab_size is not None
@@ -35,7 +35,7 @@ class GPT(nn.Module):
             dict(
                 wte=Embedding(config.padded_vocab_size, config.n_embd),
                 h=nn.ModuleList(
-                    Block(config, block_idx) for block_idx in range(config.n_layer)
+                    BlockFlex(config, block_idx) for block_idx in range(config.n_layer)
                 ),
                 ln_f=self.norm_class(config.n_embd, eps=config.norm_eps),
             )
@@ -268,10 +268,12 @@ class GPT(nn.Module):
                     )
             else:
                 if self.sub_network_head_size is None:
+                    head_size = self.config.head_size
+                    head_size = head_size if isinstance(head_size, int) else head_size[i]
                     cos, sin = self.rope_cache(
                         seq_len=self.max_seq_length,
                         n_elem=int(
-                            self.config.rotary_percentage * (self.config.head_size)
+                            self.config.rotary_percentage * (head_size)
                         ),
                         device=self.device,
                     )

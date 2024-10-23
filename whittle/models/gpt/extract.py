@@ -3,23 +3,22 @@ from __future__ import annotations
 from collections import OrderedDict
 
 from whittle.models.gpt import GPT
+from whittle.models.gpt_flex import GPTFlex
 
 
 def set_subnet_attention_sizes(model, subnet_config):
     n_query_groups = []
     head_size = []
-
     for i in range(subnet_config.n_layer):
         block = model.transformer.h[i]
         n_query_groups.append(block.attn.sub_network_query_groups)
         head_size.append(block.attn.sub_network_head_size)
-
     subnet_config.n_query_groups = n_query_groups
     subnet_config.head_size = head_size
 
 
-def extract_sub_network(model, sub_network_config):
-    sub_network = GPT(sub_network_config)
+def extract_sub_network(model, sub_network_config, use_flex=False):
+    sub_network = GPT(sub_network_config) if use_flex else GPTFlex(sub_network_config)
 
     state_dict = extract_linear(model.lm_head)
     sub_network.lm_head.load_state_dict(state_dict)
