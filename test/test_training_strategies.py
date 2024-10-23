@@ -63,16 +63,18 @@ class MLP(nn.Module):
 
 @pytest.mark.parametrize("strategy", methods)
 def test_integration_training_strategies_mlp(strategy):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
     update_op = strategy(
         sampler=sampler_mlp,
         loss_function=loss_function,
-        device="cpu",
+        device=device,
         total_number_of_steps=1,
     )
 
-    model = MLP(5)
-    inputs = torch.rand((8, 5))
-    outputs = torch.rand((8, 1))
+    model = MLP(5).to(device)
+    inputs = torch.rand((8, 5)).to(device)
+    outputs = torch.rand((8, 1)).to(device)
     loss = update_op(model, inputs, outputs)
     assert isinstance(loss, float)
 
@@ -80,11 +82,13 @@ def test_integration_training_strategies_mlp(strategy):
 @pytest.mark.parametrize("strategy", methods)
 @pytest.mark.parametrize("kd_loss", [None, DistillLoss(0.5, 0.5)])
 def test_integration_training_strategies_gpt(strategy, kd_loss):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
     update_op = strategy(
         sampler=sampler_gpt,
         loss_function=torch.nn.CrossEntropyLoss(),
         kd_loss=kd_loss,
-        device="cpu",
+        device=device,
         total_number_of_steps=1,
     )
 
@@ -103,8 +107,8 @@ def test_integration_training_strategies_gpt(strategy, kd_loss):
     config.norm_eps = 1e-5
     config.lm_head_bias = True
     config.fix_head_size = True
-    gpt = GPT(config)
-    inputs = torch.randint(0, 128, (1, 128))
-    outputs = torch.randn([1, 128, 128])
+    gpt = GPT(config).to(device)
+    inputs = torch.randint(0, 128, (1, 128)).to(device)
+    outputs = torch.randn([1, 128, 128]).to(device)
     loss = update_op(gpt, inputs, outputs)
     assert isinstance(loss, float)

@@ -1,9 +1,9 @@
-from __future__ import annotations
+from __future__ import annotations  # noqa: INP001
 
 from litgpt import Config
-from litgpt.model import GPT as LitGPT
+from litgpt.model import GPT
 
-from whittle.metrics.latency import profile_model_latency
+from whittle.metrics.flops import estimate_flops
 
 
 def update_config(
@@ -33,8 +33,18 @@ if __name__ == "__main__":
     config.n_embd = 128
     config.intermediate_size = 128 * 4
     config.n_layer = 4
-    model = LitGPT(config)
-    print(f"Full model cuda {profile_model_latency(model,use_cuda=True)} ms")
+    model = GPT(config)
+    print(
+        f"Full model {estimate_flops(model=model, metric='flops')} flops"
+    )
+    print(
+        f"Full model {estimate_flops(model=model, metric='macs')} macs"
+    )
     config = update_config(config, 64, 64 * 4, 4, 2, 4)
-    model = LitGPT(config)
-    print(f"Mini model cuda {profile_model_latency(model,use_cuda=True)} ms")
+    model = GPT(config)
+    print(
+        f"Mini model {estimate_flops(model=model, metric='flops')} flops"
+    )
+    print(
+        f"Mini model {estimate_flops(model=model, metric='macs')} macs"
+    )

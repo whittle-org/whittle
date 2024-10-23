@@ -3,6 +3,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
@@ -12,16 +13,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # Run in all these versions of Python
         python-version: ["3.9", "3.10", "3.11"]
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: install the latest version uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          version: latest
+      - name: create virtual environment
+        run: uv venv --python ${{ matrix.python-version }}
       - name: Install
-        run: pip install ".[dev]"
+        run: uv pip install ".[dev]"
       - name: Run pytest
-        run: pytest -vvv
+        run: uv run pytest -vvv

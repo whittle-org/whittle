@@ -6,7 +6,7 @@ import litgpt
 from litgpt import Config
 
 from whittle.models.gpt_flex.blocks.causal_self_attention import CausalSelfAttentionFlex
-from whittle.models.gpt_flex.blocks.mlp import GemmaMLP, GptNeoxMLP, LLaMAMLP
+from whittle.models.gpt_flex.blocks.mlp import GemmaMLPFlex, GptNeoxMLPFlex, LLaMAMLPFlex
 from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
 
@@ -73,11 +73,11 @@ class BlockFlex(litgpt.model.Block):
     def mlp_class(self):
         # `self._mlp_class` cannot be the type to keep the config json serializable
         if self.config.mlp_class_name == "LLaMAMLP":
-            return LLaMAMLP
+            return LLaMAMLPFlex
         elif self.config.mlp_class_name == "GemmaMLP":
-            return GemmaMLP
+            return GemmaMLPFlex
         elif self.config.mlp_class_name == "GptNeoxMLP":
-            return GptNeoxMLP
+            return GptNeoxMLPFlex
         else:
             raise ValueError(f"Unknown MLP class: {self.config._mlp_class}")
 

@@ -6,9 +6,10 @@ import torch
 from litgpt import Config
 
 from whittle.modules import Linear
+from whittle.models.gpt.blocks import GptNeoxMLP, LLaMAMLP, GemmaMLP
 
 
-class GptNeoxMLP(litgpt.model.GptNeoxMLP):
+class GptNeoxMLPFlex(GptNeoxMLP):
     def __init__(self, config: Config, intermediate_size: int | None = None) -> None:
         isize = config.intermediate_size
         config.intermediate_size = 5
@@ -48,7 +49,7 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         self.proj.reset_super_network()
 
 
-class LLaMAMLP(litgpt.model.LLaMAMLP):
+class LLaMAMLPFlex(LLaMAMLP):
     def __init__(self, config: Config, intermediate_size: int | None = None) -> None:
         super().__init__(config)
         intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
@@ -86,7 +87,7 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         self.proj.reset_super_network()
 
 
-class GemmaMLP(LLaMAMLP):
+class GemmaMLPFlex(GemmaMLP):
     def __init__(self, config: Config) -> None:
         super().__init__(config)
 
