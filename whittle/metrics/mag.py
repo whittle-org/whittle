@@ -8,7 +8,7 @@ from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import GptNeoxMLP, GemmaMLP, LLaMAMLP
 
 
-def weight_magnitude(model: GPT):
+def compute_weight_magnitude(model: GPT):
     """
     Computes the sum of the weight magnitudes of the current sub-network of a GPT model. Make sure to set the
     sub-network before calling this function.
@@ -20,19 +20,19 @@ def weight_magnitude(model: GPT):
         float: magnitude of the weights of the activated sub-network
     """
     magnitude = 0
-    magnitude += weight_magnitude_linear_layer(model.lm_head)
-    magnitude += weight_magnitude_embedding(model.transformer.wte)
+    magnitude += compute_weight_magnitude_linear_layer(model.lm_head)
+    magnitude += compute_weight_magnitude_embedding(model.transformer.wte)
     for i in range(model.sub_network_n_layers):
         block = model.transformer.h[i]
-        magnitude += weight_magnitude_layer_norm(block.norm_1)
-        magnitude += weight_magnitude_attention(block.attn)
-        magnitude += weight_magnitude_mlp(block.mlp)
-        magnitude += weight_magnitude_layer_norm(block.norm_2)
-    magnitude += weight_magnitude_layer_norm(model.transformer.ln_f)
+        magnitude += compute_weight_magnitude_layer_norm(block.norm_1)
+        magnitude += compute_weight_magnitude_attention(block.attn)
+        magnitude += compute_weight_magnitude_mlp(block.mlp)
+        magnitude += compute_weight_magnitude_layer_norm(block.norm_2)
+    magnitude += compute_weight_magnitude_layer_norm(model.transformer.ln_f)
     return magnitude
 
 
-def weight_magnitude_mlp(mlp):
+def compute_weight_magnitude_mlp(mlp):
     if isinstance(mlp, GptNeoxMLP):
         layers = [mlp.proj, mlp.fc]
 
@@ -45,11 +45,11 @@ def weight_magnitude_mlp(mlp):
 
     mag = 0
     for layer in layers:
-        mag += weight_magnitude_linear_layer(layer)
+        mag += compute_weight_magnitude_linear_layer(layer)
     return mag
 
 
-def weight_magnitude_layer_norm(layer):
+def compute_weight_magnitude_layer_norm(layer):
     if layer is None:
         return 0
     if isinstance(layer, LayerNorm):
@@ -67,7 +67,7 @@ def weight_magnitude_layer_norm(layer):
     return float(mag)
 
 
-def weight_magnitude_linear_layer(layer):
+def compute_weight_magnitude_linear_layer(layer):
     n = layer.sub_network_in_features
     m = layer.sub_network_out_features
     mag = torch.sum(torch.abs(layer.weight[:m, :n]))
@@ -76,13 +76,13 @@ def weight_magnitude_linear_layer(layer):
     return float(mag)
 
 
-def weight_magnitude_embedding(layer):
+def compute_weight_magnitude_embedding(layer):
     n = layer.sub_network_embedding_dim
     mag = torch.sum(torch.abs(layer.weight[:, :n]))
     return float(mag)
 
 
-def weight_magnitude_attention(layer):
-    mag = weight_magnitude_linear_layer(layer.attn)
-    mag += weight_magnitude_linear_layer(layer.proj)
+def compute_weight_magnitude_attention(layer):
+    mag = compute_weight_magnitude_linear_layer(layer.attn)
+    mag += compute_weight_magnitude_linear_layer(layer.proj)
     return float(mag)

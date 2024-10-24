@@ -3,7 +3,7 @@ from __future__ import annotations
 from litgpt import Config
 from litgpt.model import GPT as LitGPT
 
-from whittle.metrics.latency import profile_model_latency
+from whittle.metrics.latency import compute_latency
 
 
 def update_config(
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     config.intermediate_size = 128 * 4
     config.n_layer = 4
     model = LitGPT(config)
-    print(f"Full model cuda {profile_model_latency(model,use_cuda=True)} ms")
+    print(f"Full model cuda {compute_latency(model, use_cuda=True)} ms")
     config = update_config(config, 64, 64 * 4, 4, 2, 4)
     model = LitGPT(config)
-    print(f"Mini model cuda {profile_model_latency(model,use_cuda=True)} ms")
+    print(f"Mini model cuda {compute_latency(model, use_cuda=True)} ms")

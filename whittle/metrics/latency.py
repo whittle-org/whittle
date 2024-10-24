@@ -34,7 +34,7 @@ def get_total_cpu_gpu_runtime(prof: torch.profiler.profile) -> tuple[int, int]:
     return sum_self_cpu_time_total, sum_self_cuda_time_total
 
 
-def profile_model_latency(
+def compute_latency(
     model: torch.nn.Module,
     use_cuda: bool = False,
     batch_size: int = 8,
@@ -62,7 +62,7 @@ def profile_model_latency(
         model = model.cuda()
         input_tensor = input_tensor.cuda()
 
-    # Use PyTorch profiler to record latency
+    # Use PyTorch profiler to record compute_latency
     model.eval()
     with torch.profiler.profile(
         activities=[
