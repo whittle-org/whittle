@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import Literal
 import os
+from typing import Literal
 
+import deepspeed
 import torch
+from deepspeed.accelerator.cpu_accelerator import CPU_Accelerator
 from deepspeed.profiling.flops_profiler import get_model_profile
-
 from litgpt.model import GPT
 
 
@@ -37,6 +38,7 @@ def compute_flops(
     model.eval()
 
     os.environ["DS_ACCELERATOR"] = "CPU"
+    deepspeed.accelerator.set_accelerator(CPU_Accelerator())
 
     flops, macs, _ = get_model_profile(
         model=model,
