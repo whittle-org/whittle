@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 from litgpt import Config
 from litgpt.model import build_rope_cache
-
+from litgpt.model import batched_index_select
 from whittle.models.gpt.blocks import Block
 from whittle.modules.embedding import Embedding
 from whittle.modules.layernorm import LayerNorm
@@ -27,7 +27,6 @@ class GPT(nn.Module):
         super().__init__()
         assert config.padded_vocab_size is not None
         self.config = config
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.lm_head = Linear(
             config.n_embd, config.padded_vocab_size, bias=config.lm_head_bias
         )
@@ -51,7 +50,6 @@ class GPT(nn.Module):
         self.sub_network_n_layers = self.config.n_layer
         self.cos: torch.Tensor
         self.sin: torch.Tensor
-        self.random_layers = list(range(self.config.n_layer))
         self.config.is_encoder_decoder = False
         self.main_input_name = "input_pos"
         self._supports_cache_class = True
@@ -82,18 +80,26 @@ class GPT(nn.Module):
         self._max_seq_length = value
         if not hasattr(self, "cos"):
             # first call
-            cos, sin = self.rope_cache()
+            cos, sin = self.rope_cache(self._max_seq_length, self.config.rope_n_elem)
             self.register_buffer("cos", cos, persistent=False)
             self.register_buffer("sin", sin, persistent=False)
         # override
         elif value != self.cos.size(0):
-            self.cos, self.sin = self.rope_cache(device=self.cos.device)
+            self.cos, self.sin = self.rope_cache(
+                seq_len=self._max_seq_length,
+                n_elem=self.config.rope_n_elem,
+                device=self.cos.device,
+            )
         # the mask and kv cache size will get updated on `set_kv_cache`. we cannot update it here because we don't know
         # if the kv cache is expected
 
     def reset_parameters(self) -> None:
         # Trigger resetting the rope-cache
-        self.cos, self.sin = self.rope_cache(device=self.cos.device)
+        self.cos, self.sin = self.rope_cache(
+            seq_len=self._max_seq_length,
+            n_elem=self.config.rope_n_elem,
+            device=self.cos.device,
+        )
 
     def _init_weights(self, module: nn.Module) -> None:
         """Meant to be used with `gpt.apply(gpt._init_weights)`."""
@@ -109,14 +115,57 @@ class GPT(nn.Module):
             self.transformer.wte.weight = self.lm_head.weight
 
     def rope_cache(
-        self, device: torch.device | None = None
+        self, seq_len: int, n_elem: int, device: torch.device | None = None
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        if self.config.rope_adjustments is None:
+            extra_config = None
+
+        else:
+            adjusted_params_required = [
+                "factor",
+                "low_freq_factor",
+                "high_freq_factor",
+                "original_max_seq_len",
+            ]
+            params_present = [
+                param in self.config.rope_adjustments
+                for param in adjusted_params_required
+            ]
+            num_params_present = sum(params_present)
+
+            if num_params_present == 0:
+                extra_config = None  # uses standard RoPE
+            elif num_params_present == 4:
+                # These parameters should always be used together so that we don't interfere with standard rope
+                extra_config = {
+                    "original_max_seq_len": self.config.rope_adjustments[
+                        "original_max_seq_len"
+                    ],
+                    "factor": self.config.rope_adjustments["factor"],
+                    "low_freq_factor": self.config.rope_adjustments["low_freq_factor"],
+                    "high_freq_factor": self.config.rope_adjustments[
+                        "high_freq_factor"
+                    ],
+                }
+            else:
+                # Some but not all parameters are specified; raise an error
+                missing_params = [
+                    param
+                    for param, present in zip(adjusted_params_required, params_present)
+                    if not present
+                ]
+                raise ValueError(
+                    f"The following adjusted RoPE parameters are missing in rope_adjustments: {', '.join(missing_params)}. "
+                    "All adjusted RoPE parameters must be specified together."
+                )
+
         return build_rope_cache(
-            seq_len=self.max_seq_length,
-            n_elem=self.config.rope_n_elem,
+            seq_len=seq_len,
+            n_elem=n_elem,
             device=device,
             condense_ratio=self.config.rope_condense_ratio,
             base=self.config.rope_base,
+            extra_config=extra_config,
         )
 
     def set_sub_network(
@@ -127,37 +176,27 @@ class GPT(nn.Module):
         sub_network_n_layers: int,
         sub_network_query_groups=None,
         sub_network_head_size=None,
-        sample_random_indices: bool = False,
-        index_block = None,
-        random_layers = None
+        index_block=None,
+        random_layers=None,
     ) -> None:
-        self.sample_random_indices = sample_random_indices
         self.sub_network_head_size = sub_network_head_size
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
+
         self.sub_network_n_layers = sub_network_n_layers
-        self.transformer.wte.set_sub_network(
-            self.sub_network_n_embd, sample_random_indices
-        )
-        self.transformer.ln_f.set_sub_network(
-            self.sub_network_n_embd, sample_random_indices
-        )
+        self.transformer.wte.set_sub_network(self.sub_network_n_embd)
+        self.transformer.ln_f.set_sub_network(self.sub_network_n_embd)
         if index_block is not None:
             self.random_layers = []
             for i in range(self.sub_network_n_layers):
-                if index_block != i :
+                if index_block != i:
                     self.random_layers.append(i)
         elif random_layers is not None:
             self.random_layers = random_layers
         else:
-            if sample_random_indices and sub_network_n_layers < self.config.n_layer:
-                self.random_layers = torch.randperm(self.config.n_layer)[
-                    :sub_network_n_layers
-                ]
-            else:
-                self.random_layers = list(range(self.sub_network_n_layers))
-
+            self.random_layers = list(range(self.sub_network_n_layers))
+        self.sub_network_n_layers = len(self.random_layers)
         for i, j in enumerate(self.random_layers):
             block = self.transformer.h[j]
             block.set_sub_network(
@@ -166,11 +205,8 @@ class GPT(nn.Module):
                 sub_network_num_heads[i],
                 sub_network_query_groups,
                 sub_network_head_size,
-                sample_random_indices
             )
-        self.lm_head.set_sub_network(
-            sub_network_n_embd, self.config.padded_vocab_size, sample_random_indices
-        )
+        self.lm_head.set_sub_network(sub_network_n_embd, self.config.padded_vocab_size)
 
     def select_sub_network(self, config):
         self.set_sub_network(
@@ -195,11 +231,15 @@ class GPT(nn.Module):
 
     def process_rope_cache(self, cos, sin, input_pos, T):
         if input_pos is not None:  # use the kv cache
-            cos = cos.index_select(0, input_pos)
-            sin = sin.index_select(0, input_pos)
+            cos = batched_index_select(self.cos, 0, input_pos)
+            sin = batched_index_select(self.sin, 0, input_pos)
             if self.mask_cache is None:
                 raise TypeError("You need to call `gpt.set_kv_cache()`")
-            mask = self.mask_cache.index_select(2, input_pos)
+            mask = batched_index_select(self.mask_cache, 2, input_pos)
+            if mask.dim() > 4:
+                # the mask cache has a batch dim of 1 in addition to the one
+                # we get if input_pos has a batch dimension
+                mask = mask.squeeze(1)
         else:
             cos = cos[:T]
             sin = sin[:T]
@@ -216,61 +256,69 @@ class GPT(nn.Module):
             )
 
         x = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
-        #print("Sum after emb", torch.sum(x))
+        # print("Sum after emb", torch.sum(x))
         if self.config.scale_embeddings:
             x = x * torch.tensor(self.config.n_embd**0.5, dtype=x.dtype)
+        self.intermediate_out[f"block_{0}"] = x.detach()
         for i, j in enumerate(self.random_layers):
             block = self.transformer.h[j]
             if not self.config.fix_head_size:
                 if isinstance(self.sub_network_num_heads, list):
-                    cos, sin = build_rope_cache(
+                    cos, sin = self.rope_cache(
                         seq_len=self.max_seq_length,
                         n_elem=int(
                             self.config.rotary_percentage
                             * (self.sub_network_n_embd // self.sub_network_num_heads[i])
                         ),
-                        device=self.device,
+                        device=self.cos.device,
                     )
                 else:
-                    cos, sin = build_rope_cache(
+                    cos, sin = self.rope_cache(
                         seq_len=self.max_seq_length,
                         n_elem=int(
                             self.config.rotary_percentage
                             * (self.sub_network_n_embd // self.sub_network_num_heads)
                         ),
-                        device=self.device,
+                        device=self.cos.device,
                     )
             else:
                 if self.sub_network_head_size is None:
-                    cos, sin = build_rope_cache(
+                    cos, sin = self.rope_cache(
                         seq_len=self.max_seq_length,
                         n_elem=int(
                             self.config.rotary_percentage * (self.config.head_size)
                         ),
-                        device=self.device,
+                        device=self.cos.device,
                     )
                 else:
-                    cos, sin = build_rope_cache(
+                    cos, sin = self.rope_cache(
                         seq_len=self.max_seq_length,
                         n_elem=int(
                             self.config.rotary_percentage * (self.sub_network_head_size)
                         ),
-                        device=self.device,
+                        device=self.cos.device,
                     )
 
             cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
 
-            x, attention_out, mlp_out, norm1, norm2 = block(x, cos, sin, mask, input_pos)
-            self.intermediate_out[f"block_{j}"] = x.detach()
-            self.intermediate_out[f"attn_{j}"] = [attention_out[0].detach(),attention_out[1].detach(),attention_out[2].detach(),attention_out[3]]
-            self.intermediate_out[f"mlp_{j}"] = mlp_out.detach()
-            self.intermediate_out[f"norm1_{j}"] = norm1.detach()
-            self.intermediate_out[f"norm2_{j}"] = norm2.detach()
-            #print("Sum after block", torch.sum(x))
+            x, attention_out, mlp_out, norm1, norm2 = block(
+                x, cos, sin, mask, input_pos
+            )
+            self.intermediate_out[f"block_{i+1}"] = x.detach()
+            self.intermediate_out[f"attn_{i}"] = [
+                attention_out[0].detach(),
+                attention_out[1].detach(),
+                attention_out[2].detach(),
+                attention_out[3],
+            ]
+            self.intermediate_out[f"mlp_{i}"] = mlp_out.detach()
+            self.intermediate_out[f"norm1_{i}"] = norm1.detach()
+            self.intermediate_out[f"norm2_{i}"] = norm2.detach()
+            # print("Sum after block", torch.sum(x))
         x = self.transformer.ln_f(x)
         self.intermediate_out[f"norm_f"] = x.detach()
         x = self.lm_head(x)  # (b, t, vocab_size)
-        #print("Sum after head", torch.sum(x))
+        # print("Sum after head", torch.sum(x))
         if self.config.final_logit_softcapping is not None:
             x = (
                 torch.tanh(x / self.config.final_logit_softcapping)

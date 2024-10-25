@@ -22,23 +22,16 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         self.sub_network_intermediate_size = self.intermediate_size
 
     def set_sub_network(
-        self,
-        sub_network_n_embd: int,
-        sub_network_intermediate_size: int,
-        sample_random_indices: bool = False,
+        self, sub_network_n_embd: int, sub_network_intermediate_size: int
     ):
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
 
         self.fc.set_sub_network(
-            self.sub_network_n_embd,
-            self.sub_network_intermediate_size,
-            sample_random_indices,
+            self.sub_network_n_embd, self.sub_network_intermediate_size
         )
         self.proj.set_sub_network(
-            self.sub_network_intermediate_size,
-            self.sub_network_n_embd,
-            sample_random_indices,
+            self.sub_network_intermediate_size, self.sub_network_n_embd
         )
 
     def reset_super_network(self):
@@ -50,10 +43,10 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x_fc = self.fc(x)
-        #print("Sum after fc", torch.sum(x_fc))
+        # print("Sum after fc", torch.sum(x_fc))
         x = torch.nn.functional.gelu(x_fc, approximate=self.config.gelu_approximate)
-        #print("Sum after proj", torch.sum(self.proj(x)))
-        return self.proj(x), x_fc 
+        # print("Sum after proj", torch.sum(self.proj(x)))
+        return self.proj(x), x_fc
 
 
 class LLaMAMLP(litgpt.model.LLaMAMLP):
@@ -69,28 +62,19 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         self.config = config
 
     def set_sub_network(
-        self,
-        sub_network_n_embd: int,
-        sub_network_intermediate_size: int,
-        sample_random_indices: bool = False,
+        self, sub_network_n_embd: int, sub_network_intermediate_size: int
     ):
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
 
         self.fc_1.set_sub_network(
-            self.sub_network_n_embd,
-            self.sub_network_intermediate_size,
-            sample_random_indices,
+            self.sub_network_n_embd, self.sub_network_intermediate_size
         )
         self.fc_2.set_sub_network(
-            self.sub_network_n_embd,
-            self.sub_network_intermediate_size,
-            sample_random_indices,
+            self.sub_network_n_embd, self.sub_network_intermediate_size
         )
         self.proj.set_sub_network(
-            self.sub_network_intermediate_size,
-            self.sub_network_n_embd,
-            sample_random_indices,
+            self.sub_network_intermediate_size, self.sub_network_n_embd
         )
 
     def reset_super_network(self):
@@ -106,6 +90,7 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         x_fc_2 = self.fc_2(x)
         x = torch.nn.functional.silu(x_fc_1) * x_fc_2
         return self.proj(x), x_fc_1
+
 
 class GemmaMLP(LLaMAMLP):
     def __init__(self, config: Config) -> None:

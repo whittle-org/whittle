@@ -68,38 +68,30 @@ class Block(litgpt.model.Block):
         sub_network_num_heads: int,
         sub_network_query_groups=None,
         sub_network_head_size=None,
-        sample_random_indices: bool = False,
     ) -> None:
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
-        self.norm_1.set_sub_network(self.sub_network_n_embd, sample_random_indices)
+        self.norm_1.set_sub_network(self.sub_network_n_embd)
         self.attn.set_sub_network(
             self.sub_network_n_embd,
             self.sub_network_num_heads,
             sub_network_query_groups,
             sub_network_head_size,
-            sample_random_indices,
         )
         if isinstance(self.post_attention_norm, LayerNorm) or isinstance(
             self.post_attention_norm, RMSNorm
         ):
-            self.post_attention_norm.set_sub_network(
-                self.sub_network_n_embd, sample_random_indices
-            )
+            self.post_attention_norm.set_sub_network(self.sub_network_n_embd)
         if not self.config.shared_attention_norm and self.norm_2 is not None:
-            self.norm_2.set_sub_network(self.sub_network_n_embd, sample_random_indices)
+            self.norm_2.set_sub_network(self.sub_network_n_embd)
         self.mlp.set_sub_network(
-            self.sub_network_n_embd,
-            self.sub_network_intermediate_size,
-            sample_random_indices,
+            self.sub_network_n_embd, self.sub_network_intermediate_size
         )
         if isinstance(self.post_mlp_norm, LayerNorm) or isinstance(
             self.post_mlp_norm, RMSNorm
         ):
-            self.post_mlp_norm.set_sub_network(
-                self.sub_network_n_embd, sample_random_indices
-            )
+            self.post_mlp_norm.set_sub_network(self.sub_network_n_embd)
 
     def reset_super_network(self):
         self.sub_network_n_embd = self.config.n_embd
@@ -153,7 +145,9 @@ class Block(litgpt.model.Block):
         attention_output = self.post_attention_norm(attention_output)
 
         if self.config.parallel_residual:
-            x_normed_2 = x_normed if self.config.shared_attention_norm else self.norm_2(x)
+            x_normed_2 = (
+                x_normed if self.config.shared_attention_norm else self.norm_2(x)
+            )
             mlp_out, fc = self.mlp(x_normed_2)
             x = mlp_out + attention_output + x
         else:

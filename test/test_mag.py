@@ -4,7 +4,7 @@ import torch
 from litgpt.config import Config
 
 from whittle.models.gpt import GPT
-from whittle.metrics.mag import weight_magnitude
+from whittle.metrics.mag import compute_weight_magnitude
 
 
 mlp_types = ["GptNeoxMLP", "LLaMAMLP", "GemmaMLP"]
@@ -13,7 +13,7 @@ norm_types = ["LayerNorm", "RMSNorm"]
 
 @pytest.mark.parametrize("mlp_type", mlp_types)
 @pytest.mark.parametrize("norm_type", norm_types)
-def test_weight_magnitude(mlp_type, norm_type):
+def test_compute_weight_magnitude(mlp_type, norm_type):
     config = Config()
     config.padded_vocab_size = 512
     config.n_embd = 64
@@ -62,7 +62,7 @@ def test_weight_magnitude(mlp_type, norm_type):
         if norm_type == "LayerNorm":
             block.norm_1.bias.data = torch.ones_like(block.norm_1.bias.data)
             block.norm_2.bias.data = torch.ones_like(block.norm_2.bias.data)
-    mag_super = weight_magnitude(gpt)
+    mag_super = compute_weight_magnitude(gpt)
 
     num_params_super = sum(p.numel() for p in gpt.parameters() if p.requires_grad)
 
@@ -75,6 +75,6 @@ def test_weight_magnitude(mlp_type, norm_type):
         "sub_network_n_layers": 1,
     }
     gpt.set_sub_network(**sub_network_config)
-    mag_sub_network = weight_magnitude(gpt)
+    mag_sub_network = compute_weight_magnitude(gpt)
 
     assert mag_sub_network < mag_super

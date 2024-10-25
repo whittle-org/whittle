@@ -12,7 +12,7 @@ from whittle.modules.rmsnorm import RMSNorm
 from whittle.models.gpt.blocks import GptNeoxMLP, GemmaMLP, LLaMAMLP
 
 
-def compute_parameters(model):
+def compute_all_parameters(model: nn.Module):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
@@ -28,6 +28,8 @@ def params_embedding_layer(embedding: Embedding):
 
 
 def params_layer_normalization(normalization_layer: nn.Module):
+    if normalization_layer is None:
+        return 0
     if isinstance(normalization_layer, LayerNorm):
         return 2 * normalization_layer.sub_network_in_features
     elif isinstance(normalization_layer, RMSNorm):
@@ -69,7 +71,7 @@ def params_mlp(mlp: nn.Module):
     return num_params
 
 
-def compute_parameters_sub_network_gpt(model: GPT):
+def compute_parameters(model: GPT):
     """
     Computes parameters of the current sub-network of a GPT mmodel. Make sure to set the sub-network before
     calling this function.

@@ -6,7 +6,7 @@ from litgpt.config import Config
 
 from whittle.metrics.parameters import (
     compute_parameters,
-    compute_parameters_sub_network_gpt,
+    compute_all_parameters,
 )
 from whittle.models.gpt import GPT
 
@@ -19,7 +19,7 @@ norm_types = ["LayerNorm", "RMSNorm"]
 
 def test_compute_parameters():
     model = MLP(8)
-    assert compute_parameters(model) == 641
+    assert compute_all_parameters(model) == 641
 
 
 @pytest.mark.parametrize("mlp_type", mlp_types)
@@ -45,7 +45,7 @@ def test_compute_parameters_sub_network(mlp_type, norm_type):
 
     params_super_network = compute_parameters(gpt)
 
-    params_sub_network = compute_parameters_sub_network_gpt(gpt)
+    params_sub_network = compute_parameters(gpt)
     assert params_sub_network == params_super_network
 
     # reduce super-network by one single head
@@ -58,7 +58,7 @@ def test_compute_parameters_sub_network(mlp_type, norm_type):
         + [config.n_head for _ in range(1, config.n_layer)],
         sub_network_n_layers=config.n_layer,
     )
-    params_sub_network = compute_parameters_sub_network_gpt(gpt)
+    params_sub_network = compute_parameters(gpt)
     params_single_head = (config.n_embd * config.head_size + config.head_size) * 3
     assert params_sub_network == params_super_network - params_single_head
 
@@ -69,5 +69,5 @@ def test_compute_parameters_sub_network(mlp_type, norm_type):
         sub_network_num_heads=[config.n_head - 5] * config.n_layer,
         sub_network_n_layers=config.n_layer - 2,
     )
-    params_sub_network = compute_parameters_sub_network_gpt(gpt)
+    params_sub_network = compute_parameters(gpt)
     assert params_sub_network < params_super_network
