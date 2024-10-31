@@ -10,16 +10,34 @@ from litgpt.model import KVCache, apply_rope
 from whittle.modules import Linear
 
 
-class CausalSelfAttention(nn.Module):
+class CausalSelfAttentionFlex(nn.Module):
     def __init__(self, config: Config, block_idx: int) -> None:
+        n_head = config.n_head
+        n_query_groups = config.n_query_groups
+        head_size = config.head_size
+        config.n_head = 1
+        config.n_query_groups = 1
+        config.head_size = 1
+
         super().__init__()
-        shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
+        config.n_head = n_head
+        config.n_query_groups = n_query_groups
+        config.head_size = head_size
+
+        n_head = config.n_head if isinstance(config.n_head, int) else config.n_head[block_idx]
+        n_query_groups = config.n_query_groups if isinstance(config.n_query_groups, int) else config.n_query_groups[block_idx]
+
+        self.n_head = n_head
+        self.n_query_groups = n_query_groups
+        self.head_size = config.head_size if isinstance(config.head_size, int) else config.head_size[block_idx]
+
+        shape = (n_head + 2 * n_query_groups) * self.head_size
         # key, query, value projections for all heads, but in a batch
         self.attn = Linear(config.n_embd, shape, bias=config.bias)
         # output projection
         # if `head_size` is explicitly specified in the config, `n_emd` might not be equal to `head_size * n_head`
         self.proj = Linear(
-            config.head_size * config.n_head, config.n_embd, bias=config.bias
+            self.head_size * n_head, config.n_embd, bias=config.bias
         )
         # disabled by default
         self.kv_cache: KVCache | None = None
@@ -30,12 +48,12 @@ class CausalSelfAttention(nn.Module):
         self.config = config
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
-        self.sub_network_n_head = self.config.n_head
-        self.sub_network_head_size = self.config.head_size
+        self.sub_network_n_head = n_head
+        self.sub_network_head_size = self.head_size
         self.sub_network_qkv_shape = (
-            self.config.n_head + 2 * self.config.n_query_groups
-        ) * self.config.head_size
-        self.sub_network_query_groups = self.config.n_query_groups
+            n_head + 2 * n_query_groups
+        ) * self.head_size
+        self.sub_network_query_groups = n_query_groups
         self.sub_network_q_per_kv = (
             self.sub_network_n_head // self.sub_network_query_groups
         )
@@ -51,19 +69,19 @@ class CausalSelfAttention(nn.Module):
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_n_head = sub_network_n_head
         if sub_network_query_groups is None:
-            if self.config.n_query_groups == 1:
+            if self.n_query_groups == 1:
                 self.sub_network_query_groups = 1
-            elif self.sub_network_n_head % self.config.n_query_groups == 0:
-                self.sub_network_query_groups = self.config.n_query_groups
+            elif self.sub_network_n_head % self.n_query_groups == 0:
+                self.sub_network_query_groups = self.n_query_groups
             else:
                 self.sub_network_query_groups = self.sub_network_n_head // (
-                    self.config.n_head // self.config.n_query_groups
+                    self.n_head // self.n_query_groups
                 )
         else:
             self.sub_network_query_groups = sub_network_query_groups
         if self.config.fix_head_size:
             if sub_network_head_size is None:
-                self.sub_network_head_size = self.config.head_size
+                self.sub_network_head_size = self.head_size
             else:
                 self.sub_network_head_size = sub_network_head_size
 
@@ -93,12 +111,12 @@ class CausalSelfAttention(nn.Module):
 
     def reset_super_network(self):
         self.sub_network_n_embd = self.config.n_embd
-        self.sub_network_n_head = self.config.n_head
-        self.sub_network_head_size = self.config.head_size
+        self.sub_network_n_head = self.n_head
+        self.sub_network_head_size = self.head_size
         self.sub_network_qkv_shape = (
-            self.config.n_head + 2 * self.config.n_query_groups
-        ) * self.config.head_size
-        self.sub_network_query_groups = self.config.n_query_groups
+            self.n_head + 2 * self.n_query_groups
+        ) * self.head_size
+        self.sub_network_query_groups = self.n_query_groups
         self.sub_network_q_per_kv = (
             self.sub_network_n_head // self.sub_network_query_groups
         )
@@ -144,7 +162,7 @@ class CausalSelfAttention(nn.Module):
         # training: flash attention requires it
         # inference: multi-query would require a full kv cache so avoid it to limit its memory usage
         if self.sub_network_query_groups != self.sub_network_n_head and (
-            input_pos is None or self.config.n_query_groups != 1
+            input_pos is None or self.n_query_groups != 1
         ):
             k = k.expand(
                 B,
@@ -247,8 +265,8 @@ class CausalSelfAttention(nn.Module):
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ) -> KVCache:
-        heads = 1 if self.config.n_query_groups == 1 else self.config.n_head
-        v_shape = (batch_size, heads, max_seq_length, self.config.head_size)
+        heads = 1 if self.n_query_groups == 1 else self.n_head
+        v_shape = (batch_size, heads, max_seq_length, self.head_size)
         if rope_cache_length is None:
             if self.config.rotary_percentage != 1.0:
                 raise TypeError(
@@ -260,6 +278,6 @@ class CausalSelfAttention(nn.Module):
                 batch_size,
                 heads,
                 max_seq_length,
-                rope_cache_length + self.config.head_size - self.config.rope_n_elem,
+                rope_cache_length + self.head_size - self.config.rope_n_elem,
             )
         return KVCache(k_shape, v_shape, device=device, dtype=dtype)
