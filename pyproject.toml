@@ -15,6 +15,7 @@ dependencies = [
   "matplotlib",
   "typing-extensions",
   "torch>=2",
+  "transformers>=4",
   "litgpt[all]==0.5.0",
   "syne-tune[moo]>=0.13",
   "torchvision>=0.18",
