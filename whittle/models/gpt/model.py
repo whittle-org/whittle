@@ -186,11 +186,11 @@ class GPT(nn.Module):
         self.transformer.ln_f.set_sub_network(self.sub_network_n_embd)
         if sub_network_query_groups is None:
             if self.config.n_query_groups == 1:
-                self.sub_network_query_groups = 1
+                sub_network_query_groups = 1
             elif self.sub_network_num_heads % self.config.n_query_groups == 0:
-                self.sub_network_query_groups = self.config.n_query_groups
+                sub_network_query_groups = self.config.n_query_groups
             else:
-                self.sub_network_query_groups = self.sub_network_num_heads // (
+                sub_network_query_groups = self.sub_network_num_heads // (
                     self.config.n_head // self.config.n_query_groups
                 )
         if self.config.fix_head_size:
