@@ -38,7 +38,7 @@ def test_checkpoint_loading(checkpoint_dir):
     model.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
     # test output
     model.eval()
-    sample_intermediate_size = [4 * config.n_embd for i in range(config.n_layer)]
+    sample_intermediate_size = 4 * config.n_embd
     model.set_sub_network(
         config.n_embd,
         sample_intermediate_size,

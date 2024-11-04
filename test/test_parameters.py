@@ -52,12 +52,11 @@ def test_compute_parameters_sub_network(mlp_type, norm_type):
     gpt.set_sub_network(
         sub_network_n_embd=config.n_embd,
         sub_network_intermediate_size=config.intermediate_size,
-        sub_network_num_heads=[config.n_head - 1]
-        + [config.n_head for _ in range(1, config.n_layer)],
+        sub_network_num_heads=config.n_head - 1,
         sub_network_n_layers=config.n_layer,
     )
     params_sub_network = compute_parameters(gpt)
-    params_single_head = (config.n_embd * config.head_size + config.head_size) * 3
+    params_single_head = (config.n_embd * config.head_size + config.head_size) * 3 * (config.n_layer)
     assert params_sub_network == params_super_network - params_single_head
 
     # remove larger part of the network
