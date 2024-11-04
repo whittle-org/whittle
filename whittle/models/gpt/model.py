@@ -171,8 +171,8 @@ class GPT(nn.Module):
     def set_sub_network(
         self,
         sub_network_n_embd: int,
-        sub_network_intermediate_size: list,
-        sub_network_num_heads: list,
+        sub_network_intermediate_size: int,
+        sub_network_num_heads: int,
         sub_network_n_layers: int,
         sub_network_query_groups=None,
         sub_network_head_size=None,
@@ -188,8 +188,8 @@ class GPT(nn.Module):
             block = self.transformer.h[i]
             block.set_sub_network(
                 sub_network_n_embd,
-                sub_network_intermediate_size[i],
-                sub_network_num_heads[i],
+                sub_network_intermediate_size,
+                sub_network_num_heads,
                 sub_network_query_groups,
                 sub_network_head_size,
             )
@@ -247,24 +247,14 @@ class GPT(nn.Module):
         for i in range(self.sub_network_n_layers):
             block = self.transformer.h[i]
             if not self.config.fix_head_size:
-                if isinstance(self.sub_network_num_heads, list):
-                    cos, sin = self.rope_cache(
-                        seq_len=self.max_seq_length,
-                        n_elem=int(
-                            self.config.rotary_percentage
-                            * (self.sub_network_n_embd // self.sub_network_num_heads[i])
-                        ),
-                        device=self.cos.device,
-                    )
-                else:
-                    cos, sin = self.rope_cache(
-                        seq_len=self.max_seq_length,
-                        n_elem=int(
-                            self.config.rotary_percentage
-                            * (self.sub_network_n_embd // self.sub_network_num_heads)
-                        ),
-                        device=self.cos.device,
-                    )
+                cos, sin = self.rope_cache(
+                    seq_len=self.max_seq_length,
+                    n_elem=int(
+                        self.config.rotary_percentage
+                        * (self.sub_network_n_embd // self.sub_network_num_heads)
+                    ),
+                    device=self.cos.device,
+                )
             else:
                 if self.sub_network_head_size is None:
                     cos, sin = self.rope_cache(
