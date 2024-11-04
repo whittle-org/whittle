@@ -201,6 +201,8 @@ class GPT(nn.Module):
             sub_network_head_size = (
                 self.sub_network_n_embd // self.sub_network_num_heads
             )
+            print(sub_network_head_size)
+            print(sub_network_query_groups)
         for i in range(self.sub_network_n_layers):
             block = self.transformer.h[i]
             block.set_sub_network(
