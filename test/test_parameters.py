@@ -51,9 +51,7 @@ def test_compute_parameters_sub_network(mlp_type, norm_type):
     # reduce super-network by one single head
     gpt.set_sub_network(
         sub_network_n_embd=config.n_embd,
-        sub_network_intermediate_size=[
-            config.intermediate_size for _ in range(config.n_layer)
-        ],
+        sub_network_intermediate_size=config.intermediate_size,
         sub_network_num_heads=[config.n_head - 1]
         + [config.n_head for _ in range(1, config.n_layer)],
         sub_network_n_layers=config.n_layer,
@@ -65,8 +63,8 @@ def test_compute_parameters_sub_network(mlp_type, norm_type):
     # remove larger part of the network
     gpt.set_sub_network(
         sub_network_n_embd=config.n_embd // 2,
-        sub_network_intermediate_size=[config.intermediate_size] * config.n_layer,
-        sub_network_num_heads=[config.n_head - 5] * config.n_layer,
+        sub_network_intermediate_size=config.intermediate_size,
+        sub_network_num_heads=config.n_head - 5,
         sub_network_n_layers=config.n_layer - 2,
     )
     params_sub_network = compute_parameters(gpt)

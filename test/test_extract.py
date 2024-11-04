@@ -31,9 +31,9 @@ def test_extract_sub_network() -> None:
     super_network.eval()
     super_network.set_sub_network(
         sub_network_n_embd=sub_network_config.n_embd,
-        sub_network_intermediate_size=[sub_network_config.intermediate_size]
-        * sub_network_config.n_layer,
-        sub_network_num_heads=[sub_network_config.n_head] * sub_network_config.n_layer,
+        sub_network_intermediate_size=sub_network_config.intermediate_size,
+        *sub_network_config.n_layer,
+        sub_network_num_heads=sub_network_config.n_head,
         sub_network_n_layers=sub_network_config.n_layer,
     )
 
@@ -74,9 +74,9 @@ def test_extract_sub_network_llamamlp() -> None:
     super_network.eval()
     super_network.set_sub_network(
         sub_network_n_embd=sub_network_config.n_embd,
-        sub_network_intermediate_size=[sub_network_config.intermediate_size]
-        * sub_network_config.n_layer,
-        sub_network_num_heads=[sub_network_config.n_head] * sub_network_config.n_layer,
+        sub_network_intermediate_size=sub_network_config.intermediate_size,
+        *sub_network_config.n_layer,
+        sub_network_num_heads=sub_network_config.n_head,
         sub_network_n_layers=sub_network_config.n_layer,
     )
 

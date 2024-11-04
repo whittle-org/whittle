@@ -42,7 +42,7 @@ def test_checkpoint_loading(checkpoint_dir):
     model.set_sub_network(
         config.n_embd,
         sample_intermediate_size,
-        [config.n_head for i in range(config.n_layer)],
+        config.n_head,
         config.n_layer,
     )
 
