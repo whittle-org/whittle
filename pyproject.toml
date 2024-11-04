@@ -20,6 +20,7 @@ dependencies = [
   "syne-tune[moo]>=0.13",
   "torchvision>=0.18",
   "lm_eval==0.4.4",
+  "tokenizers==0.20.0",
   "deepspeed"
 ]
 classifiers = [
