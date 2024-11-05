@@ -21,7 +21,7 @@ class RandomStrategy(BaseTrainingStrategy):
         super().__init__(**kwargs)
         self.random_samples = random_samples
 
-    def __call__(self, model, inputs, outputs, **kwargs):
+    def __call__(self, model, inputs, outputs, scale_loss=1, **kwargs):
         """Updates randomly sampled sub-networks in each step."""
         total_loss = 0
         y_supernet = model(inputs)
@@ -33,7 +33,8 @@ class RandomStrategy(BaseTrainingStrategy):
                 loss = self.kd_loss(y_hat, outputs, y_supernet)
             else:
                 loss = self.loss_function(y_hat, outputs)
-            loss.backward()
+            loss *= scale_loss
+            loss.backward() if self.fabric is None else self.fabric.backward(loss)
             model.reset_super_network()
 
             total_loss += loss.item()
