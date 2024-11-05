@@ -28,12 +28,12 @@ class SandwichStrategy(BaseTrainingStrategy):
         super().__init__(**kwargs)
         self.random_samples = random_samples
 
-    def __call__(self, model, inputs, outputs, **kwargs):
+    def __call__(self, model, inputs, outputs, scale_loss=1, **kwargs):
         total_loss = 0
         # update super-network
         y_supernet = model(inputs)
-        loss = self.loss_function(y_supernet, outputs)
-        loss.backward()
+        loss = self.loss_function(y_supernet, outputs) * scale_loss
+        loss.backward() if self.fabric is None else self.fabric.backward(loss)
         total_loss += loss.item()
 
         # update random sub-networks
@@ -45,7 +45,9 @@ class SandwichStrategy(BaseTrainingStrategy):
                 loss = self.kd_loss(y_hat, outputs, y_supernet)
             else:
                 loss = self.loss_function(y_hat, outputs)
-            loss.backward()
+
+            loss *= scale_loss
+            loss.backward() if self.fabric is None else self.fabric.backward(loss)
             model.reset_super_network()
             total_loss += loss.item()
 
@@ -57,7 +59,8 @@ class SandwichStrategy(BaseTrainingStrategy):
             loss = self.kd_loss(y_hat, outputs, y_supernet)
         else:
             loss = self.loss_function(y_hat, outputs)
-        loss.backward()
+        loss *= scale_loss
+        loss.backward() if self.fabric is None else self.fabric.backward(loss)
         model.reset_super_network()
         total_loss += loss.item()
 
