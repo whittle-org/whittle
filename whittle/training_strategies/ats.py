@@ -3,6 +3,8 @@ from __future__ import annotations
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 
 
+from typing import Any, Dict
+
 class ATS(BaseTrainingStrategy):
     """
     ATS strategy.
@@ -17,7 +19,7 @@ class ATS(BaseTrainingStrategy):
         https://arxiv.org/abs/2106.08895
     """
 
-    def __init__(self, random_samples: int = 1, **kwargs):
+    def __init__(self, random_samples: int = 1,  **kwargs: Dict[str, Any]):
         """
         Initialises an `ATS` strategy.
 
@@ -29,7 +31,7 @@ class ATS(BaseTrainingStrategy):
         self.random_samples = random_samples
         self.current_step = 0
 
-    def __call__(self, model, inputs, outputs, **kwargs):
+    def __call__(self, model, inputs, outputs,  **kwargs: Dict[str, Any]):
         """
         Updates a set of randomly sampled sub-networks if the current step is odd. Else, it updates the
         super-network.

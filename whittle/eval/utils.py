@@ -26,7 +26,8 @@ def prepare_results(results, save_filepath, print_results=True):
 def convert_and_evaluate(
     model: GPT,
     tasks: str | None = None,
-    out_dir=None,
+    checkpoint_dir: Path | None = None, 
+    out_dir: Path | None = None,    
     force_conversion: bool = False,
     num_fewshot: int | None = None,
     batch_size: int | str = 1,
