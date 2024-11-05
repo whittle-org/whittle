@@ -8,7 +8,7 @@ from __future__ import annotations
 from functools import partial
 
 from typing import Any
-from tying import Optional
+from typing import Optional
 from typing_extensions import Self
 
 import torch
