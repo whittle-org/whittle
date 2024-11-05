@@ -8,7 +8,6 @@ from __future__ import annotations
 from functools import partial
 
 from typing import Any
-from typing import Optional
 from typing_extensions import Self
 
 import torch
@@ -54,7 +53,7 @@ class GPT(nn.Module):
         self.config.is_encoder_decoder = False
         self.main_input_name = "input_pos"
         self._supports_cache_class = True
-        self.sub_network_head_size = None
+        self.sub_network_head_size: int | None = None
         # self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
 
     @property
@@ -175,10 +174,9 @@ class GPT(nn.Module):
         sub_network_intermediate_size: int,
         sub_network_num_heads: int,
         sub_network_n_layers: int,
-        sub_network_query_groups=None,
-        sub_network_head_size=None,
+        sub_network_query_groups: int | None = None,
+        sub_network_head_size: int | None = None,
     ) -> None:
-        self.sub_network_head_size = sub_network_head_size
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
@@ -197,7 +195,6 @@ class GPT(nn.Module):
         if self.config.fix_head_size:
             if sub_network_head_size is None:
                 sub_network_head_size = self.config.head_size
-
         else:
             sub_network_head_size = (
                 self.sub_network_n_embd // self.sub_network_num_heads
@@ -212,6 +209,7 @@ class GPT(nn.Module):
                 sub_network_head_size,
             )
         self.lm_head.set_sub_network(sub_network_n_embd, self.config.padded_vocab_size)
+        self.sub_network_head_size = sub_network_head_size
 
     def select_sub_network(self, config):
         self.set_sub_network(
