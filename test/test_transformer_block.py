@@ -45,6 +45,8 @@ def test_block():
         sub_network_n_embd=32,
         sub_network_intermediate_size=32 * 4,
         sub_network_num_heads=4,
+        sub_network_query_groups=config.n_query_groups // 2,
+        sub_network_head_size=32 // 4,
     )
     out_small = block(input[:, :, :32], cos, sin, mask)
     assert out_small.shape == (8, 512, 32)

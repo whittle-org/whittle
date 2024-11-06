@@ -70,8 +70,8 @@ def test_compute_weight_magnitude(mlp_type, norm_type):
 
     sub_network_config = {
         "sub_network_n_embd": 256,
-        "sub_network_intermediate_size": [1024] * 1,
-        "sub_network_num_heads": [4] * 1,
+        "sub_network_intermediate_size": 1024,
+        "sub_network_num_heads": 4,
         "sub_network_n_layers": 1,
     }
     gpt.set_sub_network(**sub_network_config)

@@ -348,9 +348,8 @@ class Test_WhittleLM:
         gpt.max_seq_length = config_14m.block_size
         gpt.set_sub_network(
             sub_network_n_embd=config_14m.n_embd,
-            sub_network_intermediate_size=[config_14m.intermediate_size]
-            * config_14m.n_layer,
-            sub_network_num_heads=[config_14m.n_head] * config_14m.n_layer,
+            sub_network_intermediate_size=config_14m.intermediate_size,
+            sub_network_num_heads=config_14m.n_head,
             sub_network_n_layers=config_14m.n_layer,
             sub_network_query_groups=config_14m.n_query_groups,
             sub_network_head_size=config_14m.head_size,
