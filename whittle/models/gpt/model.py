@@ -48,12 +48,14 @@ class GPT(nn.Module):
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
         self.sub_network_n_layers = self.config.n_layer
+        self.sub_network_head_size: int | None = self.config.head_size
+        self.sub_network_query_groups: int | None = self.config.n_query_groups
         self.cos: torch.Tensor
         self.sin: torch.Tensor
         self.config.is_encoder_decoder = False
         self.main_input_name = "input_pos"
         self._supports_cache_class = True
-        self.sub_network_head_size = None
+
         # self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
 
     @property
@@ -171,35 +173,56 @@ class GPT(nn.Module):
     def set_sub_network(
         self,
         sub_network_n_embd: int,
-        sub_network_intermediate_size: list,
-        sub_network_num_heads: list,
+        sub_network_intermediate_size: int,
+        sub_network_num_heads: int,
         sub_network_n_layers: int,
-        sub_network_query_groups=None,
-        sub_network_head_size=None,
+        sub_network_query_groups: int | None = None,
+        sub_network_head_size: int | None = None,
     ) -> None:
-        self.sub_network_head_size = sub_network_head_size
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
         self.sub_network_n_layers = sub_network_n_layers
         self.transformer.wte.set_sub_network(self.sub_network_n_embd)
         self.transformer.ln_f.set_sub_network(self.sub_network_n_embd)
+        if sub_network_query_groups is None:
+            if self.config.n_query_groups == 1:
+                self.sub_network_query_groups = 1
+            elif self.sub_network_num_heads % self.config.n_query_groups == 0:
+                self.sub_network_query_groups = self.config.n_query_groups
+            else:
+                self.sub_network_query_groups = self.sub_network_num_heads // (
+                    self.config.n_head // self.config.n_query_groups
+                )
+        else:
+            self.sub_network_query_groups = sub_network_query_groups
+        if self.config.fix_head_size:
+            if sub_network_head_size is None:
+                self.sub_network_head_size = self.config.head_size
+            else:
+                self.sub_network_head_size = sub_network_head_size
+        else:
+            self.sub_network_head_size = (
+                self.sub_network_n_embd // self.sub_network_num_heads
+            )
         for i in range(self.sub_network_n_layers):
             block = self.transformer.h[i]
             block.set_sub_network(
-                sub_network_n_embd,
-                sub_network_intermediate_size[i],
-                sub_network_num_heads[i],
-                sub_network_query_groups,
-                sub_network_head_size,
+                self.sub_network_n_embd,
+                self.sub_network_intermediate_size,
+                self.sub_network_num_heads,
+                self.sub_network_query_groups,
+                self.sub_network_head_size,
             )
-        self.lm_head.set_sub_network(sub_network_n_embd, self.config.padded_vocab_size)
+        self.lm_head.set_sub_network(
+            self.sub_network_n_embd, self.config.padded_vocab_size
+        )
 
     def select_sub_network(self, config):
         self.set_sub_network(
             config["embed_dim"],
-            [config["mlp_ratio"] * config["embed_dim"] for i in range(config["depth"])],
-            [config["num_heads"] for i in range(config["depth"])],
+            config["mlp_ratio"] * config["embed_dim"],
+            config["num_heads"],
             config["depth"],
         )
 
@@ -208,6 +231,8 @@ class GPT(nn.Module):
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
         self.sub_network_n_layers = self.config.n_layer
+        self.sub_network_head_size: int | None = self.config.head_size
+        self.sub_network_query_groups: int | None = self.config.n_query_groups
         self.transformer.wte.reset_super_network()
         self.transformer.ln_f.reset_super_network()
         for i in range(self.config.n_layer):
@@ -246,42 +271,11 @@ class GPT(nn.Module):
             x = x * torch.tensor(self.config.n_embd**0.5, dtype=x.dtype)
         for i in range(self.sub_network_n_layers):
             block = self.transformer.h[i]
-            if not self.config.fix_head_size:
-                if isinstance(self.sub_network_num_heads, list):
-                    cos, sin = self.rope_cache(
-                        seq_len=self.max_seq_length,
-                        n_elem=int(
-                            self.config.rotary_percentage
-                            * (self.sub_network_n_embd // self.sub_network_num_heads[i])
-                        ),
-                        device=self.cos.device,
-                    )
-                else:
-                    cos, sin = self.rope_cache(
-                        seq_len=self.max_seq_length,
-                        n_elem=int(
-                            self.config.rotary_percentage
-                            * (self.sub_network_n_embd // self.sub_network_num_heads)
-                        ),
-                        device=self.cos.device,
-                    )
-            else:
-                if self.sub_network_head_size is None:
-                    cos, sin = self.rope_cache(
-                        seq_len=self.max_seq_length,
-                        n_elem=int(
-                            self.config.rotary_percentage * (self.config.head_size)
-                        ),
-                        device=self.cos.device,
-                    )
-                else:
-                    cos, sin = self.rope_cache(
-                        seq_len=self.max_seq_length,
-                        n_elem=int(
-                            self.config.rotary_percentage * (self.sub_network_head_size)
-                        ),
-                        device=self.cos.device,
-                    )
+            cos, sin = self.rope_cache(
+                seq_len=self.max_seq_length,
+                n_elem=int(self.config.rotary_percentage * self.sub_network_head_size),
+                device=self.cos.device,
+            )
 
             cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
 
