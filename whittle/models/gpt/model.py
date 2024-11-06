@@ -202,7 +202,7 @@ class GPT(nn.Module):
             else:
                 self.sub_network_head_size = sub_network_head_size
         else:
-            sub_network_head_size = (
+            self.sub_network_head_size = (
                 self.sub_network_n_embd // self.sub_network_num_heads
             )
         for i in range(self.sub_network_n_layers):
