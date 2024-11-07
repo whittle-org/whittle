@@ -88,6 +88,8 @@ def init_lit_small_attention(config, base_attention):
 def test_attention(attention_config):
     config = attention_configs[attention_config]["config"]
     config.fix_head_size = attention_configs[attention_config]["fix_head_size"]
+    if not config.fix_head_size:
+        config.head_size = config.n_embd // config.n_head
     config.max_seq_len = 512
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
 
@@ -105,12 +107,26 @@ def test_attention(attention_config):
     assert out_large.shape == (8, seq_len, config.n_embd)
     lit_attention = init_lit_attention(config)
     out_lit_large = lit_attention(input, mask=mask, cos=cos, sin=sin)
-
+    if not config.fix_head_size:
+        sub_network_head_size = config.n_embd // (2 * config.n_head // 4)
+    else:
+        sub_network_head_size = config.head_size
+    if config.n_query_groups == 1:
+        sub_network_query_groups = 1
+    elif (config.n_head // 4) % config.n_query_groups == 0:
+        sub_network_query_groups = config.n_query_groups
+    else:
+        sub_network_query_groups = (config.n_head // 4) // (
+            config.n_head // config.n_query_groups
+        )
     attention.set_sub_network(
-        sub_network_n_embd=config.n_embd // 2, sub_network_n_head=config.n_head // 4
+        sub_network_n_embd=config.n_embd // 2,
+        sub_network_n_head=config.n_head // 4,
+        sub_network_query_groups=sub_network_query_groups,
+        sub_network_head_size=sub_network_head_size,
     )
     cos, sin = build_rope_cache(
-        seq_len, n_elem=int(config.rotary_percentage * attention.sub_network_head_size)
+        seq_len, n_elem=int(config.rotary_percentage * sub_network_head_size)
     )
     out_small = attention(
         input[:, :, : config.n_embd // 2], mask=mask, cos=cos, sin=sin
@@ -124,8 +140,8 @@ def test_attention(attention_config):
 
     config.n_embd = attention.sub_network_n_embd
     config.n_head = attention.sub_network_n_head
-    config.n_query_groups = attention.sub_network_query_groups
-    config.head_size = attention.sub_network_head_size
+    config.n_query_groups = sub_network_query_groups
+    config.head_size = sub_network_head_size
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
 
     lit_attention_small = init_lit_small_attention(config, lit_attention)

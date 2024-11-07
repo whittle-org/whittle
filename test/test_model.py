@@ -75,8 +75,8 @@ def test_gpt():
     assert torch.allclose(out_lit_large, out_large, atol=1e-3)
     gpt.set_sub_network(
         sub_network_n_embd=32,
-        sub_network_intermediate_size=[32 * 4 for i in range(4)],
-        sub_network_num_heads=[4 for i in range(4)],
+        sub_network_intermediate_size=32 * 4,
+        sub_network_num_heads=4,
         sub_network_n_layers=1,
         sub_network_query_groups=2,
     )

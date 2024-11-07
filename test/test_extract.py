@@ -31,9 +31,8 @@ def test_extract_sub_network() -> None:
     super_network.eval()
     super_network.set_sub_network(
         sub_network_n_embd=sub_network_config.n_embd,
-        sub_network_intermediate_size=[sub_network_config.intermediate_size]
-        * sub_network_config.n_layer,
-        sub_network_num_heads=[sub_network_config.n_head] * sub_network_config.n_layer,
+        sub_network_intermediate_size=sub_network_config.intermediate_size,
+        sub_network_num_heads=sub_network_config.n_head,
         sub_network_n_layers=sub_network_config.n_layer,
     )
 
@@ -69,21 +68,18 @@ def test_extract_sub_network_llamamlp() -> None:
     sub_network_config.n_embd = 128
     sub_network_config.intermediate_size = 1024
     sub_network_config.n_layer = 6
-    sub_network_config.n_head = 4
+    sub_network_config.n_head = 12
 
     super_network.eval()
     super_network.set_sub_network(
         sub_network_n_embd=sub_network_config.n_embd,
-        sub_network_intermediate_size=[sub_network_config.intermediate_size]
-        * sub_network_config.n_layer,
-        sub_network_num_heads=[sub_network_config.n_head] * sub_network_config.n_layer,
+        sub_network_intermediate_size=sub_network_config.intermediate_size,
+        sub_network_num_heads=sub_network_config.n_head,
         sub_network_n_layers=sub_network_config.n_layer,
     )
 
-    # dynamically computed when set_sub_network is called
-    sub_network_config.head_size = (
-        sub_network_config.n_embd // sub_network_config.n_head
-    )
+    sub_network_config.n_query_groups = super_network.sub_network_query_groups
+    sub_network_config.head_size = super_network.sub_network_head_size
 
     # instantiate a new model
     sub_network = extract_sub_network(super_network, sub_network_config)

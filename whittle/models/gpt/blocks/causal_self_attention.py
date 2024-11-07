@@ -50,27 +50,8 @@ class CausalSelfAttention(nn.Module):
     ):
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_n_head = sub_network_n_head
-        if sub_network_query_groups is None:
-            if self.config.n_query_groups == 1:
-                self.sub_network_query_groups = 1
-            elif self.sub_network_n_head % self.config.n_query_groups == 0:
-                self.sub_network_query_groups = self.config.n_query_groups
-            else:
-                self.sub_network_query_groups = self.sub_network_n_head // (
-                    self.config.n_head // self.config.n_query_groups
-                )
-        else:
-            self.sub_network_query_groups = sub_network_query_groups
-        if self.config.fix_head_size:
-            if sub_network_head_size is None:
-                self.sub_network_head_size = self.config.head_size
-            else:
-                self.sub_network_head_size = sub_network_head_size
-
-        else:
-            self.sub_network_head_size = (
-                self.sub_network_n_embd // self.sub_network_n_head
-            )
+        self.sub_network_query_groups = sub_network_query_groups
+        self.sub_network_head_size = sub_network_head_size
 
         self.sub_network_qkv_shape = (
             self.sub_network_n_head + 2 * self.sub_network_query_groups
