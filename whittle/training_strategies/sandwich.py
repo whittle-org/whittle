@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 
+from typing import Any
+
 
 class SandwichStrategy(BaseTrainingStrategy):
     """
@@ -17,7 +19,7 @@ class SandwichStrategy(BaseTrainingStrategy):
         https://arxiv.org/abs/1903.05134
     """
 
-    def __init__(self, random_samples: int = 2, **kwargs):
+    def __init__(self, random_samples: int = 2, **kwargs: Any):
         """
         Initialises a `SandwichStrategy`
 
