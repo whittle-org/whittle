@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from whittle.training_strategies.base_strategy import BaseTrainingStrategy
-
 from typing import Any
+
+from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 
 
 class StandardStrategy(BaseTrainingStrategy):
