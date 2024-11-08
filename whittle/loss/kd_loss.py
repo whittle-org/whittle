@@ -33,7 +33,7 @@ class DistillLoss(nn.Module):
         self.distillation_weight = distillation_weight
         self.kldiv = nn.KLDivLoss(reduction="batchmean")
 
-    def forward(self, outputs, labels, outputs_teacher):
+    def forward(self, outputs, labels, outputs_teacher) -> nn.Tensor:
         """
         Compute the distillation loss.
 

@@ -22,4 +22,4 @@ jobs:
       - name: Run mkdocs
         # You can include `--strict` to treat warnings as errors
         # Advised if you can sort out the typing issues
-        run: mkdocs build --clean
+        run: mkdocs build --clean --strict

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 
 
@@ -10,7 +12,7 @@ class StandardStrategy(BaseTrainingStrategy):
     Implements the standard update rule and updates all weights of the super-network.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         """
         Initialises a `StandardStrategy`
 

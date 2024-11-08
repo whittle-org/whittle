@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 
 
@@ -10,7 +12,7 @@ class RandomStrategy(BaseTrainingStrategy):
     Randomly samples and updates `random_samples` sub-networks in each step.
     """
 
-    def __init__(self, random_samples: int = 1, **kwargs):
+    def __init__(self, random_samples: int = 1, **kwargs: Any):
         """
         Initialises a `RandomStrategy`
 

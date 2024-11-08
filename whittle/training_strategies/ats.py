@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 
 
@@ -17,7 +19,7 @@ class ATS(BaseTrainingStrategy):
         https://arxiv.org/abs/2106.08895
     """
 
-    def __init__(self, random_samples: int = 1, **kwargs):
+    def __init__(self, random_samples: int = 1, **kwargs: Any):
         """
         Initialises an `ATS` strategy.
 
