@@ -8,7 +8,7 @@ from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import GptNeoxMLP, GemmaMLP, LLaMAMLP
 
 
-def compute_weight_magnitude(model: GPT):
+def compute_weight_magnitude(model: GPT) -> float:
     """
     Computes the sum of the weight magnitudes of the current sub-network of a GPT model. Make sure to set the
     sub-network before calling this function.

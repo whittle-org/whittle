@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 import numpy as np
 
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
@@ -23,7 +24,9 @@ class RandomLinearStrategy(BaseTrainingStrategy):
         https://proceedings.mlr.press/v80/bender18a/bender18a.pdf
     """
 
-    def __init__(self, total_number_of_steps: int, random_samples: int = 1, **kwargs):
+    def __init__(
+        self, total_number_of_steps: int, random_samples: int = 1, **kwargs: Any
+    ):
         """
         Initialises a `RandomLinearStrategy`
 
