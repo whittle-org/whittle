@@ -21,8 +21,9 @@ class StandardStrategy(BaseTrainingStrategy):
         """
         super().__init__(**kwargs)
 
-    def __call__(self, model, inputs, outputs, **kwargs):
+    def __call__(self, model, inputs, outputs, scale_loss=1, **kwargs):
         y_hat = model(inputs)
         loss = self.loss_function(y_hat, outputs)
-        loss.backward()
+        loss *= scale_loss
+        loss.backward() if self.fabric is None else self.fabric.backward(loss)
         return loss.item()
