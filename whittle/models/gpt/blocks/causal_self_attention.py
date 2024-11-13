@@ -45,8 +45,8 @@ class CausalSelfAttention(nn.Module):
         self,
         sub_network_n_embd: int,
         sub_network_n_head: int,
-        sub_network_query_groups=None,
-        sub_network_head_size=None,
+        sub_network_query_groups: int,
+        sub_network_head_size: int,
     ):
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_n_head = sub_network_n_head

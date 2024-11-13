@@ -66,8 +66,8 @@ class Block(litgpt.model.Block):
         sub_network_n_embd: int,
         sub_network_intermediate_size: int,
         sub_network_num_heads: int,
-        sub_network_query_groups=None,
-        sub_network_head_size=None,
+        sub_network_query_groups: int,
+        sub_network_head_size: int,
     ) -> None:
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
