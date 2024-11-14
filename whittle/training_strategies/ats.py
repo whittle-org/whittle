@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 
 
@@ -17,7 +19,7 @@ class ATS(BaseTrainingStrategy):
         https://arxiv.org/abs/2106.08895
     """
 
-    def __init__(self, random_samples: int = 1, **kwargs):
+    def __init__(self, random_samples: int = 1, **kwargs: Any):
         """
         Initialises an `ATS` strategy.
 
@@ -29,7 +31,7 @@ class ATS(BaseTrainingStrategy):
         self.random_samples = random_samples
         self.current_step = 0
 
-    def __call__(self, model, inputs, outputs, **kwargs):
+    def __call__(self, model, inputs, outputs, scale_loss=1, **kwargs):
         """
         Updates a set of randomly sampled sub-networks if the current step is odd. Else, it updates the
         super-network.
@@ -46,7 +48,8 @@ class ATS(BaseTrainingStrategy):
                     loss = self.kd_loss(y_hat, outputs, y_supernet)
                 else:
                     loss = self.loss_function(y_hat, outputs)
-                loss.backward()
+                loss *= scale_loss
+                loss.backward() if self.fabric is None else self.fabric.backward(loss)
                 model.reset_super_network()
 
                 total_loss += loss.item()
@@ -56,7 +59,8 @@ class ATS(BaseTrainingStrategy):
                 loss = self.kd_loss(y_hat, outputs, y_supernet)
             else:
                 loss = self.loss_function(y_hat, outputs)
-            loss.backward()
+            loss *= scale_loss
+            loss.backward() if self.fabric is None else self.fabric.backward(loss)
             total_loss = loss.item()
         self.current_step += 1
         return total_loss

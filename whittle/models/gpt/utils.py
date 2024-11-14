@@ -400,6 +400,7 @@ class CycleIterator:
     Example:
         >>> iterator = CycleIterator([1, 2, 3])
         >>> [next(iterator) for _ in range(5)]
+
         [1, 2, 3, 1, 2]
 
     Note:

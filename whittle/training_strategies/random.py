@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 
 
@@ -10,7 +12,7 @@ class RandomStrategy(BaseTrainingStrategy):
     Randomly samples and updates `random_samples` sub-networks in each step.
     """
 
-    def __init__(self, random_samples: int = 1, **kwargs):
+    def __init__(self, random_samples: int = 1, **kwargs: Any):
         """
         Initialises a `RandomStrategy`
 
@@ -21,7 +23,7 @@ class RandomStrategy(BaseTrainingStrategy):
         super().__init__(**kwargs)
         self.random_samples = random_samples
 
-    def __call__(self, model, inputs, outputs, **kwargs):
+    def __call__(self, model, inputs, outputs, scale_loss=1, **kwargs):
         """Updates randomly sampled sub-networks in each step."""
         total_loss = 0
         y_supernet = model(inputs)
@@ -33,7 +35,8 @@ class RandomStrategy(BaseTrainingStrategy):
                 loss = self.kd_loss(y_hat, outputs, y_supernet)
             else:
                 loss = self.loss_function(y_hat, outputs)
-            loss.backward()
+            loss *= scale_loss
+            loss.backward() if self.fabric is None else self.fabric.backward(loss)
             model.reset_super_network()
 
             total_loss += loss.item()

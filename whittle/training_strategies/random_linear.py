@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 import numpy as np
 
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
@@ -23,7 +24,9 @@ class RandomLinearStrategy(BaseTrainingStrategy):
         https://proceedings.mlr.press/v80/bender18a/bender18a.pdf
     """
 
-    def __init__(self, total_number_of_steps: int, random_samples: int = 1, **kwargs):
+    def __init__(
+        self, total_number_of_steps: int, random_samples: int = 1, **kwargs: Any
+    ):
         """
         Initialises a `RandomLinearStrategy`
 
@@ -38,7 +41,7 @@ class RandomLinearStrategy(BaseTrainingStrategy):
         self.current_step = 0
         self.rate = np.linspace(0.0, 1, total_number_of_steps)
 
-    def __call__(self, model, inputs, outputs, **kwargs):
+    def __call__(self, model, inputs, outputs, scale_loss=1, **kwargs):
         total_loss = 0
         y_supernet = model(inputs)
         if np.random.rand() <= self.rate[self.current_step]:
@@ -51,7 +54,8 @@ class RandomLinearStrategy(BaseTrainingStrategy):
                     loss = self.kd_loss(y_hat, outputs, y_supernet)
                 else:
                     loss = self.loss_function(y_hat, outputs)
-                loss.backward()
+                loss *= scale_loss
+                loss.backward() if self.fabric is None else self.fabric.backward(loss)
                 model.reset_super_network()
 
                 total_loss += loss.item()
@@ -61,7 +65,8 @@ class RandomLinearStrategy(BaseTrainingStrategy):
                 loss = self.kd_loss(y_hat, outputs, y_supernet)
             else:
                 loss = self.loss_function(y_hat, outputs)
-            loss.backward()
+            loss *= scale_loss
+            loss.backward() if self.fabric is None else self.fabric.backward(loss)
             total_loss = loss.item()
         self.current_step += 1
         return total_loss

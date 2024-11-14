@@ -4,6 +4,8 @@ from typing import Callable
 
 import torch
 
+from lightning.fabric import Fabric
+
 from whittle.loss import DistillLoss
 from whittle.sampling.random_sampler import RandomSampler
 
@@ -21,6 +23,7 @@ class BaseTrainingStrategy:
         loss_function: Callable,
         kd_loss: Callable | None = None,
         device: str = "cuda",
+        fabric: Fabric = None,
         **kwargs,
     ):
         """
@@ -35,6 +38,7 @@ class BaseTrainingStrategy:
         self.loss_function = loss_function
         self.device = device
         self.kd_loss = kd_loss
+        self.fabric = fabric
         if isinstance(self.kd_loss, DistillLoss):
             if not isinstance(loss_function, torch.nn.CrossEntropyLoss):
                 raise TypeError(
