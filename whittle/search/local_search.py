@@ -27,21 +27,21 @@ class PopulationElement:
 
 class LS(FIFOScheduler):
     """
-
     See :class:`~syne_tune.optimizer.schedulers.searchers.RandomSearcher`
-    for ``kwargs["search_options"]`` parameters.
+       for ``kwargs["search_options"]`` parameters.
 
-    :param config_space: Configuration space for evaluation function
-    :param metric: Name of metric to optimize
-    :param population_size: See
-        :class:`~syne_tune.optimizer.schedulers.searchers.RegularizedEvolution`.
-        Defaults to 100
-    :param sample_size: See
-        :class:`~syne_tune.optimizer.schedulers.searchers.RegularizedEvolution`.
-        Defaults to 10
-    :param random_seed: Random seed, optional
-    :param kwargs: Additional arguments to
-        :class:`~syne_tune.optimizer.schedulers.FIFOScheduler`
+       Args:
+           config_space: Configuration space for evaluation function
+           metric: Name of metric to optimize
+           population_size: See
+               :class:`~syne_tune.optimizer.schedulers.searchers.RegularizedEvolution`.
+               Defaults to 100
+           sample_size: See
+               :class:`~syne_tune.optimizer.schedulers.searchers.RegularizedEvolution`.
+               Defaults to 10
+           random_seed: Random seed, optional.
+           kwargs: Additional arguments to
+               :class:`~syne_tune.optimizer.schedulers.FIFOScheduler`
     """
 
     def __init__(

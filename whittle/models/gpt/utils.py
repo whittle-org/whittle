@@ -324,7 +324,8 @@ def map_old_state_dict_weights(state_dict: dict, mapping: Mapping, prefix: str) 
 
 
 def get_default_supported_precision(training: bool) -> str:
-    """Return default precision that is supported by the hardware: either `bf16` or `16`.
+    """
+    Return default precision that is supported by the hardware: either `bf16` or `16`.
 
     Args:
         training: `-mixed` or `-true` version of the precision to use

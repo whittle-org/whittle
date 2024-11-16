@@ -6,6 +6,8 @@ import torch.nn.functional as F
 
 
 class Linear(nn.Linear):
+    """An extension of PyTorch's `torch.nn.Linear` with support of sub-network dimensionality."""
+
     def __init__(
         self,
         in_features: int,
@@ -14,7 +16,6 @@ class Linear(nn.Linear):
         device=None,
         dtype=None,
     ):
-        """ """
         super().__init__(in_features, out_features, bias, device, dtype)
 
         # Set the current sub-network dimensions equal to super-network
@@ -25,10 +26,12 @@ class Linear(nn.Linear):
     def set_sub_network(
         self, sub_network_in_features: int, sub_network_out_features: int
     ):
+        """Set the linear transformation dimensions of the current sub-network."""
         self.sub_network_in_features = sub_network_in_features
         self.sub_network_out_features = sub_network_out_features
 
     def reset_super_network(self):
+        """Reset the linear transformation dimensions of the current sub-network to the original value."""
         self.sub_network_in_features = self.in_features
         self.sub_network_out_features = self.out_features
 

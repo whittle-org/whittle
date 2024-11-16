@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 import torch.nn as nn
 
 from collections import OrderedDict
@@ -8,9 +9,24 @@ from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP
 from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
+from litgpt import Config
 
 
-def extract_sub_network(model, sub_network_config):
+def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
+    """
+    Extracts a sub-network from a given model based on the specified sub-network configuration.
+    Copies relevant layers, weights, and configurations from the full model into a sub-network model.
+
+    Args:
+        model: The original, full GPT model from which the sub-network is extracted.
+        sub_network_config: Configuration object for the sub-network, containing the necessary
+                                     architecture specifications such as embedding size, number of heads,
+                                     and number of layers.
+
+    Returns:
+        GPT: A new sub-network model instance, initialized with parameters extracted from the original model.
+    """
+
     sub_network = GPT(sub_network_config)
 
     state_dict = extract_linear(model.lm_head)

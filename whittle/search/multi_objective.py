@@ -5,10 +5,15 @@ import numpy.typing as npt
 
 
 def get_pareto_optimal(costs: np.ndarray) -> npt.NDArray[np.bool_]:
-    """Find the pareto-optimal point.
+    """
+    Find the pareto-optimal point.
 
-    :param costs: (n_points, m_cost_values) array
-    :return: (n_points, 1) indicator if point is on pareto front or not.
+    Args:
+        costs: (n_points, m_cost_values) array
+
+    Returns:
+        (n_points, 1) indicator if point is on pareto front or not.
+
     """
     assert isinstance(costs, np.ndarray)
     assert costs.ndim == 2

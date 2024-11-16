@@ -6,6 +6,8 @@ import torch.nn.functional as F
 
 
 class Embedding(torch.nn.Embedding):
+    """An extension of PyTorch's `torch.nn.Embedding` with support of sub-network dimensionality."""
+
     def __init__(
         self,
         num_embeddings: int,
@@ -34,9 +36,11 @@ class Embedding(torch.nn.Embedding):
         self.sub_network_embedding_dim: int | None = embedding_dim
 
     def set_sub_network(self, sub_network_embedding_dim: int):
+        """Set the embedding dimensionality of the current sub-network."""
         self.sub_network_embedding_dim = sub_network_embedding_dim
 
     def reset_super_network(self):
+        """Reset the embedding dimensionality of the current sub-network to the original value."""
         self.sub_network_embedding_dim = self.embedding_dim
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
