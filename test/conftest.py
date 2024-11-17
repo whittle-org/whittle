@@ -3,6 +3,7 @@
 import os
 import shutil
 from pathlib import Path
+from typing import Optional
 
 import pytest
 import torch
@@ -67,7 +68,7 @@ class MockTokenizer:
     def encode(
         self,
         text: str,
-        bos: bool | None = None,
+        bos: Optional[bool] = None,
         eos: bool = False,
         max_length: int = -1,
     ) -> torch.Tensor:
@@ -113,7 +114,7 @@ def longform_path(tmp_path):
     return path
 
 
-def RunIf(thunder: bool | None = None, **kwargs):
+def RunIf(thunder: Optional[bool] = None, **kwargs):
     reasons, marker_kwargs = _runif_reasons(**kwargs)
 
     if thunder is not None:
