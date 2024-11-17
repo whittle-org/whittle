@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 class Embedding(torch.nn.Embedding):
-    """An extension of PyTorch's `torch.nn.Embedding` with support of sub-network dimensionality."""
+    "An extension of PyTorch's torch.nn.Embedding with support to sub-sample weights corresponding to the sub-network dimensionality"
 
     def __init__(
         self,
@@ -40,7 +40,7 @@ class Embedding(torch.nn.Embedding):
         self.sub_network_embedding_dim = sub_network_embedding_dim
 
     def reset_super_network(self):
-        """Reset the embedding dimensionality of the current sub-network to the original value."""
+        """Reset the embedding dimensionality of the current sub-network to the super-network dimensionality"""
         self.sub_network_embedding_dim = self.embedding_dim
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

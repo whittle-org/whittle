@@ -11,6 +11,8 @@ from whittle.modules import Linear
 
 
 class CausalSelfAttention(nn.Module):
+    """Extension of litgpt's `litgpt.model.CausalSelfAttention` with support to adapt to sub-network dimensionality."""
+
     def __init__(self, config: Config, block_idx: int) -> None:
         super().__init__()
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
@@ -48,6 +50,7 @@ class CausalSelfAttention(nn.Module):
         sub_network_query_groups: int,
         sub_network_head_size: int,
     ):
+        """Sets the CausalSelfAttention block to the specified sub-network dimensionality."""
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_n_head = sub_network_n_head
         self.sub_network_query_groups = sub_network_query_groups
@@ -73,6 +76,7 @@ class CausalSelfAttention(nn.Module):
             self.sub_attention_scaler = self.config.attention_scores_scalar
 
     def reset_super_network(self):
+        """Resets the dimensionality of the current to the super-network dimensionality."""
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_n_head = self.config.n_head
         self.sub_network_head_size = self.config.head_size

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 
 class LayerNorm(torch.nn.LayerNorm):
-    """An extension of PyTorch's `torch.nn.LayerNorm` with support of sub-network dimensionality."""
+    """An extension of PyTorch's `torch.nn.LayerNorm` with support  with support to sub-sample weights corresponding to the sub-network dimensionality."""
 
     def __init__(self, in_features: int, eps: float = 1e-5):
         super().__init__(in_features, eps)
@@ -19,7 +19,7 @@ class LayerNorm(torch.nn.LayerNorm):
         self.sub_network_in_features = sub_network_in_features
 
     def reset_super_network(self):
-        """Reset the input dimensionality of the current sub-network to the original value."""
+        """Reset the input dimensionality of the current sub-network to the super-network dimensionality."""
         self.sub_network_in_features = self.in_features
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

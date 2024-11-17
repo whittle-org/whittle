@@ -9,10 +9,10 @@ from syne_tune.config_space import Categorical, Domain
 
 class RandomSampler:
     """
-    RandomSampler samples configurations from a given configuration space using a random state.
+    RandomSampler samples configurations from a given search space using a random state.
 
     Args:
-        config_space: The configuration space from which to sample.
+        config_space: The search space from which to sample.
         seed: Seed for the random number generator. Defaults to None.
     """
 
@@ -22,7 +22,7 @@ class RandomSampler:
 
     def sample(self) -> dict[str, Any]:
         """
-        Gets the smallest sub-network configuration from the configuration space.
+        Gets the smallest sub-network configuration from the search space.
 
         Returns:
             dict: The smallest sub-network configuration.
@@ -35,7 +35,7 @@ class RandomSampler:
 
     def get_smallest_sub_network(self) -> dict[str, Any]:
         """
-        Gets the smallest sub-network configuration from the configuration space.
+        Gets the smallest sub-network configuration from the search space.
 
         Returns:
             dict: The smallest sub-network configuration.
@@ -57,7 +57,7 @@ class RandomSampler:
 
     def get_largest_sub_network(self) -> dict[str, Any]:
         """
-        gets the largest sub-network configuration from the configuration space.
+        gets the largest sub-network configuration from the search space.
 
         Returns:
             dict: The largest sub-network configuration.

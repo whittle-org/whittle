@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 class Linear(nn.Linear):
-    """An extension of PyTorch's `torch.nn.Linear` with support of sub-network dimensionality."""
+    """An extension of PyTorch's `torch.nn.Linear` with support to sub-sample weights corresponding to the sub-network dimensionality"""
 
     def __init__(
         self,
@@ -31,7 +31,7 @@ class Linear(nn.Linear):
         self.sub_network_out_features = sub_network_out_features
 
     def reset_super_network(self):
-        """Reset the linear transformation dimensions of the current sub-network to the original value."""
+        """Reset the linear transformation dimensions of the current sub-network to the super-network dimensionality."""
         self.sub_network_in_features = self.in_features
         self.sub_network_out_features = self.out_features
 
