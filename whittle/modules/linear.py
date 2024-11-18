@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 class Linear(nn.Linear):
-    """An extension of PyTorch's `torch.nn.Linear` with support to sub-sample weights corresponding to the sub-network dimensionality"""
+    """An extension of PyTorch's torch.nn.Linear with flexible input and output dimensionality corresponding to sub-network"""
 
     def __init__(
         self,
