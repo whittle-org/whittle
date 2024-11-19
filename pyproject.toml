@@ -8,7 +8,7 @@ authors = [{name = "Aaron Klein"},
     {name = "Timur Carstensen"}]
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.9,<3.12"
+requires-python = ">=3.9,<3.13"
 # TODO: Some of these might be able to be moved to optional dependancies
 dependencies = [
   "pandas",
