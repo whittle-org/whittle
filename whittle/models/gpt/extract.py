@@ -24,7 +24,7 @@ def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
                                      and number of layers.
 
     Returns:
-        GPT: A new sub-network model instance, initialized with parameters extracted from the original model.
+        A new sub-network model instance, initialized with parameters extracted from the original model.
     """
 
     sub_network = GPT(sub_network_config)
