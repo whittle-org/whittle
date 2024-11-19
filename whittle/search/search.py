@@ -34,7 +34,7 @@ def multi_objective_search(
             Defaults to None.
 
     Returns:
-        dict: The results of the search, including Pareto-optimal solutions.
+        The results of the search, including Pareto-optimal solutions.
 
     """
     metrics = ["objective_1", "objective_2"]
