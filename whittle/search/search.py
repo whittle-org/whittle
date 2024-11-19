@@ -22,7 +22,7 @@ def multi_objective_search(
     Search for the Pareto-optimal sub-networks using the specified strategy.
 
     Args:
-        objective (callable): The objective function to optimize.
+        objective: The objective function to optimize.
         search_space: The search space for the optimization.
         search_strategy: The search strategy to use.
             Defaults to "random_search".
