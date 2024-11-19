@@ -88,7 +88,7 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
 
 
 class GemmaMLP(LLaMAMLP):
-    """ "Implementation of the forward pass of LLaMAMLP network."""
+    """Implementation of the forward pass of LLaMAMLP network."""
 
     def __init__(self, config: Config) -> None:
         super().__init__(config)
