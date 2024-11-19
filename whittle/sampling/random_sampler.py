@@ -38,7 +38,7 @@ class RandomSampler:
         Gets the smallest sub-network configuration from the search space.
 
         Returns:
-            dict: The smallest sub-network configuration.
+            The smallest sub-network configuration.
         """
         config = {}
         for k, v in self.config_space.items():
