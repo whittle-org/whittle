@@ -60,7 +60,7 @@ class RandomSampler:
         gets the largest sub-network configuration from the search space.
 
         Returns:
-            dict: The largest sub-network configuration.
+            The largest sub-network configuration.
         """
 
         config = {}
