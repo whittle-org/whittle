@@ -227,9 +227,11 @@ def fit(
     optimizer = state["optimizer"]
 
     if eval.initial_validation:
+        model.reset_super_network()
         val_loss = validate(fabric, model, val_dataloader, max_iters=eval.max_iters)
         val_loss = f"{val_loss:.3f}"
     else:
+        model.reset_super_network()
         fabric.print("Verifying settings ...")
         validate(
             fabric, model, val_dataloader, max_iters=2, verbose=False
@@ -293,13 +295,18 @@ def fit(
         is_accumulating = (
             state["iter_num"] % train.gradient_accumulation_iters(devices) != 0
         )
-        with fabric.no_backward_sync(model, enabled=is_accumulating):
-            loss = training_strategy(
-                model,
-                input_ids,
-                targets,
-                scale_loss=1 / train.gradient_accumulation_iters(devices),
+
+        if hasattr(training_strategy, "random_samples"):
+            # if we update multiple sub-networks in each step, we need to further scale the gradient
+            scale_loss = 1 / (
+                train.gradient_accumulation_iters(devices)
+                * training_strategy.random_samples
             )
+        else:
+            scale_loss = 1 / train.gradient_accumulation_iters(devices)
+
+        with fabric.no_backward_sync(model, enabled=is_accumulating):
+            loss = training_strategy(model, input_ids, targets, scale_loss=scale_loss)
         #            fabric.backward(loss / train.gradient_accumulation_iters(devices))
 
         running_loss.update(loss)
@@ -367,6 +374,7 @@ def fit(
             and state["step_count"] % eval.interval == 0
         ):
             t0 = time.perf_counter()
+            model.reset_super_network()
             val_loss = validate(fabric, model, val_dataloader, max_iters=eval.max_iters)
             val_loss = val_loss.item()
             td = time.perf_counter() - t0
@@ -392,6 +400,7 @@ def fit(
 
     # Final validation
     if eval.final_validation:
+        model.reset_super_network()
         val_loss = validate(fabric, model, val_dataloader, max_iters=eval.max_iters)
         metrics = {"val_loss": val_loss, "val_ppl": math.exp(val_loss)}
         fabric.log_dict(metrics, step=state["iter_num"])
