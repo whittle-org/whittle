@@ -26,7 +26,7 @@ jobs:
           git config user.email "action@github.com"
           branch_name="bump-version-$(date +'%Y%m%d-%H%M%S')"
           git checkout -b $branch_name
-          git push origin $branch_name
+          git push "https://${{ secrets.PUSH_ACCESS }}@github.com/whittle-org/whittle.git" $branch_name
           echo "BRANCH_NAME=$branch_name" >> $GITHUB_ENV
       - name: Create bump and changelog
         env:
