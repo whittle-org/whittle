@@ -26,6 +26,7 @@ jobs:
           git config user.email "action@github.com"
           branch_name="bump-version-$(date +'%Y%m%d-%H%M%S')"
           git checkout -b $branch_name
+          git push origin $branch_name
           echo "BRANCH_NAME=$branch_name" >> $GITHUB_ENV
       - name: Create bump and changelog
         env:
@@ -36,6 +37,9 @@ jobs:
           github_token: ${{ secrets.PUSH_ACCESS }}
           debug: true
           changelog_increment_filename: changelog-increment.md
+          commit: true
+          push: true
+          branch: ${{ env.BRANCH_NAME }}
       # Add a separate step to handle the changelog file
       - name: Handle changelog
         run: |
