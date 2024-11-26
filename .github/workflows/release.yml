@@ -38,10 +38,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-tags: 1  # Essential to later commitizen
-          fetch-depth: 0  # Recommended by the action
+          fetch-tags: 1
+          fetch-depth: 0
           token: ${{ secrets.PUSH_ACCESS }}
-      - run: git tag  # Debug statement
+      # Create and checkout a new branch for the version bump
+      - name: Create version bump branch
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          branch_name="bump-version-$(date +'%Y%m%d-%H%M%S')"
+          git checkout -b $branch_name
+          echo "BRANCH_NAME=$branch_name" >> $GITHUB_ENV
       - name: Create bump and changelog
         uses: commitizen-tools/commitizen-action@master
         id: cz
@@ -49,15 +56,42 @@ jobs:
           github_token: ${{ secrets.PUSH_ACCESS }}
           debug: true
           changelog_increment_filename: changelog-increment.md
+          # Add these to prevent direct push to main
+          commit: true
+          push: true
+          branch: ${{ env.BRANCH_NAME }}
       - run: |
           mkdir changelog-output
           mv changelog-increment.md changelog-output/changelog-increment.md
           cat changelog-output/changelog-increment.md
-      - name: Upload the changelog
-        uses: actions/upload-artifact@v4
-        with:
-          name: changelog
-          path: changelog-output
+      # Create PR
+      - name: Create Pull Request
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUSH_ACCESS }}
+        run: |
+          gh pr create \
+            --title "chore: version bump [automated]" \
+            --body "Automated version bump" \
+            --base main \
+            --head ${{ env.BRANCH_NAME }} \
+            --label "automated" \
+            --label "version-bump"
+      # Wait for PR to be merged
+      - name: Wait for PR merge
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUSH_ACCESS }}
+        run: |
+          while true; do
+            pr_state=$(gh pr view ${{ env.BRANCH_NAME }} --json state -q .state)
+            if [ "$pr_state" = "MERGED" ]; then
+              break
+            elif [ "$pr_state" = "CLOSED" ]; then
+              echo "PR was closed without merging"
+              exit 1
+            fi
+            echo "Waiting for PR to be merged..."
+            sleep 30
+          done
 
   build:
     needs: [bump]
