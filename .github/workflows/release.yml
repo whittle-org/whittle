@@ -60,6 +60,10 @@ jobs:
           commit: true
           push: true
           branch: ${{ env.BRANCH_NAME }}
+      - run: |
+          mkdir changelog-output
+          mv changelog-increment.md changelog-output/changelog-increment.md
+          cat changelog-output/changelog-increment.md
       # Create PR
       - name: Create Pull Request
         env:
