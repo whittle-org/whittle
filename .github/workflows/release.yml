@@ -35,6 +35,8 @@ jobs:
           git checkout -b $branch_name
           echo "BRANCH_NAME=$branch_name" >> $GITHUB_ENV
       - name: Create bump and changelog
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUSH_ACCESS }}
         uses: commitizen-tools/commitizen-action@master
         id: cz
         with:
