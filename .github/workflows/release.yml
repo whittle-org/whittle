@@ -43,15 +43,13 @@ jobs:
           github_token: ${{ secrets.PUSH_ACCESS }}
           debug: true
           changelog_increment_filename: changelog-increment.md
-          # Add these to prevent direct push to main
-          commit: true
-          push: false
-          branch: ${{ env.BRANCH_NAME }}
-      - run: |
-          mkdir changelog-output
-          mv changelog-increment.md changelog-output/changelog-increment.md
-          cat changelog-output/changelog-increment.md
-          git push --set-upstream origin ${{ env.BRANCH_NAME }}
+          run: |
+            mkdir changelog-output
+            mv changelog-increment.md changelog-output/changelog-increment.md
+            cat changelog-output/changelog-increment.md
+            git add changelog-output/changelog-increment.md
+            git commit -m "version bump"
+            git push --set-upstream origin ${{ env.BRANCH_NAME }}
       # Create PR
       - name: Create Pull Request
         env:

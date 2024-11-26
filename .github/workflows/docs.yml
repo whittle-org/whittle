@@ -12,14 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: install the latest version uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: "3.9"
-          cache: 'pip'
+          version: latest
+      - name: create virtual environment
+        run: uv venv --python 3.9
       - name: Install
-        run: pip install ".[dev]"
+        run: uv pip install ".[dev]"
       - name: Run mkdocs
         # You can include `--strict` to treat warnings as errors
         # Advised if you can sort out the typing issues
-        run: mkdocs build --clean --strict
+        run: uv run mkdocs build --clean --strict
