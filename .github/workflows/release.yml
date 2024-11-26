@@ -43,7 +43,7 @@ jobs:
           changelog_increment_filename: changelog-increment.md
           # Add these to prevent direct push to main
           commit: true
-          push: true
+          push: false
           branch: ${{ env.BRANCH_NAME }}
       - run: |
           mkdir changelog-output
