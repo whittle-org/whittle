@@ -37,8 +37,8 @@ jobs:
           github_token: ${{ secrets.PUSH_ACCESS }}
           debug: true
           changelog_increment_filename: changelog-increment.md
-          commit: true
-          push: true
+          commit: false
+          push: false
           branch: ${{ env.BRANCH_NAME }}
       # Add a separate step to handle the changelog file
       - name: Handle changelog
