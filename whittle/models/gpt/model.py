@@ -80,20 +80,6 @@ class GPT(nn.Module):
                 f"Cannot attend to {value}, block size is only {self.config.block_size}"
             )
         self._max_seq_length = value
-        if not hasattr(self, "cos"):
-            # first call
-            cos, sin = self.rope_cache(self._max_seq_length, self.config.rope_n_elem)
-            self.register_buffer("cos", cos, persistent=False)
-            self.register_buffer("sin", sin, persistent=False)
-        # override
-        elif value != self.cos.size(0):
-            self.cos, self.sin = self.rope_cache(
-                seq_len=self._max_seq_length,
-                n_elem=self.config.rope_n_elem,
-                device=self.cos.device,
-            )
-        # the mask and kv cache size will get updated on `set_kv_cache`. we cannot update it here because we don't know
-        # if the kv cache is expected
 
     def reset_parameters(self) -> None:
         # Trigger resetting the rope-cache
@@ -242,8 +228,8 @@ class GPT(nn.Module):
 
     def process_rope_cache(self, cos, sin, input_pos, T):
         if input_pos is not None:  # use the kv cache
-            cos = batched_index_select(self.cos, 0, input_pos)
-            sin = batched_index_select(self.sin, 0, input_pos)
+            cos = batched_index_select(cos, 0, input_pos)
+            sin = batched_index_select(sin, 0, input_pos)
             if self.mask_cache is None:
                 raise TypeError("You need to call `gpt.set_kv_cache()`")
             mask = batched_index_select(self.mask_cache, 2, input_pos)
@@ -271,10 +257,17 @@ class GPT(nn.Module):
             x = x * torch.tensor(self.config.n_embd**0.5, dtype=x.dtype)
         for i in range(self.sub_network_n_layers):
             block = self.transformer.h[i]
+
+            n_elem = (
+                self.config.rope_n_elem
+                if input_pos is not None
+                else int(self.config.rotary_percentage * self.sub_network_head_size)
+            )
+
             cos, sin = self.rope_cache(
                 seq_len=self.max_seq_length,
-                n_elem=int(self.config.rotary_percentage * self.sub_network_head_size),
-                device=self.cos.device,
+                n_elem=n_elem,
+                device=self.idx.device,
             )
 
             cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
@@ -302,7 +295,7 @@ class GPT(nn.Module):
         dtype: torch.dtype | None = None,
     ) -> None:
         if rope_cache_length is None:
-            rope_cache_length = self.cos.size(-1)
+            rope_cache_length = self.config.rope_n_elem
         if max_seq_length is None:
             max_seq_length = self.max_seq_length
         # initialize the kv cache for all blocks
