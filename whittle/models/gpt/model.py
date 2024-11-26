@@ -267,7 +267,7 @@ class GPT(nn.Module):
             cos, sin = self.rope_cache(
                 seq_len=self.max_seq_length,
                 n_elem=n_elem,
-                device=self.idx.device,
+                device=idx.device,
             )
 
             cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
