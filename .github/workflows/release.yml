@@ -5,22 +5,7 @@ permissions:
   contents: write
 jobs:
   test-code:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        # Run in all these versions of Python
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-      - name: Install
-        run: pip install ".[dev]"
-      - name: Run pytest
-        run: pytest -vvv
+    uses: whittle-org/whittle/.github/workflows/unit-test.yml@main
   test-docs:
     runs-on: ubuntu-latest
     steps:
