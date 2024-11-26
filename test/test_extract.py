@@ -168,7 +168,7 @@ def test_extract_sub_network_intermediate_size() -> None:
         make_norm_weights_random(block.post_mlp_norm)
 
     sub_network = GPTFlex(subnet_config)
-    sub_network = extract_sub_network(super_network, subnet_config)
+    sub_network = extract_sub_network(super_network, subnet_config, use_flex=True)
     sub_network.eval()
     input = torch.randint(0, 512, (1, 20))
     out_super_net = super_network(input).detach()
@@ -212,7 +212,7 @@ def test_extract_sub_network_n_head() -> None:
         make_norm_weights_random(block.post_mlp_norm)
 
     sub_network = GPTFlex(subnet_config)
-    sub_network = extract_sub_network(super_network, subnet_config)
+    sub_network = extract_sub_network(super_network, subnet_config, use_flex=True)
     sub_network.eval()
     input = torch.randint(0, 512, (1, 20))
     out_super_net = super_network(input).detach()

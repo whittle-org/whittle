@@ -23,7 +23,7 @@ def set_subnet_attention_sizes(model, subnet_config):
 
 
 def extract_sub_network(model, sub_network_config, use_flex=False):
-    sub_network = GPT(sub_network_config) if use_flex else GPTFlex(sub_network_config)
+    sub_network = GPTFlex(sub_network_config) if use_flex else GPT(sub_network_config)
 
     state_dict = extract_linear(model.lm_head)
     sub_network.lm_head.load_state_dict(state_dict)
