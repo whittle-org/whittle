@@ -9,7 +9,7 @@ def get_pareto_optimal(costs: np.ndarray) -> npt.NDArray[np.bool_]:
     Find the pareto-optimal point.
 
     Args:
-        costs: (n_points, m_cost_values) array
+        costs: array containing the costs for each objective asscoiated with each point (n_points, 2).
 
     Returns:
         (n_points, 1) indicator if point is on pareto front or not.

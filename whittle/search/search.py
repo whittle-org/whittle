@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import time
-from typing import Any
 
+from typing import Callable, Any
 import numpy as np
 
 from whittle.search.ask_tell_scheduler import AskTellScheduler
@@ -11,11 +11,11 @@ from whittle.search.multi_objective import get_pareto_optimal
 
 
 def multi_objective_search(
-    objective,
+    objective: Callable[..., Any],
     search_space: dict,
     search_strategy: str = "random_search",
     num_samples: int = 100,
-    objective_kwargs: dict | None = None,
+    objective_kwargs: dict[str, Any] | None = None,
     seed: int | None = None,
 ) -> dict[str, Any]:
     """
@@ -61,7 +61,7 @@ def multi_objective_search(
     for i in range(num_samples):
         trial_suggestion = scheduler.ask()
         objective_1, objective_2 = objective(
-            config=trial_suggestion.config, **objective_kwargs
+            trial_suggestion.config, **(objective_kwargs or {})
         )
 
         scheduler.tell(

@@ -23,6 +23,8 @@ from whittle.modules.rmsnorm import RMSNorm
 
 
 class GPT(nn.Module):
+    """An extension of litgpt's GPT model with support to adapt to sub-network dimensionality."""
+
     def __init__(self, config: Config) -> None:
         super().__init__()
         assert config.padded_vocab_size is not None
@@ -179,6 +181,18 @@ class GPT(nn.Module):
         sub_network_query_groups: int | None = None,
         sub_network_head_size: int | None = None,
     ) -> None:
+        """
+        Sets the GPT model to the specified sub-network dimensionality.
+        Input arguments are set to the specified sub-network dimensionality.
+
+        Args:
+            sub_network_n_embd: Embedding dimension of the sub-network.
+            sub_network_intermediate_size: Intermediate size of the sub-network.
+            sub_network_num_heads: Number of attention heads in the sub-network.
+            sub_network_n_layers: Number of layers in the sub-network.
+            sub_network_query_groups: Number of query groups in the sub-network. Defaults to None.
+            sub_network_head_size: Size of each attention head in the sub-network. Defaults to None.
+        """
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
@@ -218,7 +232,10 @@ class GPT(nn.Module):
             self.sub_network_n_embd, self.config.padded_vocab_size
         )
 
-    def select_sub_network(self, config):
+    def select_sub_network(self, config: dict[str, Any]) -> None:
+        """
+        Selects and sets the sub-network configuration based on the provided configuration.
+        """
         self.set_sub_network(
             config["embed_dim"],
             config["mlp_ratio"] * config["embed_dim"],
@@ -227,6 +244,9 @@ class GPT(nn.Module):
         )
 
     def reset_super_network(self):
+        """
+        Resets the GPT model to the original super-network dimensionality.
+        """
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
