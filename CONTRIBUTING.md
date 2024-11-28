@@ -4,7 +4,7 @@
 
 ```bash
 # Create your own fork of the repository if required and replace whittle-org with your username
-git clone git@github.com/whittle-org/whittle.git
+git clone git@github.com:whittle-org/whittle.git
 cd whittle
 pip install -e ".[dev]"  # Install what's here (the `.` part) and install the extra dev dependancies
 ```
