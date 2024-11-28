@@ -9,6 +9,8 @@ from whittle.modules import Linear
 
 
 class GptNeoxMLP(litgpt.model.GptNeoxMLP):
+    """An extension of litgp's `litgpt.model.GptNeoxMLP` with support to adapt to sub-network dimensionality."""
+
     def __init__(self, config: Config) -> None:
         super().__init__(config)
         self.fc = Linear(config.n_embd, config.intermediate_size, bias=config.bias)
@@ -24,6 +26,13 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
     def set_sub_network(
         self, sub_network_n_embd: int, sub_network_intermediate_size: int
     ):
+        """
+        Sets the dimensionality of the current sub-network MLP layers.
+
+        Args:
+           sub_network_n_embd: Input and output embedding dimension of the sub-network.
+           sub_network_intermediate_size: Hidden layer dimension of the sub-network MLP.
+        """
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
 
@@ -35,6 +44,7 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         )
 
     def reset_super_network(self):
+        """Resets the MLP dimensions to the original super-network dimensionality."""
         self.sub_network_n_embd = self.in_features
         self.sub_network_intermediate_size = self.intermediate_size
 
@@ -43,6 +53,8 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
 
 
 class LLaMAMLP(litgpt.model.LLaMAMLP):
+    """An extension of litgp's `litgpt.model.LLaMAMLP` with support to adapt to sub-network dimensionality."""
+
     def __init__(self, config: Config) -> None:
         super().__init__(config)
         self.fc_1 = Linear(config.n_embd, config.intermediate_size, bias=config.bias)
@@ -57,6 +69,13 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
     def set_sub_network(
         self, sub_network_n_embd: int, sub_network_intermediate_size: int
     ):
+        """
+        Sets the dimensionality of the current sub-network MLP layers.
+
+        Args:
+            sub_network_n_embd: Input and output embedding dimension of the sub-network.
+            sub_network_intermediate_size: Hidden layer dimension of the sub-network MLP.
+        """
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
 
@@ -71,6 +90,7 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         )
 
     def reset_super_network(self):
+        """Reset the input dimensionality of the current sub-network to the super-network dimensionality."""
         self.sub_network_n_embd = self.in_features
         self.sub_network_intermediate_size = self.intermediate_size
 
@@ -80,6 +100,8 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
 
 
 class GemmaMLP(LLaMAMLP):
+    """Implementation of the forward pass of LLaMAMLP network."""
+
     def __init__(self, config: Config) -> None:
         super().__init__(config)
 

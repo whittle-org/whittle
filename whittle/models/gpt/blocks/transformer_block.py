@@ -12,6 +12,8 @@ from whittle.modules.rmsnorm import RMSNorm
 
 
 class Block(litgpt.model.Block):
+    """An extension of litgpt's Transformer Block with support to adapt to sub-network dimensionality."""
+
     def __init__(self, config: Config, block_idx: int) -> None:
         super().__init__(config, block_idx)
         self.config = config
@@ -69,6 +71,16 @@ class Block(litgpt.model.Block):
         sub_network_query_groups: int,
         sub_network_head_size: int,
     ) -> None:
+        """
+        Set the Block to the specified sub-network dimensionality.
+
+        Args:
+            sub_network_n_embd: Embedding dimension of the sub-network.
+            sub_network_intermediate_size: Intermediate size of the sub-network.
+            sub_network_num_heads: Number of attention heads in the sub-network.
+            sub_network_query_groups: Number of query groups in the sub-network.
+            sub_network_head_size: Size of each attention head in the sub-network.
+        """
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
@@ -94,6 +106,9 @@ class Block(litgpt.model.Block):
             self.post_mlp_norm.set_sub_network(self.sub_network_n_embd)
 
     def reset_super_network(self):
+        """
+        Resets the layers in the Block to it's original super-network dimensionality.
+        """
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
