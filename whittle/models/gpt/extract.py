@@ -20,8 +20,7 @@ def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
     Args:
         model: The original, full GPT model from which the sub-network is extracted.
         sub_network_config: Configuration object for the sub-network, containing the necessary
-                                     architecture specifications such as embedding size, number of heads,
-                                     and number of layers.
+            architecture specifications such as embedding size, number of heads, and number of layers.
 
     Returns:
         A new sub-network model instance, initialized with parameters extracted from the original model.

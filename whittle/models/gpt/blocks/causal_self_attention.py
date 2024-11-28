@@ -50,7 +50,15 @@ class CausalSelfAttention(nn.Module):
         sub_network_query_groups: int,
         sub_network_head_size: int,
     ):
-        """Sets the CausalSelfAttention block to the specified sub-network dimensionality."""
+        """
+        Sets the CausalSelfAttention block to the specified sub-network dimensionality.
+
+        Args:
+            sub_network_n_embd: Embedding dimension of the sub-network
+            sub_network_n_head: Number of attention heads in the sub-network
+            sub_network_query_groups: Number of query groups for grouped-query attention (GQA).
+            sub_network_head_size: Size of each attention head in the sub-network.
+        """
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_n_head = sub_network_n_head
         self.sub_network_query_groups = sub_network_query_groups
@@ -76,7 +84,7 @@ class CausalSelfAttention(nn.Module):
             self.sub_attention_scaler = self.config.attention_scores_scalar
 
     def reset_super_network(self):
-        """Resets the dimensionality of the current to the super-network dimensionality."""
+        """Resets the dimensionality of the current sub-network to the super-network dimensionality."""
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_n_head = self.config.n_head
         self.sub_network_head_size = self.config.head_size

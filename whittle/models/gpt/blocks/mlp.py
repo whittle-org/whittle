@@ -26,7 +26,13 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
     def set_sub_network(
         self, sub_network_n_embd: int, sub_network_intermediate_size: int
     ):
-        """Set the input dimensionality of the current sub-network."""
+        """
+        Sets the dimensionality of the current sub-network MLP layers.
+
+        Args:
+           sub_network_n_embd: Input and output embedding dimension of the sub-network.
+           sub_network_intermediate_size: Hidden layer dimension of the sub-network MLP.
+        """
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
 
@@ -38,7 +44,7 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         )
 
     def reset_super_network(self):
-        """Reset the input dimensionality of the current sub-network to the super-network dimensionality."""
+        """Resets the MLP dimensions to the original super-network dimensionality."""
         self.sub_network_n_embd = self.in_features
         self.sub_network_intermediate_size = self.intermediate_size
 
@@ -63,7 +69,13 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
     def set_sub_network(
         self, sub_network_n_embd: int, sub_network_intermediate_size: int
     ):
-        """Set the input dimensionality of the current sub-network."""
+        """
+        Sets the dimensionality of the current sub-network MLP layers.
+
+        Args:
+            sub_network_n_embd: Input and output embedding dimension of the sub-network.
+            sub_network_intermediate_size: Hidden layer dimension of the sub-network MLP.
+        """
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
 
