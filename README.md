@@ -27,7 +27,7 @@ pip install -e .
 ```
 ### Getting started with whittle  
 
-To explore and understand different functionalities of ```whittle``` checkout [this](https://colab.research.google.com/drive/1xFhsHrqJGQnFuigLCqKHsJFLsJwksl4v?usp=sharing) colab notebook and ```examples/```
+To explore and understand different functionalities of ```whittle``` checkout [this](https://colab.research.google.com/drive/1i_FjIf_qCTJFcp0emOHX9E6I6j6kkIcH?usp=sharing) colab notebook and ```examples/```
 
 ## Projects that use whittle
 
