@@ -9,8 +9,8 @@ on:
 permissions:
   contents: write
 jobs:
-  # test-code:
-  #   uses: whittle-org/whittle/.github/workflows/unit-test.yml@main
+  test-code:
+    uses: whittle-org/whittle/.github/workflows/unit-test.yml@main
   test-docs:
     uses: whittle-org/whittle/.github/workflows/docs.yml@main
   # Need to ensure we bump before we create any artifacts
@@ -140,18 +140,18 @@ jobs:
             --notes-file changelog-increment.md \
             --verify-tag \
             "${current_version}" "dist/whittle-${current_version}.tar.gz"
-  # publish:
-  #   needs: [release]
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     id-token: write
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         ref: "main"  # Necessary to download the latest of main as this will have been updated on the step before
-  #     - uses: actions/download-artifact@v4
-  #       with:
-  #           name: build-output
-  #           path: dist
-  #     - name: Publish distribution 📦 to PyPI
-  #       uses: pypa/gh-action-pypi-publish@release/v1
+  publish:
+    needs: [release]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "main"  # Necessary to download the latest of main as this will have been updated on the step before
+      - uses: actions/download-artifact@v4
+        with:
+            name: build-output
+            path: dist
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
