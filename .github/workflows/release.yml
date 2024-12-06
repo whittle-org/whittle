@@ -27,8 +27,8 @@ jobs:
       # Create and checkout a new branch for the version bump
       - name: Create version bump branch
         run: |
-          git config user.name "GitHub Action"
-          git config user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
           branch_name="bump-version-$(date +'%Y%m%d-%H%M%S')"
           git checkout -b $branch_name
           git push "https://${{ secrets.PUSH_ACCESS }}@github.com/whittle-org/whittle.git" $branch_name
