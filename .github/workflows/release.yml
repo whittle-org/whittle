@@ -58,7 +58,10 @@ jobs:
       - name: Create Pull Request
         env:
           GITHUB_TOKEN: ${{ secrets.PUSH_ACCESS }}
+          GITHUB_ACTOR: "github-actions[bot]"
         run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "actions@github.com"
           gh pr create \
             --title "chore: version bump [automated]" \
             --body "Automated version bump" \
