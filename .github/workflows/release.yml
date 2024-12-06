@@ -1,6 +1,11 @@
 name: release
 on:
   workflow_dispatch:
+    inputs: 
+      branch:
+        type: string
+        description: "The branch to release from"
+        default: "main"
 permissions:
   contents: write
 jobs:
