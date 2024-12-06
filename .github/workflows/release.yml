@@ -1,11 +1,16 @@
 name: release
 on:
   workflow_dispatch:
+    inputs: 
+      branch:
+        type: string
+        description: "The branch to release from"
+        default: "main"
 permissions:
   contents: write
 jobs:
-  # test-code:
-  #   uses: whittle-org/whittle/.github/workflows/unit-test.yml@main
+  test-code:
+    uses: whittle-org/whittle/.github/workflows/unit-test.yml@main
   test-docs:
     uses: whittle-org/whittle/.github/workflows/docs.yml@main
   # Need to ensure we bump before we create any artifacts
@@ -20,14 +25,10 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.PUSH_ACCESS }}
       # Create and checkout a new branch for the version bump
-      - name: Create version bump branch
+      - name: Configure git
         run: |
-          git config user.name "GitHub Action"
-          git config user.email "action@github.com"
-          branch_name="bump-version-$(date +'%Y%m%d-%H%M%S')"
-          git checkout -b $branch_name
-          git push "https://${{ secrets.PUSH_ACCESS }}@github.com/whittle-org/whittle.git" $branch_name
-          echo "BRANCH_NAME=$branch_name" >> $GITHUB_ENV
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
       - name: Create bump and changelog
         env:
           GITHUB_TOKEN: ${{ secrets.PUSH_ACCESS }}
@@ -39,45 +40,16 @@ jobs:
           changelog_increment_filename: changelog-increment.md
           commit: false
           push: false
-          branch: ${{ env.BRANCH_NAME }}
+          branch: "main"
       # Add a separate step to handle the changelog file
-      - name: Handle changelog
+      - name: Handle changelog and push
         run: |
           mkdir changelog-output
           mv changelog-increment.md changelog-output/changelog-increment.md
           cat changelog-output/changelog-increment.md
           git add changelog-output/changelog-increment.md
           git commit -m "version bump"
-          git push --set-upstream origin ${{ env.BRANCH_NAME }}
-      # Create PR
-      - name: Create Pull Request
-        env:
-          GITHUB_TOKEN: ${{ secrets.PUSH_ACCESS }}
-        run: |
-          gh pr create \
-            --title "chore: version bump [automated]" \
-            --body "Automated version bump" \
-            --base main \
-            --head ${{ env.BRANCH_NAME }} \
-            --label "automated" \
-            --label "version-bump"
-      # Wait for PR to be merged
-      - name: Wait for PR merge
-        env:
-          GITHUB_TOKEN: ${{ secrets.PUSH_ACCESS }}
-        run: |
-          while true; do
-            pr_state=$(gh pr view ${{ env.BRANCH_NAME }} --json state -q .state)
-            if [ "$pr_state" = "MERGED" ]; then
-              break
-            elif [ "$pr_state" = "CLOSED" ]; then
-              echo "PR was closed without merging"
-              exit 1
-            fi
-            echo "Waiting for PR to be merged..."
-            sleep 30
-          done
-
+          git push 
   build:
     needs: [bump]
     runs-on: ubuntu-latest
@@ -98,7 +70,6 @@ jobs:
         with:
           name: build-output
           path: dist
-
   docs:
     needs: [bump]
     runs-on: ubuntu-latest
