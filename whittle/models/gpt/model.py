@@ -82,7 +82,19 @@ class GPT(nn.Module):
                 f"Cannot attend to {value}, block size is only {self.config.block_size}"
             )
         self._max_seq_length = value
-
+        if not hasattr(self, "cos"):
+            # first call
+            cos, sin = self.rope_cache(self._max_seq_length, self.config.rope_n_elem, device="cpu")
+            self.register_buffer("cos", cos, persistent=False)
+            self.register_buffer("sin", sin, persistent=False)
+        # override
+        elif value != self.cos.size(0):
+            self.cos, self.sin = self.rope_cache(
+                seq_len=self._max_seq_length,
+                n_elem=self.config.rope_n_elem,
+                device=self.cos.device,
+            )
+            
     def reset_parameters(self) -> None:
         # Trigger resetting the rope-cache
         self.cos, self.sin = self.rope_cache(
