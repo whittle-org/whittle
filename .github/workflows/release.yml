@@ -25,7 +25,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.PUSH_ACCESS }}
       # Create and checkout a new branch for the version bump
-      - name: Create version bump branch
+      - name: Configure git
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
@@ -42,7 +42,7 @@ jobs:
           push: false
           branch: "main"
       # Add a separate step to handle the changelog file
-      - name: Handle changelog
+      - name: Handle changelog and push
         run: |
           mkdir changelog-output
           mv changelog-increment.md changelog-output/changelog-increment.md
