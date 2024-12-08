@@ -21,7 +21,6 @@ dependencies = [
   "torchvision>=0.18",
   "boto3==1.34.147",
   "botocore==1.34.147",
-  "deepspeed"
 ]
 classifiers = [
   "Intended Audience :: Science/Research",
