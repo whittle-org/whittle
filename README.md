@@ -1,8 +1,12 @@
-![Whittle Logo](assets/whittle-logo.png)
+<p align="center">
+  <img src="assets/whittle-logo.png" width="100" height="100" alt="Whittle Logo">
+</p>
 
-# Whittle
+<h1 align="center">Whittle 🪒🧠</h1>
 
-![Whittle Visualization](assets/library-visualization.svg)
+<p align="center">
+  <img src="assets/library-visualization.svg" height="400" alt="Whittle Visualization">
+</p>
 
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/whittle)
 ![unit-tests](https://github.com/whittle-org/whittle/actions/workflows/unit-test.yml/badge.svg)
@@ -19,7 +23,7 @@ and allows to compress many state-of-the-art models.
 
 ## Installation
 
-Whittle supports and is tested for python 3.9 to 3.11. 
+Whittle supports and is tested for python 3.9 to 3.12. 
 
 You can install whittle with: 
 ```
