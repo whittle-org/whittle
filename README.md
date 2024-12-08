@@ -1,5 +1,7 @@
 # Whittle
 
+![Whittle Logo](assets/library-visualization.svg)
+
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/whittle)
 ![unit-tests](https://github.com/whittle-org/whittle/actions/workflows/unit-test.yml/badge.svg)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/whittle-org/whittle/blob/main/LICENSE)
