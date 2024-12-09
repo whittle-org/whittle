@@ -52,6 +52,7 @@ class GPT(nn.Module):
         self.sub_network_n_layers = self.config.n_layer
         self.sub_network_head_size: int | None = self.config.head_size
         self.sub_network_query_groups: int | None = self.config.n_query_groups
+        self.sub_network_rope_n_elem = self.config.rope_n_elem
         self.cos: torch.Tensor
         self.sin: torch.Tensor
         self.config.is_encoder_decoder = False
@@ -93,7 +94,7 @@ class GPT(nn.Module):
         elif value != self.cos.size(0):
             self.cos, self.sin = self.rope_cache(
                 seq_len=self._max_seq_length,
-                n_elem=self.config.rope_n_elem,
+                n_elem=self.sub_network_rope_n_elem,
                 device=self.cos.device,
             )
 
@@ -232,6 +233,16 @@ class GPT(nn.Module):
             self.sub_network_n_embd, self.config.padded_vocab_size
         )
 
+        # change the rope cache to match n_elem induced by subnet head size
+        self.sub_network_rope_n_elem = int(
+            self.config.rotary_percentage * self.sub_network_head_size
+        )
+        self.cos, self.sin = self.rope_cache(
+            seq_len=self._max_seq_length,
+            n_elem=self.sub_network_rope_n_elem,
+            device=self.cos.device,
+        )
+
     def select_sub_network(self, config: dict[str, Any]) -> None:
         """
         Selects and sets the sub-network configuration based on the provided configuration.
@@ -253,6 +264,7 @@ class GPT(nn.Module):
         self.sub_network_n_layers = self.config.n_layer
         self.sub_network_head_size: int | None = self.config.head_size
         self.sub_network_query_groups: int | None = self.config.n_query_groups
+        self.sub_network_rope_n_elem = self.config.rope_n_elem
         self.transformer.wte.reset_super_network()
         self.transformer.ln_f.reset_super_network()
         for i in range(self.config.n_layer):
@@ -292,18 +304,7 @@ class GPT(nn.Module):
         for i in range(self.sub_network_n_layers):
             block = self.transformer.h[i]
 
-            n_elem = (
-                self.config.rope_n_elem
-                if input_pos is not None
-                else int(self.config.rotary_percentage * self.sub_network_head_size)
-            )
-
-            cos, sin = self.rope_cache(
-                seq_len=self.max_seq_length,
-                n_elem=n_elem,
-                device=idx.device,
-            )
-
+            cos, sin = self.cos.to(idx.device), self.sin.to(idx.device)
             cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
 
             x = block(x, cos, sin, mask, input_pos)
@@ -329,13 +330,18 @@ class GPT(nn.Module):
         dtype: torch.dtype | None = None,
     ) -> None:
         if rope_cache_length is None:
-            rope_cache_length = self.config.rope_n_elem
+            rope_cache_length = self.sub_network_rope_n_elem
         if max_seq_length is None:
             max_seq_length = self.max_seq_length
         # initialize the kv cache for all blocks
         for block in self.transformer.h:
             block.attn.kv_cache = block.attn.build_kv_cache(
-                batch_size, max_seq_length, rope_cache_length, device, dtype
+                batch_size,
+                max_seq_length,
+                rope_cache_length=rope_cache_length,
+                device=device,
+                dtype=dtype,
+                rope_n_elem=self.sub_network_rope_n_elem,
             )
 
         if self.mask_cache is None or self.mask_cache.size(3) != self.max_seq_length:
