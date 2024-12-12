@@ -42,14 +42,21 @@ jobs:
           push: false
           branch: "main"
       # Add a separate step to handle the changelog file
-      - name: Handle changelog and push
+      - name: Move changelog to output directory
         run: |
           mkdir changelog-output
           mv changelog-increment.md changelog-output/changelog-increment.md
           cat changelog-output/changelog-increment.md
-          git add changelog-output/changelog-increment.md
-          git commit -m "version bump"
-          git push 
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-output
+          path: changelog-output/changelog-increment.md
+      # - name: Commit and push version bump
+      #   run: |
+      #     git add changelog-output/changelog-increment.md
+      #     git commit -m "version bump"
+      #     git push
   build:
     needs: [bump]
     runs-on: ubuntu-latest
