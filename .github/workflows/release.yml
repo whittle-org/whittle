@@ -139,8 +139,8 @@ jobs:
       - name: Download the changelog
         uses: actions/download-artifact@v4
         with:
-          name: changelog
-          path: changelog-output
+          name: changelog-output
+          path: changelog-output/changelog-increment.md
       - run: |
           ls -R changelog-output
           mv changelog-output/changelog-increment.md changelog-increment.md
