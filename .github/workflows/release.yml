@@ -53,8 +53,8 @@ jobs:
       - name: Upload changelog
         uses: actions/upload-artifact@v4
         with:
-          name: changelog-output
-          path: changelog-output/changelog-increment.md
+          name: changelog
+          path: changelog-output
       # - name: Commit and push version bump
       #   run: |
       #     git add changelog-output/changelog-increment.md
@@ -139,8 +139,8 @@ jobs:
       - name: Download the changelog
         uses: actions/download-artifact@v4
         with:
-          name: changelog-output
-          path: changelog-output/changelog-increment.md
+          name: changelog
+          path: changelog-output
       - run: |
           ls -R changelog-output
           mv changelog-output/changelog-increment.md changelog-increment.md
