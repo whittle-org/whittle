@@ -12,6 +12,7 @@ jobs:
   test-code:
     uses: whittle-org/whittle/.github/workflows/unit-test.yml@main
   test-docs:
+    needs: [test-code]
     uses: whittle-org/whittle/.github/workflows/docs.yml@main
   # Need to ensure we bump before we create any artifacts
   bump:
