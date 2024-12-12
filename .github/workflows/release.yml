@@ -26,23 +26,14 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.PUSH_ACCESS }}
       # Create and checkout a new branch for the version bump
-      - name: Configure git
-        run: |
-          git config --global user.name "GitHub Action"
-          git config --global user.email "action@github.com"
       - run: git tag
       - name: Create bump and changelog
-        env:
-          GITHUB_TOKEN: ${{ secrets.PUSH_ACCESS }}
         uses: commitizen-tools/commitizen-action@master
         id: cz
         with:
           github_token: ${{ secrets.PUSH_ACCESS }}
           debug: true
           changelog_increment_filename: changelog-increment.md
-          commit: false
-          push: false
-          branch: "main"
       # Add a separate step to handle the changelog file
       - name: Move changelog to output directory
         run: |
