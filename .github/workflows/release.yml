@@ -54,11 +54,6 @@ jobs:
         with:
           name: changelog
           path: changelog-output
-      # - name: Commit and push version bump
-      #   run: |
-      #     git add changelog-output/changelog-increment.md
-      #     git commit -m "version bump"
-      #     git push
   build:
     needs: [bump]
     runs-on: ubuntu-latest
