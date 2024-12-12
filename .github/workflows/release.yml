@@ -139,17 +139,17 @@ jobs:
           ls -R changelog-output
           mv changelog-output/changelog-increment.md changelog-increment.md
           cat changelog-increment.md
-      - name: "Create Github Release"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          current_version=$(git tag | sort --version-sort | tail -n 1)
-          echo "Release for ${current_version}"
-          gh release create  \
-            --generate-notes \
-            --notes-file changelog-increment.md \
-            --verify-tag \
-            "${current_version}" "dist/whittle-${current_version}.tar.gz"
+      # - name: "Create Github Release"
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     current_version=$(git tag | sort --version-sort | tail -n 1)
+      #     echo "Release for ${current_version}"
+      #     gh release create  \
+      #       --generate-notes \
+      #       --notes-file changelog-increment.md \
+      #       --verify-tag \
+      #       "${current_version}" "dist/whittle-${current_version}.tar.gz"
   publish:
     needs: [release]
     runs-on: ubuntu-latest
