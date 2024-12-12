@@ -92,8 +92,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-          cache: pip
-      - run: python -m pip install ".[dev]"
+      - name: install the latest version uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: latest
+      - name: create virtual environment
+        run: uv venv --python "3.10"
+      - name: Install
+        run: uv pip install ".[dev]"
       - name: "Deploy Docs"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -103,13 +109,13 @@ jobs:
           current_version=$(git tag | sort --version-sort | tail -n 1)
 
           # This block will rename previous retitled versions
-          retitled_versions=$(mike list -j | jq ".[] | select(.title != .version) | .version" | tr -d '"')
+          retitled_versions=$(uv run mike list -j | jq ".[] | select(.title != .version) | .version" | tr -d '"')
           for version in $retitled_versions; do
-            mike retitle "${version}" "${version}"
+            uv run mike retitle "${version}" "${version}"
           done
 
           echo "Deploying docs for ${current_version}"
-          mike deploy \
+          uv run mike deploy \
             --push \
             --title "${current_version} (latest)" \
             --update-aliases \
