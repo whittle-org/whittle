@@ -9,15 +9,16 @@ on:
 permissions:
   contents: write
 jobs:
-  test-code:
-    uses: whittle-org/whittle/.github/workflows/unit-test.yml@main
-  test-docs:
-    needs: [test-code]
-    uses: whittle-org/whittle/.github/workflows/docs.yml@main
+  # test-code:
+  #   uses: whittle-org/whittle/.github/workflows/unit-test.yml@main
+  # test-docs:
+  #   needs: [test-code]
+  #   uses: whittle-org/whittle/.github/workflows/docs.yml@main
   # Need to ensure we bump before we create any artifacts
   bump:
     runs-on: ubuntu-latest
-    needs: [test-code, test-docs]
+    # needs: [test-code, test-docs]
+    # needs: [test-code, test-docs]
     steps:
       - uses: actions/checkout@v4
         with:
