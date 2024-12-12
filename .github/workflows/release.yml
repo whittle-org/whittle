@@ -43,9 +43,11 @@ jobs:
           branch: "main"
       # Add a separate step to handle the changelog file
       - name: Move changelog to output directory
+        # run: |
+        #   mkdir changelog-output
+        #   mv changelog-increment.md changelog-output/changelog-increment.md
+        #   cat changelog-output/changelog-increment.md
         run: |
-          mkdir changelog-output
-          mv changelog-increment.md changelog-output/changelog-increment.md
           cat changelog-output/changelog-increment.md
       - name: Upload changelog
         uses: actions/upload-artifact@v4
