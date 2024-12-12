@@ -25,7 +25,9 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.PUSH_ACCESS }}
       # Create and checkout a new branch for the version bump
-      - run: git tag
+      - run: |
+          git fetch origin --tags
+          git tag
       - name: Create bump and changelog
         uses: commitizen-tools/commitizen-action@master
         id: cz
