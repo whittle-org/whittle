@@ -96,10 +96,10 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           version: latest
-      # - name: create virtual environment
-      #   run: uv venv --python "3.10"
-      # - name: Install
-      #   run: uv pip install ".[dev]"
+      - name: create virtual environment
+        run: uv venv --python "3.10"
+      - name: Install
+        run: uv pip install ".[dev]"
       # - name: "Deploy Docs"
       #   env:
       #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
