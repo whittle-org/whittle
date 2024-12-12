@@ -37,6 +37,7 @@ jobs:
       # Add a separate step to handle the changelog file
       - name: Move changelog to output directory
         run: |
+          mkdir changelog-output
           mv changelog-increment.md changelog-output/changelog-increment.md
           cat changelog-output/changelog-increment.md
       - name: Upload changelog
@@ -50,6 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # ref: "main"  # Necessary to download the latest of main as this will have been updated on the step before
           ref: "210-fix-artifact-upload-for-changelog"  # Necessary to download the latest of main as this will have been updated on the step before
           fetch-tags: 1
           fetch-depth: 0
