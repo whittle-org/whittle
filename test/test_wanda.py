@@ -9,7 +9,6 @@ from whittle.models.gpt import GPT, Config
 
 from whittle.prunning.wanda_structured import find_layers
 from whittle.prunning.pruner import NMPruner
-from whittle.metrics.parameters import compute_sparsity_ratio
 
 
 @pytest.mark.parametrize(
@@ -29,7 +28,7 @@ from whittle.metrics.parameters import compute_sparsity_ratio
         },
     ],
 )
-def test_wanda_model_pruning(model_info, mock_tokenizer):
+def test_wanda_model_pruning(model_info, mock_tokenizer, compute_sparsity_ratio):
     args = argparse.Namespace(nsamples=32, seed=9001, dataset="sciq", batch_size=128)
 
     config = Config.from_name(

@@ -124,6 +124,18 @@ def longform_path(tmp_path):
     return path
 
 
+@pytest.fixture()
+def compute_sparsity_ratio():
+    def _compute(layer):
+        W = layer.weight.data
+        total_elements = W.numel()
+        zero_elements = torch.sum(W == 0).item()
+        sparsity_ratio = zero_elements / total_elements
+        return sparsity_ratio
+
+    return _compute
+
+
 def RunIf(thunder: Optional[bool] = None, **kwargs):
     reasons, marker_kwargs = _runif_reasons(**kwargs)
 

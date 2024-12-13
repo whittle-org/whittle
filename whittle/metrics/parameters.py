@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 
-import torch
+
 import torch.nn as nn
 
 from whittle.models.gpt import GPT
@@ -99,11 +99,3 @@ def compute_parameters(model: GPT) -> float:
         num_params += params_layer_normalization(block.norm_2)
     num_params += params_layer_normalization(model.transformer.ln_f)
     return num_params
-
-
-def compute_sparsity_ratio(layer: nn.Module) -> float:
-    W = layer.weight.data
-    total_elements = W.numel()
-    zero_elements = torch.sum(W == 0).item()
-    sparsity_ratio = zero_elements / total_elements
-    return sparsity_ratio
