@@ -1,19 +1,27 @@
+from argparse import Namespace
+
 import torch
 import torch.nn as nn
+from transformers import PreTrainedTokenizerBase
 
 
-from whittle.baselines.sparsegpt import SparseGPT
-from whittle.baselines.data import get_loaders
+from whittle.prunning.sparsegpt import SparseGPT
+from whittle.prunning.data import get_loaders
+from whittle.modules.linear import Linear
 
 
-def find_layers(module, layers=[nn.Linear], name=""):
+def find_layers(
+    module: nn.Module,
+    layers: list[type[nn.Module]] = [Linear],
+    name: str = "",
+) -> dict[str, nn.Module]:
     """
     Recursively find the layers of a certain type in a module.
 
     Args:
-        module (nn.Module): PyTorch module.
-        layers (list): List of layer types to find.
-        name (str): Name of the module.
+        module: PyTorch module.
+        layers: List of layer types to find.
+        name: Name of the module.
 
     Returns:
         dict: Dictionary of layers of the given type(s) within the module.
@@ -31,8 +39,27 @@ def find_layers(module, layers=[nn.Linear], name=""):
 
 
 @torch.no_grad()
-def prune_sparsegpt(args, model, tokenizer, dev="cuda", prune_n=0, prune_m=0):
-    ## SparseGPT code available at: https://github.com/IST-DASLab/sparsegpt/tree/f5c25005a61f96a0933ca2f95705a963585aafaa
+def prune_sparsegpt(
+    args: Namespace,
+    model: nn.Module,
+    tokenizer: PreTrainedTokenizerBase = None,
+    dev: torch.device = torch.device("cuda:0"),
+    prune_n: int = 0,
+    prune_m: int = 0,
+) -> None:
+    """
+    Prune the model using the WANDA method.
+    SparseGPT code available at: https://github.com/IST-DASLab/sparsegpt/tree/f5c25005a61f96a0933ca2f95705a963585aafaa
+
+    Args:
+        args: Arguments for pruning.
+        model : The model to be pruned.
+        tokenizer: Tokenizer for the model.
+        device  : Device to perform pruning on.
+        prune_n : Number of weights to prune per group.
+        prune_m : Total number of weights per group.
+    """
+
     print("Starting ...")
     args.sparsity_ratio = None
     dataloader, _ = get_loaders(
@@ -46,9 +73,6 @@ def prune_sparsegpt(args, model, tokenizer, dev="cuda", prune_n=0, prune_m=0):
     use_cache = model.config.use_cache
     model.config.use_cache = False
     layers = model.transformer.h
-
-    # if "model.embed_tokens" in model.hf_device_map:
-    #    dev = model.hf_device_map["model.embed_tokens"]
 
     dtype = next(iter(model.parameters())).dtype
     inps = torch.zeros(
@@ -90,11 +114,6 @@ def prune_sparsegpt(args, model, tokenizer, dev="cuda", prune_n=0, prune_m=0):
 
     for i in range(len(layers)):
         layer = layers[i]
-        # Only for llama
-        # if f"model.layers.{i}" in model.hf_device_map:
-        #    dev = model.hf_device_map[f"model.layers.{i}"]
-        #    print(f"layer {i} device {dev}")
-        #    inps, outs, attention_mask, position_ids = inps.to(dev), outs.to(dev), attention_mask.to(dev), position_ids.to(dev)
 
         subset = find_layers(layer)
 

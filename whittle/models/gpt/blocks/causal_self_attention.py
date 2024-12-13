@@ -239,9 +239,10 @@ class CausalSelfAttention(nn.Module):
         rope_cache_length: int | None = None,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
+        rope_n_elem: int | None = None,
     ) -> KVCache:
-        heads = 1 if self.config.n_query_groups == 1 else self.config.n_head
-        v_shape = (batch_size, heads, max_seq_length, self.config.head_size)
+        heads = 1 if self.sub_network_query_groups == 1 else self.sub_network_n_head
+        v_shape = (batch_size, heads, max_seq_length, self.sub_network_head_size)
         if rope_cache_length is None:
             if self.config.rotary_percentage != 1.0:
                 raise TypeError(
@@ -249,10 +250,13 @@ class CausalSelfAttention(nn.Module):
                 )
             k_shape = v_shape
         else:
+            rope_n_elem = (
+                rope_n_elem if rope_n_elem is not None else self.config.rope_n_elem
+            )
             k_shape = (
                 batch_size,
                 heads,
                 max_seq_length,
-                rope_cache_length + self.config.head_size - self.config.rope_n_elem,
+                rope_cache_length + self.sub_network_head_size - rope_n_elem,
             )
         return KVCache(k_shape, v_shape, device=device, dtype=dtype)

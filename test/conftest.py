@@ -84,6 +84,16 @@ class MockTokenizer:
     def decode(self, tokens: torch.Tensor) -> str:
         return "".join(chr(int(t)) for t in tokens.tolist())
 
+    def __call__(self, text: str, return_tensors=None, **kwargs):
+        class TokenizerOutput:
+            def __init__(self, input_ids):
+                self.input_ids = input_ids
+
+        encoded = self.encode(text, **kwargs)
+        if return_tensors == "pt":
+            return TokenizerOutput(encoded.unsqueeze(0))
+        return TokenizerOutput(torch.tensor(encoded))
+
 
 @pytest.fixture()
 def mock_tokenizer():

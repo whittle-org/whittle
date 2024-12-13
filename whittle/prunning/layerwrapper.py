@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 
 
-# Define WrappedGPT class
 class WrappedGPT:
     """
     This class wraps a GPT layer for specific operations.
