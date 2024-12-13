@@ -55,7 +55,7 @@ def prune_sparsegpt(
         args: Arguments for pruning.
         model : The model to be pruned.
         tokenizer: Tokenizer for the model.
-        device  : Device to perform pruning on.
+        dev  : Device to perform pruning on.
         prune_n : Number of weights to prune per group.
         prune_m : Total number of weights per group.
     """
