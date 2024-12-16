@@ -103,7 +103,6 @@ def prune_wanda(
 
     print("loading calibration data")
     dataloader, _ = get_loaders(
-        "c4",
         nsamples=args.nsamples,
         seed=args.seed,
         seqlen=model.max_seq_length,

@@ -63,7 +63,6 @@ def prune_sparsegpt(
     print("Starting ...")
     args.sparsity_ratio = None
     dataloader, _ = get_loaders(
-        "c4",
         nsamples=args.nsamples,
         seed=args.seed,
         seqlen=model.max_seq_length,

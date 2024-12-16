@@ -17,7 +17,8 @@ class Pruner:
         Initialize the Pruner with arguments, necessary.
 
         Args:
-            args: Additional arguments for pruning methods.
+            args: Additional arguments for wanda or sparsed methods.
+                  Arguments specified are nsamples, seed, batch_size.
         """
         self.args = args
 

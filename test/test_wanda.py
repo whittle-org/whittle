@@ -29,7 +29,7 @@ from whittle.prunning.pruner import NMPruner
     ],
 )
 def test_wanda_model_pruning(model_info, mock_tokenizer, compute_sparsity_ratio):
-    args = argparse.Namespace(nsamples=32, seed=9001, dataset="sciq", batch_size=128)
+    args = argparse.Namespace(nsamples=32, seed=9001, batch_size=128)
 
     config = Config.from_name(
         model_info["config_name"],
