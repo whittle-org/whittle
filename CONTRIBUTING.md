@@ -4,7 +4,7 @@
 
 ```bash
 # Create your own fork of the repository if required and replace whittle-org with your username
-git clone git@github.com/whittle-org/whittle.git
+git clone git@github.com:whittle-org/whittle.git
 cd whittle
 pip install -e ".[dev]"  # Install what's here (the `.` part) and install the extra dev dependancies
 ```
@@ -20,6 +20,20 @@ pre-commit install
 ```bash
 pytest
 ```
+
+## Docstring Writing Guidelines
+
+When adding or updating functions or classes, please ensure that each has a docstring that follows this format:
+
+- **Summary**: A brief description of what the function or class does.
+- **args**: List each argument with its name, and a short description of its purpose.
+- **return**: Describe the return value, including what it represents.
+**Note**: After adding or updating the docstring, ensure that the code passes the following command with **no warnings**:
+
+```bash
+mkdocs build --clean --strict
+```
+
 
 ## Conventional commits and Commitizen
 

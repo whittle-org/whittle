@@ -11,6 +11,8 @@ from whittle.modules import Linear
 
 
 class CausalSelfAttention(nn.Module):
+    """Extension of litgpt's `litgpt.model.CausalSelfAttention` with support to adapt to sub-network dimensionality."""
+
     def __init__(self, config: Config, block_idx: int) -> None:
         super().__init__()
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
@@ -48,6 +50,15 @@ class CausalSelfAttention(nn.Module):
         sub_network_query_groups: int,
         sub_network_head_size: int,
     ):
+        """
+        Sets the CausalSelfAttention block to the specified sub-network dimensionality.
+
+        Args:
+            sub_network_n_embd: Embedding dimension of the sub-network
+            sub_network_n_head: Number of attention heads in the sub-network
+            sub_network_query_groups: Number of query groups for grouped-query attention (GQA).
+            sub_network_head_size: Size of each attention head in the sub-network.
+        """
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_n_head = sub_network_n_head
         self.sub_network_query_groups = sub_network_query_groups
@@ -73,6 +84,7 @@ class CausalSelfAttention(nn.Module):
             self.sub_attention_scaler = self.config.attention_scores_scalar
 
     def reset_super_network(self):
+        """Resets the dimensionality of the current sub-network to the super-network dimensionality."""
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_n_head = self.config.n_head
         self.sub_network_head_size = self.config.head_size
@@ -227,9 +239,10 @@ class CausalSelfAttention(nn.Module):
         rope_cache_length: int | None = None,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
+        rope_n_elem: int | None = None,
     ) -> KVCache:
-        heads = 1 if self.config.n_query_groups == 1 else self.config.n_head
-        v_shape = (batch_size, heads, max_seq_length, self.config.head_size)
+        heads = 1 if self.sub_network_query_groups == 1 else self.sub_network_n_head
+        v_shape = (batch_size, heads, max_seq_length, self.sub_network_head_size)
         if rope_cache_length is None:
             if self.config.rotary_percentage != 1.0:
                 raise TypeError(
@@ -237,10 +250,13 @@ class CausalSelfAttention(nn.Module):
                 )
             k_shape = v_shape
         else:
+            rope_n_elem = (
+                rope_n_elem if rope_n_elem is not None else self.config.rope_n_elem
+            )
             k_shape = (
                 batch_size,
                 heads,
                 max_seq_length,
-                rope_cache_length + self.config.head_size - self.config.rope_n_elem,
+                rope_cache_length + self.sub_network_head_size - rope_n_elem,
             )
         return KVCache(k_shape, v_shape, device=device, dtype=dtype)

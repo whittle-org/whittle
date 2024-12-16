@@ -1,15 +1,29 @@
-# whittle
+<p align="center">
+  <img src="assets/whittle-logo.png" width="100" height="100" alt="Whittle Logo">
+</p>
 
-Whittle is a library for Neural Architecture Search (NAS) aimed at compressing large language models (LLMs). The core idea is to treat the network as a super-network and select sub-networks that optimally balance performance and efficiency. Whittle provides the following functionalities:
+<h1 align="center">Whittle 🪒🧠</h1>
 
-- Support for a variety of LLMs to define super-networks
-- Checkpoint generation for sub-networks, enabling deployment
-- Downstream evaluation of sub-networks using LM-Eval-Harness
-- A simple interface for various super-network training strategies and multi-objective search methods
+<p align="center">
+  <img src="assets/library-visualization.svg" height="400" alt="Whittle Visualization">
+</p>
+
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/whittle)
+![unit-tests](https://github.com/whittle-org/whittle/actions/workflows/unit-test.yml/badge.svg)
+[![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/whittle-org/whittle/blob/main/LICENSE)
+
+Whittle is a Python library for compressing large language models (LLMs) 
+by extracting sub-networks to balance performance and efficiency. It is based on [LitGPT](https://github.com/Lightning-AI/litgpt)
+and allows to compress many state-of-the-art models.
+
+
+- **Neural Architecture Search:** Workflows for [pre-training super-networks](whittle/pretrain_super_network.py) and multi-objective search to select sub-networks.
+- **Evaluation**: Easy extraction of sub-networks checkpoint and evaluation using LM-Eval-Harness
+- **Efficiency**: Different metrics to estimate efficiency of sub-networks, such as latency, FLOPs, or energy consumption.
 
 ## Installation
 
-Whittle supports and is tested for python 3.9 to 3.11. 
+Whittle supports and is tested for python 3.9 to 3.12. 
 
 You can install whittle with: 
 ```
@@ -27,7 +41,7 @@ pip install -e .
 ```
 ### Getting started with whittle  
 
-To explore and understand different functionalities of ```whittle``` checkout [this](https://colab.research.google.com/drive/1xFhsHrqJGQnFuigLCqKHsJFLsJwksl4v?usp=sharing) colab notebook and ```examples/```
+To explore and understand different functionalities of ```whittle``` checkout [this](https://colab.research.google.com/drive/1i_FjIf_qCTJFcp0emOHX9E6I6j6kkIcH?usp=sharing) colab notebook and ```examples/```
 
 ## Projects that use whittle
 

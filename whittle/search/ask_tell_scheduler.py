@@ -19,7 +19,9 @@ class AskTellScheduler:
     def ask(self) -> Trial:
         """
         Ask the scheduler for new trial to run
-        :return: Trial to run
+
+        Returns:
+            Trial to run
         """
         trial_suggestion = self.bscheduler.suggest(self.trial_counter)
         trial = Trial(
@@ -32,10 +34,12 @@ class AskTellScheduler:
 
     def tell(self, trial: Trial, experiment_result: dict[str, float]):
         """
-        Feed experiment results back to the Scheduler
+        Feed experiment results back to the Scheduler.
 
-        :param trial: Trial that was run
-        :param experiment_result: {metric: value} dictionary with experiment results
+        Args:
+            trial: Trial that was run.
+            experiment_result: {metric: value} dictionary with experiment results.
+
         """
         trial_result = trial.add_results(
             metrics=experiment_result,
@@ -47,7 +51,8 @@ class AskTellScheduler:
 
     def best_trial(self, metris: str) -> TrialResult:
         """
-        Return the best trial according to the provided metric
+        Returns:
+            the best trial according to the provided metric.
         """
         if self.bscheduler.mode == "max":
             sign = 1.0

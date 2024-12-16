@@ -78,8 +78,10 @@ def test_extract_sub_network_llamamlp() -> None:
         sub_network_n_layers=sub_network_config.n_layer,
     )
 
+    # these are computed in the config and we need to override them
     sub_network_config.n_query_groups = super_network.sub_network_query_groups
     sub_network_config.head_size = super_network.sub_network_head_size
+    sub_network_config.rope_n_elem = super_network.sub_network_rope_n_elem
 
     # instantiate a new model
     sub_network = extract_sub_network(super_network, sub_network_config)

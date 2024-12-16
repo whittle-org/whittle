@@ -27,21 +27,19 @@ class PopulationElement:
 
 class LS(FIFOScheduler):
     """
+    Local Search Scheduler for hyperparameter optimization.
 
-    See :class:`~syne_tune.optimizer.schedulers.searchers.RandomSearcher`
-    for ``kwargs["search_options"]`` parameters.
+    This scheduler uses a local search strategy to explore the configuration space.
+    It extends the FIFOScheduler and integrates with the LocalSearch searcher.
 
-    :param config_space: Configuration space for evaluation function
-    :param metric: Name of metric to optimize
-    :param population_size: See
-        :class:`~syne_tune.optimizer.schedulers.searchers.RegularizedEvolution`.
-        Defaults to 100
-    :param sample_size: See
-        :class:`~syne_tune.optimizer.schedulers.searchers.RegularizedEvolution`.
-        Defaults to 10
-    :param random_seed: Random seed, optional
-    :param kwargs: Additional arguments to
-        :class:`~syne_tune.optimizer.schedulers.FIFOScheduler`
+    Args:
+        config_space: Configuration space for the evaluation function.
+        metric: List of metrics to optimize.
+        mode: Optimization mode, either "min" or "max". Defaults to "min".
+        start_point: Starting point for the search. Defaults to None.
+        random_seed: Random seed for reproducibility. Defaults to None.
+        points_to_evaluate: Initial points to evaluate. Defaults to None.
+        **kwargs: Additional arguments for the FIFOScheduler.
     """
 
     def __init__(
@@ -52,7 +50,7 @@ class LS(FIFOScheduler):
         start_point: dict[str, Any] | None = None,
         random_seed: int | None = None,
         points_to_evaluate: list[dict] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ):
         super().__init__(
             config_space=config_space,
@@ -72,16 +70,29 @@ class LS(FIFOScheduler):
 
 
 class LocalSearch(StochasticSearcher):
-    """ """
+    """
+    Local Search algorithm for hyperparameter optimization.
+
+    This searcher uses a local search strategy to explore the configuration space.
+    It extends the StochasticSearcher and used searcher input parameter in LS scheduler.
+
+    Args:
+        config_space: Configuration space for the evaluation function.
+        metric: List of metrics to optimize.
+        points_to_evaluate: Initial points to evaluate. Defaults to None.
+        start_point: Starting point for the search. Defaults to None.
+        mode: Optimization mode, either "min" or "max". Defaults to "min".
+        **kwargs: Additional arguments for the StochasticSearcher.
+    """
 
     def __init__(
         self,
-        config_space,
+        config_space: dict[str, Any],
         metric: list[str] | str,
         points_to_evaluate: list[dict] | None = None,
         start_point: dict | None = None,
         mode: list[str] | str = "min",
-        **kwargs,
+        **kwargs: Any,
     ):
         if start_point is None:
             self.start_point = {

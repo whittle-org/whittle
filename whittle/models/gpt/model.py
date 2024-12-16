@@ -23,6 +23,8 @@ from whittle.modules.rmsnorm import RMSNorm
 
 
 class GPT(nn.Module):
+    """An extension of litgpt's GPT model with support to adapt to sub-network dimensionality."""
+
     def __init__(self, config: Config) -> None:
         super().__init__()
         assert config.padded_vocab_size is not None
@@ -50,6 +52,7 @@ class GPT(nn.Module):
         self.sub_network_n_layers = self.config.n_layer
         self.sub_network_head_size: int | None = self.config.head_size
         self.sub_network_query_groups: int | None = self.config.n_query_groups
+        self.sub_network_rope_n_elem = self.config.rope_n_elem
         self.cos: torch.Tensor
         self.sin: torch.Tensor
         self.config.is_encoder_decoder = False
@@ -82,18 +85,18 @@ class GPT(nn.Module):
         self._max_seq_length = value
         if not hasattr(self, "cos"):
             # first call
-            cos, sin = self.rope_cache(self._max_seq_length, self.config.rope_n_elem)
+            cos, sin = self.rope_cache(
+                self._max_seq_length, self.config.rope_n_elem, device="cpu"
+            )
             self.register_buffer("cos", cos, persistent=False)
             self.register_buffer("sin", sin, persistent=False)
         # override
         elif value != self.cos.size(0):
             self.cos, self.sin = self.rope_cache(
                 seq_len=self._max_seq_length,
-                n_elem=self.config.rope_n_elem,
+                n_elem=self.sub_network_rope_n_elem,
                 device=self.cos.device,
             )
-        # the mask and kv cache size will get updated on `set_kv_cache`. we cannot update it here because we don't know
-        # if the kv cache is expected
 
     def reset_parameters(self) -> None:
         # Trigger resetting the rope-cache
@@ -179,6 +182,18 @@ class GPT(nn.Module):
         sub_network_query_groups: int | None = None,
         sub_network_head_size: int | None = None,
     ) -> None:
+        """
+        Sets the GPT model to the specified sub-network dimensionality.
+        Input arguments are set to the specified sub-network dimensionality.
+
+        Args:
+            sub_network_n_embd: Embedding dimension of the sub-network.
+            sub_network_intermediate_size: Intermediate size of the sub-network.
+            sub_network_num_heads: Number of attention heads in the sub-network.
+            sub_network_n_layers: Number of layers in the sub-network.
+            sub_network_query_groups: Number of query groups in the sub-network. Defaults to None.
+            sub_network_head_size: Size of each attention head in the sub-network. Defaults to None.
+        """
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
@@ -218,7 +233,20 @@ class GPT(nn.Module):
             self.sub_network_n_embd, self.config.padded_vocab_size
         )
 
-    def select_sub_network(self, config):
+        # change the rope cache to match n_elem induced by subnet head size
+        self.sub_network_rope_n_elem = int(
+            self.config.rotary_percentage * self.sub_network_head_size
+        )
+        self.cos, self.sin = self.rope_cache(
+            seq_len=self._max_seq_length,
+            n_elem=self.sub_network_rope_n_elem,
+            device=self.cos.device,
+        )
+
+    def select_sub_network(self, config: dict[str, Any]) -> None:
+        """
+        Selects and sets the sub-network configuration based on the provided configuration.
+        """
         self.set_sub_network(
             config["embed_dim"],
             config["mlp_ratio"] * config["embed_dim"],
@@ -227,12 +255,16 @@ class GPT(nn.Module):
         )
 
     def reset_super_network(self):
+        """
+        Resets the GPT model to the original super-network dimensionality.
+        """
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
         self.sub_network_n_layers = self.config.n_layer
         self.sub_network_head_size: int | None = self.config.head_size
         self.sub_network_query_groups: int | None = self.config.n_query_groups
+        self.sub_network_rope_n_elem = self.config.rope_n_elem
         self.transformer.wte.reset_super_network()
         self.transformer.ln_f.reset_super_network()
         for i in range(self.config.n_layer):
@@ -242,8 +274,8 @@ class GPT(nn.Module):
 
     def process_rope_cache(self, cos, sin, input_pos, T):
         if input_pos is not None:  # use the kv cache
-            cos = batched_index_select(self.cos, 0, input_pos)
-            sin = batched_index_select(self.sin, 0, input_pos)
+            cos = batched_index_select(cos, 0, input_pos)
+            sin = batched_index_select(sin, 0, input_pos)
             if self.mask_cache is None:
                 raise TypeError("You need to call `gpt.set_kv_cache()`")
             mask = batched_index_select(self.mask_cache, 2, input_pos)
@@ -271,12 +303,8 @@ class GPT(nn.Module):
             x = x * torch.tensor(self.config.n_embd**0.5, dtype=x.dtype)
         for i in range(self.sub_network_n_layers):
             block = self.transformer.h[i]
-            cos, sin = self.rope_cache(
-                seq_len=self.max_seq_length,
-                n_elem=int(self.config.rotary_percentage * self.sub_network_head_size),
-                device=self.cos.device,
-            )
 
+            cos, sin = self.cos.to(idx.device), self.sin.to(idx.device)
             cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
 
             x = block(x, cos, sin, mask, input_pos)
@@ -302,13 +330,18 @@ class GPT(nn.Module):
         dtype: torch.dtype | None = None,
     ) -> None:
         if rope_cache_length is None:
-            rope_cache_length = self.cos.size(-1)
+            rope_cache_length = self.sub_network_rope_n_elem
         if max_seq_length is None:
             max_seq_length = self.max_seq_length
         # initialize the kv cache for all blocks
         for block in self.transformer.h:
             block.attn.kv_cache = block.attn.build_kv_cache(
-                batch_size, max_seq_length, rope_cache_length, device, dtype
+                batch_size,
+                max_seq_length,
+                rope_cache_length=rope_cache_length,
+                device=device,
+                dtype=dtype,
+                rope_n_elem=self.sub_network_rope_n_elem,
             )
 
         if self.mask_cache is None or self.mask_cache.size(3) != self.max_seq_length:
