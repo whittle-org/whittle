@@ -8,7 +8,7 @@ from typing import Optional, Union
 
 import lightning as L
 from lightning.fabric.strategies import FSDPStrategy
-from torch.utils.data import DataLoader, ConcatDataset
+from torch.utils.data import DataLoader
 from typing_extensions import Literal
 
 
@@ -16,15 +16,12 @@ from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.model import Config
 
-from litgpt.pretrain import (
-    get_dataloaders,
-)
+from litgpt.pretrain import get_dataloaders, validate
 from litgpt.utils import (
     auto_download_checkpoint,
     check_nvlink_connectivity,
     check_valid_checkpoint_dir,
     choose_logger,
-    chunked_cross_entropy,
     find_resume_path,
     get_default_supported_precision,
     load_checkpoint,
@@ -151,24 +148,11 @@ def objective(
     eval: EvalArgs,
     verbose: bool = True,
 ) -> tuple[float, float]:
-    if verbose:
-        fabric.print("Validating ...")
     model.select_sub_network(config)
-    model.eval()
-    losses = torch.zeros(min(len(val_dataloader), eval.max_iters))
-    for k, batch in enumerate(val_dataloader):
-        if k >= eval.max_iters:
-            break
-        input_ids, targets = batch["input_ids"], batch["labels"]
-        logits = model(input_ids)
-        losses[k] = chunked_cross_entropy(
-            logits[..., :-1, :], targets[..., 1:], chunk_size=0
-        )
-
-    val_loss = losses.mean()
-
+    val_loss = validate(
+        fabric, model, val_dataloader, max_iters=eval.max_iters, verbose=verbose
+    )
     num_params = compute_parameters(model)
-
     return float(val_loss), num_params
 
 
@@ -216,9 +200,7 @@ def main(
 
     train_time = time.perf_counter()
 
-    longest_seq_length, longest_seq_ix = get_longest_seq_length(
-        ConcatDataset([train_dataloader.dataset, val_dataloader.dataset])
-    )
+    longest_seq_length = len(val_dataloader.dataset)
     model.max_seq_length = min(longest_seq_length, train.max_seq_length or int("inf"))
 
     search_space = get_search_space(config)
@@ -263,14 +245,6 @@ def main(
         sub_network = extract_sub_network(model, subnet_config)
         model.reset_super_network()
         fabric.save(save_path, {"model": sub_network})
-
-
-def get_longest_seq_length(data: list[dict]) -> tuple[int, int]:
-    # find out the minimum max_seq_length required during fine-tuning (saves memory!)
-    lengths = [len(d["input_ids"]) for d in data]
-    longest_seq_length = max(lengths)
-    longest_seq_ix = lengths.index(longest_seq_length)
-    return longest_seq_length, longest_seq_ix
 
 
 if __name__ == "__main__":
