@@ -5,6 +5,8 @@ import time
 from typing import Callable, Any
 import numpy as np
 
+from lightning.fabric.loggers import Logger
+
 from whittle.search.ask_tell_scheduler import AskTellScheduler
 from whittle.search.baselines import MethodArguments, methods
 from whittle.search.multi_objective import get_pareto_optimal
@@ -16,6 +18,7 @@ def multi_objective_search(
     search_strategy: str = "random_search",
     num_samples: int = 100,
     objective_kwargs: dict[str, Any] | None = None,
+    logger: Logger = None,
     seed: int | None = None,
 ) -> dict[str, Any]:
     """
@@ -30,6 +33,7 @@ def multi_objective_search(
             Defaults to 100.
         objective_kwargs: Keyword arguments for the objective function.
             Defaults to None.
+        logger: The lightning logger to send metrics to.
         seed: The random seed for reproducibility.
             Defaults to None.
 
@@ -74,9 +78,16 @@ def multi_objective_search(
         configs.append(trial_suggestion.config)
 
         runtime.append(time.time() - start_time)
-        print(
-            f"iteration {i}: objective_1={objective_1} ; objective_2={objective_2}; runtime = {runtime[-1]}"
+
+        observation = dict(
+            iteration=i,
+            objective_1=float(objective_1),
+            objective_2=float(objective_2),
+            runtime=runtime[-1],
         )
+
+        if logger is not None:
+            logger.log_metrics(observation)
     idx = get_pareto_optimal(costs)
 
     results = {
