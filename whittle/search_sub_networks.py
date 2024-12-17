@@ -219,6 +219,7 @@ def main(
         search_strategy=search.search_strategy,
         num_samples=search.iterations,
         seed=seed,
+        logger=fabric.logger,
     )
     training_time = time.perf_counter() - train_time
 
