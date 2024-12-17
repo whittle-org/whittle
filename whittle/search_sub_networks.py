@@ -2,7 +2,6 @@ import os
 import time
 import torch
 
-from copy import deepcopy
 from pathlib import Path
 from typing import Optional, Union
 
@@ -30,7 +29,7 @@ from litgpt.utils import (
 )
 from litgpt.data import Alpaca, DataModule
 
-from whittle.models.gpt.extract import extract_sub_network
+from whittle.models.gpt.extract import extract_current_sub_network
 from whittle.metrics import compute_parameters
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
@@ -59,7 +58,8 @@ def setup(
     seed: int = 1337,
     access_token: Optional[str] = None,
 ) -> None:
-    """Finetune a model.
+    """
+    Multi-objective search to select Pareto optimal set of sub-networks from trained super-network.
 
     Arguments:
         checkpoint_dir: The path to the base model's checkpoint directory to load for finetuning.
@@ -140,7 +140,7 @@ def setup(
 
 # FSDP has issues with `inference_mode`
 @torch.no_grad()
-def objective(
+def _objective(
     config: dict,
     fabric: L.Fabric,
     model: GPT,
@@ -208,7 +208,7 @@ def main(
     fabric.print("Start multi-objective search")
 
     search_results = multi_objective_search(
-        objective,
+        _objective,
         search_space,
         objective_kwargs={
             "fabric": fabric,
@@ -232,19 +232,12 @@ def main(
     for i, sub_network_dict in enumerate(search_results["configs"]):
         save_path = out_dir / f"sub_network_{i}" / "lit_model.pth"
         save_path.parent.mkdir(parents=True, exist_ok=True)
-        subnet_config = deepcopy(config)
+
         model.select_sub_network(sub_network_dict)
+        sub_network = extract_current_sub_network(model)
 
-        # FIXME: avoid this boilerplate code
-        subnet_config.n_query_groups = model.sub_network_query_groups
-        subnet_config.head_size = model.sub_network_head_size
-        subnet_config.n_layer = model.sub_network_n_layers
-        subnet_config.n_embd = model.sub_network_n_embd
-        subnet_config.n_head = model.sub_network_num_heads
-        subnet_config.intermediate_size = model.sub_network_intermediate_size
-
-        sub_network = extract_sub_network(model, subnet_config)
         model.reset_super_network()
+
         fabric.save(save_path, {"model": sub_network})
 
 
