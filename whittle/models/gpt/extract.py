@@ -13,7 +13,7 @@ from whittle.modules.rmsnorm import RMSNorm
 from litgpt import Config
 
 
-def extract_current_sub_network(model: GPT):
+def extract_current_sub_network(model: GPT) -> GPT:
     """
     Extracts the current sub-network of the super-network model.
     The sub-network is set by calling `set_sub_network` or `select_sub_network`. This function
