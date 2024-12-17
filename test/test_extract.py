@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import copy
 import torch
 from litgpt.config import Config
 
 from whittle.models.gpt import GPT
-from whittle.models.gpt.extract import extract_sub_network
+from whittle.models.gpt.extract import extract_sub_network, extract_current_sub_network
 from whittle.modules.rmsnorm import RMSNorm
 from whittle.modules.layernorm import LayerNorm
 
@@ -52,12 +51,11 @@ def test_extract_sub_network_llamamlp() -> None:
     config.fix_head_size = False
 
     super_network = GPT(config)
-    sub_network_config = copy.deepcopy(config)
 
     # set norm weights to random
     # the default is unit/zero vector which does not test the extract
     make_norm_weights_random(super_network.transformer.ln_f)
-    for i in range(sub_network_config.n_layer):
+    for i in range(config.n_layer):
         block = super_network.transformer.h[i]
         make_norm_weights_random(block.norm_1)
         make_norm_weights_random(block.post_attention_norm)
@@ -65,26 +63,21 @@ def test_extract_sub_network_llamamlp() -> None:
         make_norm_weights_random(block.post_mlp_norm)
 
     # simulate a smaller network
-    sub_network_config.n_embd = 128
-    sub_network_config.intermediate_size = 1024
-    sub_network_config.n_layer = 6
-    sub_network_config.n_head = 12
+    n_embd = 128
+    intermediate_size = 1024
+    n_layer = 6
+    n_head = 12
 
     super_network.eval()
     super_network.set_sub_network(
-        sub_network_n_embd=sub_network_config.n_embd,
-        sub_network_intermediate_size=sub_network_config.intermediate_size,
-        sub_network_num_heads=sub_network_config.n_head,
-        sub_network_n_layers=sub_network_config.n_layer,
+        sub_network_n_embd=n_embd,
+        sub_network_intermediate_size=intermediate_size,
+        sub_network_num_heads=n_head,
+        sub_network_n_layers=n_layer,
     )
 
-    # these are computed in the config and we need to override them
-    sub_network_config.n_query_groups = super_network.sub_network_query_groups
-    sub_network_config.head_size = super_network.sub_network_head_size
-    sub_network_config.rope_n_elem = super_network.sub_network_rope_n_elem
-
     # instantiate a new model
-    sub_network = extract_sub_network(super_network, sub_network_config)
+    sub_network = extract_current_sub_network(super_network)
     sub_network.eval()
     input = torch.randint(0, 512, (1, 20))
     out_super_net = super_network(input).detach()
