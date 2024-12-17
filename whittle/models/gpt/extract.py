@@ -4,12 +4,38 @@ from __future__ import annotations
 import torch.nn as nn
 
 from collections import OrderedDict
+from copy import deepcopy
 
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP
 from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
 from litgpt import Config
+
+
+def extract_current_sub_network(model: GPT) -> GPT:
+    """
+    Extracts the current sub-network of the super-network model.
+    The sub-network is set by calling `set_sub_network` or `select_sub_network`. This function
+    creates a new super-network model with the same configuration and parameters as the sub-network.
+
+    Args:
+        model: The original, full GPT super-network model from which the active sub-network is extracted.
+
+    Returns:
+        A new super-network model instance, initialized with parameters extracted from the original model.
+    """
+    subnet_config = deepcopy(model.config)
+
+    subnet_config.n_embd = model.sub_network_n_embd
+    subnet_config.intermediate_size = model.sub_network_intermediate_size
+    subnet_config.n_head = model.sub_network_num_heads
+    subnet_config.n_layer = model.sub_network_n_layers
+    subnet_config.head_size = model.sub_network_head_size
+    subnet_config.n_query_groups = model.sub_network_query_groups
+    subnet_config.rope_n_elem = model.sub_network_rope_n_elem
+
+    return extract_sub_network(model, subnet_config)
 
 
 def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
