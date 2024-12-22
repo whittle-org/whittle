@@ -8,9 +8,14 @@ torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
 
-## SparseGPT: https://github.com/IST-DASLab/sparsegpt/tree/f5c25005a61f96a0933ca2f95705a963585aafaa
 class SparseGPT:
-    def __init__(self, layer):
+    """
+    Class implementation of the SparseGPT algorithm for pruning GPT models.
+    https://github.com/IST-DASLab/sparsegpt/tree/f5c25005a61f96a0933ca2f95705a963585aafaa
+
+    """
+
+    def __init__(self, layer: nn.Module):
         self.layer = layer
         self.dev = self.layer.weight.device
         W = layer.weight.data.clone()
@@ -23,7 +28,14 @@ class SparseGPT:
         self.H = torch.zeros((self.columns, self.columns), device=self.dev)
         self.nsamples = 0
 
-    def add_batch(self, inp, out):
+    def add_batch(self, inp: torch.Tensor, out: torch.Tensor) -> None:
+        """
+        Add a batch of input and output tensors to the layer and update the Hessian matrix.
+
+        Args:
+            inp : The input tensor.
+            out : The output tensor.
+        """
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
         tmp = inp.shape[0]
@@ -38,15 +50,31 @@ class SparseGPT:
         inp = math.sqrt(2 / self.nsamples) * inp.float()
         self.H += inp.matmul(inp.t())
 
-    def fasterprune(self, sparsity, prune_n=0, prune_m=0, blocksize=128, percdamp=0.01):
+    def fasterprune(
+        self,
+        sparsity: float | None,
+        prune_n: int = 0,
+        prune_m: int = 0,
+        blocksize: int = 128,
+        percdamp: float = 0.01,
+    ) -> None:
+        """
+        Perform structured pruning on the model's weights using the SparseGPT algorithm.
+
+        Args:
+            sparsity: The target sparsity level, used when prune_n is set to 0.
+            prune_n: Number of weights to prune per group.
+            prune_m: Total number of weights per group.
+            blocksize: The block size for pruning, determines the number of columns from the weight
+                        matrix that are processed at a time during pruning.
+            percdamp: The percentage of damping to the Hessian matrix.
+        """
         W = self.layer.weight.data.clone()
         if isinstance(self.layer, nn.Conv2d):
             W = W.flatten(1)
         if isinstance(self.layer, transformers.Conv1D):
             W = W.t()
         W = W.float()
-
-        # tick = time.time()
 
         H = self.H
         del self.H

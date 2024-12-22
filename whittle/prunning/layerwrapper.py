@@ -4,10 +4,15 @@ import torch.nn as nn
 
 class WrappedGPT:
     """
-    This class wraps a GPT layer for specific operations.
+
+    GPT layer wrapper that enables the calculation and updating of scaling factors for pruning.
+    Scaling factors are used to determine the importance of each row in the weight matrix during pruning.
+
     """
 
-    def __init__(self, layer, layer_id=0, layer_name="none"):
+    def __init__(
+        self, layer: nn.Module, layer_id: int = 0, layer_name: str = "none"
+    ) -> None:
         self.layer = layer
         self.dev = self.layer.weight.device
         self.rows = layer.weight.data.shape[0]
@@ -19,7 +24,17 @@ class WrappedGPT:
         self.layer_id = layer_id
         self.layer_name = layer_name
 
-    def add_batch(self, inp, out):
+    def add_batch(self, inp: torch.Tensor, out: torch.Tensor) -> None:
+        """
+
+        Computes and updates the L2 norms of the input tensor (row-wise) for each
+        batch passed through the layer. These norms serve as scaling factors (`scaler_row`).
+
+        Args:
+            inp: Input tensor.
+            out: Output tensor.
+
+        """
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
         tmp = inp.shape[0]

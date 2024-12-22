@@ -1,7 +1,6 @@
 from __future__ import annotations
 import logging
 
-
 import torch.nn as nn
 
 from whittle.models.gpt import GPT

@@ -1,15 +1,7 @@
 # Code adapted from https://github.com/IST-DASLab/sparsegpt/blob/master/datautils.py
 
-import numpy as np
 import random
-import torch
 from datasets import load_dataset
-
-
-# Set seed for reproducibility
-def set_seed(seed):
-    np.random.seed(seed)
-    torch.random.manual_seed(seed)
 
 
 # Wrapper for tokenized input IDs
@@ -19,7 +11,7 @@ class TokenizerWrapper:
 
 
 # Load and process c4 dataset
-def get_c4(nsamples, seed, seqlen, tokenizer):
+def get_c4_dataloader(nsamples, seed, seqlen, tokenizer):
     # Load train and validation datasets
     traindata = load_dataset(
         "allenai/c4",
@@ -55,6 +47,6 @@ def get_c4(nsamples, seed, seqlen, tokenizer):
     return trainloader, valenc
 
 
-# Function to select the appropriate loader based on dataset name
-def get_loaders(nsamples=128, seed=0, seqlen=2048, tokenizer=None):
-    return get_c4(nsamples, seed, seqlen, tokenizer)
+# # Function to select the appropriate loader based on dataset name
+# def get_loaders(nsamples=128, seed=0, seqlen=2048, tokenizer=None):
+#     return get_c4(nsamples, seed, seqlen, tokenizer)
