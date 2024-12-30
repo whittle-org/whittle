@@ -2,8 +2,10 @@ import argparse
 import pytest
 
 from whittle.models.gpt import GPT, Config
-from whittle.prunning.data import get_c4_dataloader
-from whittle.prunning.pruners import WandaPruner, SparseGptPruner, MagnitudePruner
+from whittle.prunning.utilis.data import get_c4_dataloader
+from whittle.prunning.pruners.magnitude import MagnitudePruner
+from whittle.prunning.pruners.sparsegpt import SparseGptPruner
+from whittle.prunning.pruners.wanda import WandaPruner
 
 
 @pytest.mark.parametrize(
@@ -23,7 +25,7 @@ from whittle.prunning.pruners import WandaPruner, SparseGptPruner, MagnitudePrun
         },
     ],
 )
-def test_wanda_model_pruning(model_info, mock_tokenizer):
+def test_model_pruning(model_info, mock_tokenizer):
     args = argparse.Namespace(nsamples=32, seed=9001, batch_size=128)
 
     config = Config.from_name(

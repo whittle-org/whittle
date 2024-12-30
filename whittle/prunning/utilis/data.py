@@ -45,8 +45,3 @@ def get_c4_dataloader(nsamples, seed, seqlen, tokenizer):
     valenc = valenc.input_ids[:, : (256 * seqlen)]
     valenc = TokenizerWrapper(valenc)
     return trainloader, valenc
-
-
-# # Function to select the appropriate loader based on dataset name
-# def get_loaders(nsamples=128, seed=0, seqlen=2048, tokenizer=None):
-#     return get_c4(nsamples, seed, seqlen, tokenizer)
