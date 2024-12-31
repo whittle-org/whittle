@@ -38,7 +38,7 @@ class Pruner:
 
         model.reset_super_network()
 
-        if "_prune_wanda_sparse" in self.__class__.__dict__:
+        if "_prune" in self.__class__.__dict__:
             if args is None:
                 raise ValueError("args must be provided for WANDA or SparseGPT pruning")
             total_parameters = self.compute_parameters(model.transformer.h)
@@ -47,7 +47,7 @@ class Pruner:
                     "dataloader must be provided for WANDA or SparseGPT pruning"
                 )
 
-            self._prune_wanda_sparse(args, model, dataloader, prune_n, prune_m, dev)
+            self._prune(args, model, dataloader, prune_n, prune_m, dev)
             return self.count_sparse_parameters(model.transformer.h) / total_parameters
 
         else:
@@ -110,7 +110,7 @@ class Pruner:
     ) -> None:
         pass
 
-    def _prune_wanda_sparse(
+    def _prune(
         self,
         args: Namespace,
         model: GPT,

@@ -12,7 +12,7 @@ from whittle.prunning.utilis.catcher import Catcher
 
 
 class SparseGptPruner(Pruner):
-    def _prune_wanda_sparse(
+    def _prune(
         self,
         args: Namespace,
         model: GPT,
