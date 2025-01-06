@@ -1,4 +1,3 @@
-import argparse
 import pytest
 
 from whittle.models.gpt import GPT, Config
@@ -26,8 +25,6 @@ from whittle.prunning.pruners.wanda import WandaPruner
     ],
 )
 def test_model_pruning(model_info, mock_tokenizer):
-    args = argparse.Namespace(nsamples=32, seed=9001, batch_size=128)
-
     config = Config.from_name(
         model_info["config_name"],
         block_size=6,
@@ -47,8 +44,8 @@ def test_model_pruning(model_info, mock_tokenizer):
     pruner_magnitude = MagnitudePruner()
 
     dataloader, _ = get_c4_dataloader(
-        nsamples=args.nsamples,
-        seed=args.seed,
+        nsamples=32,
+        seed=9001,
         seqlen=model.max_seq_length,
         tokenizer=mock_tokenizer,
     )
@@ -59,21 +56,21 @@ def test_model_pruning(model_info, mock_tokenizer):
         prune_m=4,
     )
     sparsity_ratio_wanda = pruner_wanda(
-        args=args,
         model=model,
         dataloader=dataloader,
         prune_n=2,
         prune_m=4,
         dev="cpu",
+        nsamples=32,
     )
 
     sparsity_ratio_sparsegpt = pruner_sparsegpt(
-        args=args,
         model=model,
         dataloader=dataloader,
         prune_n=2,
         prune_m=4,
         dev="cpu",
+        nsamples=32,
     )
 
     assert abs(sparsity_ratio_magnitude - 0.5) <= 0.1

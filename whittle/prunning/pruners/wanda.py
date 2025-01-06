@@ -1,4 +1,4 @@
-from argparse import Namespace
+from typing import Any
 import logging
 
 import torch
@@ -13,41 +13,40 @@ from whittle.prunning.utilis.layerwrapper import WrappedGPT
 class WandaPruner(Pruner):
     def _prune(
         self,
-        args: Namespace,
         model: GPT,
-        dataloader: DataLoader,
         prune_n: int = 2,
         prune_m: int = 4,
-        dev: str = "cuda",
+        **kwargs: Any,
     ) -> None:
         """
-        Prune the model using Sparse Prunning.
+        Prune the model using WANDA pruning.
 
         Args:
-            args: Namespace arguments containing nsamples, seed, and batch_size.
-            model: The model to be pruned
-            dataloader: Dataloader for WANDA pruning
-            prune_n: Number of weights to prune per group
-            prune_m: Total number of weights per group
-            dev: Device to use for computation
+            model: The model to be pruned.
+            prune_n: Number of weights to prune per group.
+            prune_m: Total number of weights per group.
+            **kwargs: Additional arguments (e.g., 'nsamples' ,dev, dataloader).
         """
+
+        nsamples = kwargs.get("nsamples", 32)
+        dataloader: DataLoader = kwargs.get("dataloader")
+
         use_cache = model.config.use_cache
         model.config.use_cache = False
 
         with torch.no_grad():
             inps, outs, attention_mask, position_ids = self._prepare_calibration_input(
-                args, model, dataloader, dev
+                model=model,
+                dataloader=dataloader,
+                dev=kwargs.get("dev", "cuda"),
+                nsamples=nsamples,
             )
 
         layers = model.transformer.h
-        for i in range(len(layers)):
-            layer = layers[i]
-
+        for i, layer in enumerate(layers):
             subset = self._find_layers(layer, layers=[Linear])
 
-            wrapped_layers = {}
-            for name in subset:
-                wrapped_layers[name] = WrappedGPT(subset[name])
+            wrapped_layers = {name: WrappedGPT(subset[name]) for name in subset}
 
             def add_batch(name):
                 def tmp(_, inp, out):
@@ -55,11 +54,12 @@ class WandaPruner(Pruner):
 
                 return tmp
 
-            handles = []
-            for name in wrapped_layers:
-                handles.append(subset[name].register_forward_hook(add_batch(name)))
+            handles = [
+                subset[name].register_forward_hook(add_batch(name))
+                for name in wrapped_layers
+            ]
 
-            for j in range(args.nsamples):
+            for j in range(nsamples):
                 with torch.no_grad():
                     outs[j] = layer(
                         inps[j].unsqueeze(0),
@@ -73,12 +73,12 @@ class WandaPruner(Pruner):
                 h.remove()
 
             for name in subset:
-                logging.info(f"pruning layer {i} name {name}")
+                logging.info(f"Pruning layer {i} name {name}")
                 W_metric = torch.abs(subset[name].weight.data) * torch.sqrt(
                     wrapped_layers[name].scaler_row.reshape((1, -1))
                 )
 
-                W_mask = torch.zeros_like(W_metric) == 1
+                W_mask = torch.zeros_like(W_metric, dtype=torch.bool)
                 for ii in range(W_metric.shape[1]):
                     if ii % prune_m == 0:
                         tmp = W_metric[:, ii : (ii + prune_m)].float()
@@ -89,7 +89,7 @@ class WandaPruner(Pruner):
                         )
                 subset[name].weight.data[W_mask] = 0
 
-            for j in range(args.nsamples):
+            for j in range(nsamples):
                 with torch.no_grad():
                     outs[j] = layer(
                         inps[j].unsqueeze(0),
@@ -98,6 +98,8 @@ class WandaPruner(Pruner):
                         sin=model.sin,
                         input_pos=position_ids,
                     )[0]
+
             inps, outs = outs, inps
+
         model.config.use_cache = use_cache
         torch.cuda.empty_cache()

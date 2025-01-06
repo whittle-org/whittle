@@ -1,3 +1,5 @@
+from typing import Any
+
 import torch
 
 from whittle.models.gpt import GPT
@@ -5,7 +7,25 @@ from whittle.prunning.pruners.base_pruner import Pruner
 
 
 class MagnitudePruner(Pruner):
-    def _prune_magnitude(self, model: GPT, prune_n: int = 2, prune_m: int = 4) -> None:
+    def __call__(
+        self,
+        model: GPT,
+        prune_n: int = 2,
+        prune_m: int = 4,
+        **kwargs: Any,
+    ) -> float:
+        model.reset_super_network()
+        total_parameters = self.compute_parameters(model.transformer.h)
+        self._prune(model, prune_n, prune_m)
+        return self.count_sparse_parameters(model.transformer.h) / total_parameters
+
+    def _prune(
+        self,
+        model: GPT,
+        prune_n: int = 2,
+        prune_m: int = 4,
+        **kwargs: Any,
+    ) -> None:
         """
         Prune the model usign magnitude-based pruning.
 
@@ -13,8 +33,10 @@ class MagnitudePruner(Pruner):
             model: The model to be pruned.
             prune_n: Number of weights to prune per group.
             prune_m: Total number of weights per group.
+            **kwargs: Additional arguments specific to Wanda and SparseGPT.
 
         """
+
         layers = [model.transformer, model.lm_head]
         for i in range(len(layers)):
             layer = layers[i]
