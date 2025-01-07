@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from whittle.pruning.pruners.base_pruner import Pruner
 from whittle.models.gpt import GPT
 from whittle.modules.linear import Linear
-from whittle.pruning.utilis.layerwrapper import WrappedGPT
+from whittle.pruning.utils.layerwrapper import WrappedGPT
 
 
 class WandaPruner(Pruner):
@@ -19,7 +19,11 @@ class WandaPruner(Pruner):
         **kwargs: Any,
     ) -> None:
         """
-        Prune the model using WANDA pruning.
+        Prunes a pre-trained model using the WANDA [1] method.
+
+        [1] Sun, M., Liu, Z., Bair, A., and Kolter, J. Z.
+        A simple and effective pruning approach for large language models.
+        In The Twelfth International Conference on Learning Representations, 2024
 
         Args:
             model: The model to be pruned.

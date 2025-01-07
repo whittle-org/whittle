@@ -6,10 +6,10 @@ import torch
 from whittle.models.gpt import GPT
 from whittle.modules.linear import Linear
 from whittle.pruning.pruners.base_pruner import Pruner
-from whittle.pruning.utilis.sparsegpt import SparseGPT
+from whittle.pruning.utils.sparsegpt import SparseGPT
 
 
-class SparseGptPruner(Pruner):
+class SparseGPTPruner(Pruner):
     def _prune(
         self,
         model: GPT,
@@ -18,7 +18,11 @@ class SparseGptPruner(Pruner):
         **kwargs: Any,
     ) -> None:
         """
-        Prune the model using Sparse Prunning.
+        Prunes a pre-trained model using the Sparse GPT method by Frantar an Alistarh.
+
+        Frantar, E. and Alistarh, D.
+        SparseGPT: Massive language models can be accurately pruned in one-shot.
+        arXiv preprint arXiv:2301.00774,
 
         Args:
             model: The model to be pruned.

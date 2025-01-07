@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from whittle.models.gpt import GPT
 from whittle.modules.embedding import Embedding
 from whittle.modules.linear import Linear
-from whittle.pruning.utilis.catcher import Catcher
+from whittle.pruning.utils.catcher import Catcher
 
 
 class Pruner:

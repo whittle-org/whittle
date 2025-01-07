@@ -1,7 +1,7 @@
-from .pruners import MagnitudePruner, SparseGptPruner, WandaPruner
+from .pruners import MagnitudePruner, SparseGPTPruner, WandaPruner
 
 __all__ = [
     "MagnitudePruner",
-    "SparseGptPruner",
+    "SparseGPTPruner",
     "WandaPruner",
 ]

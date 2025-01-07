@@ -27,7 +27,9 @@ class MagnitudePruner(Pruner):
         **kwargs: Any,
     ) -> None:
         """
-        Prune the model usign magnitude-based pruning.
+        Prunes a pre-trained model using magnitude-based structural pruning. For each
+        structural component (e.g head) we compute a score based on the sum of the magnitudes of
+        its weights.
 
         Args:
             model: The model to be pruned.
