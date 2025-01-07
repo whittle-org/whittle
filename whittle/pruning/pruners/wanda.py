@@ -4,10 +4,10 @@ import logging
 import torch
 from torch.utils.data import DataLoader
 
-from whittle.prunning.pruners.base_pruner import Pruner
+from whittle.pruning.pruners.base_pruner import Pruner
 from whittle.models.gpt import GPT
 from whittle.modules.linear import Linear
-from whittle.prunning.utilis.layerwrapper import WrappedGPT
+from whittle.pruning.utilis.layerwrapper import WrappedGPT
 
 
 class WandaPruner(Pruner):

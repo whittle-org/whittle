@@ -5,8 +5,8 @@ import torch
 
 from whittle.models.gpt import GPT
 from whittle.modules.linear import Linear
-from whittle.prunning.pruners.base_pruner import Pruner
-from whittle.prunning.utilis.sparsegpt import SparseGPT
+from whittle.pruning.pruners.base_pruner import Pruner
+from whittle.pruning.utilis.sparsegpt import SparseGPT
 
 
 class SparseGptPruner(Pruner):

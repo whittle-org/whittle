@@ -3,7 +3,7 @@ from typing import Any
 import torch
 
 from whittle.models.gpt import GPT
-from whittle.prunning.pruners.base_pruner import Pruner
+from whittle.pruning.pruners.base_pruner import Pruner
 
 
 class MagnitudePruner(Pruner):
