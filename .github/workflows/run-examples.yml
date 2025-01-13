@@ -24,10 +24,10 @@ jobs:
         run: uv venv --python ${{ matrix.python-version }}
       - name: Install
         run: uv pip install ".[dev]"
-      - name: Run sine curves example
+      - name: Run sinc example
         run: |
-          uv run python -m examples.sine_curves.sinc_nas
-          uv run python -m examples.sine_curves.search
+          uv run python -m examples.sinc.sinc_nas
+          uv run python -m examples.sinc.search
       - name: Run fashion MNIST example
         run: |
           uv run python -m examples.fashion_mnist.train_fashion_mnist
