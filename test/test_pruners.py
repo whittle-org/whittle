@@ -1,10 +1,10 @@
 import pytest
 
 from whittle.models.gpt import GPT, Config
-from whittle.prunning.utilis.data import get_c4_dataloader
-from whittle.prunning.pruners.magnitude import MagnitudePruner
-from whittle.prunning.pruners.sparsegpt import SparseGptPruner
-from whittle.prunning.pruners.wanda import WandaPruner
+from whittle.pruning.utils.data import get_c4_dataloader
+from whittle.pruning.pruners.magnitude import MagnitudePruner
+from whittle.pruning.pruners.sparsegpt import SparseGPTPruner
+from whittle.pruning.pruners.wanda import WandaPruner
 
 
 @pytest.mark.parametrize(
@@ -40,7 +40,7 @@ def test_model_pruning(model_info, mock_tokenizer):
 
     model = GPT(config)
     pruner_wanda = WandaPruner()
-    pruner_sparsegpt = SparseGptPruner()
+    pruner_sparsegpt = SparseGPTPruner()
     pruner_magnitude = MagnitudePruner()
 
     dataloader, _ = get_c4_dataloader(
