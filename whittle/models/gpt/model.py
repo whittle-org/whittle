@@ -102,7 +102,7 @@ class GPT(nn.Module):
         # Trigger resetting the rope-cache
         self.cos, self.sin = self.rope_cache(
             seq_len=self._max_seq_length,
-            n_elem=self.config.rope_n_elem,
+            n_elem=self.sub_network_rope_n_elem,
             device=self.cos.device,
         )
 
