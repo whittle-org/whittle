@@ -258,6 +258,8 @@ class GPT(nn.Module):
         """
         Resets the GPT model to the original super-network dimensionality.
         """
+        rebuild_rope = self.sub_network_rope_n_elem != self.config.rope_n_elem
+
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
@@ -271,6 +273,10 @@ class GPT(nn.Module):
             block = self.transformer.h[i]
             block.reset_super_network()
         self.lm_head.reset_super_network()
+
+        # rebuild the rope cache
+        if rebuild_rope:
+            self.reset_parameters()
 
     def process_rope_cache(self, cos, sin, input_pos, T):
         if input_pos is not None:  # use the kv cache
