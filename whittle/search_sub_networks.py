@@ -45,7 +45,7 @@ def setup(
     precision: Optional[str] = None,
     devices: Optional[Union[int, str]] = 1,
     num_nodes: Optional[int] = 1,
-    resume: Union[bool, Literal["auto"], Path] = False,
+    resume: Optional[Union[bool, Literal["auto"], Path]] = False,
     data: Optional[DataModule] = None,
     search: SearchArgs = SearchArgs(
         iterations=100,
