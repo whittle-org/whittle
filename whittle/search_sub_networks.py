@@ -146,7 +146,7 @@ def _objective(
     model: GPT,
     val_dataloader: DataLoader,
     eval: EvalArgs,
-    verbose: bool = True,
+    verbose: Optional[bool] = True,
 ) -> tuple[float, float]:
     model.select_sub_network(config)
     val_loss = validate(
