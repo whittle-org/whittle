@@ -169,7 +169,7 @@ def main(
     eval: EvalArgs,
     search: SearchArgs,
 ) -> None:
-    fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
+    fabric.seed_everything(seed)
 
     tokenizer = Tokenizer(checkpoint_dir)
 
