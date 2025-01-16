@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import time
 
-from typing import Callable, Any
+from typing import Callable, Any, Optional
 import numpy as np
 
 from lightning.fabric.loggers import Logger

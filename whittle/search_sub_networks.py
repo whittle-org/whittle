@@ -1,15 +1,15 @@
 import os
 import time
-import torch
 
 from pathlib import Path
 from typing import Optional, Union
+from typing_extensions import Literal
+
+import torch
+from torch.utils.data import DataLoader
 
 import lightning as L
 from lightning.fabric.strategies import FSDPStrategy
-from torch.utils.data import DataLoader
-from typing_extensions import Literal
-
 
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
@@ -44,13 +44,14 @@ def setup(
     out_dir: Optional[Path] = Path("out/finetune/full"),
     precision: Optional[str] = None,
     devices: Optional[Union[int, str]] = 1,
-    num_nodes: Optional[int] = 1,
+    num_nodes: int = 1,
     resume: Optional[Union[bool, Literal["auto"], Path]] = False,
     data: Optional[DataModule] = None,
-    search: Optional[SearchArgs] = SearchArgs(
+    search: SearchArgs = SearchArgs(
         iterations=100,
+        log_interval=1,
     ),
-    train: Optional[TrainArgs] = TrainArgs(
+    train: TrainArgs = TrainArgs(
         max_seq_length=512,
     ),
     eval: Optional[EvalArgs] = EvalArgs(),

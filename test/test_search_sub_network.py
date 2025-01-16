@@ -1,14 +1,12 @@
 import os
-import torch
 import pytest
 import pathlib
 
+from unittest.mock import Mock
 from contextlib import redirect_stdout
-
 from io import StringIO
 
-from unittest.mock import Mock
-
+import torch
 from torch.utils.data import DataLoader
 
 from lightning.fabric import Fabric
