@@ -224,7 +224,6 @@ def main(
     training_time = time.perf_counter() - train_time
 
     fabric.print(f"Total search time: {training_time:.02f}.")
-    # Save the checkpoint of sub-networks in the Pareto front
     fabric.print(
         f"Found {len(search_results['configs'])} Pareto optimal sub-networks. Save checkpoints to {out_dir}."
     )
