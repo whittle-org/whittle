@@ -47,7 +47,7 @@ def setup(
     num_nodes: Optional[int] = 1,
     resume: Optional[Union[bool, Literal["auto"], Path]] = False,
     data: Optional[DataModule] = None,
-    search: SearchArgs = SearchArgs(
+    search: Optional[SearchArgs] = SearchArgs(
         iterations=100,
     ),
     train: TrainArgs = TrainArgs(
