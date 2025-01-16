@@ -41,10 +41,10 @@ from whittle.pretrain_super_network import get_search_space
 
 def setup(
     checkpoint_dir: Path,
-    out_dir: Path = Path("out/finetune/full"),
+    out_dir: Optional[Path] = Path("out/finetune/full"),
     precision: Optional[str] = None,
-    devices: Union[int, str] = 1,
-    num_nodes: int = 1,
+    devices: Optional[Union[int, str]] = 1,
+    num_nodes: Optional[int] = 1,
     resume: Union[bool, Literal["auto"], Path] = False,
     data: Optional[DataModule] = None,
     search: SearchArgs = SearchArgs(
