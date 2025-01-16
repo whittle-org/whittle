@@ -17,7 +17,7 @@ def multi_objective_search(
     search_space: dict,
     search_strategy: str = "random_search",
     num_samples: int = 100,
-    objective_kwargs: dict[str, Any] | None = None,
+    objective_kwargs: Optional[dict[str, Any]] = None,
     logger: Logger = None,
     seed: int | None = None,
 ) -> dict[str, Any]:
