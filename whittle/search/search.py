@@ -18,8 +18,8 @@ def multi_objective_search(
     search_strategy: str = "random_search",
     num_samples: int = 100,
     objective_kwargs: Optional[dict[str, Any]] = None,
-    logger: Logger = None,
-    seed: int | None = None,
+    logger: Optional[Logger] = None,
+    seed: Optional[int] = None,
 ) -> dict[str, Any]:
     """
     Search for the Pareto-optimal sub-networks using the specified strategy.
