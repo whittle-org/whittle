@@ -50,12 +50,12 @@ def setup(
     search: Optional[SearchArgs] = SearchArgs(
         iterations=100,
     ),
-    train: TrainArgs = TrainArgs(
+    train: Optional[TrainArgs] = TrainArgs(
         max_seq_length=512,
     ),
-    eval: EvalArgs = EvalArgs(),
-    logger_name: Literal["wandb", "tensorboard", "csv"] = "csv",
-    seed: int = 1337,
+    eval: Optional[EvalArgs] = EvalArgs(),
+    logger_name: Optional[Literal["wandb", "tensorboard", "csv"]] = "csv",
+    seed: Optional[int] = 1337,
     access_token: Optional[str] = None,
 ) -> None:
     """
