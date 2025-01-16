@@ -34,6 +34,7 @@ def multi_objective_search(
         objective_kwargs: Keyword arguments for the objective function.
             Defaults to None.
         logger: The lightning logger to send metrics to.
+            Defaults to None.
         seed: The random seed for reproducibility.
             Defaults to None.
 
