@@ -3,6 +3,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 on:
+  workflow_dispatch:
   workflow_call:
   push:
     branches: [ main ]
@@ -17,12 +18,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: install the latest version uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v5
         with:
+          python-version: ${{ matrix.python-version }}
           version: latest
-      - name: create virtual environment
-        run: uv venv --python ${{ matrix.python-version }}
-      - name: Install
-        run: uv pip install ".[dev]"
+          enable-cache: true
+          prune-cache: false
+          cache-dependency-glob: "**/pyproject.toml"  
       - name: Run pytest
-        run: uv run pytest -vvv
+        run: uv run --all-extras pytest -vvv
+
