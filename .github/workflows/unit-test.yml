@@ -20,6 +20,7 @@ jobs:
       - name: install the latest version uv
         uses: astral-sh/setup-uv@v5
         with:
+          python-version: ${{ matrix.python-version }}
           version: latest
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"  
