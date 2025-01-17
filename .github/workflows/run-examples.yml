@@ -24,10 +24,6 @@ jobs:
           enable-cache: true
           prune-cache: false
           cache-dependency-glob: "**/pyproject.toml"
-      # - name: create virtual environment
-      #   run: uv venv --python ${{ matrix.python-version }}
-      # - name: Install
-      #   run: uv pip install ".[dev]"
       - name: Run sinc example
         run: |
           uv run python -m examples.sinc.sinc_nas

@@ -16,8 +16,10 @@ jobs:
       - name: install the latest version uv
         uses: astral-sh/setup-uv@v5
         with:
+          python-version: "3.9"
           version: latest
           enable-cache: true
+          prune-cache: false
           cache-dependency-glob: "**/pyproject.toml"
       - name: create virtual environment
         run: uv venv --python 3.9
