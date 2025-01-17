@@ -17,9 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: install the latest version uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v5
         with:
           version: latest
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"  
       - name: create virtual environment
         run: uv venv --python ${{ matrix.python-version }}
       - name: Install
