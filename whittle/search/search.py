@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import time
+from typing import Any, Callable, Optional
 
-from typing import Callable, Any, Optional
 import numpy as np
-
 from lightning.fabric.loggers import Logger
 
 from whittle.search.ask_tell_scheduler import AskTellScheduler
