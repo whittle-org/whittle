@@ -1,20 +1,18 @@
+from __future__ import annotations
+
 import os
 import time
-
 from pathlib import Path
 from typing import Optional, Union
 from typing_extensions import Literal
 
-import torch
-from torch.utils.data import DataLoader
-
 import lightning as L
+import torch
 from lightning.fabric.strategies import FSDPStrategy
-
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
+from litgpt.data import Alpaca, DataModule
 from litgpt.model import Config
-
 from litgpt.pretrain import get_dataloaders, validate
 from litgpt.utils import (
     auto_download_checkpoint,
@@ -23,20 +21,19 @@ from litgpt.utils import (
     choose_logger,
     find_resume_path,
     get_default_supported_precision,
-    load_checkpoint,
     init_out_dir,
+    load_checkpoint,
     parse_devices,
 )
-from litgpt.data import Alpaca, DataModule
+from torch.utils.data import DataLoader
 
-from whittle.models.gpt.extract import extract_current_sub_network
+from whittle.args import SearchArgs
 from whittle.metrics import compute_parameters
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
-from whittle.args import SearchArgs
-from whittle.search import multi_objective_search
-
+from whittle.models.gpt.extract import extract_current_sub_network
 from whittle.pretrain_super_network import get_search_space
+from whittle.search import multi_objective_search
 
 
 def setup(

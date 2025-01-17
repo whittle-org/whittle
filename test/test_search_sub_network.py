@@ -1,19 +1,18 @@
-import os
-import pytest
-import pathlib
+from __future__ import annotations
 
-from unittest.mock import Mock
+import os
+import pathlib
 from contextlib import redirect_stdout
 from io import StringIO
+from unittest.mock import Mock
 
+import pytest
 import torch
-from torch.utils.data import DataLoader
-
 from lightning.fabric import Fabric
-
 from litgpt.args import EvalArgs
 from litgpt.config import Config
 from litgpt.scripts.download import download_from_hub
+from torch.utils.data import DataLoader
 
 from whittle import search_sub_networks
 from whittle.args import SearchArgs
