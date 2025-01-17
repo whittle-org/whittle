@@ -169,3 +169,6 @@ required-imports = ["from __future__ import annotations"]
 combine-as-imports = true
 extra-standard-library = ["typing_extensions"]
 force-wrap-aliases = true
+
+[tool.ruff.lint.pyupgrade]
+keep-runtime-typing = true
