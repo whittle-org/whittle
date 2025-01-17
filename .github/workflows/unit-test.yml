@@ -23,6 +23,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           version: latest
           enable-cache: true
+          prune-cache: false
           cache-dependency-glob: "**/pyproject.toml"  
       # - name: create virtual environment
       #   run: uv venv --python ${{ matrix.python-version }}
