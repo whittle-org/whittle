@@ -30,7 +30,7 @@ jobs:
       # - name: Install
       #   run: uv pip install ".[dev]"
       - name: Run pytest
-        run: uv run pytest -vvv
+        run: uv run --all-extras pytest -vvv
       # run: | 
       #   uv pip install pytest
       #   uv run pytest -vvv
