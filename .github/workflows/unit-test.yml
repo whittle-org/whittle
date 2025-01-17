@@ -23,9 +23,9 @@ jobs:
           version: latest
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"  
-      - name: create virtual environment
-        run: uv venv --python ${{ matrix.python-version }}
-      - name: Install
-        run: uv pip install ".[dev]"
+      # - name: create virtual environment
+      #   run: uv venv --python ${{ matrix.python-version }}
+      # - name: Install
+      #   run: uv pip install ".[dev]"
       - name: Run pytest
         run: uv run pytest -vvv
