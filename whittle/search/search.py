@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import time
+from typing import Any, Callable, Optional
 
-from typing import Callable, Any
 import numpy as np
+from lightning.fabric.loggers import Logger
 
 from whittle.search.ask_tell_scheduler import AskTellScheduler
 from whittle.search.baselines import MethodArguments, methods
@@ -15,8 +16,9 @@ def multi_objective_search(
     search_space: dict,
     search_strategy: str = "random_search",
     num_samples: int = 100,
-    objective_kwargs: dict[str, Any] | None = None,
-    seed: int | None = None,
+    objective_kwargs: Optional[dict[str, Any]] = None,
+    logger: Optional[Logger] = None,
+    seed: Optional[int] = None,
 ) -> dict[str, Any]:
     """
     Search for the Pareto-optimal sub-networks using the specified strategy.
@@ -29,6 +31,8 @@ def multi_objective_search(
         num_samples: The number of samples to evaluate.
             Defaults to 100.
         objective_kwargs: Keyword arguments for the objective function.
+            Defaults to None.
+        logger: The lightning logger to send metrics to.
             Defaults to None.
         seed: The random seed for reproducibility.
             Defaults to None.
@@ -74,9 +78,16 @@ def multi_objective_search(
         configs.append(trial_suggestion.config)
 
         runtime.append(time.time() - start_time)
-        print(
-            f"iteration {i}: objective_1={objective_1} ; objective_2={objective_2}; runtime = {runtime[-1]}"
+
+        observation = dict(
+            iteration=i,
+            objective_1=float(objective_1),
+            objective_2=float(objective_2),
+            runtime=runtime[-1],
         )
+
+        if logger is not None:
+            logger.log_metrics(observation)
     idx = get_pareto_optimal(costs)
 
     results = {
