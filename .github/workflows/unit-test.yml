@@ -29,4 +29,6 @@ jobs:
       # - name: Install
       #   run: uv pip install ".[dev]"
       - name: Run pytest
-        run: python -m pytest -vvv
+        run: | 
+          uv pip install pytest
+          python -m pytest -vvv
