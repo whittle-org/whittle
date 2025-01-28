@@ -18,7 +18,7 @@ and allows to compress many state-of-the-art models.
 
 
 - **Neural Architecture Search:** Workflows for [pre-training super-networks](whittle/pretrain_super_network.py) and multi-objective search to select sub-networks.
-- **Structural Pruning:** State-of-the-art approaches to pruning structural components of pre-trained LLMs.
+- **Structural Pruning:** State-of-the-art approaches to [pruning](whittle/prune.py) structural components of pre-trained LLMs.
 - **Evaluation**: Easy extraction of sub-networks checkpoint and evaluation using LM-Eval-Harness
 - **Efficiency**: Different metrics to estimate efficiency of sub-networks, such as latency, FLOPs, or energy consumption.
 

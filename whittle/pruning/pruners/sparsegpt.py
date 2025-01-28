@@ -100,6 +100,3 @@ class SparseGPTPruner(Pruner):
             torch.cuda.empty_cache()
 
             inps, outs = outs, inps
-
-        model.config.use_cache = True
-        torch.cuda.empty_cache()

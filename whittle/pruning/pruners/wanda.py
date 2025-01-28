@@ -35,9 +35,6 @@ class WandaPruner(Pruner):
         nsamples = kwargs.get("nsamples", 32)
         dataloader: DataLoader = kwargs.get("dataloader")
 
-        use_cache = model.config.use_cache
-        model.config.use_cache = False
-
         with torch.no_grad():
             inps, outs, attention_mask, position_ids = self._prepare_calibration_input(
                 model=model,
@@ -104,6 +101,3 @@ class WandaPruner(Pruner):
                     )[0]
 
             inps, outs = outs, inps
-
-        model.config.use_cache = use_cache
-        torch.cuda.empty_cache()
