@@ -11,6 +11,7 @@
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/whittle)
 ![unit-tests](https://github.com/whittle-org/whittle/actions/workflows/unit-test.yml/badge.svg)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/whittle-org/whittle/blob/main/LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/whittle?color=informational)](https://pypi.org/project/whittle/)
 
 Whittle is a Python library for compressing large language models (LLMs) 
 by extracting sub-networks to balance performance and efficiency. It is based on [LitGPT](https://github.com/Lightning-AI/litgpt)
