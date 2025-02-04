@@ -1,7 +1,11 @@
 # Code adapted from https://github.com/IST-DASLab/sparsegpt/blob/master/datautils.py
 
 import random
+
+import torch
+from torch.utils.data import TensorDataset
 from datasets import load_dataset
+from torch.utils.data import DataLoader
 
 
 # Wrapper for tokenized input IDs
@@ -26,8 +30,9 @@ def get_c4_dataloader(nsamples, seed, seqlen, tokenizer):
 
     # Generate samples from training set
     random.seed(seed)
-    trainloader = []
-    for _ in range(nsamples):
+    input_data = torch.zeros(nsamples, seqlen, dtype=torch.int)
+    output_data = torch.zeros(nsamples, seqlen, dtype=torch.int)
+    for k in range(nsamples):
         while True:
             i = random.randint(0, len(traindata) - 1)
             trainenc = tokenizer(traindata[i]["text"], return_tensors="pt")
@@ -38,10 +43,11 @@ def get_c4_dataloader(nsamples, seed, seqlen, tokenizer):
         inp = trainenc.input_ids[:, i:j]
         tar = inp.clone()
         tar[:, :-1] = -100
-        trainloader.append((inp, tar))
+        input_data[k] = inp
+        output_data[k] = tar
 
     # Prepare validation dataset
     valenc = tokenizer(" ".join(valdata[:1100]["text"]), return_tensors="pt")
     valenc = valenc.input_ids[:, : (256 * seqlen)]
     valenc = TokenizerWrapper(valenc)
-    return trainloader, valenc
+    return DataLoader(TensorDataset(input_data, output_data)), valenc
