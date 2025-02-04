@@ -105,7 +105,12 @@ class Pruner:
         layers = model.transformer.h
         dtype = next(iter(model.parameters())).dtype
         inps = torch.zeros(
-            (nsamples, model.max_seq_length, model.config.n_embd),
+            (
+                nsamples,
+                dataloader.batch_size,
+                model.max_seq_length,
+                model.config.n_embd,
+            ),
             dtype=dtype,
             device=dev,
         )
