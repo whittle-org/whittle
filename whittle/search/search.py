@@ -9,6 +9,7 @@ from lightning.fabric.loggers import Logger
 from whittle.search.ask_tell_scheduler import AskTellScheduler
 from whittle.search.baselines import MethodArguments, methods
 from whittle.search.multi_objective import get_pareto_optimal
+from whittle.search.param_bins import ParamBins
 
 
 def multi_objective_search(
@@ -19,6 +20,7 @@ def multi_objective_search(
     objective_kwargs: Optional[dict[str, Any]] = None,
     logger: Optional[Logger] = None,
     seed: Optional[int] = None,
+    param_bins: Optional[ParamBins] = None
 ) -> dict[str, Any]:
     """
     Search for the Pareto-optimal sub-networks using the specified strategy.
@@ -35,6 +37,10 @@ def multi_objective_search(
         logger: The lightning logger to send metrics to.
             Defaults to None.
         seed: The random seed for reproducibility.
+            Defaults to None.
+        param_bins: The parameter bins that limit the sub-network params in the search.
+            The configs from ask() are rejected if they fit into a bin that is full.
+            The bin size is increased if all bins are full.
             Defaults to None.
 
     Returns:
@@ -62,8 +68,17 @@ def multi_objective_search(
     runtime = []
     configs = []
     start_time = time.time()
+    
     for i in range(num_samples):
-        trial_suggestion = scheduler.ask()
+        # sample a new configuration - optionally reject if it falls in a full bin
+        trial_suggestion = None
+        while trial_suggestion is None:
+            trial_suggestion = scheduler.ask()
+            # do not use the suggestion if it falls in a full bin
+            if param_bins is not None:
+                if not param_bins.put_in_bin(trial_suggestion.config):
+                    trial_suggestion = None
+
         objective_1, objective_2 = objective(
             trial_suggestion.config, **(objective_kwargs or {})
         )

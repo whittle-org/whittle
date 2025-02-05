@@ -11,7 +11,7 @@ import torch
 from lightning.fabric.strategies import FSDPStrategy
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
-from litgpt.data import Alpaca, DataModule
+from litgpt.data import DataModule, TinyStories
 from litgpt.model import Config
 from litgpt.pretrain import get_dataloaders, validate
 from litgpt.utils import (
@@ -27,13 +27,14 @@ from litgpt.utils import (
 )
 from torch.utils.data import DataLoader
 
-from whittle.args import SearchArgs
+from whittle.args import SearchArgs, ParamBinArgs
 from whittle.metrics import compute_parameters
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.models.gpt.extract import extract_current_sub_network
 from whittle.pretrain_super_network import get_search_space
 from whittle.search import multi_objective_search
+from whittle.search.param_bins import ParamsEstimator, ParamBins
 
 
 def setup(
@@ -55,6 +56,8 @@ def setup(
     logger_name: Optional[Literal["wandb", "tensorboard", "csv"]] = "csv",
     seed: Optional[int] = 1337,
     access_token: Optional[str] = None,
+    use_param_bins: Optional[bool] = False,
+    param_bins: ParamBinArgs = ParamBinArgs()
 ) -> None:
     """
     Multi-objective search to select Pareto optimal set of sub-networks from trained super-network.
@@ -76,12 +79,16 @@ def setup(
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
         access_token: Optional API token to access models with restrictions.
+        use_param_bins: Whether to use parameter bins to limit the search space.
+        num_bins: The number of bins to use for the parameter bins.
+        log_bins: Whether to use log spaced bins.
+        start_bin_size: The starting size of the bins (how many configs can be in each bin until it is full).
     """
     checkpoint_dir = auto_download_checkpoint(
         model_name=checkpoint_dir, access_token=access_token
     )
 
-    data = Alpaca() if data is None else data
+    data = TinyStories() if data is None else data
     num_devices = int(parse_devices(devices))
     out_dir = init_out_dir(out_dir)
 
@@ -132,6 +139,7 @@ def setup(
         train,
         eval,
         search,
+        param_bins if use_param_bins else None,
     )
 
 
@@ -152,7 +160,6 @@ def _objective(
     num_params = compute_parameters(model)
     return float(val_loss), num_params
 
-
 def main(
     fabric: L.Fabric,
     devices: int,
@@ -165,6 +172,7 @@ def main(
     train: TrainArgs,
     eval: EvalArgs,
     search: SearchArgs,
+    param_bins: Optional[ParamBinArgs] = None,
 ) -> None:
     fabric.seed_everything(seed)
 
@@ -173,6 +181,7 @@ def main(
     train_dataloader, val_dataloader = get_dataloaders(
         fabric, data, tokenizer, train, train.max_seq_length
     )
+
     train_dataloader, val_dataloader = fabric.setup_dataloaders(
         train_dataloader, val_dataloader
     )
@@ -204,6 +213,22 @@ def main(
 
     fabric.print("Start multi-objective search")
 
+    bins = None
+    if param_bins is not None:
+        from whittle.sampling.random_sampler import RandomSampler
+        sampler = RandomSampler(search_space, seed=seed)
+
+        # get bins limited by the smallest/largest config
+        params_estimator = ParamsEstimator(model)
+        bins = ParamBins(
+            sampler.get_smallest_sub_network(),
+            sampler.get_largest_sub_network(),
+            params_estimator,
+            num_bins=param_bins.num_bins,
+            log_bins=param_bins.log_bins,
+            start_bin_size=param_bins.start_bin_size
+        )
+
     search_results = multi_objective_search(
         _objective,
         search_space,
@@ -217,6 +242,7 @@ def main(
         num_samples=search.iterations,
         seed=seed,
         logger=fabric.logger,
+        param_bins=bins
     )
     training_time = time.perf_counter() - train_time
 
