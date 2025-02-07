@@ -57,7 +57,7 @@ def setup(
     seed: Optional[int] = 1337,
     access_token: Optional[str] = None,
     use_param_bins: Optional[bool] = False,
-    param_bins: ParamBinArgs = ParamBinArgs()
+    param_bins: ParamBinArgs = ParamBinArgs(),
 ) -> None:
     """
     Multi-objective search to select Pareto optimal set of sub-networks from trained super-network.
@@ -160,6 +160,7 @@ def _objective(
     num_params = compute_parameters(model)
     return float(val_loss), num_params
 
+
 def main(
     fabric: L.Fabric,
     devices: int,
@@ -216,6 +217,7 @@ def main(
     bins = None
     if param_bins is not None:
         from whittle.sampling.random_sampler import RandomSampler
+
         sampler = RandomSampler(search_space, seed=seed)
 
         # get bins limited by the smallest/largest config
@@ -226,7 +228,7 @@ def main(
             params_estimator,
             num_bins=param_bins.num_bins,
             log_bins=param_bins.log_bins,
-            start_bin_size=param_bins.start_bin_size
+            start_bin_size=param_bins.start_bin_size,
         )
 
     search_results = multi_objective_search(
@@ -242,7 +244,7 @@ def main(
         num_samples=search.iterations,
         seed=seed,
         logger=fabric.logger,
-        param_bins=bins
+        param_bins=bins,
     )
     training_time = time.perf_counter() - train_time
 

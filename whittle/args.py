@@ -21,7 +21,7 @@ class SearchArgs:
 @dataclass
 class ParamBinArgs:
     """parameter bin-related arguments - to limit what networks are sampled"""
-    
+
     """Number of parameter bins to use"""
     num_bins: int = 20
     """Whether to use log spaced bins"""

@@ -20,7 +20,7 @@ def multi_objective_search(
     objective_kwargs: Optional[dict[str, Any]] = None,
     logger: Optional[Logger] = None,
     seed: Optional[int] = None,
-    param_bins: Optional[ParamBins] = None
+    param_bins: Optional[ParamBins] = None,
 ) -> dict[str, Any]:
     """
     Search for the Pareto-optimal sub-networks using the specified strategy.
@@ -68,7 +68,7 @@ def multi_objective_search(
     runtime = []
     configs = []
     start_time = time.time()
-    
+
     for i in range(num_samples):
         # sample a new configuration - optionally reject if it falls in a full bin
         trial_suggestion = None
