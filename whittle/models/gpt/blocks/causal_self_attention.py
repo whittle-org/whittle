@@ -7,7 +7,7 @@ import torch.nn as nn
 from litgpt import Config
 from litgpt.model import KVCache, apply_rope
 
-from whittle.modules import Linear
+from whittle.modules import LinearQKV, LinearProj
 
 
 class CausalSelfAttention(nn.Module):
@@ -17,10 +17,10 @@ class CausalSelfAttention(nn.Module):
         super().__init__()
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
-        self.attn = Linear(config.n_embd, shape, bias=config.bias)
+        self.attn = LinearQKV(config.n_embd, shape, bias=config.bias)
         # output projection
         # if `head_size` is explicitly specified in the config, `n_emd` might not be equal to `head_size * n_head`
-        self.proj = Linear(
+        self.proj = LinearProj(
             config.head_size * config.n_head, config.n_embd, bias=config.bias
         )
         # disabled by default
@@ -31,17 +31,146 @@ class CausalSelfAttention(nn.Module):
         )
         self.config = config
         # Set current sub-network to super-network
+        self.q_per_kv = config.n_head // config.n_query_groups
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_n_head = self.config.n_head
         self.sub_network_head_size = self.config.head_size
         self.sub_network_qkv_shape = (
-            self.config.n_head + 2 * self.config.n_query_groups
-        ) * self.config.head_size
+            (self.q_per_kv + 2) * self.config.head_size * self.config.n_query_groups
+        )
         self.sub_network_query_groups = self.config.n_query_groups
         self.sub_network_q_per_kv = (
             self.sub_network_n_head // self.sub_network_query_groups
         )
         self.sub_attention_scaler = self.config.attention_scores_scalar
+        self.q_per_kv = self.config.n_head // self.config.n_query_groups
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    def get_qkv_indices(self):
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        heads_per_group = self.sub_network_n_head // self.sub_network_query_groups
+        head_size = self.config.head_size
+        sub_network_head_size = self.sub_network_head_size
+        n_head = self.config.n_head
+        n_query_groups = self.config.n_query_groups
+        sub_network_n_head = self.sub_network_n_head
+
+        if n_head == n_query_groups:
+            h_indices = torch.arange(sub_network_n_head, device=device)
+            start_q = h_indices * head_size
+            start_k = (h_indices + 1) * head_size
+            start_v = (h_indices + 2) * head_size
+
+            qkv_indices = torch.cat(
+                [
+                    torch.arange(s, s + sub_network_head_size, device=device)
+                    for s in torch.cat([start_q, start_k, start_v])
+                ]
+            )
+
+        elif n_query_groups == 1:
+            h_indices = torch.arange(sub_network_n_head, device=device)
+            start_q = h_indices * head_size
+            qkv_indices = torch.cat(
+                [
+                    torch.arange(s, s + sub_network_head_size, device=device)
+                    for s in start_q
+                ]
+            )
+
+            end_queries = n_head * head_size
+            start_k = end_queries
+            start_v = start_k + head_size
+
+            qkv_indices = torch.cat(
+                [
+                    qkv_indices,
+                    torch.arange(
+                        start_k, start_k + sub_network_head_size, device=device
+                    ),
+                    torch.arange(
+                        start_v, start_v + sub_network_head_size, device=device
+                    ),
+                ]
+            )
+
+        else:
+            g_indices = torch.arange(self.sub_network_query_groups, device=device)
+            start_q = g_indices * (heads_per_group + 2) * head_size
+
+            qkv_indices = torch.cat(
+                [
+                    torch.arange(
+                        s + h * head_size,
+                        s + h * head_size + sub_network_head_size,
+                        device=device,
+                    )
+                    for s in start_q
+                    for h in range(self.q_per_kv)
+                ]
+            )
+
+            start_k = start_q + heads_per_group * head_size
+            start_v = start_k + head_size
+
+            qkv_indices = torch.cat(
+                [
+                    qkv_indices,
+                    torch.cat(
+                        [
+                            torch.arange(s, s + sub_network_head_size, device=device)
+                            for s in start_k
+                        ]
+                    ),
+                    torch.cat(
+                        [
+                            torch.arange(s, s + sub_network_head_size, device=device)
+                            for s in start_v
+                        ]
+                    ),
+                ]
+            )
+
+        return qkv_indices.long()
+
+    def get_proj_indices(self):
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        n_head = self.config.n_head
+        n_query_groups = self.config.n_query_groups
+        sub_network_n_head = self.sub_network_n_head
+        heads_per_group = sub_network_n_head // n_query_groups
+        sub_network_query_groups = self.sub_network_query_groups
+        sub_network_head_size = self.sub_network_head_size
+        head_size = self.config.head_size
+
+        if n_head == n_query_groups:
+            h_indices = torch.arange(sub_network_n_head, device=device)
+            proj_indices = torch.cat(
+                [
+                    torch.arange(
+                        i * head_size,
+                        i * head_size + sub_network_head_size,
+                        device=device,
+                    )
+                    for i in h_indices
+                ]
+            )
+        else:
+            g_indices = torch.arange(sub_network_query_groups, device=device)
+            start = g_indices * heads_per_group * head_size
+            proj_indices = torch.cat(
+                [
+                    torch.arange(
+                        s + h * head_size,
+                        s + h * head_size + sub_network_head_size,
+                        device=device,
+                    )
+                    for s in start
+                    for h in range(self.q_per_kv)
+                ]
+            )
+
+        return proj_indices.long()
 
     def set_sub_network(
         self,
@@ -59,19 +188,47 @@ class CausalSelfAttention(nn.Module):
             sub_network_query_groups: Number of query groups for grouped-query attention (GQA).
             sub_network_head_size: Size of each attention head in the sub-network.
         """
-        self.sub_network_n_embd = sub_network_n_embd
-        self.sub_network_n_head = sub_network_n_head
-        self.sub_network_query_groups = sub_network_query_groups
-        self.sub_network_head_size = sub_network_head_size
-
+        self.sub_network_n_embd = (
+            sub_network_n_embd if sub_network_n_embd else self.config.n_embd
+        )
+        self.sub_network_n_head = (
+            sub_network_n_head if sub_network_n_head else self.config.n_head
+        )
+        self.sub_network_query_groups = (
+            sub_network_query_groups
+            if sub_network_query_groups
+            else self.config.n_query_groups
+        )
+        self.sub_network_head_size = (
+            sub_network_head_size if sub_network_head_size else self.config.head_size
+        )
+        if self.config.n_query_groups == 1:
+            self.q_per_kv = self.sub_network_n_head
+            self.sub_network_query_groups = 1
+        elif (
+            self.config.n_head != self.config.n_query_groups
+            and self.config.n_query_groups != 1
+        ):
+            self.sub_network_query_groups = self.config.n_query_groups
+            self.q_per_kv = self.sub_network_n_head // self.config.n_query_groups
+        elif self.config.n_head == self.config.n_query_groups:
+            self.q_per_kv = 1
+            self.sub_network_query_groups = self.sub_network_n_head
         self.sub_network_qkv_shape = (
-            self.sub_network_n_head + 2 * self.sub_network_query_groups
-        ) * self.sub_network_head_size
-
-        self.attn.set_sub_network(self.sub_network_n_embd, self.sub_network_qkv_shape)
+            (self.q_per_kv + 2)
+            * self.sub_network_head_size
+            * self.sub_network_query_groups
+        )
+        self.sub_network_q_per_kv = self.q_per_kv
+        self.qkv_indices = self.get_qkv_indices()
+        self.attn.set_sub_network(
+            self.sub_network_n_embd, self.sub_network_qkv_shape, self.qkv_indices
+        )
+        self.proj_indices = self.get_proj_indices()
         self.proj.set_sub_network(
-            self.sub_network_head_size * self.sub_network_n_head,
+            self.sub_network_head_size * self.sub_network_query_groups * self.q_per_kv,
             self.sub_network_n_embd,
+            self.proj_indices,
         )
         self.sub_network_q_per_kv = self.sub_network_n_head // float(
             self.sub_network_query_groups
@@ -107,9 +264,9 @@ class CausalSelfAttention(nn.Module):
         mask: torch.Tensor | None = None,
         input_pos: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        assert (
-            self.sub_network_n_embd is not None
-        ), "You need to call `gpt.set_sub_network()"
+        assert self.sub_network_n_embd is not None, (
+            "You need to call `gpt.set_sub_network()"
+        )
         (
             B,
             T,
@@ -117,8 +274,7 @@ class CausalSelfAttention(nn.Module):
         ) = x.size()  # batch size, sequence length, embedding dimensionality (n_embd)
         qkv = self.attn(x)
         # assemble into a number of query groups to support MHA, MQA and GQA together (see `config.n_query_groups`)
-        q_per_kv = self.sub_network_n_head // self.sub_network_query_groups
-        total_qkv = q_per_kv + 2  # each group has 1+ queries, 1 key, and 1 value
+        total_qkv = self.q_per_kv + 2  # each group has 1+ queries, 1 key, and 1 value
 
         qkv = qkv.view(
             B,
@@ -131,25 +287,25 @@ class CausalSelfAttention(nn.Module):
         qkv = qkv.permute(0, 2, 3, 1, 4)  # (B, n_query_groups, total_qkv, T, hs)
 
         # split batched computation into three
-        q, k, v = qkv.split((q_per_kv, 1, 1), dim=2)
+        q, k, v = qkv.split((self.q_per_kv, 1, 1), dim=2)
 
         # maybe repeat k and v if for the non multi-head attention cases
         # training: flash attention requires it
         # inference: multi-query would require a full kv cache so avoid it to limit its memory usage
-        if self.sub_network_query_groups != self.sub_network_n_head and (
-            input_pos is None or self.config.n_query_groups != 1
-        ):
+        if self.sub_network_query_groups != (
+            self.sub_network_query_groups * self.q_per_kv
+        ) and (input_pos is None or self.sub_network_query_groups != 1):
             k = k.expand(
                 B,
                 self.sub_network_query_groups,
-                q_per_kv,
+                self.q_per_kv,
                 T,
                 self.sub_network_head_size,
             )
             v = v.expand(
                 B,
                 self.sub_network_query_groups,
-                q_per_kv,
+                self.q_per_kv,
                 T,
                 self.sub_network_head_size,
             )
@@ -188,7 +344,9 @@ class CausalSelfAttention(nn.Module):
             mask += sliding_window_bias
         y = self.scaled_dot_product_attention(q, k, v, mask)
         y = y.reshape(
-            B, T, self.sub_network_head_size * self.sub_network_n_head
+            B,
+            T,
+            self.sub_network_head_size * self.q_per_kv * self.sub_network_query_groups,
         )  # re-assemble all head outputs side by side
         return self.proj(y)
 
