@@ -44,7 +44,6 @@ class CausalSelfAttention(nn.Module):
         )
         self.sub_attention_scaler = self.config.attention_scores_scalar
         self.q_per_kv = self.config.n_head // self.config.n_query_groups
-        device = "cuda" if torch.cuda.is_available() else "cpu"
 
     def get_qkv_indices(self):
         qkv_indices = []
@@ -230,9 +229,9 @@ class CausalSelfAttention(nn.Module):
         mask: torch.Tensor | None = None,
         input_pos: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        assert self.sub_network_n_embd is not None, (
-            "You need to call `gpt.set_sub_network()"
-        )
+        assert (
+            self.sub_network_n_embd is not None
+        ), "You need to call `gpt.set_sub_network()"
         (
             B,
             T,

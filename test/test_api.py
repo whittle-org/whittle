@@ -30,7 +30,6 @@ def copy_subnetwork_weights(sub_network, super_network):
     # Ensure both networks are in evaluation mode to avoid any changes in weights during copying.
     embd = super_network.sub_network_n_embd
     intermediate = super_network.sub_network_intermediate_size
-    n_layer = super_network.sub_network_n_layers
     super_network.lm_head.weight.data[:, :embd] = sub_network.lm_head.weight.data
     if super_network.lm_head.bias is not None:
         super_network.lm_head.bias.data = sub_network.lm_head.bias.data

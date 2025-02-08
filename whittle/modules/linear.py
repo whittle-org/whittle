@@ -53,7 +53,7 @@ class Linear(nn.Linear):
             )
 
 
-class LinearQKV(Linear):
+class LinearQKV(nn.Linear):
     """An extension of Linear to support QKV Indexing"""
 
     def __init__(
@@ -116,7 +116,7 @@ class LinearQKV(Linear):
                 )
 
 
-class LinearProj(Linear):
+class LinearProj(nn.Linear):
     """An extension of Linear to support Projection Indexing"""
 
     def __init__(

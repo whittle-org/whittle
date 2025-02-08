@@ -174,13 +174,6 @@ def copy_weights(model_source, model_target):
         p1.data = p2.data
 
 
-def copy_weights(model_source, model_target):
-    for (_, p1), (_, p2) in zip(
-        model_source.named_parameters(), model_target.named_parameters()
-    ):
-        p1.data = p2.data
-
-
 def test_llama_3_1():
     config_llama = Config.from_name(
         "Llama-3-8B",
