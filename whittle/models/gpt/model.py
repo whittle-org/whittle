@@ -377,4 +377,11 @@ class GPT(nn.Module):
     def clear_kv_cache(self) -> None:
         self.mask_cache = None
         for block in self.transformer.h:
-       
+            block.attn.kv_cache = None
+
+
+def build_mask_cache(
+    max_seq_length: int, device: torch.device | None = None
+) -> torch.Tensor:
+    ones = torch.ones((max_seq_length, max_seq_length), device=device, dtype=torch.bool)
+    return torch.tril(ones).unsqueeze(0).unsqueeze(0)
