@@ -88,6 +88,7 @@ def test_gpt():
     config.n_query_groups = 2
     config.intermediate_size = 32 * 4
     config.n_layer = 1
+    print(config)
     lit_gpt_small = LitGPT(config)
     lit_gpt_small.lm_head.weight.data = gpt.lm_head.weight.data[
         : gpt.lm_head.sub_network_out_features, : gpt.lm_head.sub_network_in_features
@@ -110,6 +111,7 @@ def test_gpt():
             block.attn.attn.bias.data = block_orig.attn.attn.bias.data[
                 block_orig.attn.qkv_indices
             ]
+            print(torch.tensor(block_orig.attn.qkv_indices).shape)
         else:
             block.attn.attn.weight.data = block_orig.attn.attn.weight.data[
                 : block_orig.attn.attn.sub_network_out_features,
@@ -163,6 +165,13 @@ def test_gpt():
         ]
     out_lit_small = lit_gpt_small(input)
     assert torch.allclose(out_lit_small, out_small, atol=1e-3)
+
+
+def copy_weights(model_source, model_target):
+    for (_, p1), (_, p2) in zip(
+        model_source.named_parameters(), model_target.named_parameters()
+    ):
+        p1.data = p2.data
 
 
 def copy_weights(model_source, model_target):

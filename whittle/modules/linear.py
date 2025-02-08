@@ -51,7 +51,8 @@ class Linear(nn.Linear):
                     : self.sub_network_out_features, : self.sub_network_in_features
                 ],
             )
-        
+
+
 class LinearQKV(Linear):
     """An extension of Linear to support QKV Indexing"""
 
@@ -72,7 +73,10 @@ class LinearQKV(Linear):
         self.qkv_indices = None
 
     def set_sub_network(
-        self, sub_network_in_features: int, sub_network_out_features: int, qkv_indices: torch.Tensor
+        self,
+        sub_network_in_features: int,
+        sub_network_out_features: int,
+        qkv_indices: torch.Tensor,
     ):
         """Set the linear transformation dimensions of the current sub-network."""
         self.sub_network_in_features = sub_network_in_features
@@ -87,37 +91,30 @@ class LinearQKV(Linear):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.use_bias:
-          if self.qkv_indices is not None:
-            return F.linear(
-                x,
-                self.weight[
-                    self.qkv_indices, : self.sub_network_in_features
-                ],
-                self.bias[self.qkv_indices],
-            )
-          else:
-            return F.linear(
-                x,
-                self.weight[
-                    :, : self.sub_network_in_features
-                ],
-                self.bias,
-            )
-        else:
             if self.qkv_indices is not None:
-              return F.linear(
-                  x,
-                  self.weight[
-                      self.qkv_indices, : self.sub_network_in_features
-                  ],
-              )
+                return F.linear(
+                    x,
+                    self.weight[self.qkv_indices, : self.sub_network_in_features],
+                    self.bias[self.qkv_indices],
+                )
             else:
                 return F.linear(
                     x,
-                    self.weight[
-                        :, : self.sub_network_in_features
-                    ],
+                    self.weight[:, : self.sub_network_in_features],
+                    self.bias,
                 )
+        else:
+            if self.qkv_indices is not None:
+                return F.linear(
+                    x,
+                    self.weight[self.qkv_indices, : self.sub_network_in_features],
+                )
+            else:
+                return F.linear(
+                    x,
+                    self.weight[:, : self.sub_network_in_features],
+                )
+
 
 class LinearProj(Linear):
     """An extension of Linear to support Projection Indexing"""
@@ -139,7 +136,10 @@ class LinearProj(Linear):
         self.proj_indices = None
 
     def set_sub_network(
-        self, sub_network_in_features: int, sub_network_out_features: int, proj_indices: torch.Tensor
+        self,
+        sub_network_in_features: int,
+        sub_network_out_features: int,
+        proj_indices: torch.Tensor,
     ):
         """Set the linear transformation dimensions of the current sub-network."""
         self.sub_network_in_features = sub_network_in_features
@@ -157,31 +157,23 @@ class LinearProj(Linear):
             if self.proj_indices is not None:
                 return F.linear(
                     x,
-                    self.weight[
-                        : self.sub_network_out_features, self.proj_indices
-                    ],
+                    self.weight[: self.sub_network_out_features, self.proj_indices],
                     self.bias[: self.sub_network_out_features],
                 )
             else:
                 return F.linear(
                     x,
-                    self.weight[
-                        : self.sub_network_out_features, :
-                    ],
+                    self.weight[: self.sub_network_out_features, :],
                     self.bias[: self.sub_network_out_features],
                 )
         else:
             if self.proj_indices is not None:
                 return F.linear(
                     x,
-                    self.weight[
-                        : self.sub_network_out_features, self.proj_indices
-                    ],
+                    self.weight[: self.sub_network_out_features, self.proj_indices],
                 )
             else:
                 return F.linear(
                     x,
-                    self.weight[
-                        : self.sub_network_out_features, :
-                    ],
+                    self.weight[: self.sub_network_out_features, :],
                 )

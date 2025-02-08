@@ -29,7 +29,10 @@ def extract_current_sub_network(model: GPT) -> GPT:
 
     subnet_config.n_embd = model.sub_network_n_embd
     subnet_config.intermediate_size = model.sub_network_intermediate_size
-    subnet_config.n_head = model.sub_network_num_heads
+    if model.config.n_head != model.config.n_query_groups:
+        subnet_config.n_head = (
+            int(model.sub_network_num_heads) // model.config.n_query_groups
+        ) * model.sub_network_query_groups
     subnet_config.n_layer = model.sub_network_n_layers
     subnet_config.head_size = model.sub_network_head_size
     subnet_config.n_query_groups = model.sub_network_query_groups
@@ -67,10 +70,7 @@ def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
         sub_network_block = sub_network.transformer.h[i]
 
         # Attention
-        state_dict = extract_linear(block.attn.attn)
-        sub_network_block.attn.attn.load_state_dict(state_dict)
-        state_dict = extract_linear(block.attn.proj)
-        sub_network_block.attn.proj.load_state_dict(state_dict)
+        extract_attention(block.attn, sub_network_block.attn)
 
         # MLP
         extract_mlp(block.mlp, sub_network_block.mlp)
@@ -82,6 +82,39 @@ def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
         extract_norm(block.post_mlp_norm, sub_network_block.post_mlp_norm)
 
     return sub_network
+
+
+def extract_attention(super_network_attention, sub_network_attention):
+    if super_network_attention.qkv_indices is not None:
+        sub_network_attention.attn.weight.data = (
+            super_network_attention.attn.weight.data[
+                super_network_attention.qkv_indices, :
+            ][:, 0 : sub_network_attention.sub_network_n_embd]
+        )
+        if sub_network_attention.attn.bias is not None:
+            sub_network_attention.attn.bias.data = (
+                super_network_attention.attn.bias.data[
+                    super_network_attention.qkv_indices
+                ]
+            )
+    else:
+        state_dict = extract_linear(super_network_attention.attn)
+        sub_network_attention.attn.load_state_dict(state_dict)
+    if super_network_attention.proj_indices is not None:
+        sub_network_attention.proj.weight.data = (
+            super_network_attention.proj.weight.data[
+                0 : sub_network_attention.sub_network_n_embd
+            ][:, super_network_attention.proj_indices]
+        )
+        if sub_network_attention.proj.bias is not None:
+            sub_network_attention.proj.bias.data = (
+                super_network_attention.proj.bias.data[
+                    0 : sub_network_attention.sub_network_n_embd
+                ]
+            )
+    else:
+        state_dict = extract_linear(super_network_attention.proj)
+        sub_network_attention.proj.load_state_dict(state_dict)
 
 
 def extract_mlp(mlp, sub_mlp):
@@ -142,7 +175,6 @@ def extract_linear(super_network_linear):
     super_network_state = super_network_linear.state_dict()
     in_feat_sub = super_network_linear.sub_network_in_features
     out_feat_sub = super_network_linear.sub_network_out_features
-
     new_state_dict = OrderedDict()
     new_state_dict["weight"] = super_network_state["weight"][
         :out_feat_sub, :in_feat_sub
@@ -158,7 +190,6 @@ def extract_embedding(super_network_embedding):
     super_network_state = super_network_embedding.state_dict()
     new_state_dict = OrderedDict()
     sub_network_embedding_dim = super_network_embedding.sub_network_embedding_dim
-
     new_state_dict["weight"] = super_network_state["weight"][
         :, :sub_network_embedding_dim
     ]

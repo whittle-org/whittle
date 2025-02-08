@@ -39,6 +39,7 @@ def test_model_pruning(model_info, mock_tokenizer):
     config.use_cache = True
 
     model = GPT(config)
+    model.reset_super_network()
     pruner_wanda = WandaPruner()
     pruner_sparsegpt = SparseGPTPruner()
     pruner_magnitude = MagnitudePruner()
