@@ -44,7 +44,7 @@ def params_layer_normalization(normalization_layer: nn.Module):
 def params_attention_layer(attention: CausalSelfAttention):
     dmodel = attention.sub_network_n_embd
     dhead = attention.sub_network_head_size
-    if attention.config.n_query_groups != attention.config.n_head:
+    if attention.config.n_query_groups!=attention.config.n_head:
         q_per_kv = attention.sub_network_n_head // attention.config.n_query_groups
         num_query_groups = attention.sub_network_query_groups
     else:
@@ -102,3 +102,5 @@ def compute_parameters(model: GPT) -> float:
         num_params += params_layer_normalization(block.norm_2)
     num_params += params_layer_normalization(model.transformer.ln_f)
     return num_params
+
+
