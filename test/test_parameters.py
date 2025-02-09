@@ -73,5 +73,3 @@ def test_compute_parameters_sub_network(mlp_type, norm_type):
     )
     params_sub_network = compute_parameters(gpt)
     assert params_sub_network < params_super_network
-
-
