@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional, Union
 from typing_extensions import Literal
 
+import json
 import lightning as L
 import torch
 from lightning.fabric.strategies import FSDPStrategy
@@ -24,6 +25,7 @@ from litgpt.utils import (
     init_out_dir,
     load_checkpoint,
     parse_devices,
+    save_config,
 )
 from torch.utils.data import DataLoader
 
@@ -250,19 +252,28 @@ def main(
 
     fabric.print(f"Total search time: {training_time:.02f}.")
     fabric.print(
-        f"Found {len(search_results['configs'])} Pareto optimal sub-networks. Save checkpoints to {out_dir}."
+        f"Found {len(search_results['configs'])} sub-networks ({sum(i for i in search_results['is_pareto_optimal'])} Pareto optimal). Save checkpoints to {out_dir}."
     )
 
+    pareto_optimal_paths = []
     for i, sub_network_dict in enumerate(search_results["configs"]):
         save_path = out_dir / f"sub_network_{i}" / "lit_model.pth"
         save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if search_results["is_pareto_optimal"][i]:
+            pareto_optimal_paths.append(str(save_path.absolute()))
 
         model.select_sub_network(sub_network_dict)
         sub_network = extract_current_sub_network(model)
 
         model.reset_super_network()
 
-        fabric.save(save_path, {"model": sub_network})
+        fabric.save(save_path, {"model": sub_network, "parent_dir": checkpoint_dir})
+        save_config(sub_network.config, out_dir / f"sub_network_{i}")
+
+    # save all paths to pareto optimal sub-networks
+    with open(out_dir / "pareto_optimal_paths.json", "w") as f:
+        json.dump(pareto_optimal_paths, f)
 
 
 if __name__ == "__main__":

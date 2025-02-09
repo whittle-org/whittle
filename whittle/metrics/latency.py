@@ -1,6 +1,7 @@
 import torch
 import torch.profiler
 from torch.profiler import record_function
+from typing import Optional
 
 
 # Define a sample language model (e.g., a simple RNN or transformer-based model)
@@ -39,6 +40,7 @@ def compute_latency(
     use_cuda: bool = False,
     batch_size: int = 8,
     n_samples: int = 10,
+    device: Optional[str] = None,
 ) -> float:
     """
     Profiles the latency of a PyTorch model for inference.
@@ -51,6 +53,7 @@ def compute_latency(
         use_cuda (bool, optional): If True and CUDA is available, the model will be moved to the GPU for profiling. Defaults to False.
         batch_size (int, optional): The batch size for the input tensor. Defaults to 8.
         n_samples (int, optional): The number of samples to profile after the warm-up phase. Defaults to 10.
+        device (Optional[str], optional): The device to use for profiling. If None, the device is inferred based on use_cuda. Defaults to None.
 
     Returns:
         float: The average inference time per sample in milliseconds.
@@ -58,9 +61,13 @@ def compute_latency(
     input_tensor = torch.randint(
         0, model.config.padded_vocab_size, (batch_size, model.max_seq_length)
     )
-    if use_cuda and torch.cuda.is_available():
-        model = model.cuda()
-        input_tensor = input_tensor.cuda()
+    if device is None:
+        if use_cuda and torch.cuda.is_available():
+            model = model.cuda()
+            input_tensor = input_tensor.cuda()
+    else:
+        model = model.to(device)
+        input_tensor = input_tensor.to(device)
 
     # Use PyTorch profiler to record compute_latency
     model.eval()
