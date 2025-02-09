@@ -30,6 +30,7 @@ def test_compute_parameters_sub_network(mlp_type, norm_type):
     config.n_embd = 64
     config.intermediate_size = 64 * 4
     config.n_head = 8
+    config.bias = False
     config.n_query_groups = 8
     config.head_size = 8
     config.n_layer = 2
@@ -54,11 +55,13 @@ def test_compute_parameters_sub_network(mlp_type, norm_type):
         sub_network_intermediate_size=config.intermediate_size,
         sub_network_num_heads=config.n_head - 1,
         sub_network_n_layers=config.n_layer,
+        sub_network_head_size=config.head_size,
+        sub_network_query_groups=config.n_query_groups - 1,
     )
     params_sub_network = compute_parameters(gpt)
     params_single_head = (
-        (config.n_embd * config.head_size + config.head_size) * 3 * (config.n_layer)
-    )
+        config.n_embd * config.head_size + config.head_size * config.n_embd * 3
+    ) * (config.n_layer)
     assert params_sub_network == params_super_network - params_single_head
 
     # remove larger part of the network
