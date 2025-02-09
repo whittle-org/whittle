@@ -103,3 +103,4 @@ def compute_parameters(model: GPT) -> float:
     num_params += params_layer_normalization(model.transformer.ln_f)
     return num_params
 
+
