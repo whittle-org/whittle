@@ -39,7 +39,7 @@ class CausalSelfAttention(nn.Module):
             (self.q_per_kv + 2) * self.config.head_size * self.config.n_query_groups
         )
         self.sub_network_query_groups = self.config.n_query_groups
-        self.sub_network_q_per_kv = (
+        self.sub_network_q_per_kv = int(
             self.sub_network_n_head // self.sub_network_query_groups
         )
         self.sub_attention_scaler = self.config.attention_scores_scalar
@@ -181,7 +181,7 @@ class CausalSelfAttention(nn.Module):
         self.sub_network_qkv_shape = (
             (q_per_kv + 2) * self.sub_network_head_size * self.sub_network_query_groups
         )
-        self.sub_network_q_per_kv = q_per_kv
+        self.sub_network_q_per_kv = int(q_per_kv)
         self.qkv_indices = self.get_qkv_indices()
         self.attn.set_sub_network(
             self.sub_network_n_embd, self.sub_network_qkv_shape, self.qkv_indices
@@ -193,9 +193,6 @@ class CausalSelfAttention(nn.Module):
             * self.sub_network_q_per_kv,
             self.sub_network_n_embd,
             self.proj_indices,
-        )
-        self.sub_network_q_per_kv = self.sub_network_n_head // float(
-            self.sub_network_query_groups
         )
         if self.config.attention_scores_scalar:
             self.sub_attention_scaler = (
@@ -213,7 +210,7 @@ class CausalSelfAttention(nn.Module):
             self.config.n_head + 2 * self.config.n_query_groups
         ) * self.config.head_size
         self.sub_network_query_groups = self.config.n_query_groups
-        self.sub_network_q_per_kv = (
+        self.sub_network_q_per_kv = int(
             self.sub_network_n_head // self.sub_network_query_groups
         )
         self.attn.reset_super_network()
