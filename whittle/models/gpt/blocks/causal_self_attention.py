@@ -43,7 +43,6 @@ class CausalSelfAttention(nn.Module):
             self.sub_network_n_head // self.sub_network_query_groups
         )
         self.sub_attention_scaler = self.config.attention_scores_scalar
-        self.q_per_kv = self.config.n_head // self.config.n_query_groups
 
     def get_qkv_indices(self):
         qkv_indices = []
@@ -84,7 +83,7 @@ class CausalSelfAttention(nn.Module):
         else:
             for g in range(self.sub_network_query_groups):
                 start_q = g * (heads_per_group + 2) * self.config.head_size
-                for h in range(self.q_per_kv):
+                for h in range(self.sub_network_q_per_kv):
                     qkv_indices.extend(
                         [
                             i
@@ -124,7 +123,7 @@ class CausalSelfAttention(nn.Module):
         else:
             for g in range(sub_network_query_groups):
                 start = g * heads_per_group * head_size
-                for h in range(self.q_per_kv):
+                for h in range(self.sub_network_q_per_kv):
                     proj_indices.append(
                         torch.arange(
                             start + h * head_size,
@@ -164,7 +163,7 @@ class CausalSelfAttention(nn.Module):
             sub_network_head_size if sub_network_head_size else self.config.head_size
         )
         if self.config.n_query_groups == 1:
-            self.q_per_kv = self.sub_network_n_head
+            q_per_kv = self.sub_network_n_head
             self.sub_network_query_groups = 1
         elif (
             self.config.n_head != self.config.n_query_groups
@@ -175,23 +174,23 @@ class CausalSelfAttention(nn.Module):
                 if sub_network_query_groups
                 else self.config.n_query_groups
             )
-            self.q_per_kv = self.sub_network_n_head // self.config.n_query_groups
+            q_per_kv = self.sub_network_n_head // self.config.n_query_groups
         elif self.config.n_head == self.config.n_query_groups:
-            self.q_per_kv = 1
+            q_per_kv = 1
             self.sub_network_query_groups = self.sub_network_n_head
         self.sub_network_qkv_shape = (
-            (self.q_per_kv + 2)
+            (q_per_kv + 2)
             * self.sub_network_head_size
             * self.sub_network_query_groups
         )
-        self.sub_network_q_per_kv = self.q_per_kv
+        self.sub_network_q_per_kv = q_per_kv
         self.qkv_indices = self.get_qkv_indices()
         self.attn.set_sub_network(
             self.sub_network_n_embd, self.sub_network_qkv_shape, self.qkv_indices
         )
         self.proj_indices = self.get_proj_indices()
         self.proj.set_sub_network(
-            self.sub_network_head_size * self.sub_network_query_groups * self.q_per_kv,
+            self.sub_network_head_size * self.sub_network_query_groups * self.sub_network_q_per_kv,
             self.sub_network_n_embd,
             self.proj_indices,
         )
@@ -239,7 +238,7 @@ class CausalSelfAttention(nn.Module):
         ) = x.size()  # batch size, sequence length, embedding dimensionality (n_embd)
         qkv = self.attn(x)
         # assemble into a number of query groups to support MHA, MQA and GQA together (see `config.n_query_groups`)
-        total_qkv = self.q_per_kv + 2  # each group has 1+ queries, 1 key, and 1 value
+        total_qkv = self.sub_network_q_per_kv + 2  # each group has 1+ queries, 1 key, and 1 value
 
         qkv = qkv.view(
             B,
@@ -252,25 +251,25 @@ class CausalSelfAttention(nn.Module):
         qkv = qkv.permute(0, 2, 3, 1, 4)  # (B, n_query_groups, total_qkv, T, hs)
 
         # split batched computation into three
-        q, k, v = qkv.split((self.q_per_kv, 1, 1), dim=2)
+        q, k, v = qkv.split((self.sub_network_q_per_kv, 1, 1), dim=2)
 
         # maybe repeat k and v if for the non multi-head attention cases
         # training: flash attention requires it
         # inference: multi-query would require a full kv cache so avoid it to limit its memory usage
         if self.sub_network_query_groups != (
-            self.sub_network_query_groups * self.q_per_kv
+            self.sub_network_query_groups * self.sub_network_q_per_kv
         ) and (input_pos is None or self.sub_network_query_groups != 1):
             k = k.expand(
                 B,
                 self.sub_network_query_groups,
-                self.q_per_kv,
+                self.sub_network_q_per_kv,
                 T,
                 self.sub_network_head_size,
             )
             v = v.expand(
                 B,
                 self.sub_network_query_groups,
-                self.q_per_kv,
+                self.sub_network_q_per_kv,
                 T,
                 self.sub_network_head_size,
             )
@@ -311,7 +310,7 @@ class CausalSelfAttention(nn.Module):
         y = y.reshape(
             B,
             T,
-            self.sub_network_head_size * self.q_per_kv * self.sub_network_query_groups,
+            self.sub_network_head_size * self.sub_network_q_per_kv * self.sub_network_query_groups,
         )  # re-assemble all head outputs side by side
         return self.proj(y)
 
