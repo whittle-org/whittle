@@ -3,10 +3,9 @@ from typing import Any
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-
+from whittle.modules.linear import Linear, LinearProj, LinearQKV
 from whittle.models.gpt import GPT
 from whittle.modules.embedding import Embedding
-from whittle.modules.linear import Linear
 from whittle.pruning.utils.catcher import Catcher
 
 
@@ -39,7 +38,7 @@ class Pruner:
     def _find_layers(
         self,
         module: nn.Module,
-        layers: list[type[nn.Module]] = [Linear, Embedding],
+        layers: list[type[nn.Module]] = [Linear, LinearQKV, LinearProj, Embedding],
         name: str = "",
     ) -> dict[str, nn.Module]:
         """
