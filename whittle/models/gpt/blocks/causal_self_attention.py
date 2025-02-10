@@ -179,9 +179,7 @@ class CausalSelfAttention(nn.Module):
             q_per_kv = 1
             self.sub_network_query_groups = self.sub_network_n_head
         self.sub_network_qkv_shape = (
-            (q_per_kv + 2)
-            * self.sub_network_head_size
-            * self.sub_network_query_groups
+            (q_per_kv + 2) * self.sub_network_head_size * self.sub_network_query_groups
         )
         self.sub_network_q_per_kv = q_per_kv
         self.qkv_indices = self.get_qkv_indices()
@@ -190,7 +188,9 @@ class CausalSelfAttention(nn.Module):
         )
         self.proj_indices = self.get_proj_indices()
         self.proj.set_sub_network(
-            self.sub_network_head_size * self.sub_network_query_groups * self.sub_network_q_per_kv,
+            self.sub_network_head_size
+            * self.sub_network_query_groups
+            * self.sub_network_q_per_kv,
             self.sub_network_n_embd,
             self.proj_indices,
         )
@@ -238,7 +238,9 @@ class CausalSelfAttention(nn.Module):
         ) = x.size()  # batch size, sequence length, embedding dimensionality (n_embd)
         qkv = self.attn(x)
         # assemble into a number of query groups to support MHA, MQA and GQA together (see `config.n_query_groups`)
-        total_qkv = self.sub_network_q_per_kv + 2  # each group has 1+ queries, 1 key, and 1 value
+        total_qkv = (
+            self.sub_network_q_per_kv + 2
+        )  # each group has 1+ queries, 1 key, and 1 value
 
         qkv = qkv.view(
             B,
@@ -310,7 +312,9 @@ class CausalSelfAttention(nn.Module):
         y = y.reshape(
             B,
             T,
-            self.sub_network_head_size * self.sub_network_q_per_kv * self.sub_network_query_groups,
+            self.sub_network_head_size
+            * self.sub_network_q_per_kv
+            * self.sub_network_query_groups,
         )  # re-assemble all head outputs side by side
         return self.proj(y)
 
