@@ -21,6 +21,8 @@ def multi_objective_search(
     logger: Optional[Logger] = None,
     seed: Optional[int] = None,
     param_bins: Optional[ParamBins] = None,
+    objective_1_name: str = "objective_1",
+    objective_2_name: str = "objective_2",
 ) -> dict[str, Any]:
     """
     Search for the Pareto-optimal sub-networks using the specified strategy.
@@ -94,12 +96,14 @@ def multi_objective_search(
 
         runtime.append(time.time() - start_time)
 
-        observation = dict(
-            iteration=i,
-            objective_1=float(objective_1),
-            objective_2=float(objective_2),
-            runtime=runtime[-1],
-        )
+        observation = {
+            'iteration': i,
+            objective_1_name: float(objective_1),
+            objective_2_name: float(objective_2),
+            'runtime': runtime[-1],            
+        }
+
+        print(observation)
 
         if logger is not None:
             logger.log_metrics(observation)

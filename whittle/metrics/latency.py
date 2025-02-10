@@ -89,5 +89,4 @@ def compute_latency(
 
     # Convert time to milliseconds
     total_time_ms = (cpu_time_us + cuda_time_us) / 1000
-    model = model.cpu()
     return total_time_ms / n_samples

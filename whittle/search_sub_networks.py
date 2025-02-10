@@ -30,13 +30,13 @@ from litgpt.utils import (
 from torch.utils.data import DataLoader
 
 from whittle.args import SearchArgs, ParamBinArgs
-from whittle.metrics import compute_parameters
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.models.gpt.extract import extract_current_sub_network
 from whittle.pretrain_super_network import get_search_space
 from whittle.search import multi_objective_search
 from whittle.search.param_bins import ParamsEstimator, ParamBins
+from whittle.metrics import compute_latency, compute_parameters, compute_flops
 
 
 def setup(
@@ -60,6 +60,9 @@ def setup(
     access_token: Optional[str] = None,
     use_param_bins: Optional[bool] = False,
     param_bins: ParamBinArgs = ParamBinArgs(),
+    objective_1: Optional[str] = "val_loss",
+    objective_2: Optional[str] = "parameters",
+    log_objective_names: Optional[bool] = True,
 ) -> None:
     """
     Multi-objective search to select Pareto optimal set of sub-networks from trained super-network.
@@ -82,9 +85,10 @@ def setup(
         seed: The random seed to use for reproducibility.
         access_token: Optional API token to access models with restrictions.
         use_param_bins: Whether to use parameter bins to limit the search space.
-        num_bins: The number of bins to use for the parameter bins.
-        log_bins: Whether to use log spaced bins.
-        start_bin_size: The starting size of the bins (how many configs can be in each bin until it is full).
+        param_bins: Parameters for the parameter bins.
+        objective_1: The name of the first objective to optimize (possible - val_loss, perplexity). Defaults to "val_loss".
+        objective_2: The name of the second objective to optimize (possible - parameters, latency, flops). Defaults to "parameters".
+        log_objective_names: Whether to log the names of the objectives in the logger, or log as objective_1 and objective_2. Defaults to True.
     """
     checkpoint_dir = auto_download_checkpoint(
         model_name=checkpoint_dir, access_token=access_token
@@ -142,6 +146,8 @@ def setup(
         eval,
         search,
         param_bins if use_param_bins else None,
+        objective_1,
+        objective_2,
     )
 
 
@@ -154,13 +160,22 @@ def _objective(
     val_dataloader: DataLoader,
     eval: EvalArgs,
     verbose: Optional[bool] = True,
+    objective_1: str = "val_loss",
+    objective_2: str = "parameters",
 ) -> tuple[float, float]:
     model.select_sub_network(config)
     val_loss = validate(
-        fabric, model, val_dataloader, max_iters=eval.max_iters, verbose=verbose
+        fabric, model, val_dataloader, max_iters=eval.max_iters, verbose=verbose, return_perplexity=objective_1 == "perplexity"
     )
-    num_params = compute_parameters(model)
-    return float(val_loss), num_params
+
+    if objective_2 == "parameters":
+        obj_2 = compute_parameters(model)
+    elif objective_2 == "latency":
+        obj_2 = compute_latency(model, device=model.lm_head.weight.device)
+    elif objective_2 == "flops":
+        obj_2 = compute_flops(model, previous_device=model.lm_head.weight.device)
+
+    return float(val_loss), obj_2
 
 
 def main(
@@ -176,7 +191,13 @@ def main(
     eval: EvalArgs,
     search: SearchArgs,
     param_bins: Optional[ParamBinArgs] = None,
+    objective_1: str = "val_loss",
+    objective_2: str = "parameters",
+    log_objective_names: bool = True,
 ) -> None:
+    assert objective_1 in ["val_loss", "perplexity"], f"Invalid objective_1: {objective_1}, must be 'val_loss' or 'perplexity'"
+    assert objective_2 in ["parameters", "latency", "flops"], f"Invalid objective_2: {objective_2}, must be 'parameters', 'latency' or 'flops'"
+
     fabric.seed_everything(seed)
 
     tokenizer = Tokenizer(checkpoint_dir)
@@ -205,7 +226,7 @@ def main(
         fabric.print(f"Resuming training from {resume}")
         fabric.load(resume, state)
     else:
-        load_checkpoint(fabric, state["model"], checkpoint_path)
+        load_checkpoint(fabric, model, checkpoint_path)
 
     train_time = time.perf_counter()
 
@@ -241,12 +262,16 @@ def main(
             "model": model,
             "val_dataloader": val_dataloader,
             "eval": eval,
+            "objective_1": objective_1,
+            "objective_2": objective_2,
         },
         search_strategy=search.search_strategy,
         num_samples=search.iterations,
         seed=seed,
         logger=fabric.logger,
         param_bins=bins,
+        objective_1_name=objective_1 if log_objective_names else "objective_1",
+        objective_2_name=objective_2 if log_objective_names else "objective_2",
     )
     training_time = time.perf_counter() - train_time
 
