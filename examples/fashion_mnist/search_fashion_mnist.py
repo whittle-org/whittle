@@ -34,9 +34,7 @@ def objective(
     )
 
     mac = 0
-    mac += compute_mac_linear_layer(
-        model.fc_base.in_features, model.fc_base.out_features
-    )
+    mac += compute_mac_linear_layer(model.fc_base.in_features, model.fc_base.out_features)
     mac += compute_mac_linear_layer(model.fc1.in_features, config["fc1_out"])
     mac += compute_mac_linear_layer(config["fc1_out"], config["fc2_out"])
     mac += compute_mac_linear_layer(config["fc2_out"], 10)

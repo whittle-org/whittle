@@ -1,11 +1,11 @@
 # Code adapted from https://github.com/IST-DASLab/sparsegpt/blob/master/datautils.py
+from __future__ import annotations
 
 import random
 
 import torch
-from torch.utils.data import TensorDataset
 from datasets import load_dataset
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 
 # Wrapper for tokenized input IDs
