@@ -170,9 +170,11 @@ def _objective(
         model,
         val_dataloader,
         max_iters=eval.max_iters,
-        verbose=verbose,
-        return_perplexity=objective_1 == "perplexity",
+        verbose=verbose
     )
+
+    if objective_1 == "perplexity":
+        val_loss = torch.exp(val_loss)
 
     if objective_2 == "parameters":
         obj_2 = compute_parameters(model)
