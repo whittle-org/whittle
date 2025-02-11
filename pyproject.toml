@@ -2,11 +2,14 @@
 name = "whittle"
 version = "0.4.1"
 description = "Two-stage neural architecture search for large language models"
+# alphabetic order
 authors = [
-    { name = "Aaron Klein" },
-    { name = "Arber Zela" },
-    { name = "Rhea Sukthanker" },
-    { name = "Timur Carstensen" },
+    {name = "Timur Carstensen"},
+    {name = "Gabriela Kadlecová"},
+    {name = "Aaron Klein"},
+    {name = "Hannan Mahadik"},
+    {name = "Rhea Sukthanker"},
+    {name = "Arber Zela"},
 ]
 license = { file = "LICENSE" }
 readme = "README.md"
