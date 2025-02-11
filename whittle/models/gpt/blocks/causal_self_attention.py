@@ -107,9 +107,9 @@ class CausalSelfAttention(nn.Module):
         mask: torch.Tensor | None = None,
         input_pos: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        assert (
-            self.sub_network_n_embd is not None
-        ), "You need to call `gpt.set_sub_network()"
+        assert self.sub_network_n_embd is not None, (
+            "You need to call `gpt.set_sub_network()"
+        )
         (
             B,
             T,
