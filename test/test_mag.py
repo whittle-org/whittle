@@ -1,11 +1,11 @@
+from __future__ import annotations
+
 import pytest
 import torch
-
 from litgpt.config import Config
 
-from whittle.models.gpt import GPT
 from whittle.metrics.mag import compute_weight_magnitude
-
+from whittle.models.gpt import GPT
 
 mlp_types = ["GptNeoxMLP", "LLaMAMLP", "GemmaMLP"]
 norm_types = ["LayerNorm", "RMSNorm"]
