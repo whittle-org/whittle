@@ -134,7 +134,7 @@ select = [
     "INP001", # https://docs.astral.sh/ruff/rules/implicit-namespace-package/#implicit-namespace-package-inp001
     "I",
 ]
-ignore = []
+ignore = ["UP038"]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
