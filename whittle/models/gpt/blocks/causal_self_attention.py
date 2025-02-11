@@ -77,9 +77,7 @@ class CausalSelfAttention(nn.Module):
             self.sub_network_query_groups
         )
         if self.config.attention_scores_scalar:
-            self.sub_attention_scaler = (
-                self.sub_network_n_embd // self.sub_network_n_head
-            )
+            self.sub_attention_scaler = self.sub_network_n_embd // self.sub_network_n_head
         else:
             self.sub_attention_scaler = self.config.attention_scores_scalar
 
@@ -107,9 +105,9 @@ class CausalSelfAttention(nn.Module):
         mask: torch.Tensor | None = None,
         input_pos: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        assert (
-            self.sub_network_n_embd is not None
-        ), "You need to call `gpt.set_sub_network()"
+        assert self.sub_network_n_embd is not None, (
+            "You need to call `gpt.set_sub_network()"
+        )
         (
             B,
             T,

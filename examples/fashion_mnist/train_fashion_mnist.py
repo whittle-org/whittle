@@ -3,10 +3,9 @@ from __future__ import annotations
 import json
 import os
 from argparse import ArgumentParser
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
-from tqdm import trange
 import numpy as np
 import pandas as pd
 import torch
@@ -17,6 +16,7 @@ from tabulate import tabulate
 from torch.utils.data import DataLoader, random_split
 from torchvision import datasets
 from torchvision.transforms import ToTensor
+from tqdm import trange
 
 from examples.fashion_mnist.model import LeNet
 from whittle.sampling.random_sampler import RandomSampler

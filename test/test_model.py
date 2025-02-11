@@ -28,9 +28,7 @@ def test_gpt():
     gpt.transformer.wte.weight.data = torch.randn_like(gpt.transformer.wte.weight.data)
     gpt.lm_head.weight.data = torch.randn_like(gpt.lm_head.weight.data)
     gpt.lm_head.bias.data = torch.randn_like(gpt.lm_head.bias.data)
-    gpt.transformer.ln_f.weight.data = torch.randn_like(
-        gpt.transformer.ln_f.weight.data
-    )
+    gpt.transformer.ln_f.weight.data = torch.randn_like(gpt.transformer.ln_f.weight.data)
 
     for block in gpt.transformer.h:
         block.attn.attn.weight.data = torch.randn_like(block.attn.attn.weight.data)
