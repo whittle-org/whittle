@@ -19,13 +19,14 @@ class DistillLoss(nn.Module):
         kldiv (nn.KLDivLoss): The KL divergence loss function.
     """
 
-    def __init__(self, temperature, distillation_weight):
+    def __init__(self, temperature, distillation_weight, reverse_kd=False):
         """
         Initializes the DistillLoss module.
 
         Args:
             temperature (float): The temperature for distillation.
             distillation_weight (float): The weight factor for the distillation loss.
+            reverse_kd (bool): Whether to use the forward or reverse KL divergence (default: False).
         """
         super().__init__()
 
@@ -51,16 +52,22 @@ class DistillLoss(nn.Module):
         """
         soft_target_loss = 0
         outputs_teacher = outputs_teacher.detach()
+
         if outputs_teacher is not None and self.distillation_weight > 0:
             soft_target_loss = self.kldiv(
                 F.log_softmax(outputs / self.temperature, dim=1),
                 F.softmax(outputs_teacher / self.temperature, dim=1),
             ) * (self.temperature**2)
 
-        hard_target_loss = F.cross_entropy(outputs, labels, reduction="mean")
+        hard_target_loss = F.cross_entropy(
+            outputs.reshape(-1, outputs.size(-1)), 
+            labels.reshape(-1),
+            reduction="mean"
+        )
 
         total_loss = soft_target_loss * self.distillation_weight + hard_target_loss * (
             1 - self.distillation_weight
         )
 
         return total_loss
+
