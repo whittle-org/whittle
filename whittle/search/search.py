@@ -97,10 +97,10 @@ def multi_objective_search(
         runtime.append(time.time() - start_time)
 
         observation = {
-            'iteration': i,
+            "iteration": i,
             objective_1_name: float(objective_1),
             objective_2_name: float(objective_2),
-            'runtime': runtime[-1],            
+            "runtime": runtime[-1],
         }
 
         print(observation)

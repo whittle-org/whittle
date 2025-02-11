@@ -39,7 +39,7 @@ def setup(
     if out_dir is None:
         out_dir = checkpoint_dir / "eval"
 
-    metrics_path = out_dir / 'metrics.json'
+    metrics_path = out_dir / "metrics.json"
 
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -52,9 +52,11 @@ def setup(
     model.name_or_path = tokenizer_name_or_path  # WhittleLM loads AutoTokenizer inside
 
     metrics = {}
-    metrics['parameters'] = compute_parameters(model)
-    metrics['flops'] = compute_flops(model)
-    metrics['latency'] = compute_latency(model, batch_size=latency_batch_size, device=device)
+    metrics["parameters"] = compute_parameters(model)
+    metrics["flops"] = compute_flops(model)
+    metrics["latency"] = compute_latency(
+        model, batch_size=latency_batch_size, device=device
+    )
 
     metrics_path.write_text(json.dumps(metrics, indent=2))
 
@@ -75,4 +77,5 @@ def setup(
 
 if __name__ == "__main__":
     from jsonargparse import CLI
+
     CLI(setup)

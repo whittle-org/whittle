@@ -6,8 +6,8 @@ from typing import Optional
 
 
 def load_sub_network_results(eval_path: Path) -> dict:
-    metrics_path = eval_path / 'metrics.json'
-    results_path = eval_path / 'results.json'
+    metrics_path = eval_path / "metrics.json"
+    results_path = eval_path / "results.json"
 
     metrics = json.loads(metrics_path.read_text())
     results = json.loads(results_path.read_text())
@@ -15,21 +15,17 @@ def load_sub_network_results(eval_path: Path) -> dict:
 
     # process metrics - parameters, flops, latency
     for m_key, m_value in metrics.items():
-        sub_network_results.append({
-            'task': '_metrics',
-            'metric': m_key,
-            'score': m_value
-        })
+        sub_network_results.append(
+            {"task": "_metrics", "metric": m_key, "score": m_value}
+        )
 
     # process lm_eval_harness results
-    tasks = results['results']
+    tasks = results["results"]
     for task, task_metrics in tasks.items():
         for m_key, m_value in task_metrics.items():
-            sub_network_results.append({
-                'task': task,
-                'metric': m_key.replace(',none', ''),
-                'score': m_value
-            })
+            sub_network_results.append(
+                {"task": task, "metric": m_key.replace(",none", ""), "score": m_value}
+            )
 
     return sub_network_results
 
@@ -37,7 +33,7 @@ def load_sub_network_results(eval_path: Path) -> dict:
 def setup(
     results_dir: Path,
     output_path: Optional[Path] = None,
-    pareto_path: Optional[Path] = None
+    pareto_path: Optional[Path] = None,
 ) -> None:
     """
     Load and process evaluation results from a directory containing sub-network evaluation results.
@@ -49,7 +45,7 @@ def setup(
     """
 
     if output_path is None:
-        output_path = results_dir / 'sub_network_results.csv'
+        output_path = results_dir / "sub_network_results.csv"
 
     pareto_front = None
     if pareto_path is not None:
@@ -63,17 +59,21 @@ def setup(
         if eval_path.is_dir():
             sub_network_name = eval_path.name
             try:
-                sub_network_results = load_sub_network_results(eval_path / 'eval')
+                sub_network_results = load_sub_network_results(eval_path / "eval")
                 # every metric of the network is a new row
                 for sub_res in sub_network_results:
-                    entry = {'sub_network': sub_network_name, **sub_res}
+                    entry = {"sub_network": sub_network_name, **sub_res}
                     if pareto_front is not None:
-                        entry['pareto'] = str(eval_path.absolute() / 'lit_model.pth') in pareto_front
+                        entry["pareto"] = (
+                            str(eval_path.absolute() / "lit_model.pth") in pareto_front
+                        )
 
                     full_results.append(entry)
-            
+
             except FileNotFoundError:
-                print(f"Skipping {eval_path} as it does not contain evaluation results.")
+                print(
+                    f"Skipping {eval_path} as it does not contain evaluation results."
+                )
                 continue
 
     results = pd.DataFrame(full_results)
@@ -82,4 +82,5 @@ def setup(
 
 if __name__ == "__main__":
     from jsonargparse import CLI
+
     CLI(setup)

@@ -165,7 +165,12 @@ def _objective(
 ) -> tuple[float, float]:
     model.select_sub_network(config)
     val_loss = validate(
-        fabric, model, val_dataloader, max_iters=eval.max_iters, verbose=verbose, return_perplexity=objective_1 == "perplexity"
+        fabric,
+        model,
+        val_dataloader,
+        max_iters=eval.max_iters,
+        verbose=verbose,
+        return_perplexity=objective_1 == "perplexity",
     )
 
     if objective_2 == "parameters":
@@ -195,8 +200,15 @@ def main(
     objective_2: str = "parameters",
     log_objective_names: bool = True,
 ) -> None:
-    assert objective_1 in ["val_loss", "perplexity"], f"Invalid objective_1: {objective_1}, must be 'val_loss' or 'perplexity'"
-    assert objective_2 in ["parameters", "latency", "flops"], f"Invalid objective_2: {objective_2}, must be 'parameters', 'latency' or 'flops'"
+    assert objective_1 in [
+        "val_loss",
+        "perplexity",
+    ], f"Invalid objective_1: {objective_1}, must be 'val_loss' or 'perplexity'"
+    assert objective_2 in [
+        "parameters",
+        "latency",
+        "flops",
+    ], f"Invalid objective_2: {objective_2}, must be 'parameters', 'latency' or 'flops'"
 
     fabric.seed_everything(seed)
 
