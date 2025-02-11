@@ -2,6 +2,8 @@
 Adapted from the original LitGPT code.
 """
 
+from __future__ import annotations
+
 import os
 from contextlib import redirect_stdout
 from io import StringIO
@@ -9,14 +11,12 @@ from unittest import mock
 from unittest.mock import ANY, Mock
 
 import torch
-from torch.utils.data import DataLoader
-
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import Config
-
-from whittle import pretrain_super_network
+from torch.utils.data import DataLoader
 
 from test.conftest import RunIf
+from whittle import pretrain_super_network
 
 
 @RunIf(min_cuda_gpus=1, standalone=True)

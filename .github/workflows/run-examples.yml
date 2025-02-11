@@ -5,9 +5,9 @@ concurrency:
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 jobs:
   test-examples:
     runs-on: ubuntu-latest
@@ -26,11 +26,11 @@ jobs:
           cache-dependency-glob: "**/pyproject.toml"
       - name: Run sinc example
         run: |
-          uv run python -m examples.sinc.sinc_nas
-          uv run python -m examples.sinc.search
+          uv run --all-extras python -m examples.sinc.sinc_nas
+          uv run --all-extras python -m examples.sinc.search
       - name: Run fashion MNIST example
         run: |
-          uv run python -m examples.fashion_mnist.train_fashion_mnist
-          uv run python -m examples.fashion_mnist.search_fashion_mnist
+          uv run --all-extras python -m examples.fashion_mnist.train_fashion_mnist
+          uv run --all-extras python -m examples.fashion_mnist.search_fashion_mnist
       - name: Run flops profiling
-        run: uv run python -m examples.profile.profile_flops
+        run: uv run --all-extras python -m examples.profile.profile_flops

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+
 import numpy as np
 
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy

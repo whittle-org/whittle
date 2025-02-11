@@ -1,15 +1,15 @@
 from __future__ import annotations
+
 import logging
 
 import torch.nn as nn
 
 from whittle.models.gpt import GPT
-from whittle.models.gpt.blocks import CausalSelfAttention
+from whittle.models.gpt.blocks import CausalSelfAttention, GemmaMLP, GptNeoxMLP, LLaMAMLP
 from whittle.modules.embedding import Embedding
-from whittle.modules.linear import Linear
 from whittle.modules.layernorm import LayerNorm
+from whittle.modules.linear import Linear
 from whittle.modules.rmsnorm import RMSNorm
-from whittle.models.gpt.blocks import GptNeoxMLP, GemmaMLP, LLaMAMLP
 
 
 def compute_all_parameters(model: nn.Module):
