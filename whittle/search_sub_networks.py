@@ -148,6 +148,7 @@ def setup(
         param_bins if use_param_bins else None,
         objective_1,
         objective_2,
+        log_objective_names,
     )
 
 
