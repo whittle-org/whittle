@@ -65,6 +65,7 @@ dev = [
     "black",                # Allows mkdocstrings to do formatting...
 ]
 distributed = ["deepspeed", "triton==3.0.0"]
+all = ["whittle[dev]", "whittle[distributed]"]
 
 [tool.setuptools.packages.find]
 include = ["whittle", "whittle.*"]
