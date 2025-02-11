@@ -166,11 +166,7 @@ def _objective(
 ) -> tuple[float, float]:
     model.select_sub_network(config)
     val_loss = validate(
-        fabric,
-        model,
-        val_dataloader,
-        max_iters=eval.max_iters,
-        verbose=verbose
+        fabric, model, val_dataloader, max_iters=eval.max_iters, verbose=verbose
     )
 
     if objective_1 == "perplexity":
