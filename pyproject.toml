@@ -43,6 +43,10 @@ classifiers = [
 homepage = "https://github.com/whittle-org/whittle"
 # TODO: documentation = "https://whittle-org.github.io/whittle/"
 
+[project.scripts]
+whittle = "whittle.__main__:main"
+
+
 [project.optional-dependencies]
 dev = [
   # -- deploy --

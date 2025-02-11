@@ -356,7 +356,7 @@ def fit(
             if isinstance(val_loss, float):
                 val_loss = f"{val_loss:.3f}"
             fabric.print(
-                f"Epoch {metrics['epoch']+1} | iter {metrics['iter']} step {metrics['step']} |"
+                f"Epoch {metrics['epoch'] + 1} | iter {metrics['iter']} step {metrics['step']} |"
                 f" loss train: {metrics['loss']:.3f},"
                 f" val: {val_loss} |"
                 f" iter time: {metrics['iter_time'] * 1000:.2f} ms"
@@ -503,7 +503,7 @@ def main(
     # Save final checkpoint
     save_checkpoint(fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth")
 
-    fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
+    fabric.print(f"Training time: {(time.perf_counter() - train_time):.2f}s")
     if fabric.device.type == "cuda":
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 
