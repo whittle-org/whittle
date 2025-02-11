@@ -5,16 +5,16 @@ https://github.com/EleutherAI/gpt-neox/tree/main/megatron/model.
 """
 
 from __future__ import annotations
-from functools import partial
 
+from functools import partial
 from typing import Any
 from typing_extensions import Self
 
 import torch
 import torch.nn as nn
 from litgpt import Config
-from litgpt.model import build_rope_cache
-from litgpt.model import batched_index_select
+from litgpt.model import batched_index_select, build_rope_cache
+
 from whittle.models.gpt.blocks import Block
 from whittle.modules.embedding import Embedding
 from whittle.modules.layernorm import LayerNorm
@@ -148,9 +148,7 @@ class GPT(nn.Module):
                     ],
                     "factor": self.config.rope_adjustments["factor"],
                     "low_freq_factor": self.config.rope_adjustments["low_freq_factor"],
-                    "high_freq_factor": self.config.rope_adjustments[
-                        "high_freq_factor"
-                    ],
+                    "high_freq_factor": self.config.rope_adjustments["high_freq_factor"],
                 }
             else:
                 # Some but not all parameters are specified; raise an error
