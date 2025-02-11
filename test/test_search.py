@@ -53,11 +53,13 @@ bin_tolerance = [0, 1]
 bin_size = [1, 2]
 num_bins = [3, 10]
 
+
 @pytest.mark.parametrize("bin_t", bin_tolerance)
 @pytest.mark.parametrize("bin_s", bin_size)
 @pytest.mark.parametrize("bin_n", num_bins)
 def test_param_bins(bin_t, bin_s, bin_n):
     print(bin_t, bin_s, bin_n)
+
     def params_estimator(config):
         return config["a"]
 
@@ -83,7 +85,7 @@ def test_param_bins(bin_t, bin_s, bin_n):
         # fill the last one unless it'd be filled fully (leave 1 not full)
         if j < bin_s - 1:
             assert bins.put_in_bin({"a": 1 + (bin_n - bin_t - 1) * bin_width})
-        
+
     assert bins.current_bin_length == bin_s
 
     # last bin is not filled fully -> this should be false

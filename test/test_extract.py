@@ -125,7 +125,7 @@ def test_save_config() -> None:
     save_dir.mkdir(parents=True, exist_ok=True)
     save_config(sub_network.config, save_dir)
 
-    cfg = Config.from_file(save_dir / 'model_config.yaml')
+    cfg = Config.from_file(save_dir / "model_config.yaml")
     for key in cfg.__dict__:
         assert cfg.__dict__[key] == sub_network.config.__dict__[key]
 
