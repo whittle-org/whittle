@@ -31,14 +31,12 @@ class LoRAEmbedding(LoRALayer):
         Only LoRA's A and B matrices are updated, pretrained weights stay frozen.
 
         Args:
-            in_features: number of input features of the pretrained weights
-            out_features: number of output features of the pretrained weights
-            r: rank of the weight update matrices. To make sense of using LoRA the rank should be smaller than the rank of
-                the weights of the model. The rank can be as low as 1: https://arxiv.org/pdf/2106.09685.pdf (section 7.2)
-            lora_alpha: alpha is needed for scaling updates as alpha/r
-                "This scaling helps to reduce the need to retune hyperparameters when we vary r"
-                https://arxiv.org/pdf/2106.09685.pdf (section 4.1)
-            lora_dropout: dropout that is applied on the input in the LoRA branch (before multiplying by matrix A)
+            num_embeddings: Number of embeddings in the vocabulary.
+            embedding_dim: Dimension of the embedding vectors.
+            r: Rank of the weight update matrices.
+            lora_alpha: Alpha is needed for scaling updates as alpha/r.
+            lora_dropout: Dropout that is applied on the input in the LoRA branch (before multiplying by matrix A).
+            **kwargs: Additional arguments to be passed to the `torch.nn.Embedding` constructor.
         """
         super().__init__(r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout)
         self.embedding = Embedding(num_embeddings, embedding_dim, **kwargs)

@@ -17,7 +17,13 @@ class LoRAConfig(BaseConfig):
             "This scaling helps to reduce the need to retune hyperparameters when we vary r"
             https://arxiv.org/pdf/2106.09685.pdf (section 4.1)
         lora_dropout: dropout that is applied on the input in the LoRA branch (before multiplying by matrix A)
-        lora_*: whether to apply LoRA to the specified weights or not
+        lora_query: whether to apply LoRA to the query
+        lora_key: whether to apply LoRA to the key
+        lora_value: whether to apply LoRA to the value
+        lora_projection: whether to apply LoRA to the projection
+        lora_mlp: whether to apply LoRA to the MLP
+        lora_head: whether to apply LoRA to the head
+        lora_emb: whether to apply LoRA to the embedding
     """
 
     lora_r: int = 4
