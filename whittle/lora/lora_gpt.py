@@ -1,5 +1,5 @@
 from whittle.models.gpt.model import GPT as BaseModel
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from typing_extensions import Self
 
 import torch
@@ -11,7 +11,6 @@ from whittle.lora.config import LoRAConfig as Config
 from whittle.lora.lora_linear import LoRALinear
 from whittle.lora.lora_embedding import LoRAEmbedding
 from whittle.lora.lora_block import LoRABlock as Block
-from typing import Union
 from litgpt.utils import map_old_state_dict_weights
 
 
@@ -51,8 +50,8 @@ class GPT(BaseModel):
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
         self.sub_network_n_layers = self.config.n_layer
-        self.sub_network_head_size: int | None = self.config.head_size
-        self.sub_network_query_groups: int | None = self.config.n_query_groups
+        self.sub_network_head_size: Union[int, None] = self.config.head_size
+        self.sub_network_query_groups: Union[int, None] = self.config.n_query_groups
         self.sub_network_rope_n_elem = self.config.rope_n_elem
         self.cos: torch.Tensor
         self.sin: torch.Tensor

@@ -1,3 +1,4 @@
+from typing import Union
 import torch.nn as nn
 from whittle.models.gpt.blocks import Block as BaseBlock
 from whittle.lora.lora_attention import CausalSelfAttention
@@ -28,7 +29,7 @@ class LoRABlock(BaseBlock):
             else nn.Identity()
         )
         self.attn = CausalSelfAttention(config, block_idx)
-        self.norm_2: LayerNorm | RMSNorm | None = (
+        self.norm_2: Union[LayerNorm, RMSNorm, None] = (
             None
             if config.shared_attention_norm
             else self.norm_class()(config.n_embd, eps=config.norm_eps)
