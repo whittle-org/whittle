@@ -8,7 +8,6 @@ from litgpt.model import GPT as LitGPT
 from whittle.lora.lora_gpt import GPT
 
 
-
 def test_gpt():
     torch.manual_seed(0)
     config = Config()
@@ -42,7 +41,9 @@ def test_gpt():
     litconfig.lm_head_bias = True
     litconfig.fix_head_size = False
     gpt = GPT(config)
-    gpt.transformer.wte.embedding.weight.data = torch.randn_like(gpt.transformer.wte.embedding.weight.data)
+    gpt.transformer.wte.embedding.weight.data = torch.randn_like(
+        gpt.transformer.wte.embedding.weight.data
+    )
     gpt.lm_head.linear.weight.data = torch.randn_like(gpt.lm_head.linear.weight.data)
     gpt.lm_head.linear.bias.data = torch.randn_like(gpt.lm_head.linear.bias.data)
     gpt.transformer.ln_f.weight.data = torch.randn_like(
@@ -50,16 +51,36 @@ def test_gpt():
     )
 
     for block in gpt.transformer.h:
-        block.attn.attn.linear.weight.data = torch.randn_like(block.attn.attn.linear.weight.data)
-        block.attn.attn.linear.bias.data = torch.randn_like(block.attn.attn.linear.bias.data)
-        block.attn.proj.linear.bias.data = torch.randn_like(block.attn.proj.linear.bias.data)
-        block.attn.proj.linear.weight.data = torch.randn_like(block.attn.proj.linear.weight.data)
-        block.mlp.fc_1.linear.weight.data = torch.randn_like(block.mlp.fc_1.linear.weight.data)
-        block.mlp.fc_1.linear.bias.data = torch.randn_like(block.mlp.fc_1.linear.bias.data)
-        block.mlp.fc_2.linear.weight.data = torch.randn_like(block.mlp.fc_2.linear.weight.data)
-        block.mlp.fc_2.linear.bias.data = torch.randn_like(block.mlp.fc_2.linear.bias.data)
-        block.mlp.proj.linear.weight.data = torch.randn_like(block.mlp.proj.linear.weight.data)
-        block.mlp.proj.linear.bias.data = torch.randn_like(block.mlp.proj.linear.bias.data)
+        block.attn.attn.linear.linear.weight.data = torch.randn_like(
+            block.attn.attn.linear.linear.weight.data
+        )
+        block.attn.attn.linear.linear.bias.data = torch.randn_like(
+            block.attn.attn.linear.linear.bias.data
+        )
+        block.attn.proj.linear.bias.data = torch.randn_like(
+            block.attn.proj.linear.bias.data
+        )
+        block.attn.proj.linear.weight.data = torch.randn_like(
+            block.attn.proj.linear.weight.data
+        )
+        block.mlp.fc_1.linear.weight.data = torch.randn_like(
+            block.mlp.fc_1.linear.weight.data
+        )
+        block.mlp.fc_1.linear.bias.data = torch.randn_like(
+            block.mlp.fc_1.linear.bias.data
+        )
+        block.mlp.fc_2.linear.weight.data = torch.randn_like(
+            block.mlp.fc_2.linear.weight.data
+        )
+        block.mlp.fc_2.linear.bias.data = torch.randn_like(
+            block.mlp.fc_2.linear.bias.data
+        )
+        block.mlp.proj.linear.weight.data = torch.randn_like(
+            block.mlp.proj.linear.weight.data
+        )
+        block.mlp.proj.linear.bias.data = torch.randn_like(
+            block.mlp.proj.linear.bias.data
+        )
         block.norm_1.weight.data = torch.randn_like(block.norm_1.weight.data)
         block.norm_2.weight.data = torch.randn_like(block.norm_2.weight.data)
 
@@ -75,8 +96,8 @@ def test_gpt():
     lit_gpt.transformer.ln_f.weight.data = gpt.transformer.ln_f.weight.data
     for i, block in enumerate(lit_gpt.transformer.h):
         block_orig = gpt.transformer.h[i]
-        block.attn.attn.weight.data = block_orig.attn.attn.linear.weight.data
-        block.attn.attn.bias.data = block_orig.attn.attn.linear.bias.data
+        block.attn.attn.weight.data = block_orig.attn.attn.linear.linear.weight.data
+        block.attn.attn.bias.data = block_orig.attn.attn.linear.linear.bias.data
         block.attn.proj.bias.data = block_orig.attn.proj.linear.bias.data
         block.attn.proj.weight.data = block_orig.attn.proj.linear.weight.data
         block.mlp.fc_1.weight.data = block_orig.mlp.fc_1.linear.weight.data
@@ -96,7 +117,7 @@ def test_gpt():
         sub_network_num_heads=4,
         sub_network_n_layers=1,
         sub_network_query_groups=2,
-        sub_network_head_size=config.head_size
+        sub_network_head_size=config.head_size,
     )
     out_small = gpt(input)
     assert out_small.shape == (1, 64, 128)
@@ -111,9 +132,11 @@ def test_gpt():
         : gpt.lm_head.sub_network_out_features, : gpt.lm_head.sub_network_in_features
     ]
     lit_gpt_small.lm_head.bias.data = gpt.lm_head.linear.bias.data[:]
-    lit_gpt_small.transformer.wte.weight.data = gpt.transformer.wte.embedding.weight.data[
-        :, : gpt.transformer.wte.sub_network_embedding_dim
-    ]
+    lit_gpt_small.transformer.wte.weight.data = (
+        gpt.transformer.wte.embedding.weight.data[
+            :, : gpt.transformer.wte.sub_network_embedding_dim
+        ]
+    )
     lit_gpt_small.transformer.ln_f.weight.data = gpt.transformer.ln_f.weight.data[
         : gpt.transformer.ln_f.sub_network_in_features
     ]
@@ -121,20 +144,24 @@ def test_gpt():
     for i, block in enumerate(lit_gpt_small.transformer.h):
         block_orig = gpt.transformer.h[i]
         if block_orig.attn.qkv_indices is not None:
-            block.attn.attn.weight.data = block_orig.attn.attn.linear.weight.data[
-                block_orig.attn.qkv_indices,
-                : block_orig.attn.attn.sub_network_in_features,
-            ]
-            block.attn.attn.bias.data = block_orig.attn.attn.linear.bias.data[
+            block.attn.attn.weight.data = (
+                block_orig.attn.attn.linear.linear.weight.data[
+                    block_orig.attn.qkv_indices,
+                    : block_orig.attn.attn.sub_network_in_features,
+                ]
+            )
+            block.attn.attn.bias.data = block_orig.attn.attn.linear.linear.bias.data[
                 block_orig.attn.qkv_indices
             ]
             print(torch.tensor(block_orig.attn.qkv_indices).shape)
         else:
-            block.attn.attn.weight.data = block_orig.attn.attn.linear.weight.data[
-                : block_orig.attn.attn.sub_network_out_features,
-                : block_orig.attn.attn.sub_network_in_features,
-            ]
-            block.attn.attn.bias.data = block_orig.attn.attn.linear.bias.data[
+            block.attn.attn.weight.data = (
+                block_orig.attn.attn.linear.linear.weight.data[
+                    : block_orig.attn.attn.sub_network_out_features,
+                    : block_orig.attn.attn.sub_network_in_features,
+                ]
+            )
+            block.attn.attn.bias.data = block_orig.attn.attn.linear.linear.bias.data[
                 : block_orig.attn.attn.sub_network_out_features
             ]
         if block_orig.attn.proj_indices is not None:
@@ -198,6 +225,7 @@ def copy_weights(model_source, model_target):
             if param_source.shape == param_target.shape:
                 param_source.data.copy_(param_target.data)
                 print(f"Copying {name} to {target_name}")
+
 
 def test_llama_3_1():
     config_llama = Config.from_name(

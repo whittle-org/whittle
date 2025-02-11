@@ -53,11 +53,18 @@ attention_configs = {
 def init_attention(config):
     attention = CausalSelfAttention(config, 2)
     torch.manual_seed(0)
-    attention.attn.linear.weight.data = torch.randn_like(attention.attn.linear.weight.data)
-    attention.attn.linear.bias.data = torch.randn_like(attention.attn.linear.bias.data)
+    attention.attn.linear.linear.weight.data = torch.randn_like(
+        attention.attn.linear.linear.weight.data
+    )
+    attention.attn.linear.linear.bias.data = torch.randn_like(
+        attention.attn.linear.linear.bias.data
+    )
     attention.proj.linear.bias.data = torch.randn_like(attention.proj.linear.bias.data)
-    attention.proj.linear.weight.data = torch.randn_like(attention.proj.linear.weight.data)
+    attention.proj.linear.weight.data = torch.randn_like(
+        attention.proj.linear.weight.data
+    )
     return attention
+
 
 def init_lit_attention(config):
     attention = LitCausalSelfAttention(config, 2)
@@ -73,14 +80,26 @@ def init_lit_small_attention(config, base_attention, attention_super):
     attention = LitCausalSelfAttention(config, 2)
     torch.manual_seed(0)
     slices = tuple(slice(0, s) for s in attention.attn.weight.data.size())[1]
-    qkv_indices = attention_super.qkv_indices if attention_super.qkv_indices is not None else slice(0,attention.attn.weight.data.size()[0])
-    attention.attn.weight.data = base_attention.attn.weight.data[qkv_indices,:][:,0:attention.attn.weight.data.size()[1]]
+    qkv_indices = (
+        attention_super.qkv_indices
+        if attention_super.qkv_indices is not None
+        else slice(0, attention.attn.weight.data.size()[0])
+    )
+    attention.attn.weight.data = base_attention.attn.weight.data[qkv_indices, :][
+        :, 0 : attention.attn.weight.data.size()[1]
+    ]
     attention.attn.bias.data = base_attention.attn.bias.data[qkv_indices]
-    proj_indices = attention_super.proj_indices if attention_super.proj_indices is not None else slice(0,attention.proj.weight.data.size()[-1])
+    proj_indices = (
+        attention_super.proj_indices
+        if attention_super.proj_indices is not None
+        else slice(0, attention.proj.weight.data.size()[-1])
+    )
     slices = tuple(slice(0, s) for s in attention.proj.bias.data.size())
     attention.proj.bias.data = base_attention.proj.bias.data[slices]
-    
-    attention.proj.weight.data = base_attention.proj.weight.data[0:attention.proj.weight.data.size()[0],:][:,proj_indices]
+
+    attention.proj.weight.data = base_attention.proj.weight.data[
+        0 : attention.proj.weight.data.size()[0], :
+    ][:, proj_indices]
     return attention
 
 
@@ -108,7 +127,7 @@ def test_attention(attention_config):
     lit_attention = init_lit_attention(config)
     out_lit_large = lit_attention(input, mask=mask, cos=cos, sin=sin)
     if not config.fix_head_size:
-        sub_network_head_size = config.head_size//2
+        sub_network_head_size = config.head_size // 2
     else:
         sub_network_head_size = config.head_size
     if config.n_query_groups == 1:
@@ -119,7 +138,7 @@ def test_attention(attention_config):
         sub_network_query_groups = sub_network_n_head
     else:
         sub_network_query_groups = config.n_query_groups // 2
-        sub_network_n_head = (config.n_head//2)
+        sub_network_n_head = config.n_head // 2
     attention.set_sub_network(
         sub_network_n_embd=config.n_embd // 2,
         sub_network_n_head=sub_network_n_head,
@@ -142,7 +161,9 @@ def test_attention(attention_config):
     if config.n_query_groups == config.n_head:
         config.n_head = attention.sub_network_n_head
     else:
-        config.n_head = (attention.sub_network_n_head//config.n_query_groups)*attention.sub_network_query_groups
+        config.n_head = (
+            attention.sub_network_n_head // config.n_query_groups
+        ) * attention.sub_network_query_groups
     config.n_query_groups = attention.sub_network_query_groups
     config.head_size = attention.sub_network_head_size
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)

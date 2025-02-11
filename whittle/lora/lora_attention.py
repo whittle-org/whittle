@@ -2,23 +2,23 @@ from whittle.models.gpt.blocks.causal_self_attention import (
     CausalSelfAttention as BaseCausalSelfAttention,
 )
 from whittle.lora.lora_qkv_linear import LoRAQKVLinear
-from whittle.lora.lora_linear import LoRALinear, LoRALinearProj
+from whittle.lora.lora_linear import LoRALinearProj
 from whittle.lora.config import LoRAConfig as Config
-from typing import Dict, Any, Tuple, Optional
+from typing import Any, Optional
 import torch
-import torch.nn as nn
 from litgpt.utils import map_old_state_dict_weights
 from litgpt.model import KVCache
+
 
 class CausalSelfAttention(BaseCausalSelfAttention):
     def __init__(self, config: Config, block_idx: int) -> None:
         # Skip the parent class __init__ altogether and replace it to avoid
         # useless allocations
-        nn.Module.__init__(self)
+        super().__init__(config=config, block_idx=block_idx)
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
         self.attn = LoRAQKVLinear(
-            config = config,
+            config=config,
             in_features=config.n_embd,
             out_features=shape,
             r=config.lora_r,
@@ -119,7 +119,15 @@ class CausalSelfAttention(BaseCausalSelfAttention):
         )
         self.sub_network_q_per_kv = int(q_per_kv)
         self.qkv_indices = self.get_qkv_indices()
-        self.attn.set_sub_network(self.sub_network_n_embd, self.sub_network_qkv_shape, self.sub_network_n_head, self.sub_network_query_groups, self.sub_network_head_size, qkv_indices=self.qkv_indices, sub_network_q_per_kv=self.q_per_kv)
+        self.attn.set_sub_network(
+            self.sub_network_n_embd,
+            self.sub_network_qkv_shape,
+            qkv_indices=self.qkv_indices,
+            sub_network_n_head=self.sub_network_n_head,
+            sub_network_query_groups=self.sub_network_query_groups,
+            sub_network_head_size=self.sub_network_head_size,
+            sub_network_q_per_kv=self.q_per_kv,
+        )
         self.proj_indices = self.get_proj_indices()
         self.proj.set_sub_network(
             self.sub_network_head_size
@@ -136,7 +144,7 @@ class CausalSelfAttention(BaseCausalSelfAttention):
             self.sub_attention_scaler = self.config.attention_scores_scalar
 
     def _load_from_state_dict(
-        self, state_dict: Dict, prefix: str, *args: Any, **kwargs: Any
+        self, state_dict: dict, prefix: str, *args: Any, **kwargs: Any
     ) -> None:
         """For compatibility with base checkpoints."""
         mapping = {

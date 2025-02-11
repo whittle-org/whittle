@@ -1,15 +1,17 @@
-from whittle.models.gpt.blocks.mlp import GptNeoxMLP as GptNeoxMLPBase, LLaMAMLP as LLaMAMLPBase
+from whittle.models.gpt.blocks.mlp import (
+    GptNeoxMLP as GptNeoxMLPBase,
+    LLaMAMLP as LLaMAMLPBase,
+)
 from whittle.lora.lora_linear import LoRALinear
 from litgpt.config import Config
-from typing import Dict, Tuple, Any
+from typing import Any
 import torch
-import torch.nn as nn
 from litgpt.utils import map_old_state_dict_weights
 
 
 class LoRAGptNeoxMLP(GptNeoxMLPBase):
     def __init__(self, config: Config) -> None:
-        nn.Module.__init__(self)
+        super().__init__(config)
         self.in_features = config.n_embd
         self.intermediate_size = config.intermediate_size
         self.fc = LoRALinear(
@@ -32,7 +34,7 @@ class LoRAGptNeoxMLP(GptNeoxMLPBase):
         self.config = config
 
     def _load_from_state_dict(
-        self, state_dict: Dict, prefix: str, *args: Any, **kwargs: Any
+        self, state_dict: dict, prefix: str, *args: Any, **kwargs: Any
     ) -> None:
         """For compatibility with base checkpoints."""
         mapping = {
@@ -47,7 +49,7 @@ class LoRAGptNeoxMLP(GptNeoxMLPBase):
 
 class LoRALLaMAMLP(LLaMAMLPBase):
     def __init__(self, config: Config) -> None:
-        nn.Module.__init__(self)
+        super().__init__(config)
         self.in_features = config.n_embd
         self.intermediate_size = config.intermediate_size
         self.fc_1 = LoRALinear(
@@ -78,7 +80,7 @@ class LoRALLaMAMLP(LLaMAMLPBase):
         self.config = config
 
     def _load_from_state_dict(
-        self, state_dict: Dict, prefix: str, *args: Any, **kwargs: Any
+        self, state_dict: dict, prefix: str, *args: Any, **kwargs: Any
     ) -> None:
         """For compatibility with base checkpoints."""
         mapping = {

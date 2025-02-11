@@ -1,27 +1,23 @@
 from whittle.models.gpt.model import GPT as BaseModel
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 from typing_extensions import Self
 
 import torch
 import torch.nn as nn
 
 from whittle.lora.config import LoRAConfig as Config
-from litgpt.model import build_rope_cache
 
 # from whittle.models.gpt.blocks import Block
-from whittle.modules.linear import Linear
-from whittle.modules.rmsnorm import RMSNorm
-from whittle.modules.layernorm import LayerNorm
 from whittle.lora.lora_linear import LoRALinear
 from whittle.lora.lora_embedding import LoRAEmbedding
 from whittle.lora.lora_block import LoRABlock as Block
-from typing import Union, Dict, Tuple, Any, List
+from typing import Union
 from litgpt.utils import map_old_state_dict_weights
 
 
 class GPT(BaseModel):
     def __init__(self, config: Config) -> None:
-        nn.Module.__init__(self)
+        super().__init__(config)
         assert config.padded_vocab_size is not None
         self.config = config
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -70,7 +66,7 @@ class GPT(BaseModel):
         idx: torch.Tensor,
         input_pos: Optional[torch.Tensor] = None,
         lm_head_chunk_size: int = 0,
-    ) -> Union[torch.Tensor, List[torch.Tensor]]:
+    ) -> Union[torch.Tensor, list[torch.Tensor]]:
         T = idx.size(1)
         if self.max_seq_length < T:
             raise ValueError(
@@ -111,28 +107,7 @@ class GPT(BaseModel):
             module.reset_parameters()
 
     def _load_from_state_dict(
-        self, state_dict: Dict, prefix: str, *args: Any, **kwargs: Any
-    ) -> None:
-        """For compatibility with base checkpoints."""
-        mapping = {
-            "lm_head.weight": "lm_head.linear.weight",
-            "lm_head.bias": "lm_head.linear.bias",
-        }
-        state_dict = map_old_state_dict_weights(state_dict, mapping, prefix)
-        super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
-
-    @classmethod
-    def from_name(cls, name: str, **kwargs: Any) -> Self:
-        return cls(Config.from_name(name, **kwargs))
-
-    def _init_weights(self, module: nn.Module) -> None:
-        """Meant to be used with `gpt.apply(gpt._init_weights)`. Unused method left for completeness."""
-        super()._init_weights(module)
-        if isinstance(module, LoRALinear):
-            module.reset_parameters()
-
-    def _load_from_state_dict(
-        self, state_dict: Dict, prefix: str, *args: Any, **kwargs: Any
+        self, state_dict: dict, prefix: str, *args: Any, **kwargs: Any
     ) -> None:
         """For compatibility with base checkpoints."""
         mapping = {

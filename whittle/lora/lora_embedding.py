@@ -1,19 +1,10 @@
 import math
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any
 
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from typing_extensions import Self
 
-import litgpt
-from litgpt.config import Config as BaseConfig
-from litgpt.model import GPT as BaseModel
-from litgpt.model import Block as BaseBlock
-from litgpt.model import CausalSelfAttention as BaseCausalSelfAttention
-from litgpt.model import KVCache
-from litgpt.utils import map_old_state_dict_weights
 from litgpt.lora import LoRALayer
 from whittle.modules.embedding import Embedding
 
@@ -54,6 +45,7 @@ class LoRAEmbedding(LoRALayer):
         self.num_embeddings = num_embeddings
         self.embedding_dim = embedding_dim
         self.sub_network_embedding_dim = embedding_dim
+        self.merged: bool = False
         # Actual trainable parameters
         if r > 0:
             self.lora_A = nn.Parameter(torch.empty((r, num_embeddings)))

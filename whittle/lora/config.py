@@ -1,8 +1,11 @@
 from litgpt.config import Config as BaseConfig
 from dataclasses import dataclass
-import litgpt
-from typing import Type
-from whittle.lora.lora_mlps import LoRAGptNeoxMLP as GptNeoxMLP, LoRALLaMAMLP as LLaMAMLP, LoRAGemmaMLP as GemmaMLP
+from whittle.lora.lora_mlps import (
+    LoRAGptNeoxMLP as GptNeoxMLP,
+    LoRALLaMAMLP as LLaMAMLP,
+    LoRAGemmaMLP as GemmaMLP,
+)
+
 
 @dataclass
 class LoRAConfig(BaseConfig):
@@ -29,7 +32,7 @@ class LoRAConfig(BaseConfig):
     lora_emb: bool = False
 
     @property
-    def mlp_class(self) -> Type:
+    def mlp_class(self) -> type:
         if self.mlp_class_name == "GptNeoxMLP":
             return GptNeoxMLP
         elif self.mlp_class_name == "LLaMAMLP":

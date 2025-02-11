@@ -1,12 +1,11 @@
-from whittle.lora.lora_linear import LoRALinear
-from whittle.modules.linear import LinearQKV
-from typing import Union, Tuple, Any
+from whittle.lora.lora_linear import LoRALayer, LoRALinearQKV
+from typing import Union, Any
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-class LoRAQKVLinear(LoRALinear):
+class LoRAQKVLinear(LoRALayer):
     # LoRA implemented in a dense layer
     def __init__(
         self,
@@ -22,15 +21,13 @@ class LoRAQKVLinear(LoRALinear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        enable_lora: Union[bool, Tuple[bool, bool, bool]] = False,
+        enable_lora: Union[bool, tuple[bool, bool, bool]] = False,
         **kwargs: Any,
     ):
-        super(LoRALinear, self).__init__(
-            r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout
-        )
+        super().__init__(r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout)
         self.config = config
         assert out_features == (n_head + 2 * n_query_groups) * head_size
-        self.linear = LinearQKV(in_features, out_features, **kwargs)
+        self.linear = LoRALinearQKV(in_features, out_features, **kwargs)
         self.use_bias = self.linear.use_bias
         self.head_size = head_size
         self.fix_head_size = fix_head_size
@@ -39,7 +36,7 @@ class LoRAQKVLinear(LoRALinear):
         self.out_features = out_features
         self.n_query_groups = n_query_groups
         if isinstance(enable_lora, bool):
-            enable_lora = [enable_lora] * 3
+            enable_lora = (enable_lora, enable_lora, enable_lora)
         assert len(enable_lora) == 3
         self.enable_lora = enable_lora
         self.sub_network_in_features = in_features
@@ -96,10 +93,10 @@ class LoRAQKVLinear(LoRALinear):
         self,
         sub_network_in_features: int,
         sub_network_out_features: int,
+        qkv_indices=None,
         sub_network_n_head=None,
         sub_network_query_groups=None,
         sub_network_head_size=None,
-        qkv_indices=None,
         sub_network_q_per_kv=None,
     ):
         self.sub_network_in_features = sub_network_in_features
@@ -137,10 +134,12 @@ class LoRAQKVLinear(LoRALinear):
         # Indices are needed to properly pad weight updates with zeros.
         if not hasattr(self, "_lora_ind"):
             enable_q, enable_k, enable_v = self.enable_lora
-            qkv_group_size = (
-                self.sub_network_q_per_kv + 2
+            qkv_group_size = self.sub_network_q_per_kv + 2
+            candidate_indices = (
+                range(self.sub_network_out_features)
+                if self.qkv_indices is None
+                else self.qkv_indices
             )
-            candidate_indices = range(self.sub_network_out_features) if self.qkv_indices is None else self.qkv_indices
             lora_ind = []
             if enable_q:
                 q_ind = [
@@ -266,13 +265,16 @@ class LoRAQKVLinear(LoRALinear):
         # ⚬ r: rank of all LoRA layers (equal in size)
 
         input_splitted = input.chunk(sum(self.enable_lora), dim=1)  # N * (B, C // N, T)
-        qkv_shapes = (
+        qkv_shapes = [
             # if `head_size` is explicitly specified in the config, `n_embd` (or `in_features`)
             # might not be equal to `head_size * n_head`, thus we use it directly here
-            self.sub_network_head_size * self.sub_network_query_groups * self.sub_network_q_per_kv * self.enable_q,
+            self.sub_network_head_size
+            * self.sub_network_query_groups
+            * self.sub_network_q_per_kv
+            * self.enable_q,
             self.sub_network_head_size * self.sub_network_query_groups * self.enable_k,
             self.sub_network_head_size * self.sub_network_query_groups * self.enable_v,
-        )
+        ]
         qkv_shapes = [s for s in qkv_shapes if s]
         weight_splitted = weight.split(qkv_shapes)  # N * (C_output', r, 1)
         return torch.cat(
@@ -286,13 +288,13 @@ class LoRAQKVLinear(LoRALinear):
         # ⚬ self.linear.weight.data: (384, 128) or (3 * embedding_size, embedding_size)
         # ⚬ self.lora_A.data: (4, 128)
         # ⚬ self.lora_B.data: (256, 2)
-        qkv_shapes = (
+        qkv_shapes = [
             # if `head_size` is explicitly specified in the config, `n_embd` (or `in_features`)
             # might not be equal to `head_size * n_head`, thus we use it directly here
             self.sub_network_head_size * self.sub_network_n_head * self.enable_q,
             self.sub_network_head_size * self.sub_network_query_groups * self.enable_k,
             self.sub_network_head_size * self.sub_network_query_groups * self.enable_v,
-        )
+        ]
         qkv_shapes = [s for s in qkv_shapes if s]
         if self.qkv_indices is not None:
             lora = self.conv1d(
@@ -346,33 +348,38 @@ class LoRAQKVLinear(LoRALinear):
         if self.r == 0 or not any(self.enable_lora) or self.merged:
             return pretrained
         after_A = F.linear(
-                self.lora_dropout(x), self.lora_A[:, : self.sub_network_in_features]
-            )  # (64, 64, 128) @ (4, 128) -> (64, 64, 4)
+            self.lora_dropout(x), self.lora_A[:, : self.sub_network_in_features]
+        )  # (64, 64, 128) @ (4, 128) -> (64, 64, 4)
         # For F.conv1d:
         # ⚬ input: input tensor of shape (mini-batch, in_channels, iW)
         # ⚬ weight: filters of shape (out_channels, in_channels/groups, kW)
-        qkv_shapes = (
+        qkv_shapes = [
             # if `head_size` is explicitly specified in the config, `n_embd` (or `in_features`)
             # might not be equal to `head_size * n_head`, thus we use it directly here
-            self.sub_network_head_size * self.sub_network_query_groups * self.sub_network_q_per_kv * self.enable_q,
+            self.sub_network_head_size
+            * self.sub_network_query_groups
+            * self.sub_network_q_per_kv
+            * self.enable_q,
             self.sub_network_head_size * self.sub_network_query_groups * self.enable_k,
             self.sub_network_head_size * self.sub_network_query_groups * self.enable_v,
-        )
+        ]
         qkv_shapes = [s for s in qkv_shapes if s]
         if self.qkv_indices is not None:
             after_B = self.conv1d(
                 after_A.transpose(-2, -1),  # (64, 64, 4) -> (64, 4, 64)
-                self.lora_B[self.qkv_indices, :].unsqueeze(-1),  # (256, 2) -> (256, 2, 1)
+                self.lora_B[self.qkv_indices, :].unsqueeze(
+                    -1
+                ),  # (256, 2) -> (256, 2, 1)
             ).transpose(
                 -2, -1
             )  # (64, 4, 64) @ (256, 2, 1) -> (64, 256, 64) -> (64, 64, 256)
         else:
             after_B = self.conv1d(
                 after_A.transpose(-2, -1),  # (64, 64, 4) -> (64, 4, 64)
-                self.lora_B[: sum(qkv_shapes), :].unsqueeze(-1),  # (256, 2) -> (256, 2, 1)
-            ).transpose(
-                -2, -1
-            )
+                self.lora_B[: sum(qkv_shapes), :].unsqueeze(
+                    -1
+                ),  # (256, 2) -> (256, 2, 1)
+            ).transpose(-2, -1)
         lora = (
             self.zero_pad(after_B) * self.scaling
         )  # (64, 64, 256) after zero_pad (64, 64, 384)

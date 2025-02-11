@@ -1,16 +1,19 @@
-import torch
 import torch.nn as nn
 from whittle.models.gpt.blocks import Block as BaseBlock
 from whittle.lora.lora_attention import CausalSelfAttention
 from whittle.modules.rmsnorm import RMSNorm
 from whittle.modules.layernorm import LayerNorm
-from whittle.lora.lora_mlps import LoRAGptNeoxMLP as GptNeoxMLP, LoRALLaMAMLP as LLaMAMLP, LoRAGemmaMLP as GemmaMLP
+from whittle.lora.lora_mlps import (
+    LoRAGptNeoxMLP as GptNeoxMLP,
+    LoRALLaMAMLP as LLaMAMLP,
+    LoRAGemmaMLP as GemmaMLP,
+)
 from whittle.lora.config import LoRAConfig as Config
 
 
 class LoRABlock(BaseBlock):
     def __init__(self, config: Config, block_idx: int) -> None:
-        nn.Module.__init__(self)
+        super().__init__(config, block_idx)
         self.config = config
         if not config.parallel_residual and config.shared_attention_norm:
             raise NotImplementedError(

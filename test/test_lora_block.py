@@ -11,6 +11,7 @@ from litgpt.model import (
     build_rope_cache,
 )
 
+
 def test_block():
     config = Config()
     config.n_embd = 64
@@ -38,15 +39,27 @@ def test_block():
     block = Block(config, 0)
     input = torch.rand(8, 512, 64)
     mask = build_mask_cache(512)
-    block.attn.attn.linear.weight.data = torch.ones_like(block.attn.attn.linear.weight.data)
-    block.attn.attn.linear.bias.data = torch.ones_like(block.attn.attn.linear.bias.data)
+    block.attn.attn.linear.linear.weight.data = torch.ones_like(
+        block.attn.attn.linear.linear.weight.data
+    )
+    block.attn.attn.linear.linear.bias.data = torch.ones_like(
+        block.attn.attn.linear.linear.bias.data
+    )
     block.attn.proj.linear.bias.data = torch.ones_like(block.attn.proj.linear.bias.data)
-    block.attn.proj.linear.weight.data = torch.ones_like(block.attn.proj.linear.weight.data)
-    block.mlp.fc_1.linear.weight.data = torch.ones_like(block.mlp.fc_1.linear.weight.data)
+    block.attn.proj.linear.weight.data = torch.ones_like(
+        block.attn.proj.linear.weight.data
+    )
+    block.mlp.fc_1.linear.weight.data = torch.ones_like(
+        block.mlp.fc_1.linear.weight.data
+    )
     block.mlp.fc_1.linear.bias.data = torch.ones_like(block.mlp.fc_1.linear.bias.data)
-    block.mlp.fc_2.linear.weight.data = torch.ones_like(block.mlp.fc_2.linear.weight.data)
+    block.mlp.fc_2.linear.weight.data = torch.ones_like(
+        block.mlp.fc_2.linear.weight.data
+    )
     block.mlp.fc_2.linear.bias.data = torch.ones_like(block.mlp.fc_2.linear.bias.data)
-    block.mlp.proj.linear.weight.data = torch.ones_like(block.mlp.proj.linear.weight.data)
+    block.mlp.proj.linear.weight.data = torch.ones_like(
+        block.mlp.proj.linear.weight.data
+    )
     block.mlp.proj.linear.bias.data = torch.ones_like(block.mlp.proj.linear.bias.data)
     block.reset_super_network()
     out_large = block(input, cos, sin, mask)
