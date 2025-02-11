@@ -6,6 +6,8 @@ from pathlib import Path
 from pprint import pprint
 
 import torch
+from litgpt.utils import auto_download_checkpoint, check_valid_checkpoint_dir
+from litgpt.model import Config
 
 from whittle.eval.whittle_llms import WhittleLM
 from whittle.models.gpt import GPT
@@ -24,10 +26,10 @@ def prepare_results(results, save_filepath, print_results=True):
 
 
 def convert_and_evaluate(
-    model: GPT,
+    checkpoint_dir: Path | None = None,
+    model: GPT | None = None,
     tasks: str | None = None,
     out_dir: Path | str = "evaluate",
-    force_conversion: bool = False,
     num_fewshot: int | None = None,
     batch_size: int | str = 1,
     device: str | None = None,
@@ -42,8 +44,6 @@ def convert_and_evaluate(
     Arguments:
         out_dir: Directory in which to save the converted checkpoints for evaluation.
             Saves to `checkpoint_dir`/evaluate by default.
-        force_conversion: Set to `True` to reconvert the model and override
-            an existing model.pth from a previous evaluation call.
         tasks: CSV of task names to evaluate. Example: "hellaswag,truthfulqa_mc2,mmlu"
         num_fewshot: Number of examples in few-shot context.
         batch_size: Batch size configuration as positive integer value (default: 1),
@@ -55,6 +55,18 @@ def convert_and_evaluate(
             Saves to `out_dir/results.json` by default.
         access_token: Optional API token to access models with restrictions.
     """
+    if checkpoint_dir is None and model is None:
+        raise ValueError("Either `model` or `checkpoint_dir` must be provided")
+
+    if checkpoint_dir is not None:
+        checkpoint_dir = auto_download_checkpoint(
+            model_name=checkpoint_dir, access_token=access_token
+        )
+        check_valid_checkpoint_dir(checkpoint_dir)
+        config = Config.from_file(checkpoint_dir / "model_config.yaml")
+        config.fix_head_size = True
+        loaded_model = GPT(config)
+
     if tasks is None:
         from lm_eval.tasks import TaskManager
 
@@ -83,7 +95,10 @@ def convert_and_evaluate(
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
     model = WhittleLM(
-        pretrained=model, device=device, batch_size=batch_size, dtype=dtype
+        pretrained=model if model is not None else loaded_model,
+        device=device,
+        batch_size=batch_size,
+        dtype=dtype,
     )
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"

@@ -4,7 +4,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Literal, Union
 
 import lightning as L
 import torch
@@ -49,12 +49,12 @@ from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 def setup(
     checkpoint_dir: Path,
     out_dir: Path = Path("out/finetune/full"),
-    precision: Optional[str] = None,
-    devices: Union[int, str] = "auto",
+    precision: str | None = None,
+    devices: int | str = "auto",
     num_nodes: int = 1,
     num_dataloader_workers: int = 16,
-    resume: Union[bool, Literal["auto"], Path] = False,
-    data: Optional[DataModule] = None,
+    resume: bool | Literal["auto"] | Path = False,
+    data: DataModule | None = None,
     train: FineTuningArgs = FineTuningArgs(
         save_interval=1000,
         log_interval=2048,
@@ -70,10 +70,10 @@ def setup(
     train_strategy: str = "sandwich",
     sampling_strategy: str = "random",
     eval: EvalArgs = EvalArgs(interval=1000, max_new_tokens=100, max_iters=100),
-    optimizer: Union[str, dict] = "AdamW",
+    optimizer: str | dict = "AdamW",
     logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
     seed: int = 1337,
-    access_token: Optional[str] = None,
+    access_token: str | None = None,
     downstream_test_iters: int = 500,
     downstream_dataset: str = "arc_easy",
     importance_objective: str = "norm",
@@ -104,7 +104,7 @@ def setup(
     # pprint(locals())
     data = Alpaca(num_workers=num_dataloader_workers) if data is None else data
     # data = OpenWebText(num_workers=num_dataloader_workers) if data is None else data
-    devices = parse_devices(devices)
+    devices: int = parse_devices(devices)
     out_dir = init_out_dir(out_dir)
 
     check_valid_checkpoint_dir(checkpoint_dir)
