@@ -30,9 +30,9 @@ def setup(
     df = pd.read_csv(results_path, index_col=0)
 
     if tasks is None:
-        tasks = [t for t in df["task"].unique() if not t.startswith("_")]
+        task_list = [t for t in df["task"].unique() if not t.startswith("_")]
     else:
-        tasks = tasks.split(",")
+        task_list = tasks.split(",")
 
     x_metric_df = df[df["metric"] == metric]
     x_metric_df = (
@@ -41,7 +41,7 @@ def setup(
         .rename(columns={"score": metric})
     )
 
-    for task in tasks:
+    for task in task_list:
         task_df = df[df["task"] == task]
         if task_metric is None:
             possible = task_df["metric"].unique().tolist()

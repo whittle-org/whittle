@@ -44,6 +44,10 @@ def multi_objective_search(
             The configs from ask() are rejected if they fit into a bin that is full.
             The bin size is increased if all bins are full.
             Defaults to None.
+        objective_1_name: The name of the first objective.
+            Defaults to "objective_1".
+        objective_2_name: The name of the second objective.
+            Defaults to "objective_2".
 
     Returns:
         The results of the search, including Pareto-optimal solutions.
@@ -67,8 +71,8 @@ def multi_objective_search(
     scheduler = AskTellScheduler(base_scheduler=base_scheduler)
 
     costs = np.empty((num_samples, 2))
-    runtime = []
-    configs = []
+    runtime: list[float] = []
+    configs: list[dict[str, Any]] = []
     start_time = time.time()
 
     for i in range(num_samples):
