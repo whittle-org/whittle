@@ -1,22 +1,29 @@
+from __future__ import annotations
+
 import math
 import pprint
 import time
 from datetime import timedelta
 from pathlib import Path
-from typing import Optional, Union
+from typing import Literal
 
 import lightning as L
 import torch
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
-from torch.utils.data import DataLoader
-from torchmetrics.aggregation import RunningMean
-from typing_extensions import Literal
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import name_to_config
 from litgpt.data import DataModule, TinyLlama
 from litgpt.model import Config
+from litgpt.pretrain import (
+    get_dataloaders,
+    get_lr,
+    initialize_weights,
+    save_checkpoint,
+    validate,
+    validate_args,
+)
 from litgpt.utils import (
     CycleIterator,
     capture_hparams,
@@ -31,26 +38,19 @@ from litgpt.utils import (
     num_parameters,
     parse_devices,
 )
-from litgpt.pretrain import (
-    get_dataloaders,
-    validate_args,
-    initialize_weights,
-    save_checkpoint,
-    validate,
-    get_lr,
-)
+from syne_tune.config_space import lograndint, randint
+from torch.utils.data import DataLoader
+from torchmetrics.aggregation import RunningMean
 
+from whittle.models.gpt import GPT
+from whittle.models.gpt.blocks import Block
+from whittle.sampling.random_sampler import RandomSampler
 from whittle.training_strategies import (
-    SandwichStrategy,
     RandomStrategy,
+    SandwichStrategy,
     StandardStrategy,
 )
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
-from whittle.sampling.random_sampler import RandomSampler
-from whittle.models.gpt import GPT
-from whittle.models.gpt.blocks import Block
-from syne_tune.config_space import randint, lograndint
-
 
 training_strategies_cls = {
     "sandwich": SandwichStrategy,
@@ -70,12 +70,12 @@ def get_search_space(config):
 
 def setup(
     model_name: str,
-    model_config: Optional[Config] = None,
+    model_config: Config | None = None,
     out_dir: Path = Path("../examples/gpt/out/pretrain"),
     precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
-    initial_checkpoint_dir: Optional[Path] = None,
-    resume: Union[bool, Literal["auto"], Path] = False,
-    data: Optional[DataModule] = None,
+    initial_checkpoint_dir: Path | None = None,
+    resume: bool | Literal["auto"] | Path = False,
+    data: DataModule | None = None,
     train: TrainArgs = TrainArgs(
         save_interval=1000,
         log_interval=1,
@@ -88,11 +88,11 @@ def setup(
         tie_embeddings=False,
     ),
     eval: EvalArgs = EvalArgs(interval=1000, max_iters=100),
-    optimizer: Union[str, dict] = "AdamW",
-    devices: Union[int, str] = "auto",
+    optimizer: str | dict = "AdamW",
+    devices: int | str = "auto",
     num_nodes: int = 1,
     training_strategy: str = "sandwich",
-    tokenizer_dir: Optional[Path] = None,
+    tokenizer_dir: Path | None = None,
     logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
     seed: int = 42,
 ):
@@ -218,7 +218,7 @@ def fit(
     train_dataloader: DataLoader,
     val_dataloader: DataLoader,
     out_dir: Path,
-    tokenizer_dir: Optional[Path],
+    tokenizer_dir: Path | None,
     train: TrainArgs,
     eval: EvalArgs,
     training_strategy: BaseTrainingStrategy,
@@ -251,9 +251,7 @@ def fit(
             return chunked_cross_entropy(y, x, chunk_size=0)  # noqa: F821
 
         measured_flops = measure_flops(meta_model, model_fwd, model_loss)
-        fabric.print(
-            f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}"
-        )
+        fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
         del meta_model, x
 
     max_tokens_per_device = train.max_tokens // fabric.world_size
@@ -356,7 +354,7 @@ def fit(
             if isinstance(val_loss, float):
                 val_loss = f"{val_loss:.3f}"
             fabric.print(
-                f"Epoch {metrics['epoch']+1} | iter {metrics['iter']} step {metrics['step']} |"
+                f"Epoch {metrics['epoch'] + 1} | iter {metrics['iter']} step {metrics['step']} |"
                 f" loss train: {metrics['loss']:.3f},"
                 f" val: {val_loss} |"
                 f" iter time: {metrics['iter_time'] * 1000:.2f} ms"
@@ -413,16 +411,16 @@ def main(
     fabric: L.Fabric,
     devices: int,
     seed: int,
-    initial_checkpoint_dir: Optional[Path],
-    resume: Union[bool, Literal["auto"], Path],
+    initial_checkpoint_dir: Path | None,
+    resume: bool | Literal["auto"] | Path,
     config: Config,
     data: DataModule,
     out_dir: Path,
-    tokenizer_dir: Optional[Path],
-    tokenizer: Optional[Tokenizer],
+    tokenizer_dir: Path | None,
+    tokenizer: Tokenizer | None,
     train: TrainArgs,
     eval: EvalArgs,
-    optimizer: Union[str, dict],
+    optimizer: str | dict,
     training_strategy: str,
 ) -> None:
     validate_args(train, eval, initial_checkpoint_dir, resume)
@@ -450,9 +448,7 @@ def main(
     model = fabric.setup(model)
 
     extra_kwargs = {"fused": fabric.device.type == "cuda"}
-    optimizer = instantiate_torch_optimizer(
-        optimizer, model.parameters(), **extra_kwargs
-    )
+    optimizer = instantiate_torch_optimizer(optimizer, model.parameters(), **extra_kwargs)
     optimizer = fabric.setup_optimizers(optimizer)
 
     sampler = RandomSampler(config_space=get_search_space(config), seed=seed)
@@ -503,7 +499,7 @@ def main(
     # Save final checkpoint
     save_checkpoint(fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth")
 
-    fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
+    fabric.print(f"Training time: {(time.perf_counter() - train_time):.2f}s")
     if fabric.device.type == "cuda":
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 

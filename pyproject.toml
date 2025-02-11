@@ -83,7 +83,10 @@ version_files = ["pyproject.toml:version", "whittle/__version__.py"]
 changelog_start_rev = "0.1.3"
 
 [tool.ruff]
-target-version = "py39" # Match lowest supported
+target-version = "py310"
+line-length = 90
+src = ["whittle"]
+
 # Exclude a variety of commonly ignored directories.
 exclude = [
     "supernet_configs",
@@ -129,12 +132,14 @@ select = [
     "F",
     "UP",
     "INP001", # https://docs.astral.sh/ruff/rules/implicit-namespace-package/#implicit-namespace-package-inp001
+    "I",
 ]
-ignore = []
+ignore = ["UP038"]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
 unfixable = []
+extend-safe-fixes = ["ALL"]
 
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
@@ -160,7 +165,7 @@ line-ending = "auto"
 docstring-code-format = false
 
 [tool.ruff.lint.isort]
-known-first-party = ["whittle", "examples", "sinc"]
+known-first-party = ["whittle", "examples", "sinc", "test"]
 no-lines-before = ["future"]
 required-imports = ["from __future__ import annotations"]
 combine-as-imports = true
@@ -169,3 +174,9 @@ force-wrap-aliases = true
 
 [tool.ruff.lint.pyupgrade]
 keep-runtime-typing = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pylint]
+max-args = 10 # Changed from default of 5

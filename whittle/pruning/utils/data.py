@@ -1,6 +1,8 @@
 # Code adapted from https://github.com/IST-DASLab/sparsegpt/blob/master/datautils.py
+from __future__ import annotations
 
 import random
+
 from datasets import load_dataset
 
 
