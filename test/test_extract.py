@@ -4,9 +4,9 @@ import torch
 from litgpt.config import Config
 
 from whittle.models.gpt import GPT
-from whittle.models.gpt.extract import extract_sub_network, extract_current_sub_network
-from whittle.modules.rmsnorm import RMSNorm
+from whittle.models.gpt.extract import extract_current_sub_network, extract_sub_network
 from whittle.modules.layernorm import LayerNorm
+from whittle.modules.rmsnorm import RMSNorm
 
 
 def test_extract_sub_network() -> None:

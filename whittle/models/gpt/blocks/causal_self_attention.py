@@ -77,9 +77,7 @@ class CausalSelfAttention(nn.Module):
             self.sub_network_query_groups
         )
         if self.config.attention_scores_scalar:
-            self.sub_attention_scaler = (
-                self.sub_network_n_embd // self.sub_network_n_head
-            )
+            self.sub_attention_scaler = self.sub_network_n_embd // self.sub_network_n_head
         else:
             self.sub_attention_scaler = self.config.attention_scores_scalar
 

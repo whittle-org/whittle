@@ -8,6 +8,7 @@ import math
 import pickle
 import random
 import sys
+from collections.abc import Iterable, Iterator, Mapping
 from io import BytesIO
 from pathlib import Path
 from typing import (
@@ -15,7 +16,6 @@ from typing import (
     Any,
     TypeVar,
 )
-from collections.abc import Iterable, Iterator, Mapping
 from typing_extensions import Self
 
 import lightning as L
@@ -54,9 +54,7 @@ def check_valid_checkpoint_dir(checkpoint_dir: Path) -> None:
     files = {
         "lit_model.pth": (checkpoint_dir / "lit_model.pth").is_file(),
         "lit_config.json": (checkpoint_dir / "lit_config.json").is_file(),
-        "tokenizer.json OR tokenizer.model": (
-            checkpoint_dir / "tokenizer.json"
-        ).is_file()
+        "tokenizer.json OR tokenizer.model": (checkpoint_dir / "tokenizer.json").is_file()
         or (checkpoint_dir / "tokenizer.model").is_file(),
         "tokenizer_config.json": (checkpoint_dir / "tokenizer_config.json").is_file(),
     }
@@ -64,7 +62,9 @@ def check_valid_checkpoint_dir(checkpoint_dir: Path) -> None:
         if all(files.values()):
             # we're good
             return
-        problem = f" is missing the files: {[f for f, exists in files.items() if not exists]!r}"
+        problem = (
+            f" is missing the files: {[f for f, exists in files.items() if not exists]!r}"
+        )
     else:
         problem = " is not a checkpoint directory"
 
@@ -353,9 +353,7 @@ def load_checkpoint(
         model.load_state_dict(state_dict, strict=strict)
 
 
-def flops_per_param(
-    max_seq_length: int, n_layer: int, n_embd: int, n_params: int
-) -> int:
+def flops_per_param(max_seq_length: int, n_layer: int, n_embd: int, n_params: int) -> int:
     flops_per_token = (
         2 * n_params
     )  # each parameter is used for a MAC (2 FLOPS) per network operation
@@ -448,9 +446,7 @@ def sample_config(
     max_layer = max(choices_dict["n_layer_choices"])
     sampled_dict["sample_layer_indices"] = []
     if layer_sampling_scheme == "normal":
-        sampled_dict["sample_layer_indices"] = list(
-            range(sampled_dict["sample_n_layer"])
-        )
+        sampled_dict["sample_layer_indices"] = list(range(sampled_dict["sample_n_layer"]))
     elif layer_sampling_scheme == "strided":
         if sampled_dict["sample_n_layer"] == max_layer:
             sampled_dict["sample_layer_indices"] = list(
@@ -493,9 +489,7 @@ def sample_config(
     return sampled_dict
 
 
-def sample_config_max(
-    choices_dict: dict, layer_sampling_scheme: str = "normal"
-) -> dict:
+def sample_config_max(choices_dict: dict, layer_sampling_scheme: str = "normal") -> dict:
     """Sample a configuration from a dictionary of choices.
 
     Args:
@@ -528,9 +522,7 @@ def sample_config_max(
     return sampled_dict
 
 
-def sample_config_min(
-    choices_dict: dict, layer_sampling_scheme: str = "normal"
-) -> dict:
+def sample_config_min(choices_dict: dict, layer_sampling_scheme: str = "normal") -> dict:
     """Sample a configuration from a dictionary of choices.
 
     Args:
@@ -563,9 +555,7 @@ def sample_config_min(
     return sampled_dict
 
 
-def sample_config_mid(
-    choices_dict: dict, layer_sampling_scheme: str = "normal"
-) -> dict:
+def sample_config_mid(choices_dict: dict, layer_sampling_scheme: str = "normal") -> dict:
     """Sample a configuration from a dictionary of choices.
 
     Args:

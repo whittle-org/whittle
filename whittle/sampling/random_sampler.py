@@ -1,6 +1,6 @@
 from __future__ import annotations
-import warnings
 
+import warnings
 from typing import Any
 
 import numpy as np
@@ -44,7 +44,7 @@ class RandomSampler:
         for k, v in self.config_space.items():
             if isinstance(v, Domain):
                 if isinstance(v, Categorical):
-                    if all(isinstance(e, (int, float)) for e in v.categories):
+                    if all(isinstance(e, int | float) for e in v.categories):
                         config[k] = min(v.categories)
                     else:
                         warnings.warn(
@@ -67,7 +67,7 @@ class RandomSampler:
         for k, v in self.config_space.items():
             if isinstance(v, Domain):
                 if isinstance(v, Categorical):
-                    if all(isinstance(e, (int, float)) for e in v.categories):
+                    if all(isinstance(e, int | float) for e in v.categories):
                         config[k] = max(v.categories)
                     else:
                         warnings.warn(

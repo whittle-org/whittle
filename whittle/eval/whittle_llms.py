@@ -158,9 +158,9 @@ class WhittleLM(TemplateLM):
         self._config = self._model.config
 
         if tokenizer:
-            assert isinstance(
-                tokenizer, transformers.PreTrainedTokenizer
-            ) or isinstance(tokenizer, transformers.PreTrainedTokenizerFast)
+            assert isinstance(tokenizer, transformers.PreTrainedTokenizer) or isinstance(
+                tokenizer, transformers.PreTrainedTokenizerFast
+            )
             self.tokenizer = tokenizer
         else:
             # Get tokenizer
@@ -335,9 +335,7 @@ class WhittleLM(TemplateLM):
                 # models like MBart are listed in both seq2seq and causal mistakenly in HF transformers.
                 # these special cases should be treated as seq2seq models.
                 self.AUTO_MODEL_CLASS = transformers.AutoModelForSeq2SeqLM
-            elif (
-                getattr(self.config, "model_type") in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
-            ):
+            elif getattr(self.config, "model_type") in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES:
                 self.AUTO_MODEL_CLASS = GPT
             else:
                 if not trust_remote_code:
@@ -448,9 +446,7 @@ class WhittleLM(TemplateLM):
         if self.world_size > 1:
             # if multi-GPU, always take minimum over all selected batch sizes
             max_rnk_bs = torch.tensor([batch_size], device=self.device)
-            gathered = (
-                self.accelerator.gather(max_rnk_bs).cpu().detach().numpy().tolist()
-            )
+            gathered = self.accelerator.gather(max_rnk_bs).cpu().detach().numpy().tolist()
             batch_size = min(gathered)
             clear_torch_cache()
             return batch_size
@@ -537,9 +533,7 @@ class WhittleLM(TemplateLM):
             if attn_mask is not None or labels is not None:
                 assert attn_mask is not None and labels is not None
                 assert self.AUTO_MODEL_CLASS == transformers.AutoModelForSeq2SeqLM
-                return self.model(
-                    input_ids=inps, attention_mask=attn_mask, labels=labels
-                )
+                return self.model(input_ids=inps, attention_mask=attn_mask, labels=labels)
             else:
                 assert self.AUTO_MODEL_CLASS == GPT
                 return self.model(inps)
@@ -733,9 +727,7 @@ class WhittleLM(TemplateLM):
         )
         batch_fn = (
             self._batch_scheduler
-            if self.batch_size == "auto"
-            and n_reordered_requests > 0
-            and not override_bs
+            if self.batch_size == "auto" and n_reordered_requests > 0 and not override_bs
             else None
         )
 
