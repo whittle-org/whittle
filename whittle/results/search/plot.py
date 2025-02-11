@@ -12,6 +12,16 @@ def setup(
     tasks: Optional[str] = None,
     task_metric: Optional[str] = None,
 ) -> None:
+    """
+    Plot the results of a sub-network search.
+
+    Arguments:
+        results_dir: The path to the directory containing the sub-network search results.
+        plot_dir: Directory in which to save the plots. If not provided, saving to `results_dir/plot` by default.
+        metric: The metric to use for the x-axis of the plot.
+        tasks: Task names to evaluate. Example: "hellaswag,mmlu"
+        task_metric: The metric to use for the y-axis of the plot. If not provided, the first metric from unique metrics is used.
+    """
     results_path = results_dir / "sub_network_results.csv"
     if plot_dir is None:
         plot_dir = results_dir / "plot"

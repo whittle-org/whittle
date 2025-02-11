@@ -2,10 +2,10 @@ import json
 import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
-from typing import Optional
+from typing import Optional, List, Any
 
 
-def load_sub_network_results(eval_path: Path) -> dict:
+def load_sub_network_results(eval_path: Path) -> List[dict[str, Any]]:
     metrics_path = eval_path / "metrics.json"
     results_path = eval_path / "results.json"
 

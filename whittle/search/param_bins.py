@@ -2,28 +2,30 @@ import numpy as np
 from whittle.metrics.parameters import (
     compute_parameters,
 )
+from typing import Callable, Any
+from whittle.models.gpt import GPT
 
 
 class ParamsEstimator:
-    def __init__(self, model):
+    def __init__(self, model: GPT):
         self.model = model
 
-    def get_params(self, config):
+    def get_params(self, config: dict[str, Any]) -> float:
         self.model.select_sub_network(config)
         params = compute_parameters(self.model)
         self.model.reset_super_network()
         return params
 
-    def __call__(self, config):
+    def __call__(self, config: dict[str, Any]) -> float:
         return self.get_params(config)
 
 
 class ParamBins:
     def __init__(
         self,
-        min_config: dict,
-        max_config: dict,
-        params_func: callable,
+        min_config: dict[str, Any],
+        max_config: dict[str, Any],
+        params_func: Callable,
         num_bins: int = 20,
         log_bins: bool = False,
         start_bin_size: int = 1,
@@ -47,10 +49,10 @@ class ParamBins:
         self.current_bin_length = start_bin_size
         self.empty_bin_tolerance = empty_bin_tolerance
 
-    def get_params(self, config):
+    def get_params(self, config: dict[str, Any]) -> float:
         return self.params_func(config)
 
-    def put_in_bin(self, config):
+    def put_in_bin(self, config: dict[str, Any]) -> bool:
         params = self.get_params(config)
 
         found = False

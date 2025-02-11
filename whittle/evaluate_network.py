@@ -1,7 +1,7 @@
 import json
 import torch
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 from litgpt import Config
 from whittle.models.gpt import GPT
 from whittle.metrics import compute_parameters, compute_flops, compute_latency
@@ -11,13 +11,13 @@ from whittle.eval.utils import convert_and_evaluate
 def setup(
     checkpoint_dir: Path,
     out_dir: Optional[Path] = None,
-    tasks: str | None = None,
-    seed: Optional[int] = 1337,
-    num_fewshot: int | None = None,
-    batch_size: int | str = 1,
+    tasks: Optional[str] = None,
+    seed: int = 1337,
+    num_fewshot: Optional[int] = None,
+    batch_size: Union[int, str] = 1,
     latency_batch_size: int = 8,
-    device: str | None = None,
-    limit: float | None = None,
+    device: Optional[str] = None,
+    limit: Optional[float] = None,
     tokenizer_name_or_path: Optional[str] = None,
 ) -> None:
     """
@@ -34,7 +34,7 @@ def setup(
         latency_batch_size: Batch size for latency computation.
         device: Device to use for evaluation, for example, "cuda" or "cuda:0".
         limit: Limit on number of examples per task.
-        tokenizer_path: Name or path to the tokenizer file to use for the model. Default is checkpoint_dir.
+        tokenizer_name_or_path: Name or path to the tokenizer file to use for the model. Default is checkpoint_dir.
     """
     if out_dir is None:
         out_dir = checkpoint_dir / "eval"
