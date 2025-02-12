@@ -173,7 +173,6 @@ def setup(
     if torch.cuda.is_available() and devices > 1:  # type: ignore[operator]
         check_nvlink_connectivity(fabric)
 
-    fabric.print("launching")
     fabric.launch(
         main,
         devices,
