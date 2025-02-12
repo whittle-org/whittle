@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 import torch
+
 from whittle.models.gpt import GPT, Config
 from whittle.pruning.pruners.magnitude import MagnitudePruner
 from whittle.pruning.pruners.sparsegpt import SparseGPTPruner

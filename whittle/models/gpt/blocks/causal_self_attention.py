@@ -7,7 +7,7 @@ import torch.nn as nn
 from litgpt import Config
 from litgpt.model import KVCache, apply_rope
 
-from whittle.modules import LinearQKV, LinearProj
+from whittle.modules import LinearProj, LinearQKV
 
 
 class CausalSelfAttention(nn.Module):
@@ -69,12 +69,7 @@ class CausalSelfAttention(nn.Module):
                 qkv_indices.extend([i for i in range(start_q, end_q)])
             end_queries = self.config.n_head * self.config.head_size
             qkv_indices.extend(
-                [
-                    i
-                    for i in range(
-                        end_queries, end_queries + self.sub_network_head_size
-                    )
-                ]
+                [i for i in range(end_queries, end_queries + self.sub_network_head_size)]
             )
             end_keys = end_queries + self.config.head_size
             qkv_indices.extend(

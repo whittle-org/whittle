@@ -169,9 +169,7 @@ def test_attention(attention_config):
         )
         assert torch.all(
             lit_attention_small.attn.weight.data
-            == attention.attn.weight.data[attention.qkv_indices, :][
-                :, 0 : config.n_embd
-            ]
+            == attention.attn.weight.data[attention.qkv_indices, :][:, 0 : config.n_embd]
         )
 
     out_lit_small = lit_attention_small(
