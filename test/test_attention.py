@@ -142,9 +142,7 @@ def test_attention(attention_config):
     cos, sin = build_rope_cache(
         seq_len, n_elem=int(config.rotary_percentage * sub_network_head_size)
     )
-    out_small = attention(
-        input[:, :, : config.n_embd // 2], mask=mask, cos=cos, sin=sin
-    )
+    out_small = attention(input[:, :, : config.n_embd // 2], mask=mask, cos=cos, sin=sin)
 
     # check shape of sub-network attention
     assert out_small.shape == (8, seq_len, config.n_embd // 2)

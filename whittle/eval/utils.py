@@ -82,9 +82,7 @@ def convert_and_evaluate(
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    model = WhittleLM(
-        pretrained=model, device=device, batch_size=batch_size, dtype=dtype
-    )
+    model = WhittleLM(pretrained=model, device=device, batch_size=batch_size, dtype=dtype)
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 

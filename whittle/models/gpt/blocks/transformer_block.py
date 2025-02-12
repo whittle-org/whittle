@@ -1,8 +1,9 @@
 from __future__ import annotations
+
 from functools import partial
-import torch.nn as nn
 
 import litgpt
+import torch.nn as nn
 from litgpt import Config
 
 from whittle.models.gpt.blocks.causal_self_attention import CausalSelfAttention

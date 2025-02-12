@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-
-import torch.nn as nn
-
 from collections import OrderedDict
 from copy import deepcopy
+
+import torch.nn as nn
+from litgpt import Config
 
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP
 from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
-from litgpt import Config
 
 
 def extract_current_sub_network(model: GPT) -> GPT:
@@ -176,9 +175,7 @@ def extract_linear(super_network_linear):
     in_feat_sub = super_network_linear.sub_network_in_features
     out_feat_sub = super_network_linear.sub_network_out_features
     new_state_dict = OrderedDict()
-    new_state_dict["weight"] = super_network_state["weight"][
-        :out_feat_sub, :in_feat_sub
-    ]
+    new_state_dict["weight"] = super_network_state["weight"][:out_feat_sub, :in_feat_sub]
 
     if super_network_linear.use_bias:
         new_state_dict["bias"] = super_network_state["bias"][:out_feat_sub]
