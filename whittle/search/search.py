@@ -9,7 +9,7 @@ from lightning.fabric.loggers import Logger
 from whittle.search.ask_tell_scheduler import AskTellScheduler
 from whittle.search.baselines import MethodArguments, methods
 from whittle.search.multi_objective import get_pareto_optimal
-from whittle.search.param_bins import ParamBins
+from whittle.sampling.param_bins import ParamBins
 
 
 def multi_objective_search(
@@ -65,6 +65,7 @@ def multi_objective_search(
             metrics=metrics,
             mode=["min", "min"],
             random_seed=seed,
+            param_bins=param_bins,
         )
     )
 
@@ -76,14 +77,7 @@ def multi_objective_search(
     start_time = time.time()
 
     for i in range(num_samples):
-        # sample a new configuration - optionally reject if it falls in a full bin
-        trial_suggestion = None
-        while trial_suggestion is None:
-            trial_suggestion = scheduler.ask()
-            # do not use the suggestion if it falls in a full bin
-            if param_bins is not None:
-                if not param_bins.put_in_bin(trial_suggestion.config):
-                    trial_suggestion = None
+        trial_suggestion = scheduler.ask()
 
         objective_1, objective_2 = objective(
             trial_suggestion.config, **(objective_kwargs or {})
@@ -106,8 +100,6 @@ def multi_objective_search(
             objective_2_name: float(objective_2),
             "runtime": runtime[-1],
         }
-
-        print(observation)
 
         if logger is not None:
             logger.log_metrics(observation)

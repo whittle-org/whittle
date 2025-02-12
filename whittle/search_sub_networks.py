@@ -35,7 +35,8 @@ from whittle.models.gpt.blocks import Block
 from whittle.models.gpt.extract import extract_current_sub_network
 from whittle.pretrain_super_network import get_search_space
 from whittle.search import multi_objective_search
-from whittle.search.param_bins import ParamsEstimator, ParamBins
+from whittle.search.baselines import Methods
+from whittle.sampling.param_bins import ParamsEstimator, ParamBins
 from whittle.metrics import compute_latency, compute_parameters, compute_flops
 
 
@@ -58,7 +59,6 @@ def setup(
     logger_name: Optional[Literal["wandb", "tensorboard", "csv"]] = "csv",
     seed: Optional[int] = 1337,
     access_token: Optional[str] = None,
-    use_param_bins: Optional[bool] = False,
     param_bins: ParamBinArgs = ParamBinArgs(),
     objective_1: Optional[str] = "val_loss",
     objective_2: Optional[str] = "parameters",
@@ -85,7 +85,6 @@ def setup(
         seed: The random seed to use for reproducibility.
         access_token: Optional API token to access models with restrictions.
         use_param_bins: Whether to use parameter bins to limit the search space.
-        param_bins: Parameters for the parameter bins.
         objective_1: The name of the first objective to optimize (possible - val_loss, perplexity). Defaults to "val_loss".
         objective_2: The name of the second objective to optimize (possible - parameters, latency, flops). Defaults to "parameters".
         log_objective_names: Whether to log the names of the objectives in the logger, or log as objective_1 and objective_2. Defaults to True.
@@ -145,7 +144,7 @@ def setup(
         train,
         eval,
         search,
-        param_bins if use_param_bins else None,
+        param_bins if search.search_strategy == Methods.SRS else None,
         objective_1,
         objective_2,
         log_objective_names,

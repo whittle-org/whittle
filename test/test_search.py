@@ -6,7 +6,7 @@ from syne_tune.config_space import randint
 
 from whittle.search import multi_objective_search
 from whittle.search.baselines import methods
-from whittle.search.param_bins import ParamBins
+from whittle.sampling.param_bins import ParamBins
 
 
 def objective(config, **kwargs):
