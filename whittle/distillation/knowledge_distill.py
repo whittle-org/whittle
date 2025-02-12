@@ -17,7 +17,7 @@ class KD(nn.Module):
         seed: int,
         verbose: bool = False,
         kd_epochs: int = 10,
-        teacher_logits_loader: Any = None,  # NEW: Dynamic loader for teacher logits
+        teacher_logits_loader: Any = None, 
         **kwargs: Any,
     ) -> None:
         """
@@ -95,14 +95,6 @@ class KD(nn.Module):
 
                     teacher_logits_full = torch.full((batch_size, seq_len, vocab_size), -1e9, device=self.device)
 
-                    print(f"Shape of teacher_values: {teacher_values.shape}")
-                    print(f"Shape of teacher_indices: {teacher_indices.shape}")
-                    print(f"Shape of input_ids: {input_ids.shape}")
-                    print(f"Shape of labels: {labels.shape}")
-                    print(f"Shape of student_logits: {self.student(input_ids).shape}")
-                    print(f"Shape of teacher_logits: {self.teacher(input_ids).shape}")
-                    print(f"Shape of teacher_logits_full: {teacher_logits_full.shape}")
-                    
                     # Scatter top-k logits into full logits tensor
                     teacher_logits_full.scatter_(-1, teacher_indices, teacher_values)
 
