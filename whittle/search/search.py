@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 from lightning.fabric.loggers import Logger
@@ -16,9 +17,9 @@ def multi_objective_search(
     search_space: dict,
     search_strategy: str = "random_search",
     num_samples: int = 100,
-    objective_kwargs: Optional[dict[str, Any]] = None,
-    logger: Optional[Logger] = None,
-    seed: Optional[int] = None,
+    objective_kwargs: dict[str, Any] | None = None,
+    logger: Logger | None = None,
+    seed: int | None = None,
 ) -> dict[str, Any]:
     """
     Search for the Pareto-optimal sub-networks using the specified strategy.

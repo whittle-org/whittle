@@ -73,9 +73,7 @@ def test_LLaMAMLP():
     llama_mlp.reset_super_network()
     out_large = llama_mlp(input)
     assert out_large.shape == (8, 64)
-    llama_mlp.set_sub_network(
-        sub_network_n_embd=32, sub_network_intermediate_size=32 * 4
-    )
+    llama_mlp.set_sub_network(sub_network_n_embd=32, sub_network_intermediate_size=32 * 4)
     out_small = llama_mlp(input[:8, :32])
     assert out_small.shape == (8, 32)
 
@@ -128,9 +126,7 @@ def test_GemmaMLP():
     gemma_mlp.reset_super_network()
     out_large = gemma_mlp(input)
     assert out_large.shape == (8, 64)
-    gemma_mlp.set_sub_network(
-        sub_network_n_embd=32, sub_network_intermediate_size=32 * 4
-    )
+    gemma_mlp.set_sub_network(sub_network_n_embd=32, sub_network_intermediate_size=32 * 4)
     out_small = gemma_mlp(input[:8, :32])
     assert out_small.shape == (8, 32)
 

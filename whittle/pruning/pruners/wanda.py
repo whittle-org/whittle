@@ -1,12 +1,14 @@
-from typing import Any
+from __future__ import annotations
+
 import logging
+from typing import Any
 
 import torch
 from torch.utils.data import DataLoader
 
-from whittle.pruning.pruners.base_pruner import Pruner
 from whittle.models.gpt import GPT
 from whittle.modules.linear import Linear
+from whittle.pruning.pruners.base_pruner import Pruner
 from whittle.pruning.utils.layerwrapper import WrappedGPT
 
 

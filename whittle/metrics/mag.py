@@ -1,11 +1,13 @@
-import torch
+from __future__ import annotations
 
 import logging
 
+import torch
+
+from whittle.models.gpt import GPT
+from whittle.models.gpt.blocks import GemmaMLP, GptNeoxMLP, LLaMAMLP
 from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
-from whittle.models.gpt import GPT
-from whittle.models.gpt.blocks import GptNeoxMLP, GemmaMLP, LLaMAMLP
 
 
 def compute_weight_magnitude(model: GPT) -> float:

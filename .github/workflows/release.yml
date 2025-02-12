@@ -1,7 +1,7 @@
 name: release
 on:
   workflow_dispatch:
-    inputs: 
+    inputs:
       branch:
         type: string
         description: "The branch to release from"
@@ -52,7 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: "main"  # Necessary to download the latest of main as this will have been updated on the step before
+          ref: "main" # Necessary to download the latest of main as this will have been updated on the step before
           fetch-tags: 1
           fetch-depth: 0
       - uses: actions/setup-python@v5
@@ -72,7 +72,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: "main"  # Necessary to download the latest of main as this will have been updated on the step before
+          ref: "main" # Necessary to download the latest of main as this will have been updated on the step before
           fetch-tags: 1
           fetch-depth: 0
       - uses: actions/setup-python@v5
@@ -95,13 +95,13 @@ jobs:
           current_version=$(git tag | sort --version-sort | tail -n 1)
 
           # This block will rename previous retitled versions
-          retitled_versions=$(uv run mike list -j | jq ".[] | select(.title != .version) | .version" | tr -d '"')
+          retitled_versions=$(uv run --all-extras mike list -j | jq ".[] | select(.title != .version) | .version" | tr -d '"')
           for version in $retitled_versions; do
-            uv run mike retitle "${version}" "${version}"
+            uv run --all-extras mike retitle "${version}" "${version}"
           done
 
           echo "Deploying docs for ${current_version}"
-          uv run mike deploy \
+          uv run --all-extras mike deploy \
             --push \
             --title "${current_version} (latest)" \
             --update-aliases \
@@ -113,14 +113,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: "main"  # Necessary to download the latest of main as this will have been updated on the step before
+          ref: "main" # Necessary to download the latest of main as this will have been updated on the step before
           fetch-tags: 1
           fetch-depth: 0
       - name: Download the build artifiact
         uses: actions/download-artifact@v4
         with:
-            name: build-output
-            path: dist
+          name: build-output
+          path: dist
       - run: ls -R dist
       - name: Download the changelog
         uses: actions/download-artifact@v4
@@ -150,10 +150,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: "main"  # Necessary to download the latest of main as this will have been updated on the step before
+          ref: "main" # Necessary to download the latest of main as this will have been updated on the step before
       - uses: actions/download-artifact@v4
         with:
-            name: build-output
-            path: dist
+          name: build-output
+          path: dist
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

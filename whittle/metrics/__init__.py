@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 from .flops import compute_flops
 from .latency import compute_latency
 from .mag import compute_weight_magnitude
-from .parameters import compute_parameters, compute_all_parameters
-
+from .parameters import compute_all_parameters, compute_parameters
 
 __all__ = [
     "compute_flops",
