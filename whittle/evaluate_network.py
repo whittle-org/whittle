@@ -43,8 +43,8 @@ def setup(
         limit: Limit on number of examples per task.
         tokenizer_name_or_path: Name or path to the tokenizer file to use for the model. Default is checkpoint_dir.
         is_sub_network: Whether the model is a sub-network config or a whittle model. Default is False.
-        compute_flops: Whether to compute FLOPs. Default is False.
-        compute_latency: Whether to compute latency. Default is False.
+        measure_flops: Whether to compute FLOPs. Default is False.
+        measure_latency: Whether to compute latency. Default is False.
     """
     if out_dir is None:
         out_dir = checkpoint_dir / "eval"
