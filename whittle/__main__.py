@@ -39,15 +39,6 @@ def main() -> None:
         module=r".*torch\.optim\.lr_scheduler.*",
     )
 
-    # disable syne tune extras install info message
-
-    warnings.filterwarnings(
-        action="ignore",
-        # message=r".*AWS dependencies are not imported since dependencies are missing.*",
-        category=UserWarning,
-        module=r".*syne_tune.*",
-    )
-
     torch.set_float32_matmul_precision("high")
     CLI(parser_data)
 
