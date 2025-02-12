@@ -11,9 +11,10 @@ import torch
 from lightning.fabric.strategies import FSDPStrategy
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
-from litgpt.data import DataModule, TinyStories
+from litgpt.data import DataModule, TinyStories, Alpaca
 from litgpt.model import Config
 from litgpt.pretrain import get_dataloaders, validate
+from litgpt.finetune.lora import validate as finetune_validate
 from litgpt.utils import (
     auto_download_checkpoint,
     check_nvlink_connectivity,
@@ -62,6 +63,8 @@ def setup(
     objective_1: str | None = "val_loss",
     objective_2: str | None = "parameters",
     log_objective_names: bool | None = True,
+    save_checkpoints: bool = True,
+    fine_tuned: bool = False,
 ) -> None:
     """
     Multi-objective search to select Pareto optimal set of sub-networks from trained super-network.
@@ -76,7 +79,7 @@ def setup(
         resume: Path to a checkpoint directory to resume from in case training was interrupted, or ``True`` to resume
             from the latest checkpoint in ``out_dir``. An error will be raised if no checkpoint is found. Passing
             ``'auto'`` will resume from the latest checkpoint but not error if no checkpoint exists.
-        data: Data-related arguments. If not provided, the default is ``litgpt.data.Alpaca``.
+        data: Data-related arguments. If not provided, the default is ``litgpt.data.TinyStories`` or ``litgpt.data.Alpaca`` for fine-tuned models.
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
         search: Search-related arguments. See ``whittle.args.SearchArgs`` for details.
@@ -87,12 +90,20 @@ def setup(
         objective_1: The name of the first objective to optimize (possible - val_loss, perplexity). Defaults to "val_loss".
         objective_2: The name of the second objective to optimize (possible - parameters, latency, flops). Defaults to "parameters".
         log_objective_names: Whether to log the names of the objectives in the logger, or log as objective_1 and objective_2. Defaults to True.
+        save_checkpoints: Whether to save checkpoints of the sub-networks, or config + path to super-network. Defaults to True.
+        fine_tuned: Whether the model is fine-tuned. Defaults to False.
     """
     checkpoint_dir = auto_download_checkpoint(
         model_name=checkpoint_dir, access_token=access_token
     )
+    
+    if data is None:
+        #import sys
+        #sys.path.append('../do-not-touch/compressing_llms')
+        #from datasets_custom.llamamini import LLaMaMini
+        #data = LLaMaMini() if fine_tuned else TinyStories()
+        data = Alpaca() if fine_tuned else TinyStories()
 
-    data = TinyStories() if data is None else data
     num_devices = int(parse_devices(devices))
     out_dir = init_out_dir(out_dir)
 
@@ -147,6 +158,8 @@ def setup(
         objective_1,
         objective_2,
         log_objective_names,
+        save_checkpoints,
+        fine_tuned,
     )
 
 
@@ -161,11 +174,18 @@ def _objective(
     verbose: bool | None = True,
     objective_1: str = "val_loss",
     objective_2: str = "parameters",
+    fine_tuned: bool = False,
 ) -> tuple[float, float]:
     model.select_sub_network(config)
-    val_loss = validate(
-        fabric, model, val_dataloader, max_iters=eval.max_iters, verbose=verbose
-    )
+
+    if fine_tuned:
+        val_loss = finetune_validate(
+            fabric, model, val_dataloader, eval, verbose=verbose
+        )
+    else:
+        val_loss = validate(
+            fabric, model, val_dataloader, max_iters=eval.max_iters, verbose=verbose
+        )
 
     if objective_1 == "perplexity":
         val_loss = torch.exp(val_loss)
@@ -196,6 +216,8 @@ def main(
     objective_1: str = "val_loss",
     objective_2: str = "parameters",
     log_objective_names: bool = True,
+    save_checkpoints: bool = True,
+    fine_tuned: bool = False,
 ) -> None:
     assert objective_1 in [
         "val_loss",
@@ -273,6 +295,7 @@ def main(
             "eval": eval,
             "objective_1": objective_1,
             "objective_2": objective_2,
+            "fine_tuned": fine_tuned
         },
         search_strategy=search.search_strategy,
         num_samples=search.iterations,
@@ -297,13 +320,17 @@ def main(
         if search_results["is_pareto_optimal"][i]:
             pareto_optimal_paths.append(str(save_path.absolute()))
 
-        model.select_sub_network(sub_network_dict)
-        sub_network = extract_current_sub_network(model)
+        # either save the extracted checkpoint, or the config + path to super-network
+        if save_checkpoints:
+            model.select_sub_network(sub_network_dict)
+            sub_network = extract_current_sub_network(model)
+            model.reset_super_network()
 
-        model.reset_super_network()
-
-        fabric.save(save_path, {"model": sub_network, "parent_dir": checkpoint_dir})
-        save_config(sub_network.config, out_dir / f"sub_network_{i}")
+            fabric.save(save_path, {"model": sub_network, "parent_dir": checkpoint_dir})
+            save_config(sub_network.config, out_dir / f"sub_network_{i}")
+        else:
+            save_path = save_path.parent / "sub_network.pkl"
+            torch.save({"config": sub_network_dict, "parent_dir": checkpoint_dir}, save_path)
 
     # save all paths to pareto optimal sub-networks
     with open(out_dir / "pareto_optimal_paths.json", "w") as f:

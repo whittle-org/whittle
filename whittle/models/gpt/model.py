@@ -247,9 +247,10 @@ class GPT(nn.Module):
         """
         self.set_sub_network(
             config["embed_dim"],
-            config["mlp_ratio"] * config["embed_dim"],
+            int(config["mlp_ratio"] * config["embed_dim"]),
             config["num_heads"],
             config["depth"],
+            sub_network_head_size=config.get("head_size", None),
         )
 
     def reset_super_network(self):
