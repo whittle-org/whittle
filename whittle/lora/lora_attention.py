@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import torch
 from litgpt.model import KVCache
 from litgpt.utils import map_old_state_dict_weights
 
@@ -50,7 +49,6 @@ class CausalSelfAttention(BaseCausalSelfAttention):
         self.kv_cache: KVCache | None = None
 
         self.config = config
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.apply_sliding_window_attention = (
             config.sliding_window_size is not None
             and block_idx % config.sliding_window_layer_placing == 0

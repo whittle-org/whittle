@@ -21,7 +21,6 @@ class GPT(BaseModel):
         super().__init__(config)
         assert config.padded_vocab_size is not None
         self.config = config
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.lm_head = LoRALinear(
             config.n_embd,
             config.padded_vocab_size,
