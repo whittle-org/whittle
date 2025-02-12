@@ -122,7 +122,7 @@ class StratifiedRandomSampler(RandomSampler):
         """
         while True:
             config = super().sample()
-            
+
             # find a bin for the config, if not found, continue sampling
             if self.param_bins.put_in_bin(config):
                 break

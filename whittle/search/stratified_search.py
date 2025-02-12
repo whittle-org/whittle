@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, Dict, Union, List, Optional
 from syne_tune.config_space import Domain
 from syne_tune.optimizer.schedulers import FIFOScheduler
@@ -86,7 +88,7 @@ class StratifiedRandomSearcher(RandomSearcher):
         self.param_bins = param_bins
 
     def _get_config(self, **kwargs) -> Optional[dict]:
-        """Sample a new configuration at random. If it doesn't fit into bins of 
+        """Sample a new configuration at random. If it doesn't fit into bins of
         already sampled configurations, continue sampling until a valid config is found.
 
         If ``allow_duplicates == False``, this is done without replacement, so
@@ -97,7 +99,7 @@ class StratifiedRandomSearcher(RandomSearcher):
         """
         while True:
             config = super()._get_config(**kwargs)
-            
+
             # find a bin for the config, if not found, continue sampling
             if self.param_bins.put_in_bin(config):
                 break
@@ -111,7 +113,7 @@ class StratifiedRandomSearcher(RandomSearcher):
             points_to_evaluate=[],
             debug_log=self._debug_log,
             allow_duplicates=self._allow_duplicates,
-            param_bins=self.param_bins
+            param_bins=self.param_bins,
         )
         new_searcher._resource_attr = self._resource_attr
         new_searcher._restore_from_state(state)

@@ -41,9 +41,7 @@ class ParamBins:
                 np.log10(self.min_params), np.log10(self.max_params), num=num_bins + 1
             )
         else:
-            self.values = np.linspace(
-                self.min_params, self.max_params, num=num_bins + 1
-            )
+            self.values = np.linspace(self.min_params, self.max_params, num=num_bins + 1)
 
         self.bins = [0 for _ in self.values[1:]]  # one bin for every lower bound
         self.current_bin_length = start_bin_size

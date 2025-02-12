@@ -214,9 +214,9 @@ class LocalSearch(StochasticSearcher):
             TrialSchedulerWithSearcher,
         )
 
-        assert isinstance(scheduler, TrialSchedulerWithSearcher), (
-            "This searcher requires TrialSchedulerWithSearcher scheduler"
-        )
+        assert isinstance(
+            scheduler, TrialSchedulerWithSearcher
+        ), "This searcher requires TrialSchedulerWithSearcher scheduler"
         super().configure_scheduler(scheduler)
 
     def clone_from_state(self, state: dict[str, Any]):
