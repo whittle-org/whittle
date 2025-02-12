@@ -57,11 +57,23 @@ def test_student_training_data_and_distillation():
 
     dataloader = get_dummy_dataloader(batch_size=batch_size, seq_len=seq_len, num_batches=3)
 
-    # Test student training data creation
+    # Test student training data creation with new parameters
     with tempfile.TemporaryDirectory() as tmpdir:
-        training_data_output = os.path.join(tmpdir, "student_training_data.pth")
-        create_student_training_data(teacher, dataloader, device, training_data_output, top_k=5, subset_size=10)
-        assert os.path.exists(training_data_output), "Student training data file was not created."
+        training_data_output = os.path.join(tmpdir, "student_training_data")
+        create_student_training_data(
+            teacher,
+            dataloader,
+            device,
+            training_data_output,
+            top_k=5,
+            subset_size=10,
+            use_top_k_logits=True,
+            chunk_size=2,  # Force saving in chunks for test
+            precision='full'
+        )
+        # Expect at least one chunk file to be created (chunk index 0)
+        expected_file = f"{training_data_output}_part0.pt"
+        assert os.path.exists(expected_file), "Student training data file was not created."
 
     # Test knowledge distillation
     kd = KD(
@@ -83,6 +95,6 @@ def test_student_training_data_and_distillation():
     sample_input = torch.randint(0, 10, (batch_size, seq_len)).to(device)
     logits = distilled_student(sample_input)
     assert logits.shape == (batch_size, seq_len, 10), "Distilled student output has unexpected shape."
-
+    
 if __name__ == "__main__":
     pytest.main([__file__])

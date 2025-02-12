@@ -247,6 +247,7 @@ def create_student_training_data(
         top_k: int = 100,  # Store only top-K logits per token
         subset_size: int = 1024, # Number of batches to store
         use_top_k_logits: bool = True,
+        chunk_size: int = 2000, # Number of batches to store per chunk
         precision: str = 'full' # Precision of the stored logits ('full' or 'half') 
     ) -> None:
     """
@@ -269,7 +270,6 @@ def create_student_training_data(
     teacher.eval()
     teacher.to(device)
 
-    chunk_size = 2000
     stored_values, stored_indices = [], []
     file_counter = 0
 
