@@ -7,7 +7,7 @@ import torch.nn as nn
 from litgpt import Config
 from litgpt.model import KVCache, apply_rope
 
-from whittle.modules import LinearQKV, LinearProj
+from whittle.modules import LinearProj, LinearQKV
 
 
 class CausalSelfAttention(nn.Module):
@@ -46,7 +46,6 @@ class CausalSelfAttention(nn.Module):
 
     def get_qkv_indices(self):
         qkv_indices = []
-        device = "cuda" if torch.cuda.is_available() else "cpu"
         heads_per_group = self.config.n_head // self.config.n_query_groups
         if self.config.n_head == self.config.n_query_groups:
             for h in range(self.sub_network_n_head):
@@ -69,12 +68,7 @@ class CausalSelfAttention(nn.Module):
                 qkv_indices.extend([i for i in range(start_q, end_q)])
             end_queries = self.config.n_head * self.config.head_size
             qkv_indices.extend(
-                [
-                    i
-                    for i in range(
-                        end_queries, end_queries + self.sub_network_head_size
-                    )
-                ]
+                [i for i in range(end_queries, end_queries + self.sub_network_head_size)]
             )
             end_keys = end_queries + self.config.head_size
             qkv_indices.extend(
@@ -103,10 +97,9 @@ class CausalSelfAttention(nn.Module):
                 qkv_indices.extend(
                     [i for i in range(start_v, start_v + self.sub_network_head_size)]
                 )
-        return torch.tensor(qkv_indices, dtype=torch.long).to(device)
+        return qkv_indices
 
     def get_proj_indices(self):
-        device = "cuda" if torch.cuda.is_available() else "cpu"
         n_head = self.config.n_head
         n_query_groups = self.config.n_query_groups
         sub_network_n_head = self.sub_network_n_head
@@ -117,20 +110,21 @@ class CausalSelfAttention(nn.Module):
         proj_indices = []
         if n_head == n_query_groups:
             for i in range(sub_network_n_head):
-                proj_indices.append(
-                    torch.arange(i * head_size, i * head_size + sub_network_head_size)
+                proj_indices.extend(
+                    i for i in range(i * head_size, i * head_size + sub_network_head_size)
                 )
         else:
             for g in range(sub_network_query_groups):
                 start = g * heads_per_group * head_size
                 for h in range(self.sub_network_q_per_kv):
-                    proj_indices.append(
-                        torch.arange(
+                    proj_indices.extend(
+                        i
+                        for i in range(
                             start + h * head_size,
                             start + h * head_size + sub_network_head_size,
                         )
                     )
-        return torch.cat(proj_indices).long().to(device)
+        return proj_indices
 
     def set_sub_network(
         self,

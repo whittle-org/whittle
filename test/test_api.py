@@ -60,9 +60,7 @@ def copy_subnetwork_weights(sub_network, super_network):
         block.mlp.fc.weight.data[:intermediate, :embd] = block_orig.mlp.fc.weight.data
         if block.mlp.fc.bias is not None:
             block.mlp.fc.bias.data[:intermediate] = block_orig.mlp.fc.bias.data
-        block.mlp.proj.weight.data[:embd, :intermediate] = (
-            block_orig.mlp.proj.weight.data
-        )
+        block.mlp.proj.weight.data[:embd, :intermediate] = block_orig.mlp.proj.weight.data
         if block.mlp.proj.bias is not None:
             block.mlp.proj.bias.data[:embd] = block_orig.mlp.proj.bias.data
         block.norm_1.weight.data[:embd] = block_orig.norm_1.weight.data
