@@ -128,18 +128,18 @@ class SavingProxyForTensor:
         if reduce_args[0] == torch._utils._rebuild_tensor_v2:
             # for Tensors with Python attributes
             (a0, a1, (storage, *a2_other), *other_reduce_args) = reduce_args
-            assert isinstance(
-                storage, torch.storage.TypedStorage
-            ), "Please check for updates"
+            assert isinstance(storage, torch.storage.TypedStorage), (
+                "Please check for updates"
+            )
             storage_proxy = SavingProxyForStorage(
                 storage, saver, protocol_version=protocol_version
             )
             self.reduce_args = (a0, a1, (storage_proxy, *a2_other), *other_reduce_args)
         else:
             (storage, *other_reduce_args) = reduce_args
-            assert isinstance(
-                storage, torch.storage.TypedStorage
-            ), "Please check for updates"
+            assert isinstance(storage, torch.storage.TypedStorage), (
+                "Please check for updates"
+            )
             storage_proxy = SavingProxyForStorage(
                 storage, saver, protocol_version=protocol_version
             )
