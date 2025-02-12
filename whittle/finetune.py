@@ -30,8 +30,6 @@ from litgpt.utils import (
     parse_devices,
     save_hyperparameters,
 )
-
-# from search_spaces import search_spaces
 from torch.utils.data import ConcatDataset, DataLoader
 from torchmetrics import RunningMean
 
@@ -81,16 +79,20 @@ def setup(
     """Finetune a model.
 
     Arguments:
-        checkpoint_dir: The path to the base model's checkpoint directory to load for finetuning.
-        out_dir: Directory in which to save checkpoints and logs. If running in a Lightning Studio Job, look for it in
-            /teamspace/jobs/<job-name>/share.
-        precision: The precision to use for finetuning. Possible choices: "bf16-true", "bf16-mixed", "32-true".
+        checkpoint_dir: The path to the base model's checkpoint directory to load
+            for finetuning.
+        out_dir: Directory in which to save checkpoints and logs. If running in
+            a Lightning Studio Job, look for it in /teamspace/jobs/<job-name>/share.
+        precision: The precision to use for finetuning.
+            Possible choices: "bf16-true", "bf16-mixed", "32-true".
         devices: How many devices/GPUs to use
         num_nodes: How many nodes the code is being run on.
-        resume: Path to a checkpoint directory to resume from in case training was interrupted, or ``True`` to resume
-            from the latest checkpoint in ``out_dir``. An error will be raised if no checkpoint is found. Passing
-            ``'auto'`` will resume from the latest checkpoint but not error if no checkpoint exists.
-        data: Data-related arguments. If not provided, the default is ``litgpt.data.Alpaca``.
+        resume: Path to a checkpoint directory to resume from in case training was
+            interrupted, or ``True`` to resume from the latest checkpoint in ``out_dir``.
+            An error will be raised if no checkpoint is found. Passing ``'auto'``
+            will resume from the latest checkpoint but not error if no checkpoint exists.
+        data: Data-related arguments. If not provided, the
+            default is ``litgpt.data.Alpaca``.
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
         optimizer: An optimizer name (such as "AdamW") or config.
@@ -121,9 +123,6 @@ def setup(
         "depth": randint(1, config.n_layer),
     }
 
-    # search_space = search_spaces[search_space_type](config)
-
-    # config_14m.tie_embeddings = False
     precision = precision or get_default_supported_precision(training=True)
     logger = choose_logger(
         logger_name,
@@ -346,7 +345,9 @@ def fit(
     forward_times = []
     while state["step_count"] < max_steps and train_iterator.epoch < train.epochs:
         if state["iter_num"] == 0:
-            print("Starting training at ", time.strftime("%H:%M:%S %Z", time.localtime()))
+            fabric.print(
+                "Starting training at ", time.strftime("%H:%M:%S %Z", time.localtime())
+            )
         state["iter_num"] += 1
         iter_t0 = time.perf_counter()
         batch = next(train_iterator)
@@ -375,12 +376,12 @@ def fit(
             optimizer.zero_grad()
             scheduler.step()
             state["step_count"] += 1
-            print("Step ", state["step_count"])
+            fabric.print("Step ", state["step_count"])
             if state["step_count"] % 512 == 0:
-                print(f"Step {state['step_count']} | Loss {loss:.3f}")
+                fabric.print(f"Step {state['step_count']} | Loss {loss:.3f}")
             post_step_time = time.perf_counter()
-            print("train loss: ", loss)
-            print("Step time: ", post_step_time - pre_step_time)
+            fabric.print("train loss: ", loss)
+            fabric.print("Step time: ", post_step_time - pre_step_time)
 
         if state["iter_num"] % train.log_interval == 0:
             loss = (
@@ -434,8 +435,8 @@ def fit(
                 save_prompt_style(data.prompt_style, checkpoint_file.parent)
 
     if fabric.is_global_zero:
-        print("Training time: ", state["train_time"])
-        print("Forward times: ", torch.mean(torch.tensor(forward_times)))
+        fabric.print("Training time: ", state["train_time"])
+        fabric.print("Forward times: ", torch.mean(torch.tensor(forward_times)))
 
 
 def get_lr_scheduler(optimizer, warmup_steps: int, max_steps: int):
