@@ -198,26 +198,42 @@ class GPT(nn.Module):
         self.sub_network_n_layers = sub_network_n_layers
         self.transformer.wte.set_sub_network(self.sub_network_n_embd)
         self.transformer.ln_f.set_sub_network(self.sub_network_n_embd)
-        if sub_network_query_groups is None:
-            if self.config.n_query_groups == 1:
-                self.sub_network_query_groups = 1
-            elif self.sub_network_num_heads % self.config.n_query_groups == 0:
-                self.sub_network_query_groups = self.config.n_query_groups
-            else:
-                self.sub_network_query_groups = self.sub_network_num_heads // (
-                    self.config.n_head // self.config.n_query_groups
-                )
+        if self.config.n_query_groups == 1:
+            self.sub_network_query_groups = 1
+            self.sub_network_num_heads = (
+                sub_network_num_heads
+                if sub_network_num_heads is not None
+                else self.config.n_head
+            )
+        elif self.config.n_head != self.config.n_query_groups:
+            self.sub_network_num_heads = (
+                sub_network_num_heads
+                if sub_network_num_heads is not None
+                else self.config.n_head
+            )
+            self.sub_network_query_groups = (
+                sub_network_query_groups
+                if sub_network_query_groups is not None
+                else self.config.n_query_groups
+            )
         else:
-            self.sub_network_query_groups = sub_network_query_groups
+            self.sub_network_query_groups = (
+                sub_network_query_groups
+                if sub_network_query_groups is not None
+                else self.config.n_head
+            )
         if self.config.fix_head_size:
             if sub_network_head_size is None:
                 self.sub_network_head_size = self.config.head_size
             else:
                 self.sub_network_head_size = sub_network_head_size
         else:
-            self.sub_network_head_size = (
-                self.sub_network_n_embd // self.sub_network_num_heads
-            )
+            if sub_network_head_size is not None:
+                self.sub_network_head_size = sub_network_head_size
+            else:
+                self.sub_network_head_size = (
+                    self.sub_network_n_embd // self.sub_network_num_heads
+                )
         for i in range(self.sub_network_n_layers):
             block = self.transformer.h[i]
             block.set_sub_network(

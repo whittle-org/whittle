@@ -70,17 +70,30 @@ def init_lit_attention(config):
     return attention
 
 
-def init_lit_small_attention(config, base_attention):
+def init_lit_small_attention(config, base_attention, attention_super):
     attention = LitCausalSelfAttention(config, 2)
     torch.manual_seed(0)
-    slices = tuple(slice(0, s) for s in attention.attn.weight.data.size())
-    attention.attn.weight.data = base_attention.attn.weight.data[slices]
-    slices = tuple(slice(0, s) for s in attention.attn.bias.data.size())
-    attention.attn.bias.data = base_attention.attn.bias.data[slices]
+    slices = tuple(slice(0, s) for s in attention.attn.weight.data.size())[1]
+    qkv_indices = (
+        attention_super.qkv_indices
+        if attention_super.qkv_indices is not None
+        else slice(0, attention.attn.weight.data.size()[0])
+    )
+    attention.attn.weight.data = base_attention.attn.weight.data[qkv_indices, :][
+        :, 0 : attention.attn.weight.data.size()[1]
+    ]
+    attention.attn.bias.data = base_attention.attn.bias.data[qkv_indices]
+    proj_indices = (
+        attention_super.proj_indices
+        if attention_super.proj_indices is not None
+        else slice(0, attention.proj.weight.data.size()[-1])
+    )
     slices = tuple(slice(0, s) for s in attention.proj.bias.data.size())
     attention.proj.bias.data = base_attention.proj.bias.data[slices]
-    slices = tuple(slice(0, s) for s in attention.proj.weight.data.size())
-    attention.proj.weight.data = base_attention.proj.weight.data[slices]
+
+    attention.proj.weight.data = base_attention.proj.weight.data[
+        0 : attention.proj.weight.data.size()[0], :
+    ][:, proj_indices]
     return attention
 
 
@@ -89,7 +102,7 @@ def test_attention(attention_config):
     config = attention_configs[attention_config]["config"]
     config.fix_head_size = attention_configs[attention_config]["fix_head_size"]
     if not config.fix_head_size:
-        config.head_size = config.n_embd // config.n_head
+        config.head_size = 32
     config.max_seq_len = 512
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
 
@@ -108,20 +121,21 @@ def test_attention(attention_config):
     lit_attention = init_lit_attention(config)
     out_lit_large = lit_attention(input, mask=mask, cos=cos, sin=sin)
     if not config.fix_head_size:
-        sub_network_head_size = config.n_embd // (2 * config.n_head // 4)
+        sub_network_head_size = config.head_size // 2
     else:
         sub_network_head_size = config.head_size
     if config.n_query_groups == 1:
         sub_network_query_groups = 1
-    elif (config.n_head // 4) % config.n_query_groups == 0:
-        sub_network_query_groups = config.n_query_groups
+        sub_network_n_head = config.n_head // 4
+    elif config.n_query_groups == config.n_head:
+        sub_network_n_head = config.n_head // 4
+        sub_network_query_groups = sub_network_n_head
     else:
-        sub_network_query_groups = (config.n_head // 4) // (
-            config.n_head // config.n_query_groups
-        )
+        sub_network_query_groups = config.n_query_groups // 2
+        sub_network_n_head = config.n_head // 2
     attention.set_sub_network(
         sub_network_n_embd=config.n_embd // 2,
-        sub_network_n_head=config.n_head // 4,
+        sub_network_n_head=sub_network_n_head,
         sub_network_query_groups=sub_network_query_groups,
         sub_network_head_size=sub_network_head_size,
     )
@@ -135,18 +149,31 @@ def test_attention(attention_config):
 
     # check that our custom model produces the same output as LitGPT
     assert torch.all(out_lit_large == out_large)
-
     config.n_embd = attention.sub_network_n_embd
-    config.n_head = attention.sub_network_n_head
-    config.n_query_groups = sub_network_query_groups
-    config.head_size = sub_network_head_size
+    if config.n_query_groups == config.n_head:
+        config.n_head = attention.sub_network_n_head
+    else:
+        config.n_head = (
+            attention.sub_network_n_head // config.n_query_groups
+        ) * attention.sub_network_query_groups
+    config.n_query_groups = attention.sub_network_query_groups
+    config.head_size = attention.sub_network_head_size
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
-
-    lit_attention_small = init_lit_small_attention(config, lit_attention)
+    lit_attention_small = init_lit_small_attention(config, lit_attention, attention)
+    if attention.qkv_indices is not None:
+        print(lit_attention_small.attn.weight.data.size())
+        print(
+            attention.attn.weight.data[attention.qkv_indices, :][
+                :, 0 : config.n_embd
+            ].size()
+        )
+        assert torch.all(
+            lit_attention_small.attn.weight.data
+            == attention.attn.weight.data[attention.qkv_indices, :][:, 0 : config.n_embd]
+        )
 
     out_lit_small = lit_attention_small(
         input[:, :, : config.n_embd], mask=mask, cos=cos, sin=sin
     )
-
     # check that our sub-networks the same output as equally sized LitGPT attention layer
     assert torch.all(out_lit_small == out_small)

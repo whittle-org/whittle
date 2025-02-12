@@ -77,11 +77,12 @@ def test_gpt():
         sub_network_num_heads=4,
         sub_network_n_layers=1,
         sub_network_query_groups=2,
+        sub_network_head_size=config.head_size,
     )
     out_small = gpt(input)
     assert out_small.shape == (1, 64, 128)
     config.n_embd = 32
-    config.n_head = 4
+    config.n_head = 2
     config.n_query_groups = 2
     config.intermediate_size = 32 * 4
     config.n_layer = 1
@@ -99,20 +100,39 @@ def test_gpt():
 
     for i, block in enumerate(lit_gpt_small.transformer.h):
         block_orig = gpt.transformer.h[i]
-        block.attn.attn.weight.data = block_orig.attn.attn.weight.data[
-            : block_orig.attn.attn.sub_network_out_features,
-            : block_orig.attn.attn.sub_network_in_features,
-        ]
-        block.attn.attn.bias.data = block_orig.attn.attn.bias.data[
-            : block_orig.attn.attn.sub_network_out_features
-        ]
-        block.attn.proj.bias.data = block_orig.attn.proj.bias.data[
-            : block_orig.attn.proj.sub_network_out_features
-        ]
-        block.attn.proj.weight.data = block_orig.attn.proj.weight.data[
-            : block_orig.attn.proj.sub_network_out_features,
-            : block_orig.attn.proj.sub_network_in_features,
-        ]
+        if block_orig.attn.qkv_indices is not None:
+            block.attn.attn.weight.data = block_orig.attn.attn.weight.data[
+                block_orig.attn.qkv_indices,
+                : block_orig.attn.attn.sub_network_in_features,
+            ]
+            block.attn.attn.bias.data = block_orig.attn.attn.bias.data[
+                block_orig.attn.qkv_indices
+            ]
+            print(torch.tensor(block_orig.attn.qkv_indices).shape)
+        else:
+            block.attn.attn.weight.data = block_orig.attn.attn.weight.data[
+                : block_orig.attn.attn.sub_network_out_features,
+                : block_orig.attn.attn.sub_network_in_features,
+            ]
+            block.attn.attn.bias.data = block_orig.attn.attn.bias.data[
+                : block_orig.attn.attn.sub_network_out_features
+            ]
+        if block_orig.attn.proj_indices is not None:
+            block.attn.proj.weight.data = block_orig.attn.proj.weight.data[
+                : block_orig.attn.proj.sub_network_out_features,
+                block_orig.attn.proj_indices,
+            ]
+            block.attn.proj.bias.data = block_orig.attn.proj.bias.data[
+                : block_orig.attn.proj.sub_network_out_features
+            ]
+        else:
+            block.attn.proj.bias.data = block_orig.attn.proj.bias.data[
+                : block_orig.attn.proj.sub_network_out_features
+            ]
+            block.attn.proj.weight.data = block_orig.attn.proj.weight.data[
+                : block_orig.attn.proj.sub_network_out_features,
+                : block_orig.attn.proj.sub_network_in_features,
+            ]
         block.mlp.fc_1.weight.data = block_orig.mlp.fc_1.weight.data[
             : block_orig.mlp.fc_1.sub_network_out_features,
             : block_orig.mlp.fc_1.sub_network_in_features,
@@ -197,7 +217,6 @@ def test_gemma_2():
         intermediate_size=86,
     )
     config_gemma.fix_head_size = True
-    print(config_gemma)
     lit_model = LitGPT(config_gemma)
     whittle_model = GPT(config_gemma)
     copy_weights(lit_model, whittle_model)
