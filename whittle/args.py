@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from litgpt.args import TrainArgs
 
@@ -10,7 +9,7 @@ from litgpt.args import TrainArgs
 class SearchArgs:
     """search-related arguments"""
 
-    save_interval: Optional[int] = 1000
+    save_interval: int | None = 1000
     """Number of optimizer steps between saving checkpoints"""
     log_interval: int = 1
     """Number of iterations between logging calls"""
@@ -22,6 +21,6 @@ class SearchArgs:
 
 @dataclass
 class FineTuningArgs(TrainArgs):
-    learning_rate: Optional[float] = 2e-5
-    temperature: Optional[float] = 10.0
-    distillation_weight: Optional[float] = 0.5
+    learning_rate: float | None = 2e-5
+    temperature: float | None = 10.0
+    distillation_weight: float | None = 0.5

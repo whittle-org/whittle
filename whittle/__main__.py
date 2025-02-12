@@ -1,13 +1,15 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
-import warnings
-import torch
+from __future__ import annotations
 
-from whittle.pretrain_super_network import setup as pretrain_fn
-from whittle.search_sub_networks import setup as search_fn
+import warnings
+
+import torch
+from jsonargparse import CLI, set_config_read_mode, set_docstring_parse_options
+
 from whittle.eval.utils import convert_and_evaluate as evaluate_fn
 from whittle.finetune import setup as finetune_fn
-
-from jsonargparse import set_config_read_mode, set_docstring_parse_options, CLI
+from whittle.pretrain_super_network import setup as pretrain_fn
+from whittle.search_sub_networks import setup as search_fn
 
 
 def main() -> None:

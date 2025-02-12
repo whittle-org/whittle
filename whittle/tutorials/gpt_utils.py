@@ -1,17 +1,17 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-import tiktoken
-from syne_tune.config_space import randint
+from __future__ import annotations
 
+import matplotlib.pyplot as plt
+import numpy as np
+import tiktoken
 import torch
 import torch.nn as nn
+from datasets import load_dataset
+from syne_tune.config_space import randint
 from torch.nn import functional as F
+from tqdm import tqdm
 
 from whittle.sampling.random_sampler import RandomSampler
 from whittle.training_strategies.sandwich import SandwichStrategy
-
-from datasets import load_dataset
 
 
 def evaluate_wikitext(model, tokenizer):
@@ -125,9 +125,7 @@ def plot_losses(losses, verbosity, val_losses=None):
     plt.show()
 
 
-def get_batch(
-    split: str, block_size: int = 8, batch_size: int = 4, device: str = "cuda"
-):
+def get_batch(split: str, block_size: int = 8, batch_size: int = 4, device: str = "cuda"):
     """Gets a randomized batch from the split of data chosen.
 
     Arguments

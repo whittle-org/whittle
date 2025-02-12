@@ -6,8 +6,8 @@ from pathlib import Path
 from pprint import pprint
 
 import torch
-from litgpt.utils import auto_download_checkpoint, check_valid_checkpoint_dir
 from litgpt.model import Config
+from litgpt.utils import auto_download_checkpoint, check_valid_checkpoint_dir
 
 from whittle.eval.whittle_llms import WhittleLM
 from whittle.models.gpt import GPT
@@ -63,7 +63,7 @@ def convert_and_evaluate(
             model_name=checkpoint_dir, access_token=access_token
         )
         check_valid_checkpoint_dir(checkpoint_dir)
-        config = Config.from_file(checkpoint_dir / "model_config.yaml")
+        config = Config.from_file(checkpoint_dir / "model_config.yaml")  # type: ignore[operator]
         config.fix_head_size = True
         loaded_model = GPT(config)
 

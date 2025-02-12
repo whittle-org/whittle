@@ -4,11 +4,11 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal
 
 import lightning as L
 import torch
-from lightning.fabric.strategies import FSDPStrategy
+from lightning.fabric.strategies.fsdp import FSDPStrategy
 from litgpt.args import EvalArgs
 from litgpt.data import Alpaca, DataModule
 from litgpt.model import Config
@@ -101,10 +101,10 @@ def setup(
     checkpoint_dir = auto_download_checkpoint(
         model_name=checkpoint_dir, access_token=access_token
     )
-    # pprint(locals())
+
     data = Alpaca(num_workers=num_dataloader_workers) if data is None else data
     # data = OpenWebText(num_workers=num_dataloader_workers) if data is None else data
-    devices: int = parse_devices(devices)
+    devices: int = parse_devices(devices)  # type: ignore[no-redef]
     out_dir = init_out_dir(out_dir)
 
     check_valid_checkpoint_dir(checkpoint_dir)
@@ -133,7 +133,7 @@ def setup(
         log_interval=train.log_interval,
     )
 
-    if devices * num_nodes > 1:
+    if devices * num_nodes > 1:  # type: ignore[operator]
         # For hybrid sharding, we want to keep parameter sharding within each node
         # strategy = FSDPStrategy(
         #     sharding_strategy="HYBRID_SHARD", device_mesh=(devices, num_nodes)
@@ -171,7 +171,7 @@ def setup(
     strategy.fabric = fabric
     strategy.gradient_accumulation_step = train.gradient_accumulation_iters(devices)
     # strategy.sampler.config_space = config_space
-    if torch.cuda.is_available() and devices > 1:
+    if torch.cuda.is_available() and devices > 1:  # type: ignore[operator]
         check_nvlink_connectivity(fabric)
 
     fabric.print("launching")
@@ -198,7 +198,7 @@ def setup(
 def main(
     fabric: L.Fabric,
     devices: int,
-    resume: Union[bool, Literal["auto"], Path],
+    resume: bool | Literal["auto"] | Path,
     seed: int,
     sampling_strategy: str,
     downstream_test_iters: int,
@@ -209,7 +209,7 @@ def main(
     out_dir: Path,
     train: FineTuningArgs,
     eval: EvalArgs,
-    optimizer: Union[str, dict],
+    optimizer: str | dict,
     train_strategy: BaseTrainingStrategy,
     importance_objective: str,
 ) -> None:
@@ -217,12 +217,8 @@ def main(
 
     tokenizer = Tokenizer(checkpoint_dir)
     train_dataloader, val_dataloader = get_dataloaders(fabric, data, tokenizer, train)
-    steps_per_epoch = len(train_dataloader) // train.gradient_accumulation_iters(
-        devices
-    )
-    lr_max_steps = min(
-        train.epochs * steps_per_epoch, (train.max_steps or float("inf"))
-    )
+    steps_per_epoch = len(train_dataloader) // train.gradient_accumulation_iters(devices)
+    lr_max_steps = min(train.epochs * steps_per_epoch, (train.max_steps or float("inf")))
 
     fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
 
@@ -240,10 +236,10 @@ def main(
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
         model = GPT(config)
         if "grid-params" in sampling_strategy:
-            print("Initializing params grid....")
-            train_strategy.sampler.initialize_grid(model)
-            print("Requested configs:", len(train_strategy.sampler.values))
-            print("Grid Size", len(train_strategy.sampler.grid))
+            fabric.print("Initializing params grid....")
+            train_strategy.sampler.initialize_grid(model)  # type: ignore[attr-defined]
+            fabric.print("Requested configs:", len(train_strategy.sampler.values))  # type: ignore[attr-defined]
+            fabric.print("Grid Size", len(train_strategy.sampler.grid))  # type: ignore[attr-defined]
 
     model.name_or_path = checkpoint_dir
     fabric.print(
@@ -302,7 +298,7 @@ def fit(
     train_dataloader: DataLoader,
     val_dataloader: DataLoader,
     devices: int,
-    resume: Union[bool, Literal["auto"], Path],
+    resume: bool | Literal["auto"] | Path,
     checkpoint_dir: Path,
     out_dir: Path,
     train: FineTuningArgs,
@@ -350,9 +346,7 @@ def fit(
     forward_times = []
     while state["step_count"] < max_steps and train_iterator.epoch < train.epochs:
         if state["iter_num"] == 0:
-            print(
-                "Starting training at ", time.strftime("%H:%M:%S %Z", time.localtime())
-            )
+            print("Starting training at ", time.strftime("%H:%M:%S %Z", time.localtime()))
         state["iter_num"] += 1
         iter_t0 = time.perf_counter()
         batch = next(train_iterator)
@@ -369,7 +363,7 @@ def fit(
         with fabric.no_backward_sync(model, enabled=is_accumulating):
             loss = train_strategy(
                 model, input_ids, targets, train.gradient_accumulation_iters(devices)
-            )
+            )  # type: ignore[call-arg]
             if fabric.is_global_zero:
                 forward_times.append(time.perf_counter() - pre_forward_time)
 

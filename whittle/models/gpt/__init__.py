@@ -7,8 +7,8 @@ import re
 from lightning_utilities.core.imports import RequirementCache
 from litgpt import Config
 
-from whittle.models.gpt.model import GPT, Block
 from whittle.models.gpt.extract import extract_current_sub_network
+from whittle.models.gpt.model import GPT, Block
 
 _LIGHTNING_AVAILABLE = RequirementCache("lightning>=2.2.0.dev0")
 if not bool(_LIGHTNING_AVAILABLE):
