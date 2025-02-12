@@ -28,7 +28,8 @@ from torch.utils.data import DataLoader
 
 from whittle.args import SearchArgs
 from whittle.metrics import compute_parameters
-from whittle.models.gpt import GPT, Block, extract_current_sub_network
+from whittle.models.gpt import GPT, Block
+from whittle.models.gpt.extract import extract_current_sub_network
 from whittle.pretrain_super_network import get_search_space
 from whittle.search import multi_objective_search
 
