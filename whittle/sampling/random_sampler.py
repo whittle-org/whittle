@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Callable
-
 import warnings
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
+from syne_tune.config_space import Categorical, Domain
+
 from whittle.args import ParamBinArgs
 from whittle.sampling.param_bins import ParamBins
-from syne_tune.config_space import Categorical, Domain
 
 
 class RandomSampler:

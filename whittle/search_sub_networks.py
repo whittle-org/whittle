@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import json
 import os
 import time
 from pathlib import Path
 from typing import Literal
 
-import json
 import lightning as L
 import torch
 from lightning.fabric.strategies import FSDPStrategy
@@ -28,15 +28,15 @@ from litgpt.utils import (
 )
 from torch.utils.data import DataLoader
 
-from whittle.args import SearchArgs, ParamBinArgs
+from whittle.args import ParamBinArgs, SearchArgs
+from whittle.metrics import compute_flops, compute_latency, compute_parameters
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.models.gpt.extract import extract_current_sub_network
 from whittle.pretrain_super_network import get_search_space
+from whittle.sampling.param_bins import ParamBins, ParamsEstimator
 from whittle.search import multi_objective_search
 from whittle.search.baselines import Methods
-from whittle.sampling.param_bins import ParamsEstimator, ParamBins
-from whittle.metrics import compute_latency, compute_parameters, compute_flops
 
 
 def setup(
@@ -83,7 +83,7 @@ def setup(
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
         access_token: Optional API token to access models with restrictions.
-        use_param_bins: Whether to use parameter bins to limit the search space.
+        param_bins: The parameter bins that limit the sub-network params in the search.
         objective_1: The name of the first objective to optimize (possible - val_loss, perplexity). Defaults to "val_loss".
         objective_2: The name of the second objective to optimize (possible - parameters, latency, flops). Defaults to "parameters".
         log_objective_names: Whether to log the names of the objectives in the logger, or log as objective_1 and objective_2. Defaults to True.

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Union, List, Optional
-from syne_tune.config_space import Domain
+from typing import Any
+
 from syne_tune.optimizer.schedulers import FIFOScheduler
 from syne_tune.optimizer.schedulers.searchers.random_grid_searcher import RandomSearcher
 
@@ -75,8 +75,8 @@ class StratifiedRandomSearcher(RandomSearcher):
 
     def __init__(
         self,
-        config_space: Dict[str, Any],
-        metric: Union[List[str], str],
+        config_space: dict[str, Any],
+        metric: list[str] | str,
         param_bins: ParamBins,
         **kwargs,
     ):
@@ -87,7 +87,7 @@ class StratifiedRandomSearcher(RandomSearcher):
         )
         self.param_bins = param_bins
 
-    def _get_config(self, **kwargs) -> Optional[dict]:
+    def _get_config(self, **kwargs) -> dict | None:
         """Sample a new configuration at random. If it doesn't fit into bins of
         already sampled configurations, continue sampling until a valid config is found.
 
@@ -106,7 +106,7 @@ class StratifiedRandomSearcher(RandomSearcher):
 
         return config
 
-    def clone_from_state(self, state: Dict[str, Any]):
+    def clone_from_state(self, state: dict[str, Any]):
         new_searcher = StratifiedRandomSearcher(
             self.config_space,
             metric=self._metric,

@@ -1,8 +1,13 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
+
 from whittle.metrics.parameters import (
     compute_parameters,
 )
-from typing import Callable, Any
 from whittle.models.gpt import GPT
 
 

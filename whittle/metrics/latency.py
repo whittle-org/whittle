@@ -3,7 +3,6 @@ from __future__ import annotations
 import torch
 import torch.profiler
 from torch.profiler import record_function
-from typing import Optional
 
 
 # Define a sample language model (e.g., a simple RNN or transformer-based model)
@@ -42,7 +41,7 @@ def compute_latency(
     use_cuda: bool = False,
     batch_size: int = 8,
     n_samples: int = 10,
-    device: Optional[str] = None,
+    device: str | None = None,
 ) -> float:
     """
     Profiles the latency of a PyTorch model for inference.

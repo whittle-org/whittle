@@ -1,24 +1,27 @@
+from __future__ import annotations
+
 import json
-import torch
 from pathlib import Path
-from typing import Optional, Union
+
+import torch
 from litgpt import Config
-from whittle.models.gpt import GPT
-from whittle.metrics import compute_parameters, compute_flops, compute_latency
+
 from whittle.eval.utils import convert_and_evaluate
+from whittle.metrics import compute_flops, compute_latency, compute_parameters
+from whittle.models.gpt import GPT
 
 
 def setup(
     checkpoint_dir: Path,
-    out_dir: Optional[Path] = None,
-    tasks: Optional[str] = None,
+    out_dir: Path | None = None,
+    tasks: str | None = None,
     seed: int = 1337,
-    num_fewshot: Optional[int] = None,
-    batch_size: Union[int, str] = 1,
+    num_fewshot: int | None = None,
+    batch_size: int | str = 1,
     latency_batch_size: int = 8,
-    device: Optional[str] = None,
-    limit: Optional[float] = None,
-    tokenizer_name_or_path: Optional[str] = None,
+    device: str | None = None,
+    limit: float | None = None,
+    tokenizer_name_or_path: str | None = None,
 ) -> None:
     """
     Evaluate a model with the LM Evaluation Harness. Compute the latency of a PyTorch model for inference, and FLOPs.

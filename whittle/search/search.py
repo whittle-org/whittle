@@ -7,10 +7,10 @@ from typing import Any
 import numpy as np
 from lightning.fabric.loggers import Logger
 
+from whittle.sampling.param_bins import ParamBins
 from whittle.search.ask_tell_scheduler import AskTellScheduler
 from whittle.search.baselines import MethodArguments, methods
 from whittle.search.multi_objective import get_pareto_optimal
-from whittle.sampling.param_bins import ParamBins
 
 
 def multi_objective_search(

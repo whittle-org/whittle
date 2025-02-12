@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Literal, Optional
+from typing import Literal
 
 try:
     import deepspeed
@@ -22,7 +22,7 @@ def compute_flops(
     batch_size: int = 1,
     sequence_length: int = 512,
     metric: Literal["flops", "macs"] = "flops",
-    previous_device: Optional[str] = None,
+    previous_device: str | None = None,
 ) -> float:
     """
     Estimates the number of floating-point operations (FLOPs) or multiply-accumulate operations (MACs) for a GPT model.
