@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import torch
 import torch.profiler
 from torch.profiler import record_function

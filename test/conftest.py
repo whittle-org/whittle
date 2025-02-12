@@ -1,6 +1,5 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
-
-from typing import Optional
+from __future__ import annotations
 
 import pytest
 import torch
@@ -17,7 +16,7 @@ class MockTokenizer:
     def encode(
         self,
         text: str,
-        bos: Optional[bool] = None,
+        bos: bool | None = None,
         eos: bool = False,
         max_length: int = -1,
     ) -> torch.Tensor:
@@ -49,7 +48,7 @@ def mock_tokenizer():
     return MockTokenizer()
 
 
-def RunIf(thunder: Optional[bool] = None, **kwargs):
+def RunIf(thunder: bool | None = None, **kwargs):
     reasons, marker_kwargs = _runif_reasons(**kwargs)
 
     if thunder is not None:

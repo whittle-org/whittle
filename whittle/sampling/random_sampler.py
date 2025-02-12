@@ -1,11 +1,13 @@
 from __future__ import annotations
-import warnings
 
+from typing import Any, Callable
+
+import warnings
 from typing import Any, Callable
 
 import numpy as np
 from whittle.args import ParamBinArgs
-from whittle.sampling.param_bins import ParamBins, ParamsEstimator
+from whittle.sampling.param_bins import ParamBins
 from syne_tune.config_space import Categorical, Domain
 
 

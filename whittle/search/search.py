@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 from lightning.fabric.loggers import Logger
@@ -17,10 +18,10 @@ def multi_objective_search(
     search_space: dict,
     search_strategy: str = "random_search",
     num_samples: int = 100,
-    objective_kwargs: Optional[dict[str, Any]] = None,
-    logger: Optional[Logger] = None,
-    seed: Optional[int] = None,
-    param_bins: Optional[ParamBins] = None,
+    objective_kwargs: dict[str, Any] | None = None,
+    logger: Logger | None = None,
+    seed: int | None = None,
+    param_bins: ParamBins | None = None,
     objective_1_name: str = "objective_1",
     objective_2_name: str = "objective_2",
 ) -> dict[str, Any]:

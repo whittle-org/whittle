@@ -3,7 +3,14 @@ from __future__ import annotations
 import os
 from typing import Literal, Optional
 
-import deepspeed
+try:
+    import deepspeed
+except ImportError:
+    raise ImportError(
+        "DeepSpeed not installed. Please install whittle with the "
+        "`distributed` dependency group: `pip install whittle[distributed]"
+    )
+
 import torch
 from deepspeed.accelerator.cpu_accelerator import CPU_Accelerator
 from deepspeed.profiling.flops_profiler import get_model_profile

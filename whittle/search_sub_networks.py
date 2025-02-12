@@ -3,8 +3,7 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
-from typing import Optional, Union
-from typing_extensions import Literal
+from typing import Literal
 
 import json
 import lightning as L
@@ -42,12 +41,12 @@ from whittle.metrics import compute_latency, compute_parameters, compute_flops
 
 def setup(
     checkpoint_dir: Path,
-    out_dir: Optional[Path] = Path("out/finetune/full"),
-    precision: Optional[str] = None,
-    devices: Optional[Union[int, str]] = 1,
+    out_dir: Path | None = Path("out/finetune/full"),
+    precision: str | None = None,
+    devices: int | str | None = 1,
     num_nodes: int = 1,
-    resume: Optional[Union[bool, Literal["auto"], Path]] = False,
-    data: Optional[DataModule] = None,
+    resume: bool | Literal["auto"] | Path | None = False,
+    data: DataModule | None = None,
     search: SearchArgs = SearchArgs(
         iterations=100,
         log_interval=1,
@@ -55,14 +54,14 @@ def setup(
     train: TrainArgs = TrainArgs(
         max_seq_length=512,
     ),
-    eval: Optional[EvalArgs] = EvalArgs(),
-    logger_name: Optional[Literal["wandb", "tensorboard", "csv"]] = "csv",
-    seed: Optional[int] = 1337,
-    access_token: Optional[str] = None,
+    eval: EvalArgs | None = EvalArgs(),
+    logger_name: Literal["wandb", "tensorboard", "csv"] | None = "csv",
+    seed: int | None = 1337,
+    access_token: str | None = None,
     param_bins: ParamBinArgs = ParamBinArgs(),
-    objective_1: Optional[str] = "val_loss",
-    objective_2: Optional[str] = "parameters",
-    log_objective_names: Optional[bool] = True,
+    objective_1: str | None = "val_loss",
+    objective_2: str | None = "parameters",
+    log_objective_names: bool | None = True,
 ) -> None:
     """
     Multi-objective search to select Pareto optimal set of sub-networks from trained super-network.
@@ -159,7 +158,7 @@ def _objective(
     model: GPT,
     val_dataloader: DataLoader,
     eval: EvalArgs,
-    verbose: Optional[bool] = True,
+    verbose: bool | None = True,
     objective_1: str = "val_loss",
     objective_2: str = "parameters",
 ) -> tuple[float, float]:
@@ -184,7 +183,7 @@ def _objective(
 def main(
     fabric: L.Fabric,
     devices: int,
-    resume: Union[bool, Literal["auto"], Path],
+    resume: bool | Literal["auto"] | Path,
     seed: int,
     config: Config,
     data: DataModule,
@@ -193,7 +192,7 @@ def main(
     train: TrainArgs,
     eval: EvalArgs,
     search: SearchArgs,
-    param_bins: Optional[ParamBinArgs] = None,
+    param_bins: ParamBinArgs | None = None,
     objective_1: str = "val_loss",
     objective_2: str = "parameters",
     log_objective_names: bool = True,
