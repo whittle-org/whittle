@@ -96,12 +96,12 @@ def setup(
     checkpoint_dir = auto_download_checkpoint(
         model_name=checkpoint_dir, access_token=access_token
     )
-    
+
     if data is None:
-        #import sys
-        #sys.path.append('../do-not-touch/compressing_llms')
-        #from datasets_custom.llamamini import LLaMaMini
-        #data = LLaMaMini() if fine_tuned else TinyStories()
+        # import sys
+        # sys.path.append('../do-not-touch/compressing_llms')
+        # from datasets_custom.llamamini import LLaMaMini
+        # data = LLaMaMini() if fine_tuned else TinyStories()
         data = Alpaca() if fine_tuned else TinyStories()
 
     num_devices = int(parse_devices(devices))
@@ -179,9 +179,7 @@ def _objective(
     model.select_sub_network(config)
 
     if fine_tuned:
-        val_loss = finetune_validate(
-            fabric, model, val_dataloader, eval, verbose=verbose
-        )
+        val_loss = finetune_validate(fabric, model, val_dataloader, eval, verbose=verbose)
     else:
         val_loss = validate(
             fabric, model, val_dataloader, max_iters=eval.max_iters, verbose=verbose
@@ -295,7 +293,7 @@ def main(
             "eval": eval,
             "objective_1": objective_1,
             "objective_2": objective_2,
-            "fine_tuned": fine_tuned
+            "fine_tuned": fine_tuned,
         },
         search_strategy=search.search_strategy,
         num_samples=search.iterations,
@@ -330,7 +328,9 @@ def main(
             save_config(sub_network.config, out_dir / f"sub_network_{i}")
         else:
             save_path = save_path.parent / "sub_network.pkl"
-            torch.save({"config": sub_network_dict, "parent_dir": checkpoint_dir}, save_path)
+            torch.save(
+                {"config": sub_network_dict, "parent_dir": checkpoint_dir}, save_path
+            )
 
     # save all paths to pareto optimal sub-networks
     with open(out_dir / "pareto_optimal_paths.json", "w") as f:

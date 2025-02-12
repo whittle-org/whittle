@@ -52,7 +52,7 @@ def setup(
 
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
 
-     # sub-network saved as a config instead of the extracted lit_model.pth (to save memory)
+    # sub-network saved as a config instead of the extracted lit_model.pth (to save memory)
     subnet_config = None
     if is_sub_network:
         ckp = torch.load(checkpoint_dir / "sub_network.pkl")
@@ -69,7 +69,7 @@ def setup(
 
     metrics = {}
     metrics["parameters"] = compute_parameters(model)
-    
+
     if measure_flops:
         metrics["flops"] = compute_latency(model)
     if measure_latency:
