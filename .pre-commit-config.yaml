@@ -40,10 +40,10 @@ repos:
           - "--ignore-missing-imports"
           - "--show-traceback"
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.5.5
+    rev: v0.9.6
     hooks:
       - id: ruff
-        args: [--fix, --exit-non-zero-on-fix, --no-cache]
+        args: [--fix, --exit-non-zero-on-fix, --no-cache, --unsafe-fixes]
       - id: ruff-format
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v3.29.0

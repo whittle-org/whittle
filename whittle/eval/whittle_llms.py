@@ -150,17 +150,22 @@ class WhittleLM(TemplateLM):
 
         # optionally: take in an already-initialized transformers.PreTrainedModel
         eval_logger.warning(
-            "`pretrained` model kwarg is not of type `str`. Many other model arguments may be ignored. Please do not launch via accelerate or use `parallelize=True` if passing an existing model this way."
+            "`pretrained` model kwarg is not of type `str`. Many other model "
+            "arguments may be ignored. Please do not launch via accelerate or "
+            "use `parallelize=True` if passing an existing model this way."
         )
-        assert not parallelize, "`parallelize=True` is not compatible with passing pre-initialized model to `pretrained`"
+        assert not parallelize, (
+            "`parallelize=True` is not compatible with passing pre-initialized "
+            "model to `pretrained`"
+        )
         self._model = pretrained
         self._device = device
         self._config = self._model.config
 
         if tokenizer:
-            assert isinstance(
-                tokenizer, transformers.PreTrainedTokenizer
-            ) or isinstance(tokenizer, transformers.PreTrainedTokenizerFast)
+            assert isinstance(tokenizer, transformers.PreTrainedTokenizer) or isinstance(
+                tokenizer, transformers.PreTrainedTokenizerFast
+            )
             self.tokenizer = tokenizer
         else:
             # Get tokenizer
@@ -200,7 +205,9 @@ class WhittleLM(TemplateLM):
         if "gemma" in getattr(self.config, "model_type", ""):
             self.add_bos_token = True
             eval_logger.info(
-                f"Model type is '{self.config.model_type}', part of the Gemma family--a BOS token will be used as Gemma underperforms without it."
+                f"Model type is '{self.config.model_type}', part of "
+                f"the Gemma family--a BOS token will be used as Gemma "
+                f"underperforms without it."
             )
 
         self._max_length = max_length
@@ -221,7 +228,9 @@ class WhittleLM(TemplateLM):
 
         # if a PreTrainedModel was passed into HFLM, we forgo distributed setup.
         eval_logger.warning(
-            "Passed an already-initialized model through `pretrained`, assuming single-process call to evaluate() or custom distributed integration"
+            "Passed an already-initialized model through `pretrained`, "
+            "assuming single-process call to evaluate() or custom "
+            "distributed integration"
         )
         self._rank = 0
         self._world_size = 1
@@ -229,7 +238,8 @@ class WhittleLM(TemplateLM):
         self.custom_prefix_token_id = prefix_token_id
         if prefix_token_id is not None:
             eval_logger.info(
-                f"Loglikelihood prefix token id used in evaluation: {self.prefix_token_id}"
+                f"Loglikelihood prefix token id used in "
+                f"evaluation: {self.prefix_token_id}"
             )
 
     @property
@@ -335,15 +345,14 @@ class WhittleLM(TemplateLM):
                 # models like MBart are listed in both seq2seq and causal mistakenly in HF transformers.
                 # these special cases should be treated as seq2seq models.
                 self.AUTO_MODEL_CLASS = transformers.AutoModelForSeq2SeqLM
-            elif (
-                getattr(self.config, "model_type") in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
-            ):
+            elif getattr(self.config, "model_type") in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES:
                 self.AUTO_MODEL_CLASS = GPT
             else:
                 if not trust_remote_code:
                     eval_logger.warning(
-                        "HF model type is neither marked as CausalLM or Seq2SeqLM. \
-                    This is expected if your model requires `trust_remote_code=True` but may be an error otherwise."
+                        "HF model type is neither marked as CausalLM or Seq2SeqLM. "
+                        "This is expected if your model requires `trust_remote_code=True` "
+                        "but may be an error otherwise."
                     )
                 # if model type is neither in HF transformers causal or seq2seq model registries
                 # then we default to GPT
@@ -448,9 +457,7 @@ class WhittleLM(TemplateLM):
         if self.world_size > 1:
             # if multi-GPU, always take minimum over all selected batch sizes
             max_rnk_bs = torch.tensor([batch_size], device=self.device)
-            gathered = (
-                self.accelerator.gather(max_rnk_bs).cpu().detach().numpy().tolist()
-            )
+            gathered = self.accelerator.gather(max_rnk_bs).cpu().detach().numpy().tolist()
             batch_size = min(gathered)
             clear_torch_cache()
             return batch_size
@@ -537,9 +544,7 @@ class WhittleLM(TemplateLM):
             if attn_mask is not None or labels is not None:
                 assert attn_mask is not None and labels is not None
                 assert self.AUTO_MODEL_CLASS == transformers.AutoModelForSeq2SeqLM
-                return self.model(
-                    input_ids=inps, attention_mask=attn_mask, labels=labels
-                )
+                return self.model(input_ids=inps, attention_mask=attn_mask, labels=labels)
             else:
                 assert self.AUTO_MODEL_CLASS == GPT
                 return self.model(inps)
@@ -554,7 +559,6 @@ class WhittleLM(TemplateLM):
         do_sample = generation_kwargs.get("do_sample", None)
 
         # The temperature has to be a strictly positive float -- if it is 0.0, use greedy decoding strategies
-        # print(generation_kwargs)
         if generation_kwargs.get("temperature") == 0.0 and do_sample is None:
             generation_kwargs["do_sample"] = do_sample = False
         first_turn = self.model.mask_cache is None
@@ -562,7 +566,7 @@ class WhittleLM(TemplateLM):
         if first_turn or max_length > self.model.max_seq_length:
             self.model.max_seq_length = max_length
             self.model.set_kv_cache(batch_size=1, device=self.device)
-        # print(generation_kwargs)
+
         outputs = []
         for i in range(context.shape[0]):
             outputs.append(
@@ -583,23 +587,23 @@ class WhittleLM(TemplateLM):
                 .data.cpu()
                 .numpy()
             )
-        # print(outputs)
+
         return torch.tensor(outputs).to(self.device)
 
     def _select_cont_toks(
         self, logits: torch.Tensor, contlen=None, inplen=None
     ) -> torch.Tensor:
         if self.AUTO_MODEL_CLASS == GPT:
-            assert (
-                contlen and inplen
-            ), "Must pass input len and cont. len to select scored logits for causal LM"
+            assert contlen and inplen, (
+                "Must pass input len and cont. len to select scored logits for causal LM"
+            )
             # discard right-padding.
             # also discard the input/context tokens. we'll only score continuations.
             logits = logits[inplen - contlen : inplen]
         elif self.AUTO_MODEL_CLASS == transformers.AutoModelForSeq2SeqLM:
-            assert (
-                contlen and not inplen
-            ), "Selecting scored logits for Seq2SeqLM requires only cont. len"
+            assert contlen and not inplen, (
+                "Selecting scored logits for Seq2SeqLM requires only cont. len"
+            )
             # only discard right-padding.
             # the logits input to this fn only contain decoder-side tokens.
             logits = logits[:contlen]
@@ -677,7 +681,8 @@ class WhittleLM(TemplateLM):
             self.batch_sizes[sched] = self.max_batch_size
             return self.batch_sizes[sched]
         print(
-            f"Passed argument batch_size = auto:{self.batch_schedule}. Detecting largest batch size"
+            f"Passed argument batch_size = auto:{self.batch_schedule}. "
+            f"Detecting largest batch size"
         )
         self.batch_sizes[sched] = self._detect_batch_size(n_reordered_requests, pos)
         print(f"Determined largest batch size: {self.batch_sizes[sched]}")
@@ -733,9 +738,7 @@ class WhittleLM(TemplateLM):
         )
         batch_fn = (
             self._batch_scheduler
-            if self.batch_size == "auto"
-            and n_reordered_requests > 0
-            and not override_bs
+            if self.batch_size == "auto" and n_reordered_requests > 0 and not override_bs
             else None
         )
 
@@ -919,7 +922,6 @@ class WhittleLM(TemplateLM):
     ) -> list[str]:
         res = []
 
-        # print(requests)
         def _collate(req: tuple[str, dict]):
             """Defines the key for the sorted method"""
             # the negative sign on len(toks) sorts descending - this has a few advantages:
@@ -970,7 +972,6 @@ class WhittleLM(TemplateLM):
         chunks = re_ords.get_batched(n=batch_size, batch_fn=batch_fn)
         for chunk in chunks:
             contexts, all_gen_kwargs = zip(*chunk)
-            # print(contexts)
             # we assume all gen kwargs in the batch are the same
             # this is safe to assume because the `grouper` object ensures it.
             gen_kwargs = all_gen_kwargs[0]
@@ -1015,7 +1016,6 @@ class WhittleLM(TemplateLM):
                 kwargs["max_length"] = context_enc.shape[1] + max_gen_toks
 
             # perform batched generation
-            # print(context_enc)
             cont = self._model_generate(
                 context=context_enc,
                 attention_mask=attn_masks,

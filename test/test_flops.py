@@ -1,10 +1,10 @@
-import pytest
+from __future__ import annotations
 
+import pytest
 from litgpt.config import Config
 
-from whittle.models.gpt import GPT
 from whittle.metrics import compute_flops
-
+from whittle.models.gpt import GPT
 
 mlp_types = ["GptNeoxMLP", "LLaMAMLP", "GemmaMLP"]
 norm_types = ["LayerNorm", "RMSNorm"]

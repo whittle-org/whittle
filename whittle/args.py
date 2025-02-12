@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
 class SearchArgs:
     """search-related arguments"""
 
-    save_interval: Optional[int] = 1000
+    save_interval: int | None = 1000
     """Number of optimizer steps between saving checkpoints"""
     log_interval: int = 1
     """Number of iterations between logging calls"""
