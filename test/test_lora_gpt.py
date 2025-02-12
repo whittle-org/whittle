@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import torch
 from litgpt import Config as LitConfig
-from whittle.lora.config import LoRAConfig as Config
 from litgpt.model import GPT as LitGPT
 
+from whittle.lora.config import LoRAConfig as Config
 from whittle.lora.lora_gpt import GPT
 
 
@@ -46,9 +46,7 @@ def test_gpt():
     )
     gpt.lm_head.linear.weight.data = torch.randn_like(gpt.lm_head.linear.weight.data)
     gpt.lm_head.linear.bias.data = torch.randn_like(gpt.lm_head.linear.bias.data)
-    gpt.transformer.ln_f.weight.data = torch.randn_like(
-        gpt.transformer.ln_f.weight.data
-    )
+    gpt.transformer.ln_f.weight.data = torch.randn_like(gpt.transformer.ln_f.weight.data)
 
     for block in gpt.transformer.h:
         block.attn.attn.linear.linear.weight.data = torch.randn_like(
@@ -132,11 +130,9 @@ def test_gpt():
         : gpt.lm_head.sub_network_out_features, : gpt.lm_head.sub_network_in_features
     ]
     lit_gpt_small.lm_head.bias.data = gpt.lm_head.linear.bias.data[:]
-    lit_gpt_small.transformer.wte.weight.data = (
-        gpt.transformer.wte.embedding.weight.data[
-            :, : gpt.transformer.wte.sub_network_embedding_dim
-        ]
-    )
+    lit_gpt_small.transformer.wte.weight.data = gpt.transformer.wte.embedding.weight.data[
+        :, : gpt.transformer.wte.sub_network_embedding_dim
+    ]
     lit_gpt_small.transformer.ln_f.weight.data = gpt.transformer.ln_f.weight.data[
         : gpt.transformer.ln_f.sub_network_in_features
     ]
@@ -144,23 +140,19 @@ def test_gpt():
     for i, block in enumerate(lit_gpt_small.transformer.h):
         block_orig = gpt.transformer.h[i]
         if block_orig.attn.qkv_indices is not None:
-            block.attn.attn.weight.data = (
-                block_orig.attn.attn.linear.linear.weight.data[
-                    block_orig.attn.qkv_indices,
-                    : block_orig.attn.attn.sub_network_in_features,
-                ]
-            )
+            block.attn.attn.weight.data = block_orig.attn.attn.linear.linear.weight.data[
+                block_orig.attn.qkv_indices,
+                : block_orig.attn.attn.sub_network_in_features,
+            ]
             block.attn.attn.bias.data = block_orig.attn.attn.linear.linear.bias.data[
                 block_orig.attn.qkv_indices
             ]
             print(torch.tensor(block_orig.attn.qkv_indices).shape)
         else:
-            block.attn.attn.weight.data = (
-                block_orig.attn.attn.linear.linear.weight.data[
-                    : block_orig.attn.attn.sub_network_out_features,
-                    : block_orig.attn.attn.sub_network_in_features,
-                ]
-            )
+            block.attn.attn.weight.data = block_orig.attn.attn.linear.linear.weight.data[
+                : block_orig.attn.attn.sub_network_out_features,
+                : block_orig.attn.attn.sub_network_in_features,
+            ]
             block.attn.attn.bias.data = block_orig.attn.attn.linear.linear.bias.data[
                 : block_orig.attn.attn.sub_network_out_features
             ]

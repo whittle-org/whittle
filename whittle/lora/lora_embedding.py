@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import math
 from typing import Any
 
 import torch
 import torch.nn as nn
+from litgpt.lora import LoRALayer
 from torch.nn import functional as F
 
-from litgpt.lora import LoRALayer
 from whittle.modules.embedding import Embedding
 
 

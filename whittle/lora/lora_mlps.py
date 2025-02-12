@@ -1,12 +1,16 @@
+from __future__ import annotations
+
+from typing import Any
+
+import torch
+from litgpt.config import Config
+from litgpt.utils import map_old_state_dict_weights
+
+from whittle.lora.lora_linear import LoRALinear
 from whittle.models.gpt.blocks.mlp import (
     GptNeoxMLP as GptNeoxMLPBase,
     LLaMAMLP as LLaMAMLPBase,
 )
-from whittle.lora.lora_linear import LoRALinear
-from litgpt.config import Config
-from typing import Any
-import torch
-from litgpt.utils import map_old_state_dict_weights
 
 
 class LoRAGptNeoxMLP(GptNeoxMLPBase):

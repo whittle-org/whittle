@@ -1,8 +1,12 @@
-from whittle.lora.lora_linear import LoRALayer, LoRALinearQKV
-from typing import Union, Any
+from __future__ import annotations
+
+from typing import Any
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from whittle.lora.lora_linear import LoRALayer, LoRALinearQKV
 
 
 class LoRAQKVLinear(LoRALayer):
@@ -21,7 +25,7 @@ class LoRAQKVLinear(LoRALayer):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        enable_lora: Union[bool, tuple[bool, bool, bool]] = False,
+        enable_lora: bool | tuple[bool, bool, bool] = False,
         **kwargs: Any,
     ):
         super().__init__(r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout)
@@ -67,9 +71,7 @@ class LoRAQKVLinear(LoRALayer):
                 head_size * n_query_groups * self.enable_v,
             )
             self.qkv_shapes = [s for s in qkv_shapes if s]
-            self.lora_B = nn.Parameter(
-                torch.empty(sum(self.qkv_shapes), r)
-            )  # (256, 2))
+            self.lora_B = nn.Parameter(torch.empty(sum(self.qkv_shapes), r))  # (256, 2))
             # Notes about shapes above
             # - self.lora_A has shape (4, 128): 4 because rank is 2 and LoRA is applied only to two matrices;
             # 128 is the input size of the x (embedding size). (4, 128) and not (128, 4) because later on in
@@ -229,9 +231,7 @@ class LoRAQKVLinear(LoRALayer):
         result = x.new_zeros(
             *x.shape[:-1], self.sub_network_out_features
         )  # (64, 64, 384)
-        return result.index_copy_(
-            dim=-1, index=self.lora_ind, source=x
-        )  # (64, 64, 384)
+        return result.index_copy_(dim=-1, index=self.lora_ind, source=x)  # (64, 64, 384)
 
     def conv1d(self, input: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
         """An extension of the `torch.nn.functional.conv1d` function with a logic specific to grouped queries.
@@ -367,9 +367,7 @@ class LoRAQKVLinear(LoRALayer):
         if self.qkv_indices is not None:
             after_B = self.conv1d(
                 after_A.transpose(-2, -1),  # (64, 64, 4) -> (64, 4, 64)
-                self.lora_B[self.qkv_indices, :].unsqueeze(
-                    -1
-                ),  # (256, 2) -> (256, 2, 1)
+                self.lora_B[self.qkv_indices, :].unsqueeze(-1),  # (256, 2) -> (256, 2, 1)
             ).transpose(
                 -2, -1
             )  # (64, 4, 64) @ (256, 2, 1) -> (64, 256, 64) -> (64, 64, 256)

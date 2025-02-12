@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import math
 from typing import Any
 
 import torch
 import torch.nn as nn
-
 from litgpt.lora import LoRALayer
+
 from whittle.modules.linear import Linear, LinearProj, LinearQKV
 
 

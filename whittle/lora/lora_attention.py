@@ -1,13 +1,17 @@
+from __future__ import annotations
+
+from typing import Any
+
+import torch
+from litgpt.model import KVCache
+from litgpt.utils import map_old_state_dict_weights
+
+from whittle.lora.config import LoRAConfig as Config
+from whittle.lora.lora_linear import LoRALinearProj
+from whittle.lora.lora_qkv_linear import LoRAQKVLinear
 from whittle.models.gpt.blocks.causal_self_attention import (
     CausalSelfAttention as BaseCausalSelfAttention,
 )
-from whittle.lora.lora_qkv_linear import LoRAQKVLinear
-from whittle.lora.lora_linear import LoRALinearProj
-from whittle.lora.config import LoRAConfig as Config
-from typing import Any, Optional
-import torch
-from litgpt.utils import map_old_state_dict_weights
-from litgpt.model import KVCache
 
 
 class CausalSelfAttention(BaseCausalSelfAttention):
@@ -43,7 +47,7 @@ class CausalSelfAttention(BaseCausalSelfAttention):
             lora_dropout=config.lora_dropout,
         )
         # disabled by default
-        self.kv_cache: Optional[KVCache] = None
+        self.kv_cache: KVCache | None = None
 
         self.config = config
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -137,9 +141,7 @@ class CausalSelfAttention(BaseCausalSelfAttention):
             self.proj_indices,
         )
         if self.config.attention_scores_scalar:
-            self.sub_attention_scaler = (
-                self.sub_network_n_embd // self.sub_network_n_head
-            )
+            self.sub_attention_scaler = self.sub_network_n_embd // self.sub_network_n_head
         else:
             self.sub_attention_scaler = self.config.attention_scores_scalar
 

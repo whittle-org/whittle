@@ -1,15 +1,17 @@
-from typing import Union
+from __future__ import annotations
+
 import torch.nn as nn
-from whittle.models.gpt.blocks import Block as BaseBlock
+
+from whittle.lora.config import LoRAConfig as Config
 from whittle.lora.lora_attention import CausalSelfAttention
-from whittle.modules.rmsnorm import RMSNorm
-from whittle.modules.layernorm import LayerNorm
 from whittle.lora.lora_mlps import (
+    LoRAGemmaMLP as GemmaMLP,
     LoRAGptNeoxMLP as GptNeoxMLP,
     LoRALLaMAMLP as LLaMAMLP,
-    LoRAGemmaMLP as GemmaMLP,
 )
-from whittle.lora.config import LoRAConfig as Config
+from whittle.models.gpt.blocks import Block as BaseBlock
+from whittle.modules.layernorm import LayerNorm
+from whittle.modules.rmsnorm import RMSNorm
 
 
 class LoRABlock(BaseBlock):
@@ -29,7 +31,7 @@ class LoRABlock(BaseBlock):
             else nn.Identity()
         )
         self.attn = CausalSelfAttention(config, block_idx)
-        self.norm_2: Union[LayerNorm, RMSNorm, None] = (
+        self.norm_2: LayerNorm | RMSNorm | None = (
             None
             if config.shared_attention_norm
             else self.norm_class()(config.n_embd, eps=config.norm_eps)

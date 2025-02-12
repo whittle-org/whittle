@@ -1,17 +1,19 @@
-from whittle.models.gpt.model import GPT as BaseModel
-from typing import Any, Optional, Union
+from __future__ import annotations
+
+from typing import Any
 from typing_extensions import Self
 
 import torch
 import torch.nn as nn
+from litgpt.utils import map_old_state_dict_weights
 
 from whittle.lora.config import LoRAConfig as Config
+from whittle.lora.lora_block import LoRABlock as Block
+from whittle.lora.lora_embedding import LoRAEmbedding
 
 # from whittle.models.gpt.blocks import Block
 from whittle.lora.lora_linear import LoRALinear
-from whittle.lora.lora_embedding import LoRAEmbedding
-from whittle.lora.lora_block import LoRABlock as Block
-from litgpt.utils import map_old_state_dict_weights
+from whittle.models.gpt.model import GPT as BaseModel
 
 
 class GPT(BaseModel):
@@ -43,15 +45,15 @@ class GPT(BaseModel):
         )
         self.max_layer = config.n_layer
         self.max_seq_length = self.config.block_size
-        self.mask_cache: Optional[torch.Tensor] = None
+        self.mask_cache: torch.Tensor | None = None
 
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
         self.sub_network_n_layers = self.config.n_layer
-        self.sub_network_head_size: Union[int, None] = self.config.head_size
-        self.sub_network_query_groups: Union[int, None] = self.config.n_query_groups
+        self.sub_network_head_size: int | None = self.config.head_size
+        self.sub_network_query_groups: int | None = self.config.n_query_groups
         self.sub_network_rope_n_elem = self.config.rope_n_elem
         self.cos: torch.Tensor
         self.sin: torch.Tensor
@@ -63,9 +65,9 @@ class GPT(BaseModel):
     def forward(
         self,
         idx: torch.Tensor,
-        input_pos: Optional[torch.Tensor] = None,
+        input_pos: torch.Tensor | None = None,
         lm_head_chunk_size: int = 0,
-    ) -> Union[torch.Tensor, list[torch.Tensor]]:
+    ) -> torch.Tensor | list[torch.Tensor]:
         T = idx.size(1)
         if self.max_seq_length < T:
             raise ValueError(
