@@ -32,6 +32,8 @@ def extract_current_sub_network(model: GPT) -> GPT:
         subnet_config.n_head = (
             int(model.sub_network_num_heads) // model.config.n_query_groups
         ) * model.sub_network_query_groups
+    else:
+        subnet_config.n_head = model.sub_network_num_heads
     subnet_config.n_layer = model.sub_network_n_layers
     subnet_config.head_size = model.sub_network_head_size
     subnet_config.n_query_groups = model.sub_network_query_groups

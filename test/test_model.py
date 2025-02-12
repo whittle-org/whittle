@@ -86,7 +86,6 @@ def test_gpt():
     config.n_query_groups = 2
     config.intermediate_size = 32 * 4
     config.n_layer = 1
-    print(config)
     lit_gpt_small = LitGPT(config)
     lit_gpt_small.lm_head.weight.data = gpt.lm_head.weight.data[
         : gpt.lm_head.sub_network_out_features, : gpt.lm_head.sub_network_in_features
