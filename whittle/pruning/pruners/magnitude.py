@@ -41,7 +41,7 @@ class MagnitudePruner(Pruner):
 
         """
 
-        layers = [model.transformer, model.lm_head]
+        layers = [model.transformer.h]
         for i in range(len(layers)):
             layer = layers[i]
             subset = self._find_layers(layer)
