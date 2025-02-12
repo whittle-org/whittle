@@ -8,7 +8,7 @@ from litgpt import Config
 from litgpt.model import GPT as LitGPT
 from litgpt.scripts.download import download_from_hub
 
-from whittle.models.gpt.model import GPT as whittleGPT
+from whittle.models.gpt.model import GPT as WhittleGPT
 
 
 @pytest.fixture(scope="session")
@@ -34,17 +34,18 @@ def test_checkpoint_loading(checkpoint_dir):
     # litgpt download --repo_id stabilityai/stablelm-base-alpha-3b
     config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
     config.fix_head_size = False
-    model = whittleGPT(config)  # .cuda()
+    model = WhittleGPT(config)  # .cuda()
     model.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
     # test output
     model.eval()
-    sample_intermediate_size = 4 * config.n_embd
+    sample_intermediate_size = config.intermediate_size
     model.set_sub_network(
         config.n_embd,
         sample_intermediate_size,
         config.n_head,
         config.n_layer,
+        config.n_query_groups,
+        config.head_size,
     )
-
     output_whittle = model(input_ids)
     assert torch.allclose(output_lit, output_whittle)
