@@ -11,10 +11,10 @@ import torch
 from lightning.fabric.strategies import FSDPStrategy
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
-from litgpt.data import DataModule, TinyStories, Alpaca
+from litgpt.data import Alpaca, DataModule, TinyStories
+from litgpt.finetune.lora import validate as finetune_validate
 from litgpt.model import Config
 from litgpt.pretrain import get_dataloaders, validate
-from litgpt.finetune.lora import validate as finetune_validate
 from litgpt.utils import (
     auto_download_checkpoint,
     check_nvlink_connectivity,
