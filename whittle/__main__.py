@@ -5,6 +5,9 @@ import warnings
 
 import torch
 from jsonargparse import CLI, set_config_read_mode, set_docstring_parse_options
+from litgpt.chat.base import main as chat_fn
+from litgpt.deploy.serve import run_server as serve_fn
+from litgpt.scripts.download import download_from_hub as download_fn
 
 from whittle.eval.utils import convert_and_evaluate as evaluate_fn
 from whittle.finetune import setup as finetune_fn
@@ -18,18 +21,31 @@ def main() -> None:
         "search": search_fn,
         "evaluate": evaluate_fn,
         "finetune": finetune_fn,
+        "download": download_fn,
+        "serve": serve_fn,
+        "chat": chat_fn,
     }
 
     set_docstring_parse_options(attribute_docstrings=True)
     set_config_read_mode(urls_enabled=True)
 
     # PyTorch bug that raises a false-positive warning
-    warning_message = r"The epoch parameter in `scheduler.step\(\)` was not necessary and is being deprecated.*"
+    scheduler_warning = r"The epoch parameter in `scheduler.step\(\)` was not necessary and is being deprecated.*"
+
     warnings.filterwarnings(
         action="ignore",
-        message=warning_message,
+        message=scheduler_warning,
         category=UserWarning,
         module=r".*torch\.optim\.lr_scheduler.*",
+    )
+
+    # disable syne tune extras install info message
+
+    warnings.filterwarnings(
+        action="ignore",
+        # message=r".*AWS dependencies are not imported since dependencies are missing.*",
+        category=UserWarning,
+        module=r".*syne_tune.*",
     )
 
     torch.set_float32_matmul_precision("high")
