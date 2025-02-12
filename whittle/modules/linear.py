@@ -76,7 +76,11 @@ class LinearQKV(nn.Linear):
         self,
         sub_network_in_features: int,
         sub_network_out_features: int,
-        qkv_indices: torch.Tensor,
+        qkv_indices=None,
+        sub_network_n_head=None,
+        sub_network_query_groups=None,
+        sub_network_head_size=None,
+        sub_network_q_per_kv=None,
     ):
         """Set the linear transformation dimensions of the current sub-network."""
         self.sub_network_in_features = sub_network_in_features
