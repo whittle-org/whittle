@@ -38,7 +38,9 @@ def param_bins(bin_n, bin_s, bin_t):
 
 @pytest.mark.parametrize("search_strategy", methods)
 def test_multi_objective_search(search_strategy, num_samples=5):
-    bins, _ = param_bins(10, 2, 1) if search_strategy == "stratified_random_search" else None
+    bins, _ = (
+        param_bins(10, 2, 1) if search_strategy == "stratified_random_search" else None
+    )
 
     results = multi_objective_search(
         objective=objective,
