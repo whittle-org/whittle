@@ -3,13 +3,21 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+import warnings
 
 import torch
 from litgpt import Config
 
 from whittle.eval.utils import convert_and_evaluate
-from whittle.metrics import compute_flops, compute_latency, compute_parameters
+from whittle.metrics import compute_latency, compute_parameters
 from whittle.models.gpt import GPT
+try:
+    from whittle.metrics import compute_flops
+except ImportError:
+    warnings.warn(
+        "DeepSpeed not installed. Please install whittle with `pip install whittle[distributed]` "
+        "to use DeepSpeed for distributed training and measuring FLOPs.", ImportError
+    )
 
 
 def setup(
@@ -82,7 +90,7 @@ def setup(
 
     model.to(device)
 
-    ckp = torch.load(checkpoint_dir / "lit_model.pth")
+    ckp = torch.load(checkpoint_dir / "lit_model.pth", weights_only=False)
     model.load_state_dict(ckp["model"] if "model" in ckp else ckp)
     del ckp
 
@@ -90,8 +98,9 @@ def setup(
         assert subnet_config is not None
         model.select_sub_network(subnet_config)
 
+    # import pdb; pdb.set_trace()
     convert_and_evaluate(
-        model,
+        model=model,
         out_dir=out_dir,
         tasks=tasks,
         seed=seed,
