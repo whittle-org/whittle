@@ -427,7 +427,7 @@ def fit(
             )
             checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
             fabric.print(f"Saving checkpoint to {str(checkpoint_file.parent)!r}")
-            # fabric.save(checkpoint_file, state)
+            fabric.save(checkpoint_file, state)
             if fabric.is_global_zero:
                 copy_config_files(checkpoint_dir, checkpoint_file.parent)
                 save_hyperparameters(setup, checkpoint_file.parent)
