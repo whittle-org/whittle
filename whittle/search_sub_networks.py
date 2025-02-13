@@ -20,15 +20,14 @@ from litgpt.utils import (
     check_nvlink_connectivity,
     check_valid_checkpoint_dir,
     choose_logger,
+    copy_config_files,
     find_resume_path,
     get_default_supported_precision,
     init_out_dir,
     load_checkpoint,
     parse_devices,
     save_config,
-    copy_config_files,
 )
-
 from torch.utils.data import DataLoader
 
 from whittle.args import ParamBinArgs, SearchArgs
