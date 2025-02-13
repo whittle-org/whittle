@@ -69,7 +69,7 @@ def setup(
     sampling_strategy: str = "random",
     eval: EvalArgs = EvalArgs(interval=1000, max_new_tokens=100, max_iters=100),
     optimizer: str | dict = "AdamW",
-    logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
+    logger_name: Literal["wandb", "tensorboard", "csv"] = "wandb",
     seed: int = 1337,
     access_token: str | None = None,
     downstream_test_iters: int = 500,
@@ -93,7 +93,7 @@ def setup(
             will resume from the latest checkpoint but not error if no checkpoint exists.
         data: Data-related arguments. If not provided, the
             default is ``litgpt.data.Alpaca``.
-        train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
+        train: Training-related arguments. See ``whittle.args.FineTuningArgs`` for details.
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
         optimizer: An optimizer name (such as "AdamW") or config.
         logger_name: The name of the logger to send metrics to.
@@ -151,25 +151,26 @@ def setup(
 
     sampler = RandomSampler(config_space=search_space, seed=seed)
 
-    if train_strategy == "sandwich":
-        strategy = SandwichStrategy(
-            loss_function=chunked_cross_entropy,
-            sampler=sampler,
-        )
-    elif train_strategy == "standard":
-        strategy = StandardStrategy(
-            loss_function=chunked_cross_entropy,
-            sampler=sampler,
-        )
-    elif train_strategy == "random":
-        strategy = RandomStrategy(
-            loss_function=chunked_cross_entropy,
-            sampler=sampler,
-        )
+    match train_strategy:
+        case "sandwich":
+            strategy = SandwichStrategy(
+                loss_function=chunked_cross_entropy,
+                sampler=sampler,
+            )
+        case "standard":
+            strategy = StandardStrategy(
+                loss_function=chunked_cross_entropy,
+                sampler=sampler,
+            )
+        case "random":
+            strategy = RandomStrategy(
+                loss_function=chunked_cross_entropy,
+                sampler=sampler,
+            )
 
     strategy.fabric = fabric
     strategy.gradient_accumulation_step = train.gradient_accumulation_iters(devices)
-    # strategy.sampler.config_space = config_space
+
     if torch.cuda.is_available() and devices > 1:  # type: ignore[operator]
         check_nvlink_connectivity(fabric)
 
@@ -222,15 +223,19 @@ def main(
 
     if fabric.global_rank == 0:
         os.makedirs(out_dir, exist_ok=True)
+
     if "importance" in sampling_strategy:
         checkpoint_path = (
             checkpoint_dir / f"lit_model_permuted_{importance_objective}.pth"
         )
     else:
         checkpoint_path = checkpoint_dir / "lit_model.pth"
+
     with open(str(checkpoint_dir / "config.json")) as f:
         hf_config = json.load(f)
+
     config.tie_embeddings = hf_config["tie_word_embeddings"]
+
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
         model = GPT(config)
         if "grid-params" in sampling_strategy:
@@ -284,10 +289,11 @@ def main(
 
     # Final evaluation
     if eval.final_validation and fabric.is_global_zero:
-        metrics = {
-            "training_time": state["train_time"],
-        }
-        fabric.log_dict(metrics, step=state["iter_num"])
+        fabric.log(
+            "training_time",
+            state["train_time"],
+            step=state["iter_num"],
+        )
 
 
 def fit(
@@ -306,7 +312,7 @@ def fit(
     model = state["model"]
     optimizer = state["optimizer"]
     scheduler = state["scheduler"]
-    # tokenizer = Tokenizer(checkpoint_dir)
+
     longest_seq_length, longest_seq_ix = get_longest_seq_length(
         ConcatDataset([train_dataloader.dataset, val_dataloader.dataset])
     )
@@ -375,12 +381,14 @@ def fit(
             optimizer.zero_grad()
             scheduler.step()
             state["step_count"] += 1
-            fabric.print("Step ", state["step_count"])
             if state["step_count"] % 512 == 0:
                 fabric.print(f"Step {state['step_count']} | Loss {loss:.3f}")
             post_step_time = time.perf_counter()
-            fabric.print("train loss: ", loss)
-            fabric.print("Step time: ", post_step_time - pre_step_time)
+            fabric.print(
+                f"Step {state['step_count']} | "
+                f"train loss: {loss:.3f} | "
+                f"Step time: {post_step_time - pre_step_time:.3f}"
+            )
 
         if state["iter_num"] % train.log_interval == 0:
             loss = (
@@ -434,8 +442,10 @@ def fit(
                 save_prompt_style(data.prompt_style, checkpoint_file.parent)
 
     if fabric.is_global_zero:
-        fabric.print("Training time: ", state["train_time"])
-        fabric.print("Forward times: ", torch.mean(torch.tensor(forward_times)))
+        fabric.print(
+            f"Training time: {state['train_time']} | "
+            f"Forward times: {torch.mean(torch.tensor(forward_times))}"
+        )
 
 
 def get_lr_scheduler(optimizer, warmup_steps: int, max_steps: int):
@@ -502,9 +512,3 @@ def validate_args(train: FineTuningArgs, eval: EvalArgs) -> None:
         )
     if issues:
         raise ValueError("\n".join(issues))
-
-
-if __name__ == "__main__":
-    from jsonargparse import CLI
-
-    CLI(setup)
