@@ -6,6 +6,7 @@ from typing import Any
 
 import torch
 from litgpt import Config
+from litgpt.utils import lazy_load
 
 from whittle.eval.utils import convert_and_evaluate
 from whittle.metrics import compute_flops, compute_latency, compute_parameters
@@ -22,8 +23,6 @@ def setup(
     latency_batch_size: int = 8,
     device: str | None = None,
     limit: float | None = None,
-    tokenizer_name_or_path: str | None = None,
-    is_sub_network: bool = False,
     measure_flops: bool = False,
     measure_latency: bool = False,
 ) -> None:
@@ -41,8 +40,6 @@ def setup(
         latency_batch_size: Batch size for latency computation.
         device: Device to use for evaluation, for example, "cuda" or "cuda:0".
         limit: Limit on number of examples per task.
-        tokenizer_name_or_path: Name or path to the tokenizer file to use for the model. Default is checkpoint_dir.
-        is_sub_network: Whether the model is a sub-network config or a whittle model. Default is False.
         measure_flops: Whether to compute FLOPs. Default is False.
         measure_latency: Whether to compute latency. Default is False.
     """
@@ -54,11 +51,15 @@ def setup(
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
 
     # sub-network saved as a config instead of the extracted lit_model.pth (to save memory)
-    subnet_config: dict[str, Any] | None = None
-    if is_sub_network:
-        ckp = torch.load(checkpoint_dir / "sub_network.pkl")
-        subnet_config = ckp["config"]
-        checkpoint_dir = ckp["parent_dir"]
+    sub_network_config: dict[str, Any] | None = None
+    ckp = lazy_load(checkpoint_dir / "lit_model.pth")
+
+    # sub-network config loading (contains the config and checkpoint path of the parent)
+    sub_network_config = ckp.get("sub_network_config", None)
+    parent_dir = ckp.get("parent_dir", None)
+    if parent_dir is not None:
+        checkpoint_dir = Path(parent_dir)
+        ckp = lazy_load(checkpoint_dir / "lit_model.pth")
 
     config = Config.from_file(checkpoint_dir / "model_config.yaml")
     config.fix_head_size = True
@@ -66,30 +67,28 @@ def setup(
     config.tie_embeddings = False
 
     model = GPT(config)
-    model.name_or_path = tokenizer_name_or_path  # WhittleLM loads AutoTokenizer inside
+    model.name_or_path = checkpoint_dir  # WhittleLM loads AutoTokenizer inside
 
+    model.load_state_dict(ckp["model"] if "model" in ckp else ckp)
+    del ckp
+
+    # if the checkpoint was a sub-network, set it at this point
+    if sub_network_config is not None:
+        model.select_sub_network(sub_network_config)
+
+    # compute metrics
     metrics = {}
     metrics["parameters"] = compute_parameters(model)
-
     if measure_flops:
         metrics["flops"] = compute_latency(model)
     if measure_latency:
         metrics["latency"] = compute_flops(
             model, batch_size=latency_batch_size, previous_device=device
         )
-
     metrics_path.write_text(json.dumps(metrics, indent=2))
 
+    # downstream task evaluation
     model.to(device)
-
-    ckp = torch.load(checkpoint_dir / "lit_model.pth")
-    model.load_state_dict(ckp["model"] if "model" in ckp else ckp)
-    del ckp
-
-    if is_sub_network:
-        assert subnet_config is not None
-        model.select_sub_network(subnet_config)
-
     convert_and_evaluate(
         model,
         out_dir=out_dir,

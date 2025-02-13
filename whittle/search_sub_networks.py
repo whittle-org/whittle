@@ -26,7 +26,9 @@ from litgpt.utils import (
     load_checkpoint,
     parse_devices,
     save_config,
+    copy_config_files,
 )
+
 from torch.utils.data import DataLoader
 
 from whittle.args import ParamBinArgs, SearchArgs
@@ -324,12 +326,14 @@ def main(
             sub_network = extract_current_sub_network(model)
             model.reset_super_network()
 
-            fabric.save(save_path, {"model": sub_network, "parent_dir": checkpoint_dir})
+            fabric.save(save_path, {"model": sub_network})
             save_config(sub_network.config, out_dir / f"sub_network_{i}")
+            copy_config_files(checkpoint_dir, save_path.parent)
         else:
             save_path = save_path.parent / "sub_network.pkl"
             torch.save(
-                {"config": sub_network_dict, "parent_dir": checkpoint_dir}, save_path
+                {"sub_network_config": sub_network_dict, "parent_dir": checkpoint_dir},
+                save_path,
             )
 
     # save all paths to pareto optimal sub-networks
