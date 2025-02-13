@@ -12,8 +12,6 @@ except ImportError:
     )
 
 import torch
-from deepspeed.accelerator.cpu_accelerator import CPU_Accelerator
-from deepspeed.profiling.flops_profiler import get_model_profile
 from litgpt.model import GPT
 
 
@@ -39,6 +37,9 @@ def compute_flops(
     Returns:
         The estimated number of floating-point operations (FLOPs) or multiply-accumulate operations (MACs) for the model's forward pass, depending on the specified metric.
     """
+
+    from deepspeed.accelerator.cpu_accelerator import CPU_Accelerator
+    from deepspeed.profiling.flops_profiler import get_model_profile
 
     input_tensor = torch.randint(
         0, model.config.padded_vocab_size, (batch_size, sequence_length)
