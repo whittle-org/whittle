@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import time
 from pathlib import Path
@@ -10,7 +11,8 @@ import torch
 from lightning.fabric.strategies import FSDPStrategy
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
-from litgpt.data import Alpaca, DataModule
+from litgpt.data import Alpaca, DataModule, TinyStories
+from litgpt.finetune.lora import validate as finetune_validate
 from litgpt.model import Config
 from litgpt.pretrain import get_dataloaders, validate
 from litgpt.utils import (
@@ -23,15 +25,18 @@ from litgpt.utils import (
     init_out_dir,
     load_checkpoint,
     parse_devices,
+    save_config,
 )
 from torch.utils.data import DataLoader
 
-from whittle.args import SearchArgs
-from whittle.metrics import compute_parameters
+from whittle.args import ParamBinArgs, SearchArgs
+from whittle.metrics import compute_flops, compute_latency, compute_parameters
 from whittle.models.gpt import GPT, Block
 from whittle.models.gpt.extract import extract_current_sub_network
 from whittle.pretrain_super_network import get_search_space
+from whittle.sampling.param_bins import ParamBins, ParamsEstimator
 from whittle.search import multi_objective_search
+from whittle.search.baselines import Methods
 
 
 def setup(
@@ -53,6 +58,12 @@ def setup(
     logger_name: Literal["wandb", "tensorboard", "csv"] | None = "csv",
     seed: int | None = 1337,
     access_token: str | None = None,
+    param_bins: ParamBinArgs = ParamBinArgs(),
+    objective_1: str | None = "val_loss",
+    objective_2: str | None = "parameters",
+    log_objective_names: bool | None = True,
+    save_checkpoints: bool = True,
+    fine_tuned: bool = False,
 ) -> None:
     """
     Multi-objective search to select Pareto optimal set of sub-networks from trained super-network.
@@ -67,19 +78,31 @@ def setup(
         resume: Path to a checkpoint directory to resume from in case training was interrupted, or ``True`` to resume
             from the latest checkpoint in ``out_dir``. An error will be raised if no checkpoint is found. Passing
             ``'auto'`` will resume from the latest checkpoint but not error if no checkpoint exists.
-        data: Data-related arguments. If not provided, the default is ``litgpt.data.Alpaca``.
+        data: Data-related arguments. If not provided, the default is ``litgpt.data.TinyStories`` or ``litgpt.data.Alpaca`` for fine-tuned models.
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
         search: Search-related arguments. See ``whittle.args.SearchArgs`` for details.
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
         access_token: Optional API token to access models with restrictions.
+        param_bins: The parameter bins that limit the sub-network params in the search.
+        objective_1: The name of the first objective to optimize (possible - val_loss, perplexity). Defaults to "val_loss".
+        objective_2: The name of the second objective to optimize (possible - parameters, latency, flops). Defaults to "parameters".
+        log_objective_names: Whether to log the names of the objectives in the logger, or log as objective_1 and objective_2. Defaults to True.
+        save_checkpoints: Whether to save checkpoints of the sub-networks, or config + path to super-network. Defaults to True.
+        fine_tuned: Whether the model is fine-tuned. Defaults to False.
     """
     checkpoint_dir = auto_download_checkpoint(
         model_name=checkpoint_dir, access_token=access_token
     )
 
-    data = Alpaca() if data is None else data
+    if data is None:
+        # import sys
+        # sys.path.append('../do-not-touch/compressing_llms')
+        # from datasets_custom.llamamini import LLaMaMini
+        # data = LLaMaMini() if fine_tuned else TinyStories()
+        data = Alpaca() if fine_tuned else TinyStories()
+
     num_devices = int(parse_devices(devices))
     out_dir = init_out_dir(out_dir)
 
@@ -130,6 +153,12 @@ def setup(
         train,
         eval,
         search,
+        param_bins if search.search_strategy == Methods.SRS else None,
+        objective_1,
+        objective_2,
+        log_objective_names,
+        save_checkpoints,
+        fine_tuned,
     )
 
 
@@ -142,13 +171,30 @@ def _objective(
     val_dataloader: DataLoader,
     eval: EvalArgs,
     verbose: bool | None = True,
+    objective_1: str = "val_loss",
+    objective_2: str = "parameters",
+    fine_tuned: bool = False,
 ) -> tuple[float, float]:
     model.select_sub_network(config)
-    val_loss = validate(
-        fabric, model, val_dataloader, max_iters=eval.max_iters, verbose=verbose
-    )
-    num_params = compute_parameters(model)
-    return float(val_loss), num_params
+
+    if fine_tuned:
+        val_loss = finetune_validate(fabric, model, val_dataloader, eval, verbose=verbose)
+    else:
+        val_loss = validate(
+            fabric, model, val_dataloader, max_iters=eval.max_iters, verbose=verbose
+        )
+
+    if objective_1 == "perplexity":
+        val_loss = torch.exp(val_loss)
+
+    if objective_2 == "parameters":
+        obj_2 = compute_parameters(model)
+    elif objective_2 == "latency":
+        obj_2 = compute_latency(model, device=model.lm_head.weight.device)
+    elif objective_2 == "flops":
+        obj_2 = compute_flops(model, previous_device=model.lm_head.weight.device)
+
+    return float(val_loss), obj_2
 
 
 def main(
@@ -163,7 +209,23 @@ def main(
     train: TrainArgs,
     eval: EvalArgs,
     search: SearchArgs,
+    param_bins: ParamBinArgs | None = None,
+    objective_1: str = "val_loss",
+    objective_2: str = "parameters",
+    log_objective_names: bool = True,
+    save_checkpoints: bool = True,
+    fine_tuned: bool = False,
 ) -> None:
+    assert objective_1 in [
+        "val_loss",
+        "perplexity",
+    ], f"Invalid objective_1: {objective_1}, must be 'val_loss' or 'perplexity'"
+    assert objective_2 in [
+        "parameters",
+        "latency",
+        "flops",
+    ], f"Invalid objective_2: {objective_2}, must be 'parameters', 'latency' or 'flops'"
+
     fabric.seed_everything(seed)
 
     tokenizer = Tokenizer(checkpoint_dir)
@@ -171,6 +233,7 @@ def main(
     train_dataloader, val_dataloader = get_dataloaders(
         fabric, data, tokenizer, train, train.max_seq_length
     )
+
     train_dataloader, val_dataloader = fabric.setup_dataloaders(
         train_dataloader, val_dataloader
     )
@@ -191,7 +254,7 @@ def main(
         fabric.print(f"Resuming training from {resume}")
         fabric.load(resume, state)
     else:
-        load_checkpoint(fabric, state["model"], checkpoint_path)
+        load_checkpoint(fabric, model, checkpoint_path)
 
     train_time = time.perf_counter()
 
@@ -202,6 +265,23 @@ def main(
 
     fabric.print("Start multi-objective search")
 
+    bins = None
+    if param_bins is not None:
+        from whittle.sampling.random_sampler import RandomSampler
+
+        sampler = RandomSampler(search_space, seed=seed)
+
+        # get bins limited by the smallest/largest config
+        params_estimator = ParamsEstimator(model)
+        bins = ParamBins(
+            sampler.get_smallest_sub_network(),
+            sampler.get_largest_sub_network(),
+            params_estimator,
+            num_bins=param_bins.num_bins,
+            log_bins=param_bins.log_bins,
+            start_bin_size=param_bins.start_bin_size,
+        )
+
     search_results = multi_objective_search(
         _objective,
         search_space,
@@ -210,29 +290,50 @@ def main(
             "model": model,
             "val_dataloader": val_dataloader,
             "eval": eval,
+            "objective_1": objective_1,
+            "objective_2": objective_2,
+            "fine_tuned": fine_tuned,
         },
         search_strategy=search.search_strategy,
         num_samples=search.iterations,
         seed=seed,
         logger=fabric.logger,
+        param_bins=bins,
+        objective_1_name=objective_1 if log_objective_names else "objective_1",
+        objective_2_name=objective_2 if log_objective_names else "objective_2",
     )
     training_time = time.perf_counter() - train_time
 
     fabric.print(f"Total search time: {training_time:.02f}.")
     fabric.print(
-        f"Found {len(search_results['configs'])} Pareto optimal sub-networks. Save checkpoints to {out_dir}."
+        f"Found {len(search_results['configs'])} sub-networks ({sum(i for i in search_results['is_pareto_optimal'])} Pareto optimal). Save checkpoints to {out_dir}."
     )
 
+    pareto_optimal_paths = []
     for i, sub_network_dict in enumerate(search_results["configs"]):
         save_path = out_dir / f"sub_network_{i}" / "lit_model.pth"
         save_path.parent.mkdir(parents=True, exist_ok=True)
 
-        model.select_sub_network(sub_network_dict)
-        sub_network = extract_current_sub_network(model)
+        if search_results["is_pareto_optimal"][i]:
+            pareto_optimal_paths.append(str(save_path.absolute()))
 
-        model.reset_super_network()
+        # either save the extracted checkpoint, or the config + path to super-network
+        if save_checkpoints:
+            model.select_sub_network(sub_network_dict)
+            sub_network = extract_current_sub_network(model)
+            model.reset_super_network()
 
-        fabric.save(save_path, {"model": sub_network})
+            fabric.save(save_path, {"model": sub_network, "parent_dir": checkpoint_dir})
+            save_config(sub_network.config, out_dir / f"sub_network_{i}")
+        else:
+            save_path = save_path.parent / "sub_network.pkl"
+            torch.save(
+                {"config": sub_network_dict, "parent_dir": checkpoint_dir}, save_path
+            )
+
+    # save all paths to pareto optimal sub-networks
+    with open(out_dir / "pareto_optimal_paths.json", "w") as f:
+        json.dump(pareto_optimal_paths, f)
 
 
 if __name__ == "__main__":

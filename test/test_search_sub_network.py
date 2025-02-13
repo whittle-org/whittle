@@ -78,4 +78,5 @@ def test_checkpoints(tmp_path, checkpoint_dir):
     for checkpoint_dir in checkpoint_dirs:
         assert set(os.listdir(out_dir / checkpoint_dir)) == {
             "lit_model.pth",
+            "model_config.yaml",
         }

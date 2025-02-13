@@ -24,3 +24,17 @@ class FineTuningArgs(TrainArgs):
     learning_rate: float | None = 2e-5
     temperature: float | None = 10.0
     distillation_weight: float | None = 0.5
+
+
+@dataclass
+class ParamBinArgs:
+    """parameter bin-related arguments - to limit what networks are sampled"""
+
+    """Number of parameter bins to use"""
+    num_bins: int = 20
+    """Whether to use log spaced bins"""
+    log_bins: bool = False
+    """Starting size of the bins (how many configs must be in each bin until the total limit is increased)"""
+    start_bin_size: int = 1
+    """The total limit will be increased even if K bins are not full yet (some param counts may have only few nets)"""
+    empty_bin_tolerance: int = 4
