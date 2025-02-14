@@ -78,10 +78,10 @@ def setup(
     # compute metrics
     metrics = {}
     metrics["parameters"] = compute_parameters(model)
-    if measure_flops:
-        metrics["flops"] = compute_latency(model)
     if measure_latency:
-        metrics["latency"] = compute_flops(
+        metrics["latency"] = compute_latency(model)
+    if measure_flops:
+        metrics["flops"] = compute_flops(
             model, batch_size=latency_batch_size, previous_device=device
         )
     metrics_path.write_text(json.dumps(metrics, indent=2))
