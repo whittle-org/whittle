@@ -6,8 +6,6 @@ from pathlib import Path
 from pprint import pprint
 
 import torch
-from litgpt.model import Config
-from litgpt.utils import auto_download_checkpoint, check_valid_checkpoint_dir
 
 from whittle.eval.whittle_llms import WhittleLM
 from whittle.models.gpt import GPT
@@ -26,8 +24,7 @@ def prepare_results(results, save_filepath, print_results=True):
 
 
 def convert_and_evaluate(
-    checkpoint_dir: Path | None = None,
-    model: GPT | None = None,
+    model: GPT,
     tasks: str | None = None,
     out_dir: Path | str = "evaluate",
     num_fewshot: int | None = None,
@@ -42,6 +39,7 @@ def convert_and_evaluate(
     """Evaluate a model with the LM Evaluation Harness.
 
     Arguments:
+        model: The instantiated model.
         out_dir: Directory in which to save the converted checkpoints for evaluation.
             Saves to `checkpoint_dir`/evaluate by default.
         tasks: CSV of task names to evaluate. Example: "hellaswag,truthfulqa_mc2,mmlu"
@@ -55,18 +53,6 @@ def convert_and_evaluate(
             Saves to `out_dir/results.json` by default.
         access_token: Optional API token to access models with restrictions.
     """
-    if checkpoint_dir is None and model is None:
-        raise ValueError("Either `model` or `checkpoint_dir` must be provided")
-
-    if checkpoint_dir is not None:
-        checkpoint_dir = auto_download_checkpoint(
-            model_name=checkpoint_dir, access_token=access_token
-        )
-        check_valid_checkpoint_dir(checkpoint_dir)
-        config = Config.from_file(checkpoint_dir / "model_config.yaml")  # type: ignore[operator]
-        config.fix_head_size = True
-        loaded_model = GPT(config)
-
     if tasks is None:
         from lm_eval.tasks import TaskManager
 
@@ -95,7 +81,7 @@ def convert_and_evaluate(
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
     model = WhittleLM(
-        pretrained=model if model is not None else loaded_model,
+        pretrained=model,
         device=device,
         batch_size=batch_size,
         dtype=dtype,
