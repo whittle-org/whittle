@@ -16,13 +16,12 @@ def objective(config, **kwargs):
 search_space = {"a": randint(0, 10), "b": randint(0, 100)}
 
 
-def param_bins(bin_n, bin_s, bin_t):
+def param_bins(bin_n, bin_s, bin_t, max_config=100):
     def params_estimator(config):
         return config["a"]
 
-    bin_width = 10
     min_config = {"a": 0}
-    max_config = {"a": bin_n * bin_width}
+    max_config = {"a": max_config}
 
     bins = ParamBins(
         min_config,
@@ -33,13 +32,13 @@ def param_bins(bin_n, bin_s, bin_t):
         start_bin_size=bin_s,
         empty_bin_tolerance=bin_t,
     )
-    return bins, bin_width
+    return bins
 
 
 @pytest.mark.parametrize("search_strategy", methods)
 def test_multi_objective_search(search_strategy, num_samples=5):
-    bins, _ = (
-        param_bins(10, 2, 1)
+    bins = (
+        param_bins(10, 2, 1, max_config=10)
         if search_strategy == "stratified_random_search"
         else (None, None)
     )
@@ -85,7 +84,8 @@ num_bins = [3, 10]
 @pytest.mark.parametrize("bin_s", bin_size)
 @pytest.mark.parametrize("bin_n", num_bins)
 def test_param_bins(bin_t, bin_s, bin_n):
-    bins, bin_width = param_bins(bin_n, bin_s, bin_t)
+    bin_width = 10
+    bins = param_bins(bin_n, bin_s, bin_t, max_config=bin_n * bin_width)
 
     # fill up to bin_n - 1 bins
     for j in range(bin_s):

@@ -63,7 +63,7 @@ class ParamBins:
         at_max_length = 0
         for i, value in enumerate(self.values):
             # get the first bin
-            if not found and params < value:
+            if not found and params <= value:
                 found = True
                 # place into a bin with space left
                 if self.bins[i - 1] < self.current_bin_length:
