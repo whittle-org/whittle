@@ -62,15 +62,9 @@ class StratifiedRandomSearch(FIFOScheduler):
 
 class StratifiedRandomSearcher(RandomSearcher):
     """
-    Searcher which randomly samples configurations to try next.
-
-    Additional arguments on top of parent class :class:`StochasticAndFilterDuplicatesSearcher`:
-
-    :param debug_log: If ``True``, debug log printing is activated.
-        Logs which configs are chosen when, and which metric values are
-        obtained. Defaults to ``False``
-    :param resource_attr: Optional. Key in ``result`` passed to :meth:`_update`
-        for resource value (for multi-fidelity schedulers)
+    Searcher which randomly samples configurations to try next. If a configuration
+    gets in a full bin (we already sampled enough configurations with a similar parameter count),
+    it is rejected and a new configuration is sampled.
     """
 
     def __init__(
@@ -78,14 +72,27 @@ class StratifiedRandomSearcher(RandomSearcher):
         config_space: dict[str, Any],
         metric: list[str] | str,
         param_bins: ParamBins,
+        sample_patience: int = 10000,
         **kwargs,
     ):
+        """
+        Args:
+            config_space: The configuration space to sample from.
+            metric: The metric to optimize.
+            param_bins: The parameter bins that limit the sub-network params in the search.
+                The configs from ask() are rejected if they fit into a bin that is full.
+                The bin size is increased if all bins are full.
+            sample_patience: The number of rejected samples to try before raising an error.
+                Defaults to 10000.
+            **kwargs: Additional arguments for the searcher.
+        """
         super().__init__(
             config_space,
             metric=metric,
             **kwargs,
         )
         self.param_bins = param_bins
+        self.sample_patience = sample_patience
 
     def _get_config(self, **kwargs) -> dict | None:
         """Sample a new configuration at random. If it doesn't fit into bins of
@@ -97,12 +104,18 @@ class StratifiedRandomSearcher(RandomSearcher):
         :param trial_id: Optional. Used for ``debug_log``
         :return: New configuration, or None
         """
+        i = 0
         while True:
             config = super()._get_config(**kwargs)
 
             # find a bin for the config, if not found, continue sampling
             if self.param_bins.put_in_bin(config):
                 break
+            i += 1
+            if i >= self.sample_patience:
+                raise ValueError(
+                    f"Could not find a valid configuration after {self.sample_patience} samples. Try increasing the tolerance for parameter bins not filled to the max."
+                )
 
         return config
 
