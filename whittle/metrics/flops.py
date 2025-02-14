@@ -12,7 +12,8 @@ except ImportError:
     )
 
 import torch
-from litgpt.model import GPT
+
+from whittle.models.gpt import GPT
 
 
 def compute_flops(
