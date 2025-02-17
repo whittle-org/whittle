@@ -65,6 +65,7 @@ def setup(
     log_objective_names: bool | None = True,
     save_checkpoints: bool = True,
     fine_tuned: bool = False,
+    copy_config_files: bool = True,
 ) -> None:
     """
     Multi-objective search to select Pareto optimal set of sub-networks from trained super-network.
@@ -91,7 +92,11 @@ def setup(
         objective_2: The name of the second objective to optimize (possible - parameters, latency, flops). Defaults to "parameters".
         log_objective_names: Whether to log the names of the objectives in the logger, or log as objective_1 and objective_2. Defaults to True.
         save_checkpoints: Whether to save checkpoints of the sub-networks, or config + path to super-network. Defaults to True.
+            If False, `lit_model.pth` will have the following format:
+            `{'sub_network_config': sub_network_config, 'parent_dir': checkpoint_dir}`
         fine_tuned: Whether the model is fine-tuned. Defaults to False.
+        copy_config_files: Whether to copy the config files from the super-network to the sub-networks. Defaults to True.
+            If set to False, we save `parent_dir` to `lit_model.pth`.
     """
     checkpoint_dir = auto_download_checkpoint(
         model_name=checkpoint_dir, access_token=access_token
@@ -324,9 +329,16 @@ def main(
             sub_network = extract_current_sub_network(model)
             model.reset_super_network()
 
-            fabric.save(save_path, {"model": sub_network})
-            save_config(sub_network.config, out_dir / f"sub_network_{i}")
-            copy_config_files(checkpoint_dir, save_path.parent)
+            # either save everything including config files, or only model_config.yaml and the weights
+            if copy_config_files:
+                copy_config_files(checkpoint_dir, save_path.parent)
+                fabric.save(save_path, {"model": sub_network})
+            else:
+                fabric.save(
+                    save_path, {"model": sub_network, "parent_dir": checkpoint_dir}
+                )
+            # the new model_config.yaml is different from the original one, so we rewrite it
+            save_config(sub_network.config, save_path.parent)
         else:
             save_path = save_path.parent / "sub_network.pkl"
             torch.save(

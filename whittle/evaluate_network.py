@@ -68,7 +68,10 @@ def setup(
     # sub-network config loading (contains the config and checkpoint path of the parent)
     sub_network_config = ckp.get("sub_network_config", None)
     parent_dir = ckp.get("parent_dir", None)
-    if parent_dir is not None:
+    if "model" not in ckp:
+        assert parent_dir is not None, (
+            'Weights are not saved in the checkpoint under "model", but `parent_dir` is not saved in the checkpoints provided.'
+        )
         checkpoint_dir = Path(parent_dir)
         ckp = lazy_load(checkpoint_dir / "lit_model.pth")
 
@@ -78,7 +81,8 @@ def setup(
     config.tie_embeddings = False
 
     model = GPT(config)
-    model.name_or_path = checkpoint_dir  # WhittleLM loads AutoTokenizer inside
+    # WhittleLM loads AutoTokenizer inside - either we copied it to checkpoint_dir, or it is referenced in parent_dir
+    model.name_or_path = checkpoint_dir if parent_dir is None else parent_dir
 
     model.load_state_dict(ckp["model"] if "model" in ckp else ckp)
     del ckp
@@ -90,13 +94,12 @@ def setup(
     # compute metrics
     metrics = {}
     metrics["parameters"] = compute_parameters(model)
-
+    if measure_latency:
+        metrics["latency"] = compute_latency(model)
     if measure_flops:
         metrics["flops"] = compute_flops(
             model, batch_size=latency_batch_size, previous_device=device
         )
-    if measure_latency:
-        metrics["latency"] = compute_latency(model)
     metrics_path.write_text(json.dumps(metrics, indent=2))
 
     # downstream task evaluation
