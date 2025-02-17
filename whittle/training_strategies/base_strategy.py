@@ -22,7 +22,7 @@ class BaseTrainingStrategy:
         loss_function: Callable,
         kd_loss: Callable | None = None,
         device: str = "cuda",
-        fabric: Fabric = None,
+        fabric: Fabric | None = None,
         **kwargs,
     ):
         """

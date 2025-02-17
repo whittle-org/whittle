@@ -256,9 +256,6 @@ class GPT(nn.Module):
             n_elem=self.sub_network_rope_n_elem,
             device=self.cos.device,
         )
-        print(
-            f"Set sub-network to: {self.sub_network_n_embd} embd, {self.sub_network_intermediate_size} intermediate size, {self.sub_network_num_heads} heads, {self.sub_network_n_layers} layers, {self.sub_network_query_groups} query groups, {self.sub_network_head_size} head size"
-        )
 
     def select_sub_network(self, config: dict[str, Any]) -> None:
         """
@@ -266,9 +263,10 @@ class GPT(nn.Module):
         """
         self.set_sub_network(
             config["embed_dim"],
-            config["mlp_ratio"] * config["embed_dim"],
+            int(config["mlp_ratio"] * config["embed_dim"]),
             config["num_heads"],
             config["depth"],
+            sub_network_head_size=config.get("head_size", None),
         )
 
     def reset_super_network(self):
