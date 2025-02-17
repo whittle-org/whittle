@@ -56,11 +56,11 @@ def setup(
     # sub-network config loading (contains the config and checkpoint path of the parent)
     sub_network_config = ckp.get("sub_network_config", None)
     parent_dir = ckp.get("parent_dir", None)
+    # it's either a standalone litgpt model or a sub-network (depending on if there is also a parent_dir)
     if "model" not in ckp:
-        assert parent_dir is not None, (
-            'Weights are not saved in the checkpoint under "model", but `parent_dir` is not saved in the checkpoints provided.'
-        )
-        checkpoint_dir = Path(parent_dir)
+        # not None: sub-network, None: raw state dict
+        if parent_dir is not None:
+            checkpoint_dir = Path(parent_dir)
         ckp = lazy_load(checkpoint_dir / "lit_model.pth")
 
     config = Config.from_file(checkpoint_dir / "model_config.yaml")

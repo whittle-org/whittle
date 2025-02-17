@@ -6,6 +6,7 @@ from typing import Any
 
 import numpy as np
 from lightning.fabric.loggers import Logger
+from tqdm import tqdm
 
 from whittle.sampling.param_bins import ParamBins
 from whittle.search.ask_tell_scheduler import AskTellScheduler
@@ -24,6 +25,7 @@ def multi_objective_search(
     param_bins: ParamBins | None = None,
     objective_1_name: str = "objective_1",
     objective_2_name: str = "objective_2",
+    verbose: bool = True,
 ) -> dict[str, Any]:
     """
     Search for the Pareto-optimal sub-networks using the specified strategy.
@@ -49,7 +51,7 @@ def multi_objective_search(
             Defaults to "objective_1".
         objective_2_name: The name of the second objective.
             Defaults to "objective_2".
-
+        verbose: Whether to have a verbose tqdm output.
     Returns:
         The results of the search, including Pareto-optimal solutions.
 
@@ -77,7 +79,7 @@ def multi_objective_search(
     configs: list[dict[str, Any]] = []
     start_time = time.time()
 
-    for i in range(num_samples):
+    for i in tqdm(range(num_samples), disable=not verbose):
         trial_suggestion = scheduler.ask()
 
         objective_1, objective_2 = objective(

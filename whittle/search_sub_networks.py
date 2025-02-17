@@ -20,7 +20,7 @@ from litgpt.utils import (
     check_nvlink_connectivity,
     check_valid_checkpoint_dir,
     choose_logger,
-    copy_config_files,
+    copy_config_files as copy_config_files_func,
     find_resume_path,
     get_default_supported_precision,
     init_out_dir,
@@ -67,6 +67,8 @@ def setup(
     save_checkpoints: bool = True,
     fine_tuned: bool = False,
     copy_config_files: bool = True,
+    verbose: bool = True,
+    num_workers: int = 4,
 ) -> None:
     """
     Multi-objective search to select Pareto optimal set of sub-networks from trained super-network.
@@ -97,7 +99,9 @@ def setup(
             `{'sub_network_config': sub_network_config, 'parent_dir': checkpoint_dir}`
         fine_tuned: Whether the model is fine-tuned. Defaults to False.
         copy_config_files: Whether to copy the config files from the super-network to the sub-networks. Defaults to True.
-            If set to False, we save `parent_dir` to `lit_model.pth`.
+            If set to False, we save `parent_dir` to `lit_model.pth`. If save_checkpoints is False, this argument is ignored.
+        verbose: Whether to print verbose output. Defaults to True.
+        num_workers: Number of workers to use for data loading. Defaults to 4.
     """
     checkpoint_dir = auto_download_checkpoint(
         model_name=checkpoint_dir, access_token=access_token
@@ -108,7 +112,11 @@ def setup(
         # sys.path.append('../do-not-touch/compressing_llms')
         # from datasets_custom.llamamini import LLaMaMini
         # data = LLaMaMini() if fine_tuned else TinyStories()
-        data = Alpaca() if fine_tuned else TinyStories()
+        data = (
+            Alpaca(num_workers=num_workers)
+            if fine_tuned
+            else TinyStories(num_workers=num_workers)
+        )
 
     num_devices = int(parse_devices(devices))
     out_dir = init_out_dir(out_dir)
@@ -166,6 +174,8 @@ def setup(
         log_objective_names,
         save_checkpoints,
         fine_tuned,
+        copy_config_files,
+        verbose,
     )
 
 
@@ -222,6 +232,8 @@ def main(
     log_objective_names: bool = True,
     save_checkpoints: bool = True,
     fine_tuned: bool = False,
+    copy_config_files: bool = True,
+    verbose: bool = True,
 ) -> None:
     assert objective_1 in [
         "val_loss",
@@ -289,6 +301,7 @@ def main(
             start_bin_size=param_bins.start_bin_size,
         )
 
+    # fabric.is_global_zero
     search_results = multi_objective_search(
         _objective,
         search_space,
@@ -308,6 +321,7 @@ def main(
         param_bins=bins,
         objective_1_name=objective_1 if log_objective_names else "objective_1",
         objective_2_name=objective_2 if log_objective_names else "objective_2",
+        verbose=verbose and fabric.is_global_zero,
     )
     training_time = time.perf_counter() - train_time
 
@@ -332,7 +346,7 @@ def main(
 
             # either save everything including config files, or only model_config.yaml and the weights
             if copy_config_files:
-                copy_config_files(checkpoint_dir, save_path.parent)
+                copy_config_files_func(checkpoint_dir, save_path.parent)
                 fabric.save(save_path, {"model": sub_network})
             else:
                 fabric.save(
@@ -341,8 +355,8 @@ def main(
             # the new model_config.yaml is different from the original one, so we rewrite it
             save_config(sub_network.config, save_path.parent)
         else:
-            save_path = save_path.parent / "sub_network.pkl"
-            torch.save(
+            # minimalistic checkpoint - only sub-network config and path to super-network
+            fabric.save(
                 {"sub_network_config": sub_network_dict, "parent_dir": checkpoint_dir},
                 save_path,
             )
