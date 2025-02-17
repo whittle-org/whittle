@@ -7,7 +7,7 @@ import torch.nn as nn
 from litgpt import Config
 from litgpt.model import KVCache, apply_rope
 
-from whittle.modules import Linear
+from whittle.modules import LinearProj, LinearQKV
 
 
 class CausalSelfAttention(nn.Module):
@@ -17,10 +17,10 @@ class CausalSelfAttention(nn.Module):
         super().__init__()
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
-        self.attn = Linear(config.n_embd, shape, bias=config.bias)
+        self.attn = LinearQKV(config.n_embd, shape, bias=config.bias)
         # output projection
         # if `head_size` is explicitly specified in the config, `n_emd` might not be equal to `head_size * n_head`
-        self.proj = Linear(
+        self.proj = LinearProj(
             config.head_size * config.n_head, config.n_embd, bias=config.bias
         )
         # disabled by default
@@ -31,17 +31,100 @@ class CausalSelfAttention(nn.Module):
         )
         self.config = config
         # Set current sub-network to super-network
+        self.q_per_kv = config.n_head // config.n_query_groups
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_n_head = self.config.n_head
         self.sub_network_head_size = self.config.head_size
         self.sub_network_qkv_shape = (
-            self.config.n_head + 2 * self.config.n_query_groups
-        ) * self.config.head_size
+            (self.q_per_kv + 2) * self.config.head_size * self.config.n_query_groups
+        )
         self.sub_network_query_groups = self.config.n_query_groups
-        self.sub_network_q_per_kv = (
+        self.sub_network_q_per_kv = int(
             self.sub_network_n_head // self.sub_network_query_groups
         )
         self.sub_attention_scaler = self.config.attention_scores_scalar
+
+    def get_qkv_indices(self):
+        qkv_indices = []
+        heads_per_group = self.config.n_head // self.config.n_query_groups
+        if self.config.n_head == self.config.n_query_groups:
+            for h in range(self.sub_network_n_head):
+                # append q
+                start_q = 3 * h * self.config.head_size
+                end_q = start_q + self.sub_network_head_size
+                qkv_indices.extend([i for i in range(start_q, end_q)])
+                # append k
+                start_k = (3 * h + 1) * self.config.head_size
+                end_k = start_k + self.sub_network_head_size
+                qkv_indices.extend([i for i in range(start_k, end_k)])
+                # append v
+                start_v = (3 * h + 2) * self.config.head_size
+                end_v = start_v + self.sub_network_head_size
+                qkv_indices.extend([i for i in range(start_v, end_v)])
+        elif self.config.n_query_groups == 1:
+            for h in range(self.sub_network_n_head):
+                start_q = h * self.config.head_size
+                end_q = start_q + self.sub_network_head_size
+                qkv_indices.extend([i for i in range(start_q, end_q)])
+            end_queries = self.config.n_head * self.config.head_size
+            qkv_indices.extend(
+                [i for i in range(end_queries, end_queries + self.sub_network_head_size)]
+            )
+            end_keys = end_queries + self.config.head_size
+            qkv_indices.extend(
+                [i for i in range(end_keys, end_keys + self.sub_network_head_size)]
+            )
+        else:
+            for g in range(self.sub_network_query_groups):
+                start_q = g * (heads_per_group + 2) * self.config.head_size
+                for h in range(self.sub_network_q_per_kv):
+                    qkv_indices.extend(
+                        [
+                            i
+                            for i in range(
+                                start_q + h * self.config.head_size,
+                                start_q
+                                + h * self.config.head_size
+                                + self.sub_network_head_size,
+                            )
+                        ]
+                    )
+                start_k = start_q + heads_per_group * self.config.head_size
+                qkv_indices.extend(
+                    [i for i in range(start_k, start_k + self.sub_network_head_size)]
+                )
+                start_v = start_k + self.config.head_size
+                qkv_indices.extend(
+                    [i for i in range(start_v, start_v + self.sub_network_head_size)]
+                )
+        return qkv_indices
+
+    def get_proj_indices(self):
+        n_head = self.config.n_head
+        n_query_groups = self.config.n_query_groups
+        sub_network_n_head = self.sub_network_n_head
+        heads_per_group = self.config.n_head // self.config.n_query_groups
+        sub_network_query_groups = self.sub_network_query_groups
+        sub_network_head_size = self.sub_network_head_size
+        head_size = self.config.head_size
+        proj_indices = []
+        if n_head == n_query_groups:
+            for i in range(sub_network_n_head):
+                proj_indices.extend(
+                    i for i in range(i * head_size, i * head_size + sub_network_head_size)
+                )
+        else:
+            for g in range(sub_network_query_groups):
+                start = g * heads_per_group * head_size
+                for h in range(self.sub_network_q_per_kv):
+                    proj_indices.extend(
+                        i
+                        for i in range(
+                            start + h * head_size,
+                            start + h * head_size + sub_network_head_size,
+                        )
+                    )
+        return proj_indices
 
     def set_sub_network(
         self,
@@ -59,22 +142,51 @@ class CausalSelfAttention(nn.Module):
             sub_network_query_groups: Number of query groups for grouped-query attention (GQA).
             sub_network_head_size: Size of each attention head in the sub-network.
         """
-        self.sub_network_n_embd = sub_network_n_embd
-        self.sub_network_n_head = sub_network_n_head
-        self.sub_network_query_groups = sub_network_query_groups
-        self.sub_network_head_size = sub_network_head_size
-
-        self.sub_network_qkv_shape = (
-            self.sub_network_n_head + 2 * self.sub_network_query_groups
-        ) * self.sub_network_head_size
-
-        self.attn.set_sub_network(self.sub_network_n_embd, self.sub_network_qkv_shape)
-        self.proj.set_sub_network(
-            self.sub_network_head_size * self.sub_network_n_head,
-            self.sub_network_n_embd,
+        self.sub_network_n_embd = (
+            sub_network_n_embd if sub_network_n_embd else self.config.n_embd
         )
-        self.sub_network_q_per_kv = self.sub_network_n_head // float(
-            self.sub_network_query_groups
+        self.sub_network_n_head = (
+            sub_network_n_head if sub_network_n_head else self.config.n_head
+        )
+        self.sub_network_query_groups = (
+            sub_network_query_groups
+            if sub_network_query_groups
+            else self.config.n_query_groups
+        )
+        self.sub_network_head_size = (
+            sub_network_head_size if sub_network_head_size else self.config.head_size
+        )
+        if self.config.n_query_groups == 1:
+            q_per_kv = self.sub_network_n_head
+            self.sub_network_query_groups = 1
+        elif (
+            self.config.n_head != self.config.n_query_groups
+            and self.config.n_query_groups != 1
+        ):
+            self.sub_network_query_groups = (
+                sub_network_query_groups
+                if sub_network_query_groups
+                else self.config.n_query_groups
+            )
+            q_per_kv = self.sub_network_n_head // self.config.n_query_groups
+        elif self.config.n_head == self.config.n_query_groups:
+            q_per_kv = 1
+            self.sub_network_query_groups = self.sub_network_n_head
+        self.sub_network_qkv_shape = (
+            (q_per_kv + 2) * self.sub_network_head_size * self.sub_network_query_groups
+        )
+        self.sub_network_q_per_kv = int(q_per_kv)
+        self.qkv_indices = self.get_qkv_indices()
+        self.attn.set_sub_network(
+            self.sub_network_n_embd, self.sub_network_qkv_shape, self.qkv_indices
+        )
+        self.proj_indices = self.get_proj_indices()
+        self.proj.set_sub_network(
+            self.sub_network_head_size
+            * self.sub_network_query_groups
+            * self.sub_network_q_per_kv,
+            self.sub_network_n_embd,
+            self.proj_indices,
         )
         if self.config.attention_scores_scalar:
             self.sub_attention_scaler = self.sub_network_n_embd // self.sub_network_n_head
@@ -90,7 +202,7 @@ class CausalSelfAttention(nn.Module):
             self.config.n_head + 2 * self.config.n_query_groups
         ) * self.config.head_size
         self.sub_network_query_groups = self.config.n_query_groups
-        self.sub_network_q_per_kv = (
+        self.sub_network_q_per_kv = int(
             self.sub_network_n_head // self.sub_network_query_groups
         )
         self.attn.reset_super_network()
@@ -115,8 +227,9 @@ class CausalSelfAttention(nn.Module):
         ) = x.size()  # batch size, sequence length, embedding dimensionality (n_embd)
         qkv = self.attn(x)
         # assemble into a number of query groups to support MHA, MQA and GQA together (see `config.n_query_groups`)
-        q_per_kv = self.sub_network_n_head // self.sub_network_query_groups
-        total_qkv = q_per_kv + 2  # each group has 1+ queries, 1 key, and 1 value
+        total_qkv = (
+            self.sub_network_q_per_kv + 2
+        )  # each group has 1+ queries, 1 key, and 1 value
 
         qkv = qkv.view(
             B,
@@ -129,25 +242,25 @@ class CausalSelfAttention(nn.Module):
         qkv = qkv.permute(0, 2, 3, 1, 4)  # (B, n_query_groups, total_qkv, T, hs)
 
         # split batched computation into three
-        q, k, v = qkv.split((q_per_kv, 1, 1), dim=2)
+        q, k, v = qkv.split((self.sub_network_q_per_kv, 1, 1), dim=2)
 
         # maybe repeat k and v if for the non multi-head attention cases
         # training: flash attention requires it
         # inference: multi-query would require a full kv cache so avoid it to limit its memory usage
-        if self.sub_network_query_groups != self.sub_network_n_head and (
-            input_pos is None or self.config.n_query_groups != 1
-        ):
+        if self.sub_network_query_groups != (
+            self.sub_network_query_groups * self.sub_network_q_per_kv
+        ) and (input_pos is None or self.sub_network_query_groups != 1):
             k = k.expand(
                 B,
                 self.sub_network_query_groups,
-                q_per_kv,
+                self.sub_network_q_per_kv,
                 T,
                 self.sub_network_head_size,
             )
             v = v.expand(
                 B,
                 self.sub_network_query_groups,
-                q_per_kv,
+                self.sub_network_q_per_kv,
                 T,
                 self.sub_network_head_size,
             )
@@ -186,7 +299,11 @@ class CausalSelfAttention(nn.Module):
             mask += sliding_window_bias
         y = self.scaled_dot_product_attention(q, k, v, mask)
         y = y.reshape(
-            B, T, self.sub_network_head_size * self.sub_network_n_head
+            B,
+            T,
+            self.sub_network_head_size
+            * self.sub_network_q_per_kv
+            * self.sub_network_query_groups,
         )  # re-assemble all head outputs side by side
         return self.proj(y)
 

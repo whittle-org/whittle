@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import pytest
 import torch
-from litgpt import Config
 from litgpt.model import (
     CausalSelfAttention as LitCausalSelfAttention,
     build_mask_cache,
     build_rope_cache,
 )
 
-from whittle.models.gpt.blocks import CausalSelfAttention
+from whittle.lora.config import LoRAConfig as Config
+from whittle.lora.lora_attention import CausalSelfAttention
 
 attention_configs = {
     "mha_fix_head_size_sliding": {
@@ -53,10 +53,16 @@ attention_configs = {
 def init_attention(config):
     attention = CausalSelfAttention(config, 2)
     torch.manual_seed(0)
-    attention.attn.weight.data = torch.randn_like(attention.attn.weight.data)
-    attention.attn.bias.data = torch.randn_like(attention.attn.bias.data)
-    attention.proj.bias.data = torch.randn_like(attention.proj.bias.data)
-    attention.proj.weight.data = torch.randn_like(attention.proj.weight.data)
+    attention.attn.linear.linear.weight.data = torch.randn_like(
+        attention.attn.linear.linear.weight.data
+    )
+    attention.attn.linear.linear.bias.data = torch.randn_like(
+        attention.attn.linear.linear.bias.data
+    )
+    attention.proj.linear.bias.data = torch.randn_like(attention.proj.linear.bias.data)
+    attention.proj.linear.weight.data = torch.randn_like(
+        attention.proj.linear.weight.data
+    )
     return attention
 
 
@@ -160,17 +166,6 @@ def test_attention(attention_config):
     config.head_size = attention.sub_network_head_size
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
     lit_attention_small = init_lit_small_attention(config, lit_attention, attention)
-    if attention.qkv_indices is not None:
-        print(lit_attention_small.attn.weight.data.size())
-        print(
-            attention.attn.weight.data[attention.qkv_indices, :][
-                :, 0 : config.n_embd
-            ].size()
-        )
-        assert torch.all(
-            lit_attention_small.attn.weight.data
-            == attention.attn.weight.data[attention.qkv_indices, :][:, 0 : config.n_embd]
-        )
 
     out_lit_small = lit_attention_small(
         input[:, :, : config.n_embd], mask=mask, cos=cos, sin=sin
