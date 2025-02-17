@@ -9,6 +9,7 @@ from typing import Literal
 import lightning as L
 import torch
 from lightning.fabric.strategies import FSDPStrategy
+from lightning.fabric.strategies.deepspeed import _DEEPSPEED_AVAILABLE
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.data import Alpaca, DataModule, TinyStories
@@ -31,13 +32,16 @@ from litgpt.utils import (
 from torch.utils.data import DataLoader
 
 from whittle.args import ParamBinArgs, SearchArgs
-from whittle.metrics import compute_flops, compute_latency, compute_parameters
+from whittle.metrics import compute_latency, compute_parameters
 from whittle.models.gpt import GPT, Block
 from whittle.models.gpt.extract import extract_current_sub_network
 from whittle.pretrain_super_network import get_search_space
 from whittle.sampling.param_bins import ParamBins, ParamsEstimator
 from whittle.search import multi_objective_search
 from whittle.search.baselines import Methods
+
+if _DEEPSPEED_AVAILABLE:
+    from whittle.metrics import compute_flops
 
 
 def setup(
@@ -60,8 +64,8 @@ def setup(
     seed: int | None = 1337,
     access_token: str | None = None,
     param_bins: ParamBinArgs = ParamBinArgs(),
-    objective_1: str | None = "val_loss",
-    objective_2: str | None = "parameters",
+    objective_1: Literal["val_loss", "flops"] | None = "val_loss",
+    objective_2: Literal["parameters", "latency", "flops"] | None = "parameters",
     log_objective_names: bool | None = True,
     save_checkpoints: bool = True,
     fine_tuned: bool = False,
@@ -98,6 +102,12 @@ def setup(
         copy_config_files: Whether to copy the config files from the super-network to the sub-networks. Defaults to True.
             If set to False, we save `parent_dir` to `lit_model.pth`.
     """
+    if objective_2 == "flops" and not _DEEPSPEED_AVAILABLE:
+        raise ValueError(
+            "FLOPs objective requires DeepSpeed. Please install DeepSpeed by running "
+            "`pip install whittle[distributed]`"
+        )
+
     checkpoint_dir = auto_download_checkpoint(
         model_name=checkpoint_dir, access_token=access_token
     )
