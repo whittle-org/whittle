@@ -357,8 +357,8 @@ def main(
         else:
             # minimalistic checkpoint - only sub-network config and path to super-network
             fabric.save(
-                {"sub_network_config": sub_network_dict, "parent_dir": checkpoint_dir},
                 save_path,
+                {"sub_network_config": sub_network_dict, "parent_dir": checkpoint_dir},
             )
 
     # save all paths to pareto optimal sub-networks
