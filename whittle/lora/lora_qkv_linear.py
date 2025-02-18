@@ -130,6 +130,9 @@ class LoRAQKVLinear(LoRALayer):
         self.sub_attention_scaler = self.config.attention_scores_scalar
         self.qkv_indices = None
 
+    def reset_parameters(self):
+        pass
+
     @property
     def lora_ind(self) -> torch.Tensor:
         """Lazy creation of a buffer with LoRA indices to overcome the limitation when FSDP with meta device is used."""
@@ -321,7 +324,7 @@ class LoRAQKVLinear(LoRALayer):
     def merge(self) -> None:
         """Merges the LoRA weights into the full-rank weights (W = W + delta_W)."""
         if self.r > 0 and any(self.enable_lora) and not self.merged:
-            super().merge()
+            self.linear.merge()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Do the forward pass.
