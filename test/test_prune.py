@@ -7,15 +7,12 @@ from io import StringIO
 from unittest.mock import Mock
 
 import pytest
-
 import torch
-from torch.utils.data import DataLoader, TensorDataset
-
 from litgpt.scripts.download import download_from_hub
+from torch.utils.data import DataLoader, TensorDataset
 
 from whittle import prune
 from whittle.args import PruningArgs
-
 
 methods = ["mag", "wanda", "sparse_gpt"]
 

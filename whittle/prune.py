@@ -3,17 +3,15 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
-from typing import Optional, Union
 
 import lightning as L
 import torch
-
 from lightning.fabric.strategies import FSDPStrategy
-from litgpt.args import TrainArgs
 from litgpt import Tokenizer
+from litgpt.args import TrainArgs
+from litgpt.data import DataModule
 from litgpt.model import Config
 from litgpt.pretrain import get_dataloaders
-from litgpt.data import DataModule
 from litgpt.utils import (
     auto_download_checkpoint,
     check_nvlink_connectivity,
@@ -27,8 +25,7 @@ from litgpt.utils import (
 from whittle.args import PruningArgs
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
-from whittle.pruning import MagnitudePruner, WandaPruner, SparseGPTPruner
-
+from whittle.pruning import MagnitudePruner, SparseGPTPruner, WandaPruner
 
 pruner_classes = {
     "mag": MagnitudePruner,
@@ -39,19 +36,19 @@ pruner_classes = {
 
 def setup(
     checkpoint_dir: Path,
-    out_dir: Optional[Path] = Path("out/finetune/full"),
-    precision: Optional[str] = None,
-    data: Optional[DataModule] = None,
-    devices: Optional[Union[int, str]] = 1,
+    out_dir: Path | None = Path("out/finetune/full"),
+    precision: str | None = None,
+    data: DataModule | None = None,
+    devices: int | str | None = 1,
     num_nodes: int = 1,
     prune: PruningArgs = PruningArgs(
         pruning_strategy="mag",
         n=2,
         m=4,
     ),
-    max_seq_length: Optional[int] = 512,
-    seed: Optional[int] = 1337,
-    access_token: Optional[str] = None,
+    max_seq_length: int | None = 512,
+    seed: int | None = 1337,
+    access_token: str | None = None,
 ) -> None:
     """
     Performs structural pruning on a specified model checkpoint and saves a new checkpoint with the pruned weights set to zero.
