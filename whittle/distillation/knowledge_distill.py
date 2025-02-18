@@ -120,6 +120,6 @@ class KD(nn.Module):
                 loss_avg += loss.item()
 
             scheduler.step()
-            print(f"Epoch {epoch}, average loss: {loss_avg / len(self.dataloader):.4f}")
+            print(f"Epoch {epoch+1}, average loss: {loss_avg / len(self.dataloader):.4f}")
 
         return self.student

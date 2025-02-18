@@ -24,6 +24,11 @@ from typing import Any, Optional, Callable, Union
 from collections.abc import Generator
 from transformers import PreTrainedTokenizer
 
+import yaml
+from pathlib import Path
+from dataclasses import asdict
+
+
 import glob
 
 
@@ -60,6 +65,10 @@ def load_teacher_model(checkpoint: str, config_file: str, device: str) -> Option
         teacher.eval()
         return teacher
     return None
+
+def save_config_to_file(config: Config, path: Union[str, Path]) -> None:
+    with open(path, 'w', encoding='utf-8') as fp:
+        yaml.safe_dump(asdict(config), fp)
 
 def load_teacher_predictions(
     path: str, 
@@ -214,8 +223,8 @@ def create_tiny_gpt(verbose=False) -> GPT:
     """
     tiny_config = Config(
         vocab_size=50688,    # Vocabulary size 
-        head_size=16,        # Head size for the attention mechanism
-        n_embd=128,          # Embedding size
+        head_size=32,        # Head size for the attention mechanism
+        n_embd=256,          # Embedding size
         n_layer=10,          # Number of layers
         n_head=4,            # Number of attention heads
         bias=True            # Include bias in linear layers
@@ -237,7 +246,7 @@ def create_tiny_gpt(verbose=False) -> GPT:
         else:
             init.zeros_(param)
 
-    return tiny_gpt
+    return tiny_gpt, tiny_config
 
 def create_student_training_data(
         teacher: Optional[GPT],

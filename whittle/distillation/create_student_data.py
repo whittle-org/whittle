@@ -8,6 +8,7 @@ from datasets import load_dataset
 from transformers import AutoTokenizer
 from jsonargparse import CLI
 from tqdm import tqdm
+from typing import Optional
 
 from whittle.args import DistillArgs
 from whittle.models.gpt.model import GPT
@@ -17,7 +18,8 @@ from whittle.distillation.utils import (
     create_dataloader,
     create_student_training_data,
     create_tiny_gpt,
-    TeacherLogitsLoader
+    TeacherLogitsLoader,
+    save_config_to_file
 )
 
 def train(
@@ -35,22 +37,22 @@ def train(
 
     for epoch in range(epochs):
         epoch_loss = 0.0
-        for batch in tqdm(dataloader, desc=f"Epoch {epoch}/{epochs-1}", unit="batch"):
+        for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}", unit="batch"):
             input_ids = batch["input_ids"].to(device)
-            target_ids = batch["labels"].to(device)
+            labels = batch["labels"].to(device)
 
             optimizer.zero_grad()
             logits = model(input_ids)
             loss = torch.nn.CrossEntropyLoss()(
                 logits.view(-1, logits.size(-1)),
-                target_ids.view(-1)
+                labels.view(-1)
             )
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
 
         avg_loss = epoch_loss / len(dataloader)
-        print(f"Epoch {epoch}, Loss average: {avg_loss:.4f}")
+        print(f"Epoch {epoch+1}, Loss average: {avg_loss:.4f}")
 
     return model
 
@@ -65,7 +67,6 @@ def evaluate(
     model.to(device)
     model.eval()
     total_loss = 0.0
-    num_batches = 0
 
     for batch in dataloader:
         input_ids = batch["input_ids"].to(device)
@@ -73,17 +74,13 @@ def evaluate(
 
         with torch.no_grad():
             logits = model(input_ids)
-            if isinstance(logits, tuple):
-                logits = logits[0]
-
             loss = torch.nn.CrossEntropyLoss()(
                 logits.view(-1, logits.size(-1)),
                 labels.view(-1)
             )
             total_loss += loss.item()
-            num_batches += 1
 
-    avg_loss = total_loss / num_batches if num_batches > 0 else float('inf')
+    avg_loss = total_loss / len(dataloader) 
     print(f"Average loss: {avg_loss:.4f}")
     return avg_loss
 
@@ -92,8 +89,9 @@ def load_teacher(
     teacher_ckpt: str, 
     model_id: str, 
     checkpoint_dir: str, 
-    access_token, 
-    device
+    access_token,
+    device: str,
+    teacher_config_path: Path 
 ):
     """
     Load the teacher model based on teacher_source option:
@@ -111,17 +109,12 @@ def load_teacher(
                 config.fix_head_size = True
                 config.model_type = "gpt"
                 teacher = GPT(config)
+                teacher_config = config
             else:
-                # If no model_id is provided, load already trained tinyGPT model, if it exists
-                tiny_config =  Config(
-                    vocab_size=50688,    # Vocabulary size 
-                    head_size=16,        # Head size for the attention mechanism
-                    n_embd=128,          # Embedding size
-                    n_layer=10,          # Number of layers
-                    n_head=4,            # Number of attention heads
-                    bias=True            # Include bias in linear layers
-            )
-                teacher = GPT(tiny_config) 
+                tiny_config = Config.from_file(teacher_config_path)
+                teacher = GPT(tiny_config)
+                teacher_config = tiny_config
+                print("Loaded teacher configuration from the provided checkpoint.") 
             
             teacher.load_state_dict(torch.load(teacher_ckpt, map_location=device, weights_only=True))
             teacher.reset_super_network()
@@ -149,15 +142,16 @@ def load_teacher(
         teacher = GPT(config)
         teacher.reset_super_network()
         smoke_test = False
+        teacher_config = config
 
     elif teacher_source == "tiny":
-        teacher = create_tiny_gpt()
+        teacher, teacher_config = create_tiny_gpt()
         smoke_test=True
     
     else:
         raise ValueError("Invalid teacher_source option. Choose from 'hub', 'checkpoint', or 'tiny'.")
 
-    return teacher, smoke_test
+    return teacher, smoke_test, teacher_config
 
 def main(
     device: str = 'cuda:0' if torch.cuda.is_available() else 'cpu',
@@ -165,15 +159,16 @@ def main(
     seq_len: int = 64,
     batch_size: int = 5,
     verbose: bool = False,
-    checkpoint_dir: str = 'checkpoints',
-    save_dir: str = 'save_dir',
+    checkpoint_dir: Path = Path('checkpoints'),
+    save_dir: Path = Path('save_dir'),
     dataset: str = 'wikitext-2-raw-v1',
     dataset_path: str = 'wikitext',
     access_token: str = '',
     epochs: int = 3,
-    teacher_ckpt: str = './checkpoints/teacher_checkpoint.pth',
+    teacher_ckpt: Path = Path('checkpoints/teacher_checkpoint.pth'),
     model_id: str = '',
-    teacher_source: str = "checkpoint",
+    teacher_source: str = 'checkpoint',
+    teacher_config_path: Path = Path('checkpoints/teacher_config.yaml'),
 
     distill: DistillArgs = DistillArgs(
         method='logits',
@@ -193,7 +188,7 @@ def main(
     if verbose:
         print(f"Generating student training data using model with configuration:\n\n{distill}\n\n")
     
-    teacher, distill.smoke_test = load_teacher(teacher_source, teacher_ckpt, model_id, checkpoint_dir, access_token, device)
+    teacher, distill.smoke_test, teacher_config = load_teacher(teacher_source, teacher_ckpt, model_id, checkpoint_dir, access_token, device, teacher_config_path)
     teacher.to(device)
     
     split = "train"
@@ -217,7 +212,10 @@ def main(
         os.makedirs(checkpoint_dir, exist_ok=True)
     teacher_checkpoint_path = os.path.join(checkpoint_dir, "teacher_checkpoint.pth")
     torch.save(teacher.state_dict(), teacher_checkpoint_path)
-    print(f"\nTeacher model checkpoint saved to {teacher_checkpoint_path}")
+    teacher_config_path = os.path.join(checkpoint_dir, "teacher_config.yaml")
+    save_config_to_file(teacher_config, teacher_config_path)
+
+    print(f"\nTeacher model checkpoint saved to {teacher_checkpoint_path} and configuration saved to {teacher_config_path}")
 
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)

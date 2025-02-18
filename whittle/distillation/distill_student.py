@@ -8,14 +8,13 @@ from whittle.models.gpt.model import GPT
 from whittle.args import DistillArgs
 from whittle.distillation.utils import (
     create_dataloader,
-    load_teacher_predictions,
-    create_tiny_gpt,
-    compute_parameters,
-    merge_saved_logits,
     TeacherLogitsLoader
 )
 from whittle.distillation.knowledge_distill import KD
 from jsonargparse import CLI
+from typing import Optional
+from pathlib import Path
+
 
 def evaluate(model: torch.nn.Module, dataloader, device: str) -> float:
     model.to(device)
@@ -46,14 +45,14 @@ def main(
     save_dir: str = 'save_dir',
     dataset: str = 'wikitext-2-raw-v1',
     dataset_path: str = 'wikitext',
-    teacher_ckpt: str = './checkpoints/teacher_checkpoint.pth',
-    student_ckpt: str = '',
-    student_config: str = '',
+    teacher_ckpt_path: Path = Path('checkpoints/teacher_checkpoint.pth'),
+    teacher_config_path: Path = Path('checkpoints/teacher_config.yaml'),
+    student_ckpt_path: Path = Path('checkpoints/student_checkpoint.pth'),
+    student_config_path: Path = Path('checkpoints/student_config.yaml'),
 
     distill: DistillArgs = DistillArgs(
         method='logits',
         on_cluster=False,
-        smoke_test=True,
         use_topk_logits=False,
         use_precomputed_logits=False
     )    
@@ -62,11 +61,14 @@ def main(
 
     train_dataset = load_dataset(dataset_path, dataset, split="train")
     test_dataset  = load_dataset(dataset_path, dataset, split="test")
-    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")    
 
     train_dataloader = create_dataloader(train_dataset, tokenizer, seq_len, batch_size, device, verbose, seed)
     test_dataloader  = create_dataloader(test_dataset, tokenizer, seq_len, batch_size, device, verbose, seed)
 
+    teacher_config = Config.from_file(teacher_config_path)
+    teacher = GPT(teacher_config)
+    
     if distill.use_precomputed_logits:
         if not distill.precomputed_logits_path:
             raise ValueError("Provide `precomputed_logits_path` when using precomputed logits.")
@@ -74,59 +76,23 @@ def main(
         teacher_logits_loader = TeacherLogitsLoader(distill.precomputed_logits_path)
     else:
         teacher_logits_loader = None
-        teacher = create_tiny_gpt()
-        teacher.load_state_dict(torch.load(teacher_ckpt, map_location=device, weights_only=True))
-        print(f"Loaded teacher model from {teacher_ckpt}")
+        teacher = GPT(teacher_config)
+        teacher.load_state_dict(torch.load(teacher_ckpt_path, map_location=device, weights_only=True))
+        print(f"Loaded teacher model from {teacher_ckpt_path}")
 
-    if student_config:
-        print("Loading student model from provided configuration.")
-        student_config = Config.from_file(distill.student_config)
+    # Load student model
+    if student_config_path.exists():
+        student_config = Config.from_file(student_config_path)
         student = GPT(student_config)
-        # Optionally load weights from the teacher (non-strict, in case shapes differ).
-        teacher = create_tiny_gpt()
-        teacher.load_state_dict(torch.load(teacher_ckpt, map_location=device, weights_only=True))
-        print(f"Loaded teacher model from {teacher_ckpt}")
-
-        # prev_params = compute_parameters(teacher)
-
-        student.load_state_dict(teacher.state_dict(), strict=False)
-        print("Loaded student model from provided configuration.\n")
-    
-    elif student_ckpt:
-        print(f"Loading student model from checkpoint: {student_ckpt}")
-        config_path = os.path.join(os.path.dirname(student_ckpt), "model_config.yaml")
-        config = Config.from_file(config_path)
-        student = GPT(config)
-        student.load_state_dict(torch.load(student_ckpt, map_location=device))
-        print(f"Loaded student model from checkpoint: {student_ckpt}")
-    
+        if student_ckpt_path.exists():
+            student.load_state_dict(torch.load(student_ckpt_path, map_location=device))
+            print(f"Loaded student model from {student_ckpt_path}")
+        else:
+            print("Student checkpoint not found. Initializing student model with random weights.")
     else:
-        print("\nNo student configuration or checkpoint provided. Using teacher's configuration for the student model.\n")
-
-        teacher = create_tiny_gpt()
-        teacher.load_state_dict(torch.load(teacher_ckpt, map_location=device, weights_only=True))
-        print(f"Loaded teacher model from {teacher_ckpt}")
-
-        student = GPT(teacher.config)
-        print("Student model configuration:", student.config)
-        student.load_state_dict(teacher.state_dict())
-        small_network = {
-            "sub_network_n_embd": teacher.config.n_embd // 2,
-            "sub_network_intermediate_size": teacher.config.intermediate_size // 2,
-            "sub_network_num_heads": teacher.config.n_head // 2,
-            "sub_network_n_layers": teacher.config.n_layer // 2,
-            "sub_network_head_size": teacher.config.head_size
-        }
-        print("Sub-network configuration:", small_network)
-        print(f"\nNumber of parameters before pruning the student model: {compute_parameters(student)}")
-        student.set_sub_network(**small_network)
-        print(f"Number of parameters after pruning the student model: {compute_parameters(student)}")
-
-    # assert compute_parameters(teacher) == prev_params
-
-    # print("\nTeacher Model Evaluation:")
-    # evaluate(teacher, test_dataloader, device)
-
+        print("Student configuration not found. Initializing student model with random weights.")
+        student = GPT(teacher_config)
+        
     print("\nEvaluating student model BEFORE distillation:")
     evaluate(student, test_dataloader, device)
 
