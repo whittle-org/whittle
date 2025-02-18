@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+import torch
+import torch.nn as nn
 
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 
@@ -42,7 +44,14 @@ class RandomLinearStrategy(BaseTrainingStrategy):
         self.current_step = 0
         self.rate = np.linspace(0.0, 1, total_number_of_steps)
 
-    def __call__(self, model, inputs, outputs, scale_loss=1, **kwargs):
+    def __call__(
+        self,
+        model: nn.Module,
+        inputs: torch.Tensor,
+        outputs: torch.Tensor,
+        scale_loss: float = 1,
+        **kwargs,
+    ):
         total_loss = 0
         y_supernet = model(inputs)
         if np.random.rand() <= self.rate[self.current_step]:

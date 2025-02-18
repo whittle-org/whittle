@@ -43,7 +43,6 @@ from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
 from whittle.models.gpt import GPT
-from whittle.models.gpt.blocks import Block
 from whittle.sampling.random_sampler import RandomSampler
 from whittle.training_strategies import (
     RandomStrategy,
@@ -92,7 +91,7 @@ def setup(
     devices: int | str = "auto",
     num_nodes: int = 1,
     training_strategy: str = "sandwich",
-    distributed_strategy: Literal["auto", "fsdp", "deepspeed"] = "auto",
+    distributed_strategy: Literal["auto", "fsdp", "deepspeed"] = "fsdp",
     tokenizer_dir: Path | None = None,
     logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
     seed: int = 42,
@@ -156,6 +155,7 @@ def setup(
 
     precision = precision or get_default_supported_precision(training=True)
     num_devices = parse_devices(devices)
+    print("num_devices is ", num_devices)
     out_dir = init_out_dir(out_dir)
     # in case the dataset requires the Tokenizer
     tokenizer = Tokenizer(tokenizer_dir) if tokenizer_dir is not None else None
@@ -170,20 +170,30 @@ def setup(
 
     if num_devices * num_nodes > 1:
         if distributed_strategy == "fsdp":
-            strategy = FSDPStrategy(
-                auto_wrap_policy={Block},
-                state_dict_type="full",
-                sharding_strategy="HYBRID_SHARD",
+            distributed_strategy = FSDPStrategy(
+                # auto_wrap_policy={Block},
+                # state_dict_type="full",
+                # sharding_strategy="HYBRID_SHARD",
             )
         elif distributed_strategy == "deepspeed":
-            strategy = DeepSpeedStrategy()
+            ds_config = {
+                "train_micro_batch_size_per_gpu": train.micro_batch_size,
+                "gradient_accumulation_steps": train.gradient_accumulation_iters(
+                    num_devices
+                ),
+                "zero_optimization": {"stage": 2},
+                "gradient_clipping": train.max_norm,
+            }
+            distributed_strategy = DeepSpeedStrategy(config=ds_config)
     else:
-        strategy = "auto"
+        distributed_strategy = "auto"
+
+    # print("distributed strategy is ", distributed_strategy)
 
     fabric = L.Fabric(
         devices=num_devices,
         num_nodes=num_nodes,
-        strategy=strategy,
+        strategy=distributed_strategy,
         precision=precision,
         loggers=[logger],
     )
@@ -229,6 +239,10 @@ def fit(
 ) -> None:
     model = state["model"]
     optimizer = state["optimizer"]
+    # print("optimizer is ", optimizer)
+    # import pdb
+
+    # pdb.set_trace()
 
     if eval.initial_validation:
         model.reset_super_network()
@@ -272,6 +286,7 @@ def fit(
     total_t0 = time.perf_counter()
 
     warmup_iters = train.warmup_iters(devices, max_iters, train_dataloader)
+    # print("got past warmup")
 
     for train_data in train_iterator:
         if state["iter_num"] >= max_iters:
@@ -279,14 +294,21 @@ def fit(
 
         # determine and set the learning rate for this iteration
         lr = get_lr(
-            optimizer.defaults["lr"],
+            optimizer.defaults["lr"]
+            if isinstance(optimizer, torch.optim.Optimizer)
+            else optimizer.optimizer.optimizer.defaults["lr"],
             state["iter_num"],
             warmup_iters,
             max_iters,
             train.min_lr,
         )
-        for param_group in optimizer.param_groups:
-            param_group["lr"] = lr
+        # print("got past lr, it is ", lr)
+        if isinstance(optimizer, torch.optim.Optimizer):
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = lr
+        else:
+            for param_group in optimizer.optimizer.optimizer.param_groups:
+                param_group["lr"] = lr
 
         state["iter_num"] += 1
         iter_t0 = time.perf_counter()
@@ -314,7 +336,8 @@ def fit(
         running_loss.update(loss)
 
         if not is_accumulating:
-            fabric.clip_gradients(model, optimizer, max_norm=train.max_norm)
+            if isinstance(optimizer, torch.optim.Optimizer):
+                fabric.clip_gradients(model, optimizer, max_norm=train.max_norm)
             optimizer.step()
             optimizer.zero_grad()
             state["step_count"] += 1
@@ -393,12 +416,36 @@ def fit(
             and not is_accumulating
             and state["step_count"] % train.save_interval == 0
         ):
-            save_checkpoint(
-                fabric,
-                state,
-                tokenizer_dir,
-                out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth",
-            )
+            if isinstance(fabric.strategy, DeepSpeedStrategy):
+                from deepspeed.utils.zero_to_fp32 import (
+                    get_fp32_state_dict_from_zero_checkpoint,
+                )
+
+                fabric.save(
+                    out_dir / f"step-{state['step_count']:08d}",
+                    state,
+                )
+
+                fabric.barrier()
+                if fabric.global_rank == 0:
+                    state_dict = get_fp32_state_dict_from_zero_checkpoint(
+                        out_dir / f"step-{state['step_count']:08d}", lazy_mode=True
+                    )
+                    # import pdb
+
+                    # pdb.set_trace()
+                    # state_dict = adapter_v2_state_from_state_dict(state_dict)
+                    torch.save(
+                        state_dict,
+                        out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth",
+                    )
+            else:
+                save_checkpoint(
+                    fabric,
+                    state,
+                    tokenizer_dir,
+                    out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth",
+                )
 
     # Final validation
     if eval.final_validation:
@@ -448,12 +495,22 @@ def main(
     fabric.print(f"Time to instantiate model: {time.perf_counter() - t0:.02f} seconds.")
     fabric.print(f"Total parameters: {num_parameters(model):,}")
 
-    model = torch.compile(model)
-    model = fabric.setup(model)
+    # model = torch.compile(model, mode="max-autotune")
 
     extra_kwargs = {"fused": fabric.device.type == "cuda"}
-    optimizer = instantiate_torch_optimizer(optimizer, model.parameters(), **extra_kwargs)
-    optimizer = fabric.setup_optimizers(optimizer)
+    if isinstance(fabric.strategy, DeepSpeedStrategy):
+        # model = fabric.setup(model, move_to_device=False)
+        optimizer = instantiate_torch_optimizer(
+            optimizer, model.parameters(), **extra_kwargs
+        )
+        model, optimizer = fabric.setup(model, optimizer)
+    else:
+        model = fabric.setup(model)
+
+        optimizer = instantiate_torch_optimizer(
+            optimizer, model.parameters(), **extra_kwargs
+        )
+        optimizer = fabric.setup_optimizers(optimizer)
 
     sampler = RandomSampler(config_space=get_search_space(config), seed=seed)
     training_strategy_kwargs = {
@@ -506,6 +563,49 @@ def main(
     fabric.print(f"Training time: {(time.perf_counter() - train_time):.2f}s")
     if fabric.device.type == "cuda":
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
+
+
+# def save_model_checkpoint(fabric, model, file_path: Path):
+#     file_path = Path(file_path)
+
+#     if isinstance(fabric.strategy, DeepSpeedStrategy):
+#         from deepspeed.utils.zero_to_fp32 import get_fp32_state_dict_from_zero_checkpoint
+
+#         tmp_path = file_path.with_suffix(".tmp")
+#         fabric.save(tmp_path, {"model": model})
+#         fabric.barrier()
+#         if fabric.global_rank == 0:
+#             # Create a consolidated checkpoint with the same name next to the deepspeed checkpoint
+#             # and only keep the adapter weights
+#             state_dict = get_fp32_state_dict_from_zero_checkpoint(tmp_path)
+#             state_dict = adapter_state_from_state_dict(state_dict)
+#             torch.save(state_dict, file_path)
+#             shutil.rmtree(tmp_path)
+#     else:
+#         state_dict = adapter_state_from_state_dict(model.state_dict())
+#         if fabric.global_rank == 0:
+#             torch.save(state_dict, file_path)
+#         fabric.barrier()
+
+
+def get_adapter_substrings():
+    substrings = ["adapter_wte", "gating_factor"]  # regular adapter v1 parameters
+    substrings.extend(
+        ["adapter_scale", "adapter_bias"]
+    )  # adapter v2: new bias and scale used in Linear
+    substrings.extend(
+        ["norm_1", "norm_2", "ln_f"]
+    )  # adapter v2: Norm parameters are now trainable
+    return substrings
+
+
+def adapter_v2_state_from_state_dict(state_dict: dict) -> dict:
+    """Return the model state dict with only the adapter weights for saving"""
+    return {
+        name: param
+        for name, param in state_dict.items()
+        if any(s in name for s in get_adapter_substrings())
+    }
 
 
 if __name__ == "__main__":
