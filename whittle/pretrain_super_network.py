@@ -9,7 +9,7 @@ from typing import Literal
 
 import lightning as L
 import torch
-from lightning.fabric.strategies import FSDPStrategy
+from lightning.fabric.strategies import DeepSpeedStrategy, FSDPStrategy
 from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
@@ -92,6 +92,7 @@ def setup(
     devices: int | str = "auto",
     num_nodes: int = 1,
     training_strategy: str = "sandwich",
+    distributed_strategy: Literal["auto", "fsdp", "deepspeed"] = "auto",
     tokenizer_dir: Path | None = None,
     logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
     seed: int = 42,
@@ -168,11 +169,14 @@ def setup(
     )
 
     if num_devices * num_nodes > 1:
-        strategy = FSDPStrategy(
-            auto_wrap_policy={Block},
-            state_dict_type="full",
-            sharding_strategy="HYBRID_SHARD",
-        )
+        if distributed_strategy == "fsdp":
+            strategy = FSDPStrategy(
+                auto_wrap_policy={Block},
+                state_dict_type="full",
+                sharding_strategy="HYBRID_SHARD",
+            )
+        elif distributed_strategy == "deepspeed":
+            strategy = DeepSpeedStrategy()
     else:
         strategy = "auto"
 
