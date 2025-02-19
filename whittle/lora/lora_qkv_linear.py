@@ -6,7 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from whittle.lora.lora_linear import LoRALayer, LoRALinearQKV
+from litgpt.lora import LoRALayer
+from whittle.lora.lora_linear import LoRALinearQKV
 
 
 class LoRAQKVLinear(LoRALayer):
@@ -130,9 +131,6 @@ class LoRAQKVLinear(LoRALayer):
         self.sub_attention_scaler = self.config.attention_scores_scalar
         self.qkv_indices = None
 
-    def reset_parameters(self):
-        pass
-
     @property
     def lora_ind(self) -> torch.Tensor:
         """Lazy creation of a buffer with LoRA indices to overcome the limitation when FSDP with meta device is used."""
@@ -172,11 +170,14 @@ class LoRAQKVLinear(LoRALayer):
                 lora_ind.extend(v_ind)
             self.register_buffer(
                 "_lora_ind",
-                torch.tensor(lora_ind, device=self.linear.weight.device),
+                torch.tensor(lora_ind, device=self.linear.linear.weight.device),
                 persistent=False,
             )
 
         return self._lora_ind
+
+    def reset_parameters(self):
+        pass
 
     def zero_pad(self, x: torch.Tensor) -> torch.Tensor:
         """Properly pad the last dimension of weight updates with zeros.
@@ -294,7 +295,10 @@ class LoRAQKVLinear(LoRALayer):
         qkv_shapes = [
             # if `head_size` is explicitly specified in the config, `n_embd` (or `in_features`)
             # might not be equal to `head_size * n_head`, thus we use it directly here
-            self.sub_network_head_size * self.sub_network_n_head * self.enable_q,
+            self.sub_network_head_size
+            * self.sub_network_query_groups
+            * self.sub_network_q_per_kv
+            * self.enable_q,
             self.sub_network_head_size * self.sub_network_query_groups * self.enable_k,
             self.sub_network_head_size * self.sub_network_query_groups * self.enable_v,
         ]
@@ -324,7 +328,31 @@ class LoRAQKVLinear(LoRALayer):
     def merge(self) -> None:
         """Merges the LoRA weights into the full-rank weights (W = W + delta_W)."""
         if self.r > 0 and any(self.enable_lora) and not self.merged:
-            self.linear.merge()
+            pretrained_dtype = self.linear.linear.weight.data.dtype
+            lora_data = self.get_lora_AB()
+            # if only the pretrained are in quantized form - dequantize, sum with LoRA and quantize the result
+            if pretrained_dtype == torch.uint8:
+                import bitsandbytes as bnb
+
+                weight = self.linear.linear.weight
+                # dequantize the pretrained weights
+                weight_data = bnb.functional.dequantize_4bit(
+                    weight.data, weight.quant_state
+                ).to(lora_data.dtype)
+                # add pretrained and LoRA weights
+                weight_data += lora_data
+                # assign updated weights and quantize by moving to CUDA device
+                self.linear.linear.weight = bnb.nn.Params4bit(
+                    weight_data, requires_grad=False, **weight.__dict__
+                )
+                self.linear.linear.weight.cuda(weight.device)
+            else:
+                # self.linear might be on CPU and lora_data on CUDA
+                # the inplace add will preserve the dtype of linear.weight
+                self.linear.linear.weight.data += lora_data.to(
+                    device=self.linear.linear.weight.data.device
+                )
+            self.merged = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Do the forward pass.

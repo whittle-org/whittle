@@ -72,15 +72,16 @@ class LoRAEmbedding(LoRALayer):
 
     def get_lora_AB(self) -> torch.Tensor:
         """Return merged lora_A and lora_B matrices with the same shape as the pretrained weights."""
-        return (
+        ab = (
             self.lora_B[: self.sub_network_embedding_dim, :] @ self.lora_A
         ) * self.scaling
+        return ab.transpose(0, 1)
 
     def merge(self) -> None:
         """Merges the LoRA weights into the full-rank weights (W = W + delta_W)."""
         if self.r > 0 and not self.merged:
             pretrained_dtype = self.embedding.weight.data.dtype
-            lora_data = self.get_lora_AB().transpose(0, 1)
+            lora_data = self.get_lora_AB()
             # if only the pretrained are in quantized form - dequantize, sum with LoRA and quantize the result
             if pretrained_dtype == torch.uint8:
                 import bitsandbytes as bnb

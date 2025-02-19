@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import yaml
-from litgpt import fabric as L
-from whittle.lora.config import Config
+import lightning as  L
+from whittle.lora.config import LoRAConfig as Config
 import torch
 from litgpt.lora import LoRALayer, lora_filter
 from whittle.lora.lora_gpt import GPT
@@ -22,7 +22,7 @@ def merge_lora_weights(model: GPT, verbose: bool = False) -> None:
 
 def merge_lora(
     checkpoint_dir: Path,
-    pretrained_checkpoint_dir: Path | None = None,
+    pretrained_checkpoint_dir: Path,
     precision: str | None = None,
     accelerator: str = "cpu",
     overwrite: bool = False,
@@ -62,17 +62,12 @@ def merge_lora(
         else:
             print("Overwriting the existing merged weights.")
 
-    lora_params, meta_pretrained_checkpoint_dir, lora_precision = load_lora_metadata(
-        checkpoint_dir
-    )
-    precision = precision if precision is not None else lora_precision
-
     if pretrained_checkpoint_dir is None:
         pretrained_checkpoint_dir = meta_pretrained_checkpoint_dir
         pretrained_checkpoint_dir = extend_checkpoint_dir(pretrained_checkpoint_dir)
 
-    fabric = L.Fabric(devices=1, precision=precision, accelerator=accelerator)
-    config = Config.from_file(checkpoint_dir / "model_config.yaml", **lora_params)
+    fabric = L.Fabric(devices=1, accelerator=accelerator)
+    config = Config.from_file(checkpoint_dir / "model_config.yaml")
     config.fix_head_size = True
     with fabric.init_module(), torch.device("meta"):
         model = GPT(config)
@@ -99,7 +94,9 @@ def merge_lora(
     # Remove LoRA parameters and the LoRA linear substring
     state_dict = {
         # linear.linear is in lora_qkv_linear.py, linear is in lora_linear.py, embedding is in lora_embedding.py
-        k.replace("linear.linear.", "").replace("linear.", "").replace("embedding.", ""): v
+        k.replace("linear.linear.", "")
+        .replace("linear.", "")
+        .replace("embedding.", ""): v
         for k, v in model.state_dict().items()
         if not lora_filter(k, v)
     }
