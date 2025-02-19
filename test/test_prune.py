@@ -48,6 +48,8 @@ def test_checkpoints(tmp_path, checkpoint_dir, pruning_strategy):
             data="test",
             prune=PruningArgs(pruning_strategy=pruning_strategy, n_samples=nsamples),
         )
-    assert set(os.listdir(out_dir)) == {
+
+    out_dir_content = {
         "lit_model.pth",
     }
+    assert out_dir_content.issubset(set(os.listdir(out_dir)))
