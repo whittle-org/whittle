@@ -38,7 +38,9 @@ class DistillArgs:
     top_k: int = 100
     """Number of top logits to store per token"""
     subset_size: int = 1024
-    """Number of tokens to store per batch"""
+    """Number of batches to store in the precomputed logits file"""
+    subnetwork: bool = True
+    """Whether to distill a subnetwork"""
 
 class ParamBinArgs:
     """parameter bin-related arguments - to limit what networks are sampled"""
