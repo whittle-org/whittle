@@ -39,7 +39,7 @@ class DistillArgs:
     """Number of top logits to store per token"""
     subset_size: int = 1024
     """Number of batches to store in the precomputed logits file"""
-    subnetwork: bool = True
+    subnetwork: bool = False
     """Whether to distill a subnetwork"""
 
 class ParamBinArgs:
