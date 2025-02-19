@@ -15,7 +15,9 @@ from syne_tune.optimizer.schedulers.multiobjective.linear_scalarizer import (
     LinearScalarizedScheduler,
 )
 
+from whittle.sampling.param_bins import ParamBins
 from whittle.search.local_search import LS
+from whittle.search.stratified_search import StratifiedRandomSearch
 
 
 def get_random(config_space):
@@ -68,6 +70,7 @@ class MethodArguments:
     metrics: list
     mode: list
     random_seed: int
+    param_bins: ParamBins | None = None
 
 
 def initial_design(config_space):
@@ -90,6 +93,7 @@ class Methods:
     RSBO = "rsbo"
     EHVI = "ehvi"
     MOASHA = "moasha"
+    SRS = "stratified_random_search"
 
 
 methods = {
@@ -99,6 +103,14 @@ methods = {
         mode=method_arguments.mode[0],
         random_seed=method_arguments.random_seed,
         points_to_evaluate=initial_design(method_arguments.config_space),
+    ),
+    Methods.SRS: lambda method_arguments: StratifiedRandomSearch(
+        config_space=method_arguments.config_space,
+        metric=method_arguments.metrics[0],
+        mode=method_arguments.mode[0],
+        random_seed=method_arguments.random_seed,
+        points_to_evaluate=initial_design(method_arguments.config_space),
+        param_bins=method_arguments.param_bins,
     ),
     Methods.MOREA: lambda method_arguments: MOREA(
         config_space=method_arguments.config_space,

@@ -65,7 +65,7 @@ class WandaPruner(Pruner):
             for j in range(nsamples):
                 with torch.no_grad():
                     outs[j] = layer(
-                        inps[j].unsqueeze(0),
+                        inps[j],
                         mask=attention_mask,
                         cos=model.cos,
                         sin=model.sin,
@@ -95,7 +95,7 @@ class WandaPruner(Pruner):
             for j in range(nsamples):
                 with torch.no_grad():
                     outs[j] = layer(
-                        inps[j].unsqueeze(0),
+                        inps[j],
                         mask=attention_mask,
                         cos=model.cos,
                         sin=model.sin,

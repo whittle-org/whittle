@@ -48,7 +48,7 @@ def test_model_pruning(model_info, mock_tokenizer):
     pruner_magnitude = MagnitudePruner()
 
     dataloader, _ = get_c4_dataloader(
-        nsamples=32,
+        n_samples=32,
         seed=9001,
         seqlen=model.max_seq_length,
         tokenizer=mock_tokenizer,
