@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import torch
 
 from whittle.models.gpt import GPT, Config
 from whittle.pruning.pruners.magnitude import MagnitudePruner
@@ -27,6 +28,7 @@ from whittle.pruning.utils.data import get_c4_dataloader
     ],
 )
 def test_model_pruning(model_info, mock_tokenizer):
+    torch.manual_seed(0)
     config = Config.from_name(
         model_info["config_name"],
         block_size=6,
@@ -46,7 +48,7 @@ def test_model_pruning(model_info, mock_tokenizer):
     pruner_magnitude = MagnitudePruner()
 
     dataloader, _ = get_c4_dataloader(
-        nsamples=32,
+        n_samples=32,
         seed=9001,
         seqlen=model.max_seq_length,
         tokenizer=mock_tokenizer,
