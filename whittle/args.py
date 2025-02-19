@@ -23,9 +23,9 @@ class PruningArgs:
 
     pruning_strategy: str = "mag"
     """Structural pruning strategy"""
-    n: int = 2
+    prune_n_weights_per_group: int = 2
     """Number of weights to prune per group"""
-    m: int = 4
+    weights_per_group: int = 4
     """Total number of weights per group"""
     n_samples: int = 32
     """Number of samples for calibration"""

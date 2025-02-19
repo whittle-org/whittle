@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
+from typing import Literal
 
 import lightning as L
 import torch
@@ -16,6 +17,7 @@ from litgpt.utils import (
     auto_download_checkpoint,
     check_nvlink_connectivity,
     check_valid_checkpoint_dir,
+    choose_logger,
     get_default_supported_precision,
     init_out_dir,
     load_checkpoint,
@@ -26,6 +28,7 @@ from whittle.args import PruningArgs
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.pruning import MagnitudePruner, SparseGPTPruner, WandaPruner
+from whittle.pruning.utils import get_c4_dataloader
 
 pruner_classes = {
     "mag": MagnitudePruner,
@@ -43,12 +46,13 @@ def setup(
     num_nodes: int = 1,
     prune: PruningArgs = PruningArgs(
         pruning_strategy="mag",
-        n=2,
-        m=4,
+        prune_n_weights_per_group=2,
+        weights_per_group=4,
     ),
     max_seq_length: int | None = 512,
     seed: int | None = 1337,
     access_token: str | None = None,
+    logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
 ) -> None:
     """
     Performs structural pruning on a specified model checkpoint and saves a new checkpoint with the pruned weights set to zero.
@@ -78,6 +82,12 @@ def setup(
 
     precision = precision or get_default_supported_precision(training=True)
 
+    logger = choose_logger(
+        logger_name,
+        out_dir,
+        name=f"prune-{config.name}",
+    )
+
     if num_devices * num_nodes > 1:
         strategy = FSDPStrategy(
             auto_wrap_policy={Block},
@@ -94,6 +104,7 @@ def setup(
         num_nodes=num_nodes,
         strategy=strategy,
         precision=precision,
+        loggers=[logger],
     )
 
     if torch.cuda.is_available() and num_devices > 1:
@@ -126,7 +137,9 @@ def main(
     tokenizer = Tokenizer(checkpoint_dir)
 
     if data is None:
-        train_dataloader, val_dataloader = None, None
+        train_dataloader, val_dataloader = get_c4_dataloader(
+            prune.n_samples, seed, max_seq_length, tokenizer
+        )
     else:
         train_dataloader, val_dataloader = get_dataloaders(
             fabric,
@@ -157,8 +170,8 @@ def main(
     pruner = pruner_classes[prune.pruning_strategy]()
     sparsity_ratio = pruner(
         model,
-        prune_n=prune.n,
-        prune_m=prune.m,
+        prune_n=prune.prune_n_weights_per_group,
+        prune_m=prune.weights_per_group,
         dataloader=val_dataloader,
         nsamples=prune.n_samples,
     )
@@ -168,6 +181,8 @@ def main(
     fabric.print(f"Total time for pruning: {pruning_time:.02f} seconds.")
     fabric.print(f"Sparsity ratio: {sparsity_ratio:.02f}.")
     fabric.print(f"Save checkpoints to {out_dir}.")
+
+    fabric.log_dict({"sparsity_ratio": sparsity_ratio, "pruning_time": pruning_time})
 
     fabric.save(out_dir / "lit_model.pth", {"model": model})
 
