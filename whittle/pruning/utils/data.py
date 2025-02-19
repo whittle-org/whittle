@@ -15,7 +15,7 @@ class TokenizerWrapper:
 
 
 # Load and process c4 dataset
-def get_c4_dataloader(nsamples, seed, seqlen, tokenizer):
+def get_c4_dataloader(n_samples, seed, seqlen, tokenizer):
     # Load train and validation datasets
     traindata = load_dataset(
         "allenai/c4",
@@ -30,9 +30,9 @@ def get_c4_dataloader(nsamples, seed, seqlen, tokenizer):
 
     # Generate samples from training set
     random.seed(seed)
-    input_data = torch.zeros(nsamples, seqlen, dtype=torch.int)
-    output_data = torch.zeros(nsamples, seqlen, dtype=torch.int)
-    for k in range(nsamples):
+    input_data = torch.zeros(n_samples, seqlen, dtype=torch.int)
+    output_data = torch.zeros(n_samples, seqlen, dtype=torch.int)
+    for k in range(n_samples):
         while True:
             i = random.randint(0, len(traindata) - 1)
             trainenc = tokenizer(traindata[i]["text"], return_tensors="pt")
