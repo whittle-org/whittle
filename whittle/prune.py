@@ -39,7 +39,7 @@ pruner_classes = {
 
 def setup(
     checkpoint_dir: Path,
-    out_dir: Path | None = Path("out/finetune/full"),
+    out_dir: Path | None = None,
     precision: str | None = None,
     data: DataModule | None = None,
     devices: int | str | None = 1,
@@ -59,9 +59,8 @@ def setup(
 
     Arguments:
         checkpoint_dir: The path to the base model's checkpoint directory to load for pruning.
-        out_dir: Directory in which to save checkpoints and logs. If running in a Lightning Studio Job, look for it in
-            /teamspace/jobs/<job-name>/share.
-        precision: The precision to use for finetuning. Possible choices: "bf16-true", "bf16-mixed", "32-true".
+        out_dir: Directory in which to save checkpoints and logs. If None, final checkpoint is saved in checkpoint_dir/pruning/<pruning_strategy>
+        precision: The precision to use for loading the model. Possible choices: "bf16-true", "bf16-mixed", "32-true".
         devices: How many devices/GPUs to use
         num_nodes: How many nodes the code is being run on.
         prune: Pruning-related arguments. See ``whittle.args.PruneArgs`` for details.
@@ -74,6 +73,9 @@ def setup(
     )
 
     num_devices = int(parse_devices(devices))
+
+    if out_dir is None:
+        out_dir = checkpoint_dir / "pruning" / prune.pruning_strategy
     out_dir = init_out_dir(out_dir)
 
     check_valid_checkpoint_dir(checkpoint_dir)
