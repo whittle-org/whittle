@@ -6,7 +6,9 @@ from typing import Any
 
 import numpy as np
 from lightning.fabric.loggers import Logger
+from tqdm import tqdm
 
+from whittle.sampling.param_bins import ParamBins
 from whittle.search.ask_tell_scheduler import AskTellScheduler
 from whittle.search.baselines import MethodArguments, methods
 from whittle.search.multi_objective import get_pareto_optimal
@@ -20,6 +22,10 @@ def multi_objective_search(
     objective_kwargs: dict[str, Any] | None = None,
     logger: Logger | None = None,
     seed: int | None = None,
+    param_bins: ParamBins | None = None,
+    objective_1_name: str = "objective_1",
+    objective_2_name: str = "objective_2",
+    verbose: bool = True,
 ) -> dict[str, Any]:
     """
     Search for the Pareto-optimal sub-networks using the specified strategy.
@@ -37,7 +43,15 @@ def multi_objective_search(
             Defaults to None.
         seed: The random seed for reproducibility.
             Defaults to None.
-
+        param_bins: The parameter bins that limit the sub-network params in the search.
+            The configs from ask() are rejected if they fit into a bin that is full.
+            The bin size is increased if all bins are full.
+            Defaults to None.
+        objective_1_name: The name of the first objective.
+            Defaults to "objective_1".
+        objective_2_name: The name of the second objective.
+            Defaults to "objective_2".
+        verbose: Whether to have a verbose tqdm output.
     Returns:
         The results of the search, including Pareto-optimal solutions.
 
@@ -54,17 +68,20 @@ def multi_objective_search(
             metrics=metrics,
             mode=["min", "min"],
             random_seed=seed,
+            param_bins=param_bins,
         )
     )
 
     scheduler = AskTellScheduler(base_scheduler=base_scheduler)
 
     costs = np.empty((num_samples, 2))
-    runtime = []
-    configs = []
+    runtime: list[float] = []
+    configs: list[dict[str, Any]] = []
     start_time = time.time()
-    for i in range(num_samples):
+
+    for i in tqdm(range(num_samples), disable=not verbose):
         trial_suggestion = scheduler.ask()
+
         objective_1, objective_2 = objective(
             trial_suggestion.config, **(objective_kwargs or {})
         )
@@ -80,12 +97,12 @@ def multi_objective_search(
 
         runtime.append(time.time() - start_time)
 
-        observation = dict(
-            iteration=i,
-            objective_1=float(objective_1),
-            objective_2=float(objective_2),
-            runtime=runtime[-1],
-        )
+        observation = {
+            "iteration": i,
+            objective_1_name: float(objective_1),
+            objective_2_name: float(objective_2),
+            "runtime": runtime[-1],
+        }
 
         if logger is not None:
             logger.log_metrics(observation)

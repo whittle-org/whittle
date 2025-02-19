@@ -28,35 +28,47 @@ def copy_subnetwork_weights(sub_network, super_network):
     """
 
     # Ensure both networks are in evaluation mode to avoid any changes in weights during copying.
-    sub_network.eval()
-    super_network.eval()
-
-    # Get the state dictionaries of both networks
-    sub_state_dict = sub_network.state_dict()
-    super_state_dict = super_network.state_dict()
-
-    # Iterate over the subnetwork's state dictionary and copy weights to the supernetwork
-    for layer_name, sub_weight in sub_state_dict.items():
-        if layer_name in super_state_dict:
-            super_weight = super_state_dict[layer_name]
-
-            # Ensure the subnetwork's weight can fit into the supernetwork's weight tensor
-            if sub_weight.size() == super_weight.size():
-                super_state_dict[layer_name] = sub_weight
-            else:
-                # Copy the sub_weight values into the corresponding part of super_weight
-                if len(sub_weight.shape) == 1:
-                    super_weight[0 : sub_weight.shape[0]] = sub_weight
-                elif len(sub_weight.shape) == 2:
-                    super_weight[0 : sub_weight.shape[0], 0 : sub_weight.shape[1]] = (
-                        sub_weight
-                    )
-                super_state_dict[layer_name] = super_weight
-        else:
-            raise KeyError(f"Layer {layer_name} not found in super-network.")
-
-    # Load the modified state dictionary back into the supernetwork
-    super_network.load_state_dict(super_state_dict)
+    embd = super_network.sub_network_n_embd
+    intermediate = super_network.sub_network_intermediate_size
+    super_network.lm_head.weight.data[:, :embd] = sub_network.lm_head.weight.data
+    if super_network.lm_head.bias is not None:
+        super_network.lm_head.bias.data = sub_network.lm_head.bias.data
+    super_network.transformer.wte.weight.data[:, :embd] = (
+        sub_network.transformer.wte.weight.data
+    )
+    super_network.transformer.ln_f.weight.data[:embd] = (
+        sub_network.transformer.ln_f.weight.data
+    )
+    if super_network.transformer.ln_f.bias is not None:
+        super_network.transformer.ln_f.bias.data[:embd] = (
+            sub_network.transformer.ln_f.bias.data
+        )
+    for i, block_orig in enumerate(sub_network.transformer.h):
+        block = super_network.transformer.h[i]
+        block.attn.attn.weight.data[block.attn.qkv_indices, :][:, :embd] = (
+            block_orig.attn.attn.weight.data
+        )
+        if block.attn.attn.bias is not None:
+            block.attn.attn.bias.data[block.attn.qkv_indices] = (
+                block_orig.attn.attn.bias.data
+            )
+        block.attn.proj.weight.data[:, block.attn.proj_indices][:embd, :] = (
+            block_orig.attn.proj.weight.data
+        )
+        if block.attn.proj.bias is not None:
+            block.attn.proj.bias.data[:embd] = block_orig.attn.proj.bias.data
+        block.mlp.fc.weight.data[:intermediate, :embd] = block_orig.mlp.fc.weight.data
+        if block.mlp.fc.bias is not None:
+            block.mlp.fc.bias.data[:intermediate] = block_orig.mlp.fc.bias.data
+        block.mlp.proj.weight.data[:embd, :intermediate] = block_orig.mlp.proj.weight.data
+        if block.mlp.proj.bias is not None:
+            block.mlp.proj.bias.data[:embd] = block_orig.mlp.proj.bias.data
+        block.norm_1.weight.data[:embd] = block_orig.norm_1.weight.data
+        block.norm_2.weight.data[:embd] = block_orig.norm_2.weight.data
+        if block.norm_1.bias is not None:
+            block.norm_1.bias.data[:embd] = block_orig.norm_1.bias.data
+        if block.norm_2.bias is not None:
+            block.norm_2.bias.data[:embd] = block_orig.norm_2.bias.data
     return super_network
 
 
@@ -344,8 +356,6 @@ class Test_WhittleLM:
         gpt_14m = GPT(config_14m).to(device)
         gpt_14m.name_or_path = "EleutherAI/pythia-14m"
         gpt_14m.load_state_dict(torch.load(str(checkpoint_dir_14m / "lit_model.pth")))
-        gpt = copy_subnetwork_weights(gpt_14m, gpt)
-        gpt.max_seq_length = config_14m.block_size
         gpt.set_sub_network(
             sub_network_n_embd=config_14m.n_embd,
             sub_network_intermediate_size=config_14m.intermediate_size,
@@ -354,6 +364,8 @@ class Test_WhittleLM:
             sub_network_query_groups=config_14m.n_query_groups,
             sub_network_head_size=config_14m.head_size,
         )
+        gpt = copy_subnetwork_weights(gpt_14m, gpt)
+        gpt.max_seq_length = config_14m.block_size
         convert_and_evaluate(
             gpt,
             out_dir=out_dir,

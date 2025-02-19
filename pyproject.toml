@@ -2,27 +2,31 @@
 name = "whittle"
 version = "0.4.1"
 description = "Two-stage neural architecture search for large language models"
+# alphabetic order
 authors = [
-    { name = "Aaron Klein" },
-    { name = "Arber Zela" },
-    { name = "Rhea Sukthanker" },
-    { name = "Timur Carstensen" },
+    {name = "Timur Carstensen"},
+    {name = "Gabriela Kadlecová"},
+    {name = "Aaron Klein"},
+    {name = "Hannan Mahadik"},
+    {name = "Rhea Sukthanker"},
+    {name = "Arber Zela"},
 ]
 license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.9,<3.13"
 # TODO: Some of these might be able to be moved to optional dependancies
 dependencies = [
-    "pandas",
-    "matplotlib",
-    "typing-extensions",
-    "torch>=2",
-    "transformers>=4",
-    "litgpt[all]==0.5.0",
-    "syne-tune[moo]>=0.13",
-    "torchvision>=0.18",
-    "boto3==1.34.147",
-    "botocore==1.34.147",
+  "pandas",
+  "matplotlib",
+  "typing-extensions",
+  "torch>=2",
+  "transformers>=4",
+  "litgpt[all]==0.5.0",
+  "syne-tune[moo]>=0.13",
+  "torchvision>=0.18",
+  "boto3==1.34.147",
+  "botocore==1.34.147",
+  "triton==3.0.0"
 ]
 classifiers = [
     "Intended Audience :: Science/Research",
