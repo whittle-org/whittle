@@ -87,7 +87,6 @@ class KD(nn.Module):
                 batch_size, seq_len = input_ids.shape
                 vocab_size = self.kwargs.get("vocab_size", self.student.config.vocab_size)
 
-                # Fetch teacher logits dynamically (if using precomputed logits)
                 if self.teacher_logits_loader is not None:
                     teacher_values, teacher_indices = self.teacher_logits_loader.get_logits(batch_idx, batch_size)
                     teacher_values = teacher_values.to(self.device)
@@ -95,25 +94,20 @@ class KD(nn.Module):
 
                     teacher_logits_full = torch.full((batch_size, seq_len, vocab_size), -1e9, device=self.device)
 
-                    # Scatter top-k logits into full logits tensor
                     teacher_logits_full.scatter_(-1, teacher_indices, teacher_values)
 
                 else:
-                    # Compute teacher logits dynamically
                     with torch.no_grad():
                         teacher_logits_full = self.teacher(input_ids)
 
-                # Compute student logits
                 student_logits = self.student(input_ids)
 
-                # Compute distillation loss
                 distill_loss = DistillLoss(
                     temperature=self.temperature,
                     distillation_weight=self.distillation_weight
                 )
                 loss = distill_loss(student_logits, labels, teacher_logits_full)
 
-                # Backpropagation
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()

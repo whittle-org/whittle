@@ -8,7 +8,6 @@ from datasets import load_dataset
 from transformers import AutoTokenizer
 from jsonargparse import CLI
 from tqdm import tqdm
-from typing import Optional
 
 from whittle.args import DistillArgs
 from whittle.models.gpt.model import GPT
@@ -18,7 +17,6 @@ from whittle.distillation.utils import (
     create_dataloader,
     create_student_training_data,
     create_tiny_gpt,
-    TeacherLogitsLoader,
     save_config_to_file
 )
 
@@ -174,7 +172,7 @@ def main(
         method='logits',
         on_cluster=False,
         smoke_test=True,
-        top_k = 1000,
+        top_k = 100,
     )
 ):
     """

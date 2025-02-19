@@ -137,6 +137,44 @@ class TeacherLogitsLoader:
 
         raise IndexError(f"Index {batch_idx} out of range in teacher logits.")
         
+def merge_saved_logits(output_path: str, merged_output_path: str):
+    """
+    Merges multiple saved teacher logits files into a single dataset file.
+
+    Args:
+        output_path (str): File path pattern of the saved chunks (e.g., 'teacher_logits_part*.pt').
+        merged_output_path (str): Final file path to save the merged dataset.
+    """
+    # Find all matching chunk files
+    chunk_files = sorted(glob.glob(f"{output_path}_part*.pt"))  # Sort to maintain order
+    print(f"Found {len(chunk_files)} chunk files to merge.")
+
+    all_values, all_indices = [], []
+
+    # Load each chunk and append to lists
+    for chunk_file in chunk_files:
+        print(f"Loading {chunk_file} ...")
+        data = torch.load(chunk_file, weights_only=True)
+        all_values.append(data["values"])
+        all_indices.append(data["indices"])
+
+    # Concatenate all tensors along the batch dimension
+    merged_values = torch.cat(all_values, dim=0)
+    merged_indices = torch.cat(all_indices, dim=0)
+
+    # Save the merged file
+    torch.save({"values": merged_values, "indices": merged_indices}, merged_output_path)
+    print(f"Saved merged dataset to {merged_output_path}")
+
+def collate_fn(batch):
+    input_ids, labels, teacher_logits = zip(*batch)
+    return {
+        "input_ids": torch.stack(input_ids),
+        "labels": torch.stack(labels),
+        "teacher_logits": torch.stack(teacher_logits)
+    }
+
+
 def tokenize_function(examples, tokenizer, seq_len ,verbose=True):
     encodings = tokenizer("\n\n".join(examples["text"]), return_tensors="pt")
     seq_len_orig = encodings.input_ids.size(1)
@@ -168,43 +206,24 @@ def tokenize_function(examples, tokenizer, seq_len ,verbose=True):
         "labels": target_ids_li,
     }
 
-def create_tiny_gpt(config: Optional[Union[Config, str]] = None, 
-                    verbose: bool = False) -> tuple[GPT, Config]:
+def create_tiny_gpt(verbose=False) -> GPT:
     """
     Create a tiny GPT model with a simplified configuration for testing.
     
-    You can optionally supply a litgpt Config instance or a path to a YAML configuration file.
-    If a config file path is provided, the configuration will be loaded from that file.
-    
-    Args:
-        config (Optional[Union[Config, str]]): Either a litgpt Config instance, a path to a YAML config file,
-                                               or None to use default parameters.
-        verbose (bool): If True, prints the configuration.
-    
     Returns:
-        tuple[GPT, Config]: An instance of the GPT model and its configuration.
+        An instance of the GPT model.
     """
-    if isinstance(config, str):
-        with open(config, 'r') as f:
-            config_dict = yaml.safe_load(f)
-        tiny_config = Config(**config_dict)
-
-    elif isinstance(config, Config):
-        tiny_config = config
-    
-    else:
-        # Create default tiny configuration if none provided
-        tiny_config = Config(
-            vocab_size=50688,    # Vocabulary size 
-            head_size=32,        # Head size for the attention mechanism
-            n_embd=256,          # Embedding size
-            n_layer=10,          # Number of layers
-            n_head=4,            # Number of attention heads
-            bias=True            # Include bias in linear layers
-        )
-        tiny_config.fix_head_size = True
-        tiny_config.model_type = "gpt"
-        tiny_config.tie_embeddings = True
+    tiny_config = Config(
+        vocab_size=50688,    # Vocabulary size 
+        head_size=32,        # Head size for the attention mechanism
+        n_embd=256,          # Embedding size
+        n_layer=10,          # Number of layers
+        n_head=4,            # Number of attention heads
+        bias=True            # Include bias in linear layers
+    )
+    tiny_config.fix_head_size = True
+    tiny_config.model_type = "gpt"
+    tiny_config.tie_embeddings = True
 
     if verbose:
         print(f"Tiny GPT Config: {tiny_config}\n\n")
@@ -227,7 +246,7 @@ def create_student_training_data(
         device: str,
         output_path: str,
         top_k: int = 100,  # Store only top-K logits per token
-        subset_size: int = 0, # Number of batches to store
+        subset_size: int = 1024, # Number of batches to store
         use_top_k_logits: bool = True,
         chunk_size: int = 2000, # Number of batches to store per chunk
         precision: str = 'full' # Precision of the stored logits ('full' or 'half') 
@@ -260,14 +279,13 @@ def create_student_training_data(
     else:
         print("Storing full logits")
 
-    if subset_size > 0:
-        print(f"Storing {subset_size} full batches.")
+    # print(f"Storing {subset_size} full batches.")
 
     with torch.no_grad():
         for batch_idx, batch in enumerate(tqdm(dataloader, desc="Generating teacher predictions")):
-            if subset_size > 0 and batch_idx >= subset_size:
-                break
-            
+            # if batch_idx >= subset_size:
+            #     break  # Stop after subset_size batches
+
             input_ids = batch["input_ids"].to(device)
             outputs = teacher(input_ids)
 
@@ -308,6 +326,7 @@ def create_dataloader(
     tokenizer: PreTrainedTokenizer,
     seq_len: int,
     batch_size: int,
+    device: str = "cuda:0" if torch.cuda.is_available() else "cpu",
     verbose: bool = True,
     seed: int = 42,
     tokenize_function: Callable = tokenize_function
@@ -388,6 +407,32 @@ def params_mlp(mlp: nn.Module):
     for layer in layers:
         num_params += params_linear_layer(layer)
     return num_params
+
+def register_intermediate_hooks(model: Any) -> None:
+    """
+    Attaches forward hooks to the embedding layer and each transformer block
+    in the model to record their outputs in a dedicated dictionary.
+    The keys used are:
+      - "block_0": output of the embedding layer,
+      - "block_{i+1}": output of the i-th transformer block,
+      - "norm2_{i}": output of the second layer-norm in the i-th block.
+    """
+    model.intermediate_out = {}
+
+    if hasattr(model.transformer, 'wte'):
+        def embed_hook(module: nn.Module, input: Any, output: Any) -> None:
+            model.intermediate_out['block_0'] = output
+        model.transformer.wte.register_forward_hook(embed_hook)
+
+    for i, block in enumerate(model.transformer.h):
+        def block_hook(module: nn.Module, input: Any, output: Any, idx: int = i) -> None:
+            model.intermediate_out[f'block_{idx+1}'] = output
+        block.register_forward_hook(block_hook)
+
+        if hasattr(block, 'ln_2'):
+            def norm_hook(module: nn.Module, input: Any, output: Any, idx: int = i) -> None:
+                model.intermediate_out[f'norm2_{idx}'] = output
+            block.ln_2.register_forward_hook(norm_hook)
 
 def compute_parameters(model: GPT) -> float:
     """

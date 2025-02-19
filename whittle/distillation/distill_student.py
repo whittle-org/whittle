@@ -12,7 +12,6 @@ from whittle.distillation.utils import (
 )
 from whittle.distillation.knowledge_distill import KD
 from jsonargparse import CLI
-from typing import Optional
 from pathlib import Path
 
 
@@ -80,7 +79,6 @@ def main(
         teacher.load_state_dict(torch.load(teacher_ckpt_path, map_location=device, weights_only=True))
         print(f"Loaded teacher model from {teacher_ckpt_path}")
 
-    # Load student model
     if student_config_path.exists():
         student_config = Config.from_file(student_config_path)
         student = GPT(student_config)
