@@ -4,6 +4,7 @@ import os
 import pathlib
 from contextlib import redirect_stdout
 from io import StringIO
+from unittest import mock
 from unittest.mock import Mock
 
 import pytest
@@ -11,6 +12,7 @@ import torch
 from litgpt.scripts.download import download_from_hub
 from torch.utils.data import DataLoader, TensorDataset
 
+from test.conftest import RunIf
 from whittle import prune
 from whittle.args import PruningArgs
 
@@ -24,6 +26,9 @@ def checkpoint_dir(tmp_path_factory):
     return pathlib.Path(checkpoint_dir) / "EleutherAI" / "pythia-14m"
 
 
+@RunIf(min_cuda_gpus=1, standalone=True)
+# Set CUDA_VISIBLE_DEVICES for FSDP hybrid-shard, if fewer GPUs are used than are available
+@mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0"})
 @pytest.mark.parametrize("pruning_strategy", methods)
 def test_checkpoints(tmp_path, checkpoint_dir, pruning_strategy):
     out_dir = tmp_path / "out"
