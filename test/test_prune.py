@@ -46,7 +46,7 @@ def test_checkpoints(tmp_path, checkpoint_dir, pruning_strategy):
             devices=1,
             out_dir=out_dir,
             data="test",
-            prune=PruningArgs(pruning_strategy=pruning_strategy, nsamples=nsamples),
+            prune=PruningArgs(pruning_strategy=pruning_strategy, n_samples=nsamples),
         )
     assert set(os.listdir(out_dir)) == {
         "lit_model.pth",

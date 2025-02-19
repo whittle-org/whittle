@@ -160,7 +160,7 @@ def main(
         prune_n=prune.n,
         prune_m=prune.m,
         dataloader=val_dataloader,
-        nsamples=prune.nsamples,
+        nsamples=prune.n_samples,
     )
 
     pruning_time = time.perf_counter() - start_time

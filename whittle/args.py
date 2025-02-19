@@ -27,7 +27,7 @@ class PruningArgs:
     """Number of weights to prune per group"""
     m: int = 4
     """Total number of weights per group"""
-    nsamples: int = 32
+    n_samples: int = 32
     """Number of samples for calibration"""
 
 
