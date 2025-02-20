@@ -71,7 +71,6 @@ class KD(nn.Module):
         optimizer = torch.optim.Adam(self.student.parameters(), lr=2e-4)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=4.5e-7)
 
-        # Ensure teacher model is in evaluation mode
         if self.teacher is not None:
             self.teacher.to(self.device)
             self.teacher.eval()

@@ -1,4 +1,3 @@
-
 import os
 import torch
 from datasets import load_dataset
@@ -48,8 +47,8 @@ def main(
     batch_size: int = 5,
     verbose: bool = False,
     save_dir: str = 'save_dir',
-    dataset: str = 'wikitext-2-raw-v1',
-    dataset_path: str = 'wikitext',
+    dataset: str = 'tiny_stories',
+    dataset_path: str = 'adamlin/tiny-stories',
     teacher_path: Path = Path('./checkpoints/standard-step-00150000'),
 
     distill: DistillArgs = DistillArgs(
@@ -161,13 +160,12 @@ def main(
             torch.save(student.state_dict(), student_ckpt)
             print(f"Student model {i+1} checkpoint saved to {student_ckpt}")
 
-        # Plot and save a scatter plot of Validation Loss vs Parameter Count
         plt.figure()
         plt.scatter(param_counts, val_losses)
         plt.xlabel("Parameter Count")
         plt.ylabel("Validation Loss")
-        plt.title("Validation Loss vs Parameter Count")
-        plot_path = os.path.join(save_dir, "val_loss_vs_params.png")
+        plt.title("TinyStories - GPT2 standard-step-00150000")
+        plot_path = os.path.join(save_dir, "TinyStories - GPT2 standard-step-00150000.png")
         plt.savefig(plot_path)
         plt.close()
         print(f"Scatter plot saved to {plot_path}")
