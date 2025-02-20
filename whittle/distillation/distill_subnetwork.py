@@ -80,6 +80,7 @@ def main(
         print(f"Loading teacher model from {teacher_path}")
         teacher_logits_loader = None
         teacher_config = Config.from_file(teacher_path / "model_config.yaml")
+        teacher_config.fix_head_size = True
         teacher = GPT(teacher_config)
         ckpt = torch.load(teacher_path / "lit_model.pth", map_location=device, weights_only=True)
         teacher.load_state_dict(ckpt, strict=False)
@@ -87,36 +88,49 @@ def main(
         print(f"Loaded teacher model from {teacher_path}") 
 
     if distill.subnetwork:
-        search_space = get_search_space(teacher_config)
-
         from whittle.sampling.random_sampler import RandomSampler
 
+        search_space = get_search_space(teacher_config)
         sampler = RandomSampler(search_space, seed=seed)
 
         min_config = sampler.get_smallest_sub_network()
-        random_config = sampler.sample()
         max_config = sampler.get_largest_sub_network()
 
-        # get bins limited by the smallest/largest config
         params_estimator = ParamsEstimator(teacher)
-        
-        param_bins = ParamBins(min_config, max_config, params_estimator, num_bins=3, log_bins=False)
 
-        # Lists to store validation losses and parameter counts for plotting later
+        param_bins = ParamBins(min_config, max_config, params_estimator, num_bins=3)
+
+        subnetworks = []
+
+        while len(subnetworks) < 10:
+            random_config = sampler.sample()
+            if param_bins.put_in_bin(random_config):
+                subnetworks.append(random_config)
+                print(f"Subnetwork accepted: {random_config}")
+
+        print("Selected Subnetworks:")
+        print(subnetworks)
+
         val_losses = []
         param_counts = []
-
-        # Generate 3 subnetworks
-        subnetworks = []
-        for _ in range(3):
-            config = param_bins.get_params(min_config)
-            subnetworks.append(config)
-            print(f"Subnetwork config: {config}")
-
-        for i, subnetwork_config in enumerate(subnetworks):
-            print(f"\nTraining subnetwork {i+1} with config: {subnetwork_config}")
-            student = GPT(subnetwork_config)
         
+        print(f"Training {len(subnetworks)} subnetworks...")
+        for i, subnetwork_config in enumerate(subnetworks):
+            print("\n" + "="*50)
+            print(f"\nTraining subnetwork {i+1} with config: {subnetwork_config}")
+            print("="*50 + "\n")
+            student = GPT(teacher_config)
+            print(f"Student model {i+1} initialized with teacher config - parameters: {compute_parameters(student)}")
+            subnetwork = {
+                    "sub_network_n_embd": subnetwork_config["embed_dim"],
+                    "sub_network_intermediate_size": int(subnetwork_config["mlp_ratio"] * subnetwork_config["embed_dim"]),
+                    "sub_network_num_heads": subnetwork_config["num_heads"],
+                    "sub_network_n_layers": subnetwork_config["depth"]
+                    }   
+
+            student.set_sub_network(**subnetwork)
+            print(f"Student model {i+1} set to sub-network - parameters: {compute_parameters(student)}") 
+
             print(f"\nEvaluating student model {i+1} BEFORE distillation:")
             _ = evaluate(student, test_dataloader, device)
 

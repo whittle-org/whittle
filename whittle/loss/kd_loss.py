@@ -19,14 +19,13 @@ class DistillLoss(nn.Module):
         kldiv (nn.KLDivLoss): The KL divergence loss function.
     """
 
-    def __init__(self, temperature, distillation_weight, reverse_kd=False):
+    def __init__(self, temperature, distillation_weight):
         """
         Initializes the DistillLoss module.
 
         Args:
             temperature (float): The temperature for distillation.
             distillation_weight (float): The weight factor for the distillation loss.
-            reverse_kd (bool): Whether to use the forward or reverse KL divergence (default: False).
         """
         super().__init__()
 
