@@ -17,12 +17,6 @@ from litgpt import Config
 from transformers import PreTrainedTokenizer
 
 from whittle.models.gpt import GPT
-from whittle.models.gpt.blocks import CausalSelfAttention
-from whittle.modules.embedding import Embedding
-from whittle.modules.linear import Linear
-from whittle.modules.layernorm import LayerNorm
-from whittle.modules.rmsnorm import RMSNorm
-from whittle.models.gpt.blocks import GptNeoxMLP, GemmaMLP, LLaMAMLP
 
 class TextDataset(Dataset):
     '''
