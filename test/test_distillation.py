@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import os
+os.environ["PYTORCH_NVML_DISABLE"] = "1"
+
 import tempfile
 import torch
 from torch import nn
@@ -95,6 +99,3 @@ def test_student_training_data_and_distillation():
     sample_input = torch.randint(0, 10, (batch_size, seq_len)).to(device)
     logits = distilled_student(sample_input)
     assert logits.shape == (batch_size, seq_len, 10), "Distilled student output has unexpected shape."
-    
-if __name__ == "__main__":
-    pytest.main([__file__])

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import torch
 import pytest
 
@@ -19,6 +21,3 @@ def test_distill_loss():
 
     loss.backward()
     assert student_logits.grad is not None
-
-if __name__ == "__main__":
-    pytest.main([__file__])
