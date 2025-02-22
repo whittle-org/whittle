@@ -44,7 +44,8 @@ def main(
     batch_size: int = 5,
     verbose: bool = False,
     save_dir: str = 'save_dir',
-    dataset_path: str = "roneneldan/TinyStories",
+    dataset: str = 'wikitext-2-raw-v1',
+    dataset_path: str = 'wikitext',
     teacher_path: Path = Path('./checkpoints/standard-step-00150000'),
     student_ckpt_path: Path = Path('checkpoints/student_checkpoint.pth'),
     student_config_path: Path = Path('checkpoints/student_config.yaml'),
@@ -60,10 +61,10 @@ def main(
 ):
     os.makedirs(save_dir, exist_ok=True)
 
-    train_dataset = load_dataset(dataset_path, split="train")
-    test_dataset  = load_dataset(dataset_path, split="test")
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    # tokenizer = GPT2Tokenizer.from_pretrained("gpt2")    
+    train_dataset = load_dataset(dataset_path, dataset, split="train")
+    test_dataset  = load_dataset(dataset_path, dataset, split="test")
+    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")    
+    # tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
     train_dataloader = create_dataloader(train_dataset, tokenizer, seq_len, batch_size, device, verbose, seed)
     test_dataloader  = create_dataloader(test_dataset, tokenizer, seq_len, batch_size, device, verbose, seed)
