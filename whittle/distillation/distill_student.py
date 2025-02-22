@@ -44,8 +44,7 @@ def main(
     batch_size: int = 5,
     verbose: bool = False,
     save_dir: str = 'save_dir',
-    dataset: str = 'tiny_stories',
-    dataset_path: str = 'roneneldan/TinyStories',
+    dataset_path: str = "roneneldan/TinyStories",
     teacher_path: Path = Path('./checkpoints/standard-step-00150000'),
     student_ckpt_path: Path = Path('checkpoints/student_checkpoint.pth'),
     student_config_path: Path = Path('checkpoints/student_config.yaml'),
@@ -61,8 +60,8 @@ def main(
 ):
     os.makedirs(save_dir, exist_ok=True)
 
-    train_dataset = load_dataset(dataset_path, dataset, split="train")
-    test_dataset  = load_dataset(dataset_path, dataset, split="test")
+    train_dataset = load_dataset(dataset_path, split="train")
+    test_dataset  = load_dataset(dataset_path, split="test")
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
     # tokenizer = GPT2Tokenizer.from_pretrained("gpt2")    
 
