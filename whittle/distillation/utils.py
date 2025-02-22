@@ -105,7 +105,7 @@ class TeacherLogitsLoader:
             batch_size (int): The batch size.
 
         Returns:
-            teacher_values (Tensor), teacher_indices (Tensor)
+            Tuple[torch.Tensor, torch.Tensor]: teacher_values, teacher_indices
         """
         # Find which chunk this batch belongs to
         offset = batch_idx * batch_size
@@ -234,9 +234,8 @@ def create_student_training_data(
     Args:
         teacher (Optional[GPT]): Pre-trained teacher model; if None, a tinyGPT model is created.
         dataloader (DataLoader): DataLoader containing the original training data.
-        device (str): Device to run the model (e.g., 'cuda:0' or 'cpu').
+        device (str): Device to run the model.
         output_path (str): File path to save teacher predictions.
-        store_intermediates (bool): If True, save intermediate activations along with logits.
         top_k (int): Number of top logits to store per token instead of full vocabulary.
         subset_size (int): Number of tokens to store per batch.
     """
