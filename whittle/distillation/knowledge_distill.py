@@ -15,6 +15,8 @@ class KD(nn.Module):
         dataloader: Any,
         device: str,
         seed: int,
+        temperature: float = 3,
+        distillation_weight: float = 0.5,
         verbose: bool = False,
         kd_epochs: int = 10,
         teacher_logits_loader: Any = None, 
@@ -48,15 +50,14 @@ class KD(nn.Module):
         self.seq_len = seq_len
         self.kd_epochs = kd_epochs
         self.teacher_logits_loader = teacher_logits_loader
+        self.temperature = temperature
+        self.distillation_weight = distillation_weight
 
     def distill(self) -> Any:
         """
         Performs distillation using logits distillation.
         Returns the distilled student model.
         """
-        self.temperature = self.kwargs.get("temperature", 3)
-        self.distillation_weight = self.kwargs.get("distillation_weight", 0.5)
-
         if self.method != "logits":
             raise ValueError("Unsupported distillation method. Only 'logits' method is supported.")
         

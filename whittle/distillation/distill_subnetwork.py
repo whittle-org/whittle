@@ -1,13 +1,12 @@
 import os
 import torch
 from datasets import load_dataset
-from transformers import GPT2Tokenizer
+from transformers import GPT2Tokenizer, AutoTokenizer
 from jsonargparse import CLI
 from pathlib import Path
 import matplotlib.pyplot as plt
 
 from litgpt import Config
-from litgpt.utils import load_checkpoint
 
 from whittle.models.gpt.model import GPT
 from whittle.args import DistillArgs
@@ -56,14 +55,17 @@ def main(
         on_cluster=False,
         use_topk_logits=False,
         use_precomputed_logits=False,
-        subnetwork=True
+        subnetwork=True,
+        temperature=0.5,
+        alpha=0.5
     )    
 ):
     os.makedirs(save_dir, exist_ok=True)
 
     train_dataset = load_dataset(dataset_path, dataset, split="train")
     test_dataset  = load_dataset(dataset_path, dataset, split="test")
-    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")    
+    # tokenizer = GPT2Tokenizer.from_pretrained("gpt2")  
+    tokenizer = AutoTokenizer.from_pretrained("gpt2")  
 
     train_dataloader = create_dataloader(train_dataset, tokenizer, seq_len, batch_size, device, verbose, seed)
     test_dataloader  = create_dataloader(test_dataset, tokenizer, seq_len, batch_size, device, verbose, seed)
@@ -119,7 +121,6 @@ def main(
             print(f"\nTraining subnetwork {i+1} with config: {subnetwork_config}")
             print("="*50 + "\n")
             student = GPT(teacher_config)
-            print(f"Student model {i+1} initialized with teacher config - parameters: {compute_parameters(student)}")
             subnetwork = {
                     "sub_network_n_embd": subnetwork_config["embed_dim"],
                     "sub_network_intermediate_size": int(subnetwork_config["mlp_ratio"] * subnetwork_config["embed_dim"]),
@@ -128,7 +129,8 @@ def main(
                     }   
 
             student.set_sub_network(**subnetwork)
-            print(f"Student model {i+1} set to sub-network - parameters: {compute_parameters(student)}") 
+            param_count = compute_parameters(student)
+            print(f"Student model {i+1} set to sub-network with parameter count: {param_count}") 
 
             print(f"\nEvaluating student model {i+1} BEFORE distillation:")
             _ = evaluate(student, test_dataloader, device)
@@ -143,17 +145,17 @@ def main(
                 seed=seed,
                 verbose=verbose,
                 kd_epochs=distill.kd_epochs,
-                teacher_logits_loader=teacher_logits_loader
+                teacher_logits_loader=teacher_logits_loader,
+                distillation_weight=distill.alpha,
+                temperature=distill.temperature
             )
             
             student = kd.distill()
 
             print(f"\nEvaluating student model {i+1} AFTER distillation:")
-            loss_after = evaluate(student, test_dataloader, device)
-            param_count = compute_parameters(student)
-            print(f"Student model {i+1} parameter count: {param_count}")
+            eval_loss = evaluate(student, test_dataloader, device)
             
-            val_losses.append(loss_after)
+            val_losses.append(eval_loss)
             param_counts.append(param_count)
 
             student_ckpt = os.path.join(save_dir, f"distilled_student_model_{i+1}_checkpoint.pth")
@@ -169,6 +171,9 @@ def main(
         plt.savefig(plot_path)
         plt.close()
         print(f"Scatter plot saved to {plot_path}")
+
+    else:
+        print("Please use distill_student.py to distill a separate student model.")
 
 if __name__ == '__main__':
     CLI(main)

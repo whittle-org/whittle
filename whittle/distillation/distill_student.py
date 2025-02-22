@@ -1,7 +1,7 @@
 import os
 import torch
 from datasets import load_dataset
-from transformers import GPT2Tokenizer
+from transformers import AutoTokenizer, GPT2Tokenizer
 
 from litgpt import Config
 from whittle.models.gpt.model import GPT
@@ -53,14 +53,17 @@ def main(
         method='logits',
         on_cluster=False,
         use_topk_logits=False,
-        use_precomputed_logits=False
+        use_precomputed_logits=False,
+        temperature=0.5,
+        alpha=0.5
     )    
 ):
     os.makedirs(save_dir, exist_ok=True)
 
     train_dataset = load_dataset(dataset_path, dataset, split="train")
     test_dataset  = load_dataset(dataset_path, dataset, split="test")
-    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")    
+    tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    # tokenizer = GPT2Tokenizer.from_pretrained("gpt2")    
 
     train_dataloader = create_dataloader(train_dataset, tokenizer, seq_len, batch_size, device, verbose, seed)
     test_dataloader  = create_dataloader(test_dataset, tokenizer, seq_len, batch_size, device, verbose, seed)
@@ -104,7 +107,9 @@ def main(
         seed=seed,
         verbose=verbose,
         kd_epochs=distill.kd_epochs,
-        teacher_logits_loader=teacher_logits_loader
+        teacher_logits_loader=teacher_logits_loader,
+        distillation_weight=distill.alpha,
+        temperature=distill.temperature
     )
     
     student = kd.distill()

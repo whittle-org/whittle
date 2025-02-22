@@ -27,6 +27,10 @@ class DistillArgs:
     """Number of epochs for knowledge distillation"""
     on_cluster: bool = False
     """Flag indicating if running on a cluster"""
+    temperature: float = 0.5
+    """Temperature for distillation"""
+    alpha: float = 0.5
+    """Weight for KL-Divergence loss"""
     smoke_test: bool = True
     """Flag for smoke testing"""
     precomputed_logits_path: str = './save_dir/student_training_data.pth'
