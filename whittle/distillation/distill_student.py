@@ -4,6 +4,7 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, GPT2Tokenizer
 
 from litgpt import Config
+
 from whittle.models.gpt.model import GPT
 from whittle.args import DistillArgs
 from whittle.distillation.utils import (
@@ -11,6 +12,7 @@ from whittle.distillation.utils import (
     TeacherLogitsLoader
 )
 from whittle.distillation.knowledge_distill import KD
+
 from jsonargparse import CLI
 from pathlib import Path
 
@@ -44,8 +46,7 @@ def main(
     save_dir: str = 'save_dir',
     dataset: str = 'tiny_stories',
     dataset_path: str = 'roneneldan/TinyStories',
-    teacher_ckpt_path: Path = Path('checkpoints/teacher_checkpoint.pth'),
-    teacher_config_path: Path = Path('checkpoints/teacher_config.yaml'),
+    teacher_path: Path = Path('./checkpoints/standard-step-00150000'),
     student_ckpt_path: Path = Path('checkpoints/student_checkpoint.pth'),
     student_config_path: Path = Path('checkpoints/student_config.yaml'),
 
@@ -67,9 +68,8 @@ def main(
 
     train_dataloader = create_dataloader(train_dataset, tokenizer, seq_len, batch_size, device, verbose, seed)
     test_dataloader  = create_dataloader(test_dataset, tokenizer, seq_len, batch_size, device, verbose, seed)
-
-    teacher_config = Config.from_file(teacher_config_path)
-    teacher = GPT(teacher_config)
+    
+    teacher = None
     
     if distill.use_precomputed_logits:
         if not distill.precomputed_logits_path:
@@ -77,10 +77,17 @@ def main(
         print("Using separate teacher logits loader...")
         teacher_logits_loader = TeacherLogitsLoader(distill.precomputed_logits_path)
     else:
+        if teacher_path is None:
+            raise ValueError("Provide teacher checkpoint path")
+        print(f"Loading teacher model from {teacher_path}")
         teacher_logits_loader = None
+        teacher_config = Config.from_file(teacher_path / "model_config.yaml")
+        teacher_config.fix_head_size = True
         teacher = GPT(teacher_config)
-        teacher.load_state_dict(torch.load(teacher_ckpt_path, map_location=device, weights_only=True))
-        print(f"Loaded teacher model from {teacher_ckpt_path}")
+        ckpt = torch.load(teacher_path / "lit_model.pth", map_location=device, weights_only=True)
+        teacher.load_state_dict(ckpt, strict=False)
+        teacher.reset_super_network()
+        print(f"Loaded teacher model from {teacher_path}") 
 
     if student_config_path.exists():
         student_config = Config.from_file(student_config_path)
