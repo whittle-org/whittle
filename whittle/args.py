@@ -25,8 +25,6 @@ class DistillArgs:
     """Distillation method to use ('logits' or 'hidden_states')"""
     kd_epochs: int = 10
     """Number of epochs for knowledge distillation"""
-    on_cluster: bool = False
-    """Flag indicating if running on a cluster"""
     temperature: float = 0.5
     """Temperature for distillation"""
     alpha: float = 0.5
@@ -37,10 +35,10 @@ class DistillArgs:
     """Path to the precomputed logits file"""
     use_precomputed_logits: bool = False
     """Whether to use precomputed logits"""
-    use_topk_logits: bool = False
+    store_topk: bool = False
     """Whether to use stored top-K logits directly"""
     top_k: int = 100
-    """Number of top logits to store per token"""
+    """Number of top-K logits to store per token"""
     subset_size: int = 1024
     """Number of batches to store in the precomputed logits file"""
     subnetwork: bool = False

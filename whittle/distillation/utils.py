@@ -220,11 +220,11 @@ def create_student_training_data(
         dataloader: DataLoader,
         device: str,
         output_path: str,
-        top_k: int = 100,  # Store only top-K logits per token
-        subset_size: int = 0, # Number of batches to store
-        use_top_k_logits: bool = True,
-        chunk_size: int = 2000, # Number of batches to store per chunk
-        precision: str = 'full' # Precision of the stored logits ('full' or 'half') 
+        top_k: int = 100,  
+        subset_size: int = 0, 
+        store_topk: bool = True, 
+        chunk_size: int = 2000, 
+        precision: str = 'full' # ('full' or 'half') 
     ) -> None:
     """
     Passes original data through the teacher model, collects predictions (top-K logits), 
@@ -236,8 +236,11 @@ def create_student_training_data(
         dataloader (DataLoader): DataLoader containing the original training data.
         device (str): Device to run the model.
         output_path (str): File path to save teacher predictions.
-        top_k (int): Number of top logits to store per token instead of full vocabulary.
-        subset_size (int): Number of tokens to store per batch.
+        top_k (int): Number of top-K logits to store per token instead of full vocabulary.
+        subset_size (int): Total number of batches to store.
+        store_topk (bool): Whether to store only top-K logits.
+        chunk_size (int): Number of batches to store per chunk.
+        precision (str): Precision to store logits ('full' or 'half').
     """
     if teacher is None:
         teacher = create_tiny_gpt()
@@ -248,7 +251,7 @@ def create_student_training_data(
     stored_values, stored_indices = [], []
     file_counter = 0
 
-    if use_top_k_logits:
+    if store_topk:
         print(f"Storing Top-{top_k} logits")
     else:
         print("Storing full logits")
@@ -267,7 +270,7 @@ def create_student_training_data(
             if isinstance(outputs, tuple):
                 outputs = outputs[0]  # Extract logits if tuple
 
-            if use_top_k_logits:
+            if store_topk:
                 topk_values, topk_indices = torch.topk(outputs, top_k, dim=-1)
             else:
                 topk_values = outputs

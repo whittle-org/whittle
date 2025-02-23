@@ -12,6 +12,7 @@ from whittle.distillation.utils import (
     TeacherLogitsLoader
 )
 from whittle.distillation.knowledge_distill import KD
+from whittle.metrics.parameters import compute_parameters
 
 from jsonargparse import CLI
 from pathlib import Path
@@ -46,14 +47,12 @@ def main(
     save_dir: str = 'save_dir',
     dataset: str = 'wikitext-2-raw-v1',
     dataset_path: str = 'wikitext',
-    teacher_path: Path = Path('./checkpoints/standard-step-00150000'),
+    teacher_path: Path = Path('checkpoints/standard-step-00150000'),
     student_ckpt_path: Path = Path('checkpoints/student_checkpoint.pth'),
     student_config_path: Path = Path('checkpoints/student_config.yaml'),
 
     distill: DistillArgs = DistillArgs(
         method='logits',
-        on_cluster=False,
-        use_topk_logits=False,
         use_precomputed_logits=False,
         temperature=0.5,
         alpha=0.5
@@ -88,6 +87,7 @@ def main(
         teacher.load_state_dict(ckpt, strict=False)
         teacher.reset_super_network()
         print(f"Loaded teacher model from {teacher_path}") 
+        print(f"Teacher model has {compute_parameters(teacher)} parameters")
 
     if student_config_path.exists():
         student_config = Config.from_file(student_config_path)
@@ -98,8 +98,25 @@ def main(
         else:
             print("Student checkpoint not found. Initializing student model with random weights.")
     else:
-        print("Student configuration not found. Initializing student model with random weights.")
+        # If no student model is provided, use a random subnet of the teacher model
+        print("No student model provided. Initializing student model with random subnet of teacher model.")
+        from whittle.sampling.random_sampler import RandomSampler
+        from whittle.pretrain_super_network import get_search_space
+
+        search_space = get_search_space(teacher_config)
+        random_config = RandomSampler(search_space, seed=seed).sample()
+
         student = GPT(teacher_config)
+        subnetwork = {
+                "sub_network_n_embd": random_config["embed_dim"],
+                "sub_network_intermediate_size": int(random_config["mlp_ratio"] * random_config["embed_dim"]),
+                "sub_network_num_heads": random_config["num_heads"],
+                "sub_network_n_layers": random_config["depth"]
+                }   
+
+        student.set_sub_network(**subnetwork)
+
+        print(f"Student model has {compute_parameters(student)} parameters") 
         
     print("\nEvaluating student model BEFORE distillation:")
     evaluate(student, test_dataloader, device)

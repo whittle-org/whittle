@@ -48,12 +48,10 @@ def main(
     save_dir: str = 'save_dir',
     dataset: str = 'wikitext-2-raw-v1',
     dataset_path: str = 'wikitext',
-    teacher_path: Path = Path('./checkpoints/standard-step-00150000'),
+    teacher_path: Path = Path('checkpoints/standard-step-00150000'),
 
     distill: DistillArgs = DistillArgs(
         method='logits',
-        on_cluster=False,
-        use_topk_logits=False,
         use_precomputed_logits=False,
         subnetwork=True,
         temperature=0.5,
@@ -86,7 +84,8 @@ def main(
         ckpt = torch.load(teacher_path / "lit_model.pth", map_location=device, weights_only=True)
         teacher.load_state_dict(ckpt, strict=False)
         teacher.reset_super_network()
-        print(f"Loaded teacher model from {teacher_path}") 
+        print(f"Loaded teacher model from {teacher_path}")
+        print(f"Teacher model parameter count: {compute_parameters(teacher)}") 
 
     if distill.subnetwork:
         from whittle.sampling.random_sampler import RandomSampler

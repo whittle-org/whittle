@@ -170,7 +170,6 @@ def main(
 
     distill: DistillArgs = DistillArgs(
         method='logits',
-        on_cluster=False,
         smoke_test=True,
         top_k = 100,
     )
