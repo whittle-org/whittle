@@ -9,7 +9,7 @@ from litgpt import Config
 from litgpt.utils import lazy_load
 
 from whittle.eval.utils import convert_and_evaluate
-from whittle.metrics import compute_flops, compute_latency, compute_parameters
+from whittle.metrics import compute_latency, compute_parameters
 from whittle.models.gpt import GPT
 
 if _DEEPSPEED_AVAILABLE:
