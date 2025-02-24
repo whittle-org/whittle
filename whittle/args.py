@@ -23,8 +23,6 @@ class DistillArgs:
 
     method: str = 'logits'
     """Distillation method to use ('logits' or 'hidden_states')"""
-    kd_epochs: int = 3
-    """Number of epochs for knowledge distillation"""
     temperature: float = 5
     """Temperature for distillation"""
     alpha: float = 0.5

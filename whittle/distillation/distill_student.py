@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import torch._dynamo
+torch._dynamo.config.suppress_errors = True
+
 import os
 import torch
 import math
@@ -57,7 +60,7 @@ def setup(
     model_name: str | None = None,
     model_config: Config | None = None,
     load_from_checkpoint: bool = True,
-    out_dir: Path = Path("examples/gpt/out/pretrain"),
+    out_dir: Path = Path("examples/gpt/out/distillation/standard-step-00190000"),
     precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
     initial_checkpoint_dir: Path = Path('checkpoints/standard-step-00190000'),
     resume: bool | Literal["auto"] | Path = False,
@@ -65,16 +68,23 @@ def setup(
     train: TrainArgs = TrainArgs(
         micro_batch_size=16,
         log_interval=100,
+        epochs=10,
         max_norm=1.0,
-        max_tokens=int(3e09)
+        max_tokens=int(3e09),
+        max_steps=50000,
+        max_seq_length=256,
+        tie_embeddings=True
     ),
     distill: DistillArgs = DistillArgs(
         method='logits',
-        kd_epochs=1,
         temperature=5,
         alpha=0.7, # Higher weight since dataset is small
     ),
-    eval: EvalArgs = EvalArgs(interval=1000, max_iters=100),
+    eval: EvalArgs = EvalArgs(
+        interval=1000, 
+        max_iters=100,
+        initial_validation=True,
+    ),
     optimizer: str | dict = "AdamW",
     devices: int | str = "auto",
     num_nodes: int = 1,
@@ -196,7 +206,7 @@ def main(
     initial_checkpoint_dir: Path = Path('checkpoints/standard-step-00190000'),
     teacher_config: Config | None = None,
     dataset: DataModule | None = None,
-    out_dir: Path = Path("examples/gpt/out/distillation"),
+    out_dir: Path = Path("examples/gpt/out/distillation/standard-step-00190000"),
     tokenizer_dir: Path | None = None,
     tokenizer: Tokenizer | None = None,
     train: TrainArgs = TrainArgs(),
@@ -229,7 +239,7 @@ def main(
     optimizer = fabric.setup_optimizers(optimizer)
 
     train_dataloader, val_dataloader = get_dataloaders(
-        fabric, dataset, tokenizer, train, teacher.max_seq_length
+        fabric, dataset, tokenizer, train, train.max_seq_length
     )
     train_dataloader, val_dataloader = fabric.setup_dataloaders(
         train_dataloader, val_dataloader
@@ -287,10 +297,9 @@ def main(
         fabric.load(resume, state)
 
     train_time = time.perf_counter()
-    fit(fabric, device, state, train_dataloader, val_dataloader, out_dir, tokenizer_dir, train, eval, distill)
 
     # Requires only one model to save checkpoint, rewriting state
-    state2 = {
+    dummy_state = {
         "model": student,
         "optimizer": optimizer,
         "train_dataloader": train_dataloader,
@@ -298,9 +307,11 @@ def main(
         "step_count": 0,
     }
 
-    save_checkpoint(fabric, state2, tokenizer_dir, out_dir / "final" / "lit_model.pth")
+    fit(fabric, device, state, train_dataloader, val_dataloader, out_dir, tokenizer_dir, train, eval, distill, dummy_state=dummy_state)
 
-    total_tokens = state["iter_num"] * train.micro_batch_size * student.max_seq_length * fabric.world_size
+    save_checkpoint(fabric, dummy_state, tokenizer_dir, out_dir / "distillation" / "lit_model.pth")
+
+    total_tokens = state["iter_num"] * train.micro_batch_size * train.max_seq_length * fabric.world_size
 
     # Print formatted output
     separator = "-" * 40
@@ -328,12 +339,14 @@ def fit(
     train: TrainArgs,
     eval: EvalArgs,
     distill: DistillArgs,
+    dummy_state: dict = None,
 ) -> None:
     teacher = state["teacher"]
     student = state["model"]
     optimizer = state["optimizer"]
 
     if eval.initial_validation:
+        fabric.print("Validating initial model ...")
         val_loss = validate(fabric, student, val_dataloader, max_iters=eval.max_iters)
         val_loss = f"{val_loss:.3f}"
     else:
@@ -353,7 +366,7 @@ def fit(
         del meta_model, x
 
     max_tokens_per_device = train.max_tokens // fabric.world_size
-    tokens_per_iter = train.micro_batch_size * student.max_seq_length
+    tokens_per_iter = train.micro_batch_size * train.max_seq_length
     max_iters = max_tokens_per_device // tokens_per_iter
     log_iter_interval = train.log_interval * train.gradient_accumulation_iters(devices)
     initial_iter = state["iter_num"]
@@ -379,8 +392,8 @@ def fit(
         state["iter_num"] += 1
         iter_t0 = time.perf_counter()
 
-        input_ids = train_data[:, 0 : student.max_seq_length].contiguous().long()
-        targets = train_data[:, 1 : (student.max_seq_length + 1)].contiguous().long()
+        input_ids = train_data[:, 0 : train.max_seq_length].contiguous().long()
+        targets = train_data[:, 1 : (train.max_seq_length + 1)].contiguous().long()
 
         distill_loss = DistillLoss(
                     temperature=distill.temperature,
@@ -410,7 +423,7 @@ def fit(
                 flops=(measured_flops * log_iter_interval),
                 batches=state["iter_num"],
                 samples=(state["iter_num"] * train.micro_batch_size),
-                lengths=(state["iter_num"] * train.micro_batch_size * student.max_seq_length),
+                lengths=(state["iter_num"] * train.micro_batch_size * train.max_seq_length),
             )
             metrics = {
                 "loss": loss,
@@ -421,8 +434,8 @@ def fit(
                 "remaining_time": (
                     (t1 - total_t0) / (state["iter_num"] - initial_iter) * (max_iters - state["iter_num"])
                 ),
-                "tokens": state["iter_num"] * train.micro_batch_size * student.max_seq_length,
-                "total_tokens": (state["iter_num"] * train.micro_batch_size * student.max_seq_length * fabric.world_size),
+                "tokens": state["iter_num"] * train.micro_batch_size * train.max_seq_length,
+                "total_tokens": (state["iter_num"] * train.micro_batch_size * train.max_seq_length * fabric.world_size),
                 "learning_rate": lr,
             }
             if isinstance(val_loss, float):
@@ -452,7 +465,7 @@ def fit(
             fabric.barrier()
 
         if train.save_interval is not None and not is_accumulating and state["step_count"] % train.save_interval == 0:
-            save_checkpoint(fabric, state, tokenizer_dir, out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth")
+            save_checkpoint(fabric, dummy_state, tokenizer_dir, out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth")
 
     # Final validation
     if eval.final_validation:
