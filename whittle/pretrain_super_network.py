@@ -43,6 +43,7 @@ from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
 from whittle.models.gpt import GPT
+from whittle.models.gpt.blocks import Block
 from whittle.sampling.random_sampler import RandomSampler
 from whittle.training_strategies import (
     RandomStrategy,
@@ -91,7 +92,7 @@ def setup(
     devices: int | str = "auto",
     num_nodes: int = 1,
     training_strategy: str = "sandwich",
-    distributed_strategy: Literal["auto", "fsdp", "deepspeed"] = "fsdp",
+    distributed_strategy: Literal["auto", "fsdp", "deepspeed"] = "deepspeed",
     tokenizer_dir: Path | None = None,
     logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
     seed: int = 42,
@@ -171,9 +172,9 @@ def setup(
     if num_devices * num_nodes > 1:
         if distributed_strategy == "fsdp":
             distributed_strategy = FSDPStrategy(
-                # auto_wrap_policy={Block},
-                # state_dict_type="full",
-                # sharding_strategy="HYBRID_SHARD",
+                auto_wrap_policy={Block},
+                state_dict_type="full",
+                sharding_strategy="HYBRID_SHARD",
             )
         elif distributed_strategy == "deepspeed":
             ds_config = {
@@ -428,17 +429,21 @@ def fit(
 
                 fabric.barrier()
                 if fabric.global_rank == 0:
-                    state_dict = get_fp32_state_dict_from_zero_checkpoint(
-                        out_dir / f"step-{state['step_count']:08d}", lazy_mode=True
-                    )
+                    # state_dict = get_fp32_state_dict_from_zero_checkpoint(
+                    #     out_dir / f"step-{state['step_count']:08d}", lazy_mode=True
+                    # )
                     # import pdb
 
                     # pdb.set_trace()
                     # state_dict = adapter_v2_state_from_state_dict(state_dict)
-                    torch.save(
-                        state_dict,
-                        out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth",
+                    fabric.strategy.save_checkpoint(
+                        out_dir / f"step-{state['step_count']:08d}",
+                        state,
                     )
+                    # torch.save(
+                    #     state_dict,
+                    #     out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth",
+                    # )
             else:
                 save_checkpoint(
                     fabric,
