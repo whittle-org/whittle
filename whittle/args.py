@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from litgpt.args import TrainArgs
-
 
 @dataclass
 class SearchArgs:
@@ -20,13 +18,19 @@ class SearchArgs:
 
 
 @dataclass
-class FineTuningArgs(TrainArgs):
-    learning_rate: float | None = 2e-5
-    temperature: float | None = 10.0
-    distillation_weight: float | None = 0.5
+class PruningArgs:
+    """pruning-related arguments"""
+
+    pruning_strategy: str = "mag"
+    """Structural pruning strategy"""
+    prune_n_weights_per_group: int = 2
+    """Number of weights to prune per group"""
+    weights_per_group: int = 4
+    """Total number of weights per group"""
+    n_samples: int = 32
+    """Number of samples for calibration"""
 
 
-@dataclass
 class ParamBinArgs:
     """parameter bin-related arguments - to limit what networks are sampled"""
 
