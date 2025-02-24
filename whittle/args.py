@@ -29,20 +29,8 @@ class DistillArgs:
     """Temperature for distillation"""
     alpha: float = 0.5
     """Weight for KL-Divergence loss"""
-    smoke_test: bool = True
+    smoke_test: bool = False
     """Flag for smoke testing"""
-    precomputed_logits_path: str = './save_dir/student_training_data.pth'
-    """Path to the precomputed logits file"""
-    use_precomputed_logits: bool = False
-    """Whether to use precomputed logits"""
-    store_topk: bool = False
-    """Whether to use stored top-K logits directly"""
-    top_k: int = 100
-    """Number of top-K logits to store per token"""
-    subset_size: int = 1024
-    """Number of batches to store in the precomputed logits file"""
-    subnetwork: bool = False
-    """Whether to distill a subnetwork"""
 
 class ParamBinArgs:
     """parameter bin-related arguments - to limit what networks are sampled"""
