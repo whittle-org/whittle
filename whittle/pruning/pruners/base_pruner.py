@@ -102,8 +102,9 @@ class Pruner:
         Prepare inputs for calibration during model pruning.
         """
 
-        use_cache = model.config.use_cache
-        model.config.use_cache = False
+        if hasattr(model.config, "use_cache"):
+            use_cache = model.config.use_cache
+            model.config.use_cache = False
         layers = model.transformer.h
         dtype = next(iter(model.parameters())).dtype
         inps = torch.zeros(
@@ -133,6 +134,8 @@ class Pruner:
         outs = torch.zeros_like(inps)
         attention_mask = cache["attention_mask"]
         position_ids = cache["position_ids"]
-        model.config.use_cache = use_cache
+
+        if hasattr(model.config, "use_cache"):
+            model.config.use_cache = use_cache
 
         return inps, outs, attention_mask, position_ids
