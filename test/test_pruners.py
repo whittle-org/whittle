@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 import torch
-from litgpt.data.alpaca import Alpaca
+from torch.utils.data import DataLoader, TensorDataset
 
 from whittle.models.gpt import GPT, Config
 from whittle.pruning.pruners.magnitude import MagnitudePruner
@@ -47,7 +47,16 @@ def test_model_pruning(model_info, mock_tokenizer):
     pruner_sparsegpt = SparseGPTPruner()
     pruner_magnitude = MagnitudePruner()
 
-    dataloader = Alpaca().train_dataloader()
+    num_sequences = 128
+    max_seq_length = 512
+    batch_size = 8
+    int(num_sequences / batch_size)
+    dataset = TensorDataset(
+        torch.randint(0, 1000, size=(num_sequences, max_seq_length)),
+        torch.randint(0, 1000, size=(num_sequences, 1)),
+    )
+
+    dataloader = DataLoader(dataset, batch_size=batch_size)
 
     sparsity_ratio_magnitude = pruner_magnitude(
         model,
