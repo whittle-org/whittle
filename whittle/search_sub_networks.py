@@ -21,7 +21,7 @@ from litgpt.utils import (
     check_nvlink_connectivity,
     check_valid_checkpoint_dir,
     choose_logger,
-    copy_config_files,
+    copy_config_files as copy_config_files_func,
     find_resume_path,
     get_default_supported_precision,
     init_out_dir,
@@ -64,12 +64,14 @@ def setup(
     seed: int | None = 1337,
     access_token: str | None = None,
     param_bins: ParamBinArgs = ParamBinArgs(),
-    objective_1: Literal["val_loss", "flops"] | None = "val_loss",
-    objective_2: Literal["parameters", "latency", "flops"] | None = "parameters",
+    performance_metric: str | None = "val_loss",
+    efficiency_metric: str | None = "parameters",
     log_objective_names: bool | None = True,
     save_checkpoints: bool = True,
     fine_tuned: bool = False,
     copy_config_files: bool = True,
+    verbose: bool = True,
+    num_workers: int = 4,
 ) -> None:
     """
     Multi-objective search to select Pareto optimal set of sub-networks from trained super-network.
@@ -92,21 +94,31 @@ def setup(
         seed: The random seed to use for reproducibility.
         access_token: Optional API token to access models with restrictions.
         param_bins: The parameter bins that limit the sub-network params in the search.
-        objective_1: The name of the first objective to optimize (possible - val_loss, perplexity). Defaults to "val_loss".
-        objective_2: The name of the second objective to optimize (possible - parameters, latency, flops). Defaults to "parameters".
+        performance_metric: The name of the first objective to optimize (possible - val_loss, perplexity). Defaults to "val_loss".
+        efficiency_metric: The name of the second objective to optimize (possible - parameters, latency, flops). Defaults to "parameters".
         log_objective_names: Whether to log the names of the objectives in the logger, or log as objective_1 and objective_2. Defaults to True.
         save_checkpoints: Whether to save checkpoints of the sub-networks, or config + path to super-network. Defaults to True.
             If False, `lit_model.pth` will have the following format:
             `{'sub_network_config': sub_network_config, 'parent_dir': checkpoint_dir}`
         fine_tuned: Whether the model is fine-tuned. Defaults to False.
+            This flag determines the dataset to use if `data` is not provided. Additionally, it changes the validation function to use for evaluation.
+            fine_tuned=True: litgpt.finetune.lora.validate, fine_tuned=False: litgpt.pretrain.validate.
         copy_config_files: Whether to copy the config files from the super-network to the sub-networks. Defaults to True.
-            If set to False, we save `parent_dir` to `lit_model.pth`.
+            If set to False, we save `parent_dir` to `lit_model.pth`. If save_checkpoints is False, this argument is ignored.
+        verbose: Whether to print verbose output. Defaults to True.
+        num_workers: Number of workers to use for data loading. Defaults to 4.
     """
-    if objective_2 == "flops" and not _DEEPSPEED_AVAILABLE:
-        raise ValueError(
-            "FLOPs objective requires DeepSpeed. Please install DeepSpeed by running "
-            "`pip install whittle[distributed]`"
-        )
+    assert performance_metric in [
+        "val_loss",
+        "perplexity",
+    ], f"Invalid objective_1: {performance_metric}, must be 'val_loss' or 'perplexity'"
+    assert efficiency_metric in [
+        "parameters",
+        "latency",
+        "flops",
+    ], (
+        f"Invalid objective_2: {efficiency_metric}, must be 'parameters', 'latency' or 'flops'"
+    )
 
     checkpoint_dir = auto_download_checkpoint(
         model_name=checkpoint_dir, access_token=access_token
@@ -117,7 +129,11 @@ def setup(
         # sys.path.append('../do-not-touch/compressing_llms')
         # from datasets_custom.llamamini import LLaMaMini
         # data = LLaMaMini() if fine_tuned else TinyStories()
-        data = Alpaca() if fine_tuned else TinyStories()
+        data = (
+            Alpaca(num_workers=num_workers)
+            if fine_tuned
+            else TinyStories(num_workers=num_workers)
+        )
 
     num_devices = int(parse_devices(devices))
     out_dir = init_out_dir(out_dir)
@@ -170,11 +186,13 @@ def setup(
         eval,
         search,
         param_bins if search.search_strategy == Methods.SRS else None,
-        objective_1,
-        objective_2,
+        performance_metric,
+        efficiency_metric,
         log_objective_names,
         save_checkpoints,
         fine_tuned,
+        copy_config_files,
+        verbose,
     )
 
 
@@ -209,6 +227,8 @@ def _objective(
         obj_2 = compute_latency(model, device=model.lm_head.weight.device)
     elif objective_2 == "flops":
         obj_2 = compute_flops(model, previous_device=model.lm_head.weight.device)
+    else:
+        raise ValueError(f"Invalid objective_2: {objective_2}")
 
     return float(val_loss), obj_2
 
@@ -226,22 +246,14 @@ def main(
     eval: EvalArgs,
     search: SearchArgs,
     param_bins: ParamBinArgs | None = None,
-    objective_1: str = "val_loss",
-    objective_2: str = "parameters",
+    performance_metric: str = "val_loss",
+    efficiency_metric: str = "parameters",
     log_objective_names: bool = True,
     save_checkpoints: bool = True,
     fine_tuned: bool = False,
+    copy_config_files: bool = True,
+    verbose: bool = True,
 ) -> None:
-    assert objective_1 in [
-        "val_loss",
-        "perplexity",
-    ], f"Invalid objective_1: {objective_1}, must be 'val_loss' or 'perplexity'"
-    assert objective_2 in [
-        "parameters",
-        "latency",
-        "flops",
-    ], f"Invalid objective_2: {objective_2}, must be 'parameters', 'latency' or 'flops'"
-
     fabric.seed_everything(seed)
 
     tokenizer = Tokenizer(checkpoint_dir)
@@ -298,6 +310,7 @@ def main(
             start_bin_size=param_bins.start_bin_size,
         )
 
+    # fabric.is_global_zero
     search_results = multi_objective_search(
         _objective,
         search_space,
@@ -306,8 +319,8 @@ def main(
             "model": model,
             "val_dataloader": val_dataloader,
             "eval": eval,
-            "objective_1": objective_1,
-            "objective_2": objective_2,
+            "objective_1": performance_metric,
+            "objective_2": efficiency_metric,
             "fine_tuned": fine_tuned,
         },
         search_strategy=search.search_strategy,
@@ -315,8 +328,9 @@ def main(
         seed=seed,
         logger=fabric.logger,
         param_bins=bins,
-        objective_1_name=objective_1 if log_objective_names else "objective_1",
-        objective_2_name=objective_2 if log_objective_names else "objective_2",
+        objective_1_name=performance_metric if log_objective_names else "objective_1",
+        objective_2_name=efficiency_metric if log_objective_names else "objective_2",
+        verbose=verbose and fabric.is_global_zero,
     )
     training_time = time.perf_counter() - train_time
 
@@ -341,7 +355,7 @@ def main(
 
             # either save everything including config files, or only model_config.yaml and the weights
             if copy_config_files:
-                copy_config_files(checkpoint_dir, save_path.parent)
+                copy_config_files_func(checkpoint_dir, save_path.parent)
                 fabric.save(save_path, {"model": sub_network})
             else:
                 fabric.save(
@@ -350,10 +364,10 @@ def main(
             # the new model_config.yaml is different from the original one, so we rewrite it
             save_config(sub_network.config, save_path.parent)
         else:
-            save_path = save_path.parent / "sub_network.pkl"
-            torch.save(
-                {"sub_network_config": sub_network_dict, "parent_dir": checkpoint_dir},
+            # minimalistic checkpoint - only sub-network config and path to super-network
+            fabric.save(
                 save_path,
+                {"sub_network_config": sub_network_dict, "parent_dir": checkpoint_dir},
             )
 
     # save all paths to pareto optimal sub-networks

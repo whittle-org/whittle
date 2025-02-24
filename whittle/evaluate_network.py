@@ -9,7 +9,7 @@ from litgpt import Config
 from litgpt.utils import lazy_load
 
 from whittle.eval.utils import convert_and_evaluate
-from whittle.metrics import compute_latency, compute_parameters
+from whittle.metrics import compute_flops, compute_latency, compute_parameters
 from whittle.models.gpt import GPT
 
 if _DEEPSPEED_AVAILABLE:
@@ -31,6 +31,7 @@ def setup(
 ) -> None:
     """
     Evaluate a model with the LM Evaluation Harness. Compute the latency of a PyTorch model for inference, and FLOPs.
+
     Arguments:
         checkpoint_dir: The path to the model's checkpoint directory to load for evaluation.
         out_dir: Directory in which to save evaluation results. If not provided, saving to `checkpoint_dir/eval` by default.
@@ -45,15 +46,6 @@ def setup(
         measure_flops: Whether to compute FLOPs. Default is False.
         measure_latency: Whether to compute latency. Default is False.
     """
-
-    if not _DEEPSPEED_AVAILABLE and measure_flops:
-        raise ValueError(
-            "DeepSpeed is not installed but you tried to call "
-            "`whittle.evaluate_network.setup` with `measure_flops=True` which depends on "
-            "DeepSpeed. Please install with `pip install whittle[distributed]` to use "
-            "DeepSpeed."
-        )
-
     if out_dir is None:
         out_dir = checkpoint_dir / "eval"
 
@@ -68,11 +60,11 @@ def setup(
     # sub-network config loading (contains the config and checkpoint path of the parent)
     sub_network_config = ckp.get("sub_network_config", None)
     parent_dir = ckp.get("parent_dir", None)
+    # it's either a standalone litgpt model or a sub-network (depending on if there is also a parent_dir)
     if "model" not in ckp:
-        assert parent_dir is not None, (
-            'Weights are not saved in the checkpoint under "model", but `parent_dir` is not saved in the checkpoints provided.'
-        )
-        checkpoint_dir = Path(parent_dir)
+        # not None: sub-network, None: raw state dict
+        if parent_dir is not None:
+            checkpoint_dir = Path(parent_dir)
         ckp = lazy_load(checkpoint_dir / "lit_model.pth")
 
     config = Config.from_file(checkpoint_dir / "model_config.yaml")
@@ -105,7 +97,7 @@ def setup(
     # downstream task evaluation
     model.to(device)
     convert_and_evaluate(
-        model=model,
+        model,
         out_dir=out_dir,
         tasks=tasks,
         seed=seed,

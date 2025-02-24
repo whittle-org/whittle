@@ -3,9 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from syne_tune.optimizer.schedulers import FIFOScheduler
-from syne_tune.optimizer.schedulers.searchers import (
-    LegacyRandomSearcher as RandomSearcher,
-)
+from syne_tune.optimizer.schedulers.searchers.random_grid_searcher import RandomSearcher
 
 from whittle.sampling.param_bins import ParamBins
 
