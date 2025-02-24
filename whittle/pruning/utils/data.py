@@ -35,19 +35,19 @@ def get_c4_dataloader(n_samples, seed, seqlen, tokenizer):
     for k in range(n_samples):
         while True:
             i = random.randint(0, len(traindata) - 1)
-            trainenc = tokenizer(traindata[i]["text"], return_tensors="pt")
-            if trainenc.input_ids.shape[1] > seqlen:
+            trainenc = tokenizer.encode(traindata[i]["text"])
+            if trainenc.shape[0] > seqlen:
                 break
-        i = random.randint(0, trainenc.input_ids.shape[1] - seqlen - 1)
+        i = random.randint(0, trainenc.shape[0] - seqlen - 1)
         j = i + seqlen
-        inp = trainenc.input_ids[:, i:j]
+        inp = trainenc[i:j]
         tar = inp.clone()
-        tar[:, :-1] = -100
+        tar[:-1] = -100
         input_data[k] = inp
         output_data[k] = tar
 
     # Prepare validation dataset
-    valenc = tokenizer(" ".join(valdata[:1100]["text"]), return_tensors="pt")
-    valenc = valenc.input_ids[:, : (256 * seqlen)]
+    valenc = tokenizer.encode(" ".join(valdata[:1100]["text"]))
+    valenc = valenc[: (256 * seqlen)]
     valenc = TokenizerWrapper(valenc)
     return DataLoader(TensorDataset(input_data, output_data)), valenc
