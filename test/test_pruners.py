@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 import torch
+from litgpt.data.alpaca import Alpaca
 
 from whittle.models.gpt import GPT, Config
 from whittle.pruning.pruners.magnitude import MagnitudePruner
 from whittle.pruning.pruners.sparsegpt import SparseGPTPruner
 from whittle.pruning.pruners.wanda import WandaPruner
-from whittle.pruning.utils.data import get_c4_dataloader
 
 
 @pytest.mark.parametrize(
@@ -47,12 +47,7 @@ def test_model_pruning(model_info, mock_tokenizer):
     pruner_sparsegpt = SparseGPTPruner()
     pruner_magnitude = MagnitudePruner()
 
-    dataloader, _ = get_c4_dataloader(
-        n_samples=32,
-        seed=9001,
-        seqlen=model.max_seq_length,
-        tokenizer=mock_tokenizer,
-    )
+    dataloader = Alpaca().train_dataloader()
 
     sparsity_ratio_magnitude = pruner_magnitude(
         model,
