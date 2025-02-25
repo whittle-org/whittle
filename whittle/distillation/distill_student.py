@@ -40,6 +40,9 @@ from litgpt.utils import (
     init_out_dir,
     instantiate_torch_optimizer,
     parse_devices,
+    save_hyperparameters,
+    copy_config_files,
+    save_config,
 )
 
 from whittle.sampling.random_sampler import RandomSampler
@@ -488,5 +491,16 @@ def fit(
         fabric.log_dict(metrics, step=state["iter_num"])
         fabric.print(f"Final evaluation | val loss: {val_loss.item():.3f} | val ppl: {math.exp(val_loss):.3f}")
 
+def save_checkpoint(fabric, state, tokenizer_dir, checkpoint_file):
+    model = state["model"]
+    checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+    fabric.print(f"Saving checkpoint to {str(checkpoint_file)!r}")
+    fabric.save(checkpoint_file, state)
+    if fabric.global_rank == 0:
+        save_hyperparameters(setup, checkpoint_file.parent)
+        if tokenizer_dir is not None:
+            copy_config_files(tokenizer_dir, checkpoint_file.parent)
+        save_config(model.config, checkpoint_file.parent)
+        
 if __name__ == "__main__":
     CLI(setup)
