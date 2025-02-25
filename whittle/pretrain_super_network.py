@@ -136,7 +136,7 @@ def setup(
     devices: int | str = "auto",
     num_nodes: int = 1,
     training_strategy: str = "sandwich",
-    distributed_strategy: Literal["auto", "fsdp", "deepspeed"] = "deepspeed",
+    distributed_strategy: Literal["auto", "fsdp", "deepspeed"] = "auto",
     tokenizer_dir: Path | None = None,
     logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
     seed: int = 42,
@@ -213,8 +213,7 @@ def setup(
         log_interval=train.log_interval,
     )
 
-    # if num_devices * num_nodes > 1:
-    if True:
+    if num_devices * num_nodes > 1:
         if distributed_strategy == "fsdp":
             distributed_strategy = FSDPStrategy(
                 auto_wrap_policy={Block},
