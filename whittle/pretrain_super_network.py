@@ -200,7 +200,6 @@ def setup(
 
     precision = precision or get_default_supported_precision(training=True)
     num_devices = parse_devices(devices)
-    print("num_devices is ", num_devices)
     out_dir = init_out_dir(out_dir)
     # in case the dataset requires the Tokenizer
     tokenizer = Tokenizer(tokenizer_dir) if tokenizer_dir is not None else None
@@ -232,8 +231,6 @@ def setup(
             distributed_strategy = DeepSpeedStrategy(config=ds_config)
     else:
         distributed_strategy = "auto"
-
-    # print("distributed strategy is ", distributed_strategy)
 
     fabric = L.Fabric(
         devices=num_devices,
@@ -327,7 +324,6 @@ def fit(
     total_t0 = time.perf_counter()
 
     warmup_iters = train.warmup_iters(devices, max_iters, train_dataloader)
-    # print("got past warmup")
 
     for train_data in train_iterator:
         if state["iter_num"] >= max_iters:
@@ -343,7 +339,6 @@ def fit(
             max_iters,
             train.min_lr,
         )
-        # print("got past lr, it is ", lr)
         if isinstance(optimizer, torch.optim.Optimizer):
             for param_group in optimizer.param_groups:
                 param_group["lr"] = lr
