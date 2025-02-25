@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 import pytest
-
 from litgpt.config import Config
 
+from test.test_training_strategies import MLP
 from whittle.metrics.parameters import (
-    compute_parameters,
     compute_all_parameters,
+    compute_parameters,
 )
 from whittle.models.gpt import GPT
-
-from test.test_training_strategies import MLP
-
 
 mlp_types = ["GptNeoxMLP", "LLaMAMLP", "GemmaMLP"]
 norm_types = ["LayerNorm", "RMSNorm"]

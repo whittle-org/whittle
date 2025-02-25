@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-
-import torch.nn as nn
-
 from collections import OrderedDict
 from copy import deepcopy
+
+import torch.nn as nn
+from litgpt import Config
 
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks.mlp import GptNeoxMLP, LLaMAMLP
 from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
-from litgpt import Config
 
 
 def extract_current_sub_network(model: GPT) -> GPT:
@@ -33,6 +32,11 @@ def extract_current_sub_network(model: GPT) -> GPT:
         subnet_config.n_head = (
             int(model.sub_network_num_heads) // model.config.n_query_groups
         ) * model.sub_network_query_groups
+<<<<<<< HEAD
+=======
+    else:
+        subnet_config.n_head = model.sub_network_num_heads
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
     subnet_config.n_layer = model.sub_network_n_layers
     subnet_config.head_size = model.sub_network_head_size
     subnet_config.n_query_groups = model.sub_network_query_groups
@@ -86,6 +90,7 @@ def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
 
 def extract_attention(super_network_attention, sub_network_attention):
     if super_network_attention.qkv_indices is not None:
+<<<<<<< HEAD
         sub_network_attention.attn.weight.data = (
             super_network_attention.attn.weight.data[
                 super_network_attention.qkv_indices, :
@@ -97,10 +102,20 @@ def extract_attention(super_network_attention, sub_network_attention):
                     super_network_attention.qkv_indices
                 ]
             )
+=======
+        sub_network_attention.attn.weight.data = super_network_attention.attn.weight.data[
+            super_network_attention.qkv_indices, :
+        ][:, 0 : sub_network_attention.sub_network_n_embd]
+        if sub_network_attention.attn.bias is not None:
+            sub_network_attention.attn.bias.data = super_network_attention.attn.bias.data[
+                super_network_attention.qkv_indices
+            ]
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
     else:
         state_dict = extract_linear(super_network_attention.attn)
         sub_network_attention.attn.load_state_dict(state_dict)
     if super_network_attention.proj_indices is not None:
+<<<<<<< HEAD
         sub_network_attention.proj.weight.data = (
             super_network_attention.proj.weight.data[
                 0 : sub_network_attention.sub_network_n_embd
@@ -112,6 +127,15 @@ def extract_attention(super_network_attention, sub_network_attention):
                     0 : sub_network_attention.sub_network_n_embd
                 ]
             )
+=======
+        sub_network_attention.proj.weight.data = super_network_attention.proj.weight.data[
+            0 : sub_network_attention.sub_network_n_embd
+        ][:, super_network_attention.proj_indices]
+        if sub_network_attention.proj.bias is not None:
+            sub_network_attention.proj.bias.data = super_network_attention.proj.bias.data[
+                0 : sub_network_attention.sub_network_n_embd
+            ]
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
     else:
         state_dict = extract_linear(super_network_attention.proj)
         sub_network_attention.proj.load_state_dict(state_dict)
@@ -176,9 +200,7 @@ def extract_linear(super_network_linear):
     in_feat_sub = super_network_linear.sub_network_in_features
     out_feat_sub = super_network_linear.sub_network_out_features
     new_state_dict = OrderedDict()
-    new_state_dict["weight"] = super_network_state["weight"][
-        :out_feat_sub, :in_feat_sub
-    ]
+    new_state_dict["weight"] = super_network_state["weight"][:out_feat_sub, :in_feat_sub]
 
     if super_network_linear.use_bias:
         new_state_dict["bias"] = super_network_state["bias"][:out_feat_sub]

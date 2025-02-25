@@ -1,11 +1,22 @@
+<<<<<<< HEAD
+=======
+from __future__ import annotations
+
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
 import math
 from typing import Any
 
 import torch
 import torch.nn as nn
+<<<<<<< HEAD
 from torch.nn import functional as F
 
 from litgpt.lora import LoRALayer
+=======
+from litgpt.lora import LoRALayer
+from torch.nn import functional as F
+
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
 from whittle.modules.embedding import Embedding
 
 
@@ -77,13 +88,22 @@ class LoRAEmbedding(LoRALayer):
     def merge(self) -> None:
         """Merges the LoRA weights into the full-rank weights (W = W + delta_W)."""
         if self.r > 0 and not self.merged:
+<<<<<<< HEAD
             pretrained_dtype = self.linear.weight.data.dtype
             lora_data = self.get_lora_AB()
+=======
+            pretrained_dtype = self.embedding.weight.data.dtype
+            lora_data = self.get_lora_AB().transpose(0, 1)
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
             # if only the pretrained are in quantized form - dequantize, sum with LoRA and quantize the result
             if pretrained_dtype == torch.uint8:
                 import bitsandbytes as bnb
 
+<<<<<<< HEAD
                 weight = self.linear.weight
+=======
+                weight = self.embedding.weight
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
                 # dequantize the pretrained weights
                 weight_data = bnb.functional.dequantize_4bit(
                     weight.data, weight.quant_state
@@ -91,6 +111,7 @@ class LoRAEmbedding(LoRALayer):
                 # add pretrained and LoRA weights
                 weight_data += lora_data
                 # assign updated weights and quantize by moving to CUDA device
+<<<<<<< HEAD
                 self.linear.weight = bnb.nn.Params4bit(
                     weight_data, requires_grad=False, **weight.__dict__
                 )
@@ -100,6 +121,17 @@ class LoRAEmbedding(LoRALayer):
                 # the inplace add will preserve the dtype of linear.weight
                 self.linear.weight.data += lora_data.to(
                     device=self.linear.weight.data.device
+=======
+                self.embedding.weight = bnb.nn.Params4bit(
+                    weight_data, requires_grad=False, **weight.__dict__
+                )
+                self.embedding.weight.cuda(weight.device)
+            else:
+                # self.linear might be on CPU and lora_data on CUDA
+                # the inplace add will preserve the dtype of linear.weight
+                self.embedding.weight.data += lora_data.to(
+                    device=self.embedding.weight.data.device
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
                 )
             self.merged = True
 

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from whittle.models.gpt.blocks.causal_self_attention import (
     CausalSelfAttention as BaseCausalSelfAttention,
 )
@@ -8,6 +9,21 @@ from typing import Any, Optional
 import torch
 from litgpt.utils import map_old_state_dict_weights
 from litgpt.model import KVCache
+=======
+from __future__ import annotations
+
+from typing import Any
+
+from litgpt.model import KVCache
+from litgpt.utils import map_old_state_dict_weights
+
+from whittle.lora.config import LoRAConfig as Config
+from whittle.lora.lora_linear import LoRALinearProj
+from whittle.lora.lora_qkv_linear import LoRAQKVLinear
+from whittle.models.gpt.blocks.causal_self_attention import (
+    CausalSelfAttention as BaseCausalSelfAttention,
+)
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
 
 
 class CausalSelfAttention(BaseCausalSelfAttention):
@@ -43,10 +59,16 @@ class CausalSelfAttention(BaseCausalSelfAttention):
             lora_dropout=config.lora_dropout,
         )
         # disabled by default
+<<<<<<< HEAD
         self.kv_cache: Optional[KVCache] = None
 
         self.config = config
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+=======
+        self.kv_cache: KVCache | None = None
+
+        self.config = config
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
         self.apply_sliding_window_attention = (
             config.sliding_window_size is not None
             and block_idx % config.sliding_window_layer_placing == 0
@@ -137,9 +159,13 @@ class CausalSelfAttention(BaseCausalSelfAttention):
             self.proj_indices,
         )
         if self.config.attention_scores_scalar:
+<<<<<<< HEAD
             self.sub_attention_scaler = (
                 self.sub_network_n_embd // self.sub_network_n_head
             )
+=======
+            self.sub_attention_scaler = self.sub_network_n_embd // self.sub_network_n_head
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
         else:
             self.sub_attention_scaler = self.config.attention_scores_scalar
 

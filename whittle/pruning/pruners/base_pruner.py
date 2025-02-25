@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any
 
 import torch
@@ -6,6 +8,10 @@ from torch.utils.data import DataLoader
 from whittle.modules.linear import Linear, LinearProj, LinearQKV
 from whittle.models.gpt import GPT
 from whittle.modules.embedding import Embedding
+<<<<<<< HEAD
+=======
+from whittle.modules.linear import Linear, LinearProj, LinearQKV
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
 from whittle.pruning.utils.catcher import Catcher
 
 
@@ -99,12 +105,18 @@ class Pruner:
         Prepare inputs for calibration during model pruning.
         """
 
-        use_cache = model.config.use_cache
-        model.config.use_cache = False
+        if hasattr(model.config, "use_cache"):
+            use_cache = model.config.use_cache
+            model.config.use_cache = False
         layers = model.transformer.h
         dtype = next(iter(model.parameters())).dtype
         inps = torch.zeros(
-            (nsamples, model.max_seq_length, model.config.n_embd),
+            (
+                nsamples,
+                dataloader.batch_size,
+                model.max_seq_length,
+                model.config.n_embd,
+            ),
             dtype=dtype,
             device=dev,
         )
@@ -125,6 +137,8 @@ class Pruner:
         outs = torch.zeros_like(inps)
         attention_mask = cache["attention_mask"]
         position_ids = cache["position_ids"]
-        model.config.use_cache = use_cache
+
+        if hasattr(model.config, "use_cache"):
+            model.config.use_cache = use_cache
 
         return inps, outs, attention_mask, position_ids

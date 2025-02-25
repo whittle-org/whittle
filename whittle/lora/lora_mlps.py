@@ -1,12 +1,27 @@
+<<<<<<< HEAD
+=======
+from __future__ import annotations
+
+from typing import Any
+
+import torch
+from litgpt.config import Config
+from litgpt.utils import map_old_state_dict_weights
+
+from whittle.lora.lora_linear import LoRALinear
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
 from whittle.models.gpt.blocks.mlp import (
     GptNeoxMLP as GptNeoxMLPBase,
     LLaMAMLP as LLaMAMLPBase,
 )
+<<<<<<< HEAD
 from whittle.lora.lora_linear import LoRALinear
 from litgpt.config import Config
 from typing import Any
 import torch
 from litgpt.utils import map_old_state_dict_weights
+=======
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
 
 
 class LoRAGptNeoxMLP(GptNeoxMLPBase):

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from typing import Union
 import torch.nn as nn
 from whittle.models.gpt.blocks import Block as BaseBlock
@@ -10,6 +11,22 @@ from whittle.lora.lora_mlps import (
     LoRAGemmaMLP as GemmaMLP,
 )
 from whittle.lora.config import LoRAConfig as Config
+=======
+from __future__ import annotations
+
+import torch.nn as nn
+
+from whittle.lora.config import LoRAConfig as Config
+from whittle.lora.lora_attention import CausalSelfAttention
+from whittle.lora.lora_mlps import (
+    LoRAGemmaMLP as GemmaMLP,
+    LoRAGptNeoxMLP as GptNeoxMLP,
+    LoRALLaMAMLP as LLaMAMLP,
+)
+from whittle.models.gpt.blocks import Block as BaseBlock
+from whittle.modules.layernorm import LayerNorm
+from whittle.modules.rmsnorm import RMSNorm
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
 
 
 class LoRABlock(BaseBlock):
@@ -29,7 +46,11 @@ class LoRABlock(BaseBlock):
             else nn.Identity()
         )
         self.attn = CausalSelfAttention(config, block_idx)
+<<<<<<< HEAD
         self.norm_2: Union[LayerNorm, RMSNorm, None] = (
+=======
+        self.norm_2: LayerNorm | RMSNorm | None = (
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
             None
             if config.shared_attention_norm
             else self.norm_class()(config.n_embd, eps=config.norm_eps)

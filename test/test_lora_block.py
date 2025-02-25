@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import torch
-from whittle.lora.config import LoRAConfig as Config
-
 from litgpt import Config as LitConfig
-from whittle.lora.lora_block import LoRABlock as Block
 from litgpt.model import (
     Block as LitBlock,
     build_mask_cache,
     build_rope_cache,
 )
+
+from whittle.lora.config import LoRAConfig as Config
+from whittle.lora.lora_block import LoRABlock as Block
 
 
 def test_block():
@@ -49,17 +49,11 @@ def test_block():
     block.attn.proj.linear.weight.data = torch.ones_like(
         block.attn.proj.linear.weight.data
     )
-    block.mlp.fc_1.linear.weight.data = torch.ones_like(
-        block.mlp.fc_1.linear.weight.data
-    )
+    block.mlp.fc_1.linear.weight.data = torch.ones_like(block.mlp.fc_1.linear.weight.data)
     block.mlp.fc_1.linear.bias.data = torch.ones_like(block.mlp.fc_1.linear.bias.data)
-    block.mlp.fc_2.linear.weight.data = torch.ones_like(
-        block.mlp.fc_2.linear.weight.data
-    )
+    block.mlp.fc_2.linear.weight.data = torch.ones_like(block.mlp.fc_2.linear.weight.data)
     block.mlp.fc_2.linear.bias.data = torch.ones_like(block.mlp.fc_2.linear.bias.data)
-    block.mlp.proj.linear.weight.data = torch.ones_like(
-        block.mlp.proj.linear.weight.data
-    )
+    block.mlp.proj.linear.weight.data = torch.ones_like(block.mlp.proj.linear.weight.data)
     block.mlp.proj.linear.bias.data = torch.ones_like(block.mlp.proj.linear.bias.data)
     block.reset_super_network()
     out_large = block(input, cos, sin, mask)

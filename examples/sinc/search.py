@@ -11,9 +11,9 @@ from torch.utils.data import DataLoader
 
 from whittle.search import multi_objective_search
 
-from .sinc_nas import validate, f
-from .model import MLP
 from .estimate_efficiency import compute_mac_linear_layer
+from .model import MLP
+from .sinc_nas import f, validate
 
 if __name__ == "__main__":
     parser = ArgumentParser()

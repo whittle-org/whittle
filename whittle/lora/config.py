@@ -1,9 +1,22 @@
+<<<<<<< HEAD
 from litgpt.config import Config as BaseConfig
 from dataclasses import dataclass
 from whittle.lora.lora_mlps import (
     LoRAGptNeoxMLP as GptNeoxMLP,
     LoRALLaMAMLP as LLaMAMLP,
     LoRAGemmaMLP as GemmaMLP,
+=======
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from litgpt.config import Config as BaseConfig
+
+from whittle.lora.lora_mlps import (
+    LoRAGemmaMLP as GemmaMLP,
+    LoRAGptNeoxMLP as GptNeoxMLP,
+    LoRALLaMAMLP as LLaMAMLP,
+>>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
 )
 
 
