@@ -11,6 +11,7 @@ from lightning.fabric.strategies import FSDPStrategy
 from litgpt import Tokenizer
 from litgpt.args import TrainArgs
 from litgpt.data import DataModule
+from litgpt.data.dolly import Alpaca
 from litgpt.model import Config
 from litgpt.pretrain import get_dataloaders
 from litgpt.utils import (
@@ -28,7 +29,6 @@ from whittle.args import PruningArgs
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.pruning import MagnitudePruner, SparseGPTPruner, WandaPruner
-from whittle.pruning.utils import get_c4_dataloader
 
 pruner_classes = {
     "mag": MagnitudePruner,
@@ -129,7 +129,7 @@ def main(
     seed: int,
     max_seq_length: int,
     config: Config,
-    data: DataModule,
+    data: DataModule | None,
     checkpoint_dir: Path,
     out_dir: Path,
     prune: PruningArgs,
@@ -138,18 +138,15 @@ def main(
 
     tokenizer = Tokenizer(checkpoint_dir)
 
-    if data is None:
-        train_dataloader, val_dataloader = get_c4_dataloader(
-            prune.n_samples, seed, max_seq_length, tokenizer
-        )
-    else:
-        train_dataloader, val_dataloader = get_dataloaders(
-            fabric,
-            data,
-            tokenizer,
-            TrainArgs(max_seq_length=max_seq_length),
-            max_seq_length,
-        )
+    data = Alpaca() if data is None else data
+
+    train_dataloader, val_dataloader = get_dataloaders(
+        fabric,
+        data,
+        tokenizer,
+        TrainArgs(max_seq_length=max_seq_length),
+        max_seq_length,
+    )
 
     train_dataloader, val_dataloader = fabric.setup_dataloaders(
         train_dataloader, val_dataloader
