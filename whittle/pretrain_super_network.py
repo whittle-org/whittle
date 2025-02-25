@@ -5,12 +5,54 @@ import pprint
 import time
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import lightning as L
 import torch
+
+# TODO: wrap this in a try-import in case deepspeed is not installed
+from deepspeed.utils.zero_to_fp32 import (
+    get_fp32_state_dict_from_zero_checkpoint,
+)
+
+# Monkeypatch Lightning Fabric's Strategy.get_module_state_dict method
+from lightning.fabric.strategies.strategy import Strategy
+from torch.nn import Module
+
+# Store the original method for later use
+original_get_module_state_dict = Strategy.get_module_state_dict
+
+
+# Define our custom implementation
+def custom_get_module_state_dict(self, module: Module) -> dict[str, Any | torch.Tensor]:
+    """Custom implementation that handles DeepSpeed module state dict differently."""
+    from lightning.fabric.strategies import DeepSpeedStrategy
+
+    if isinstance(self, DeepSpeedStrategy):
+        # For DeepSpeed, we need to handle the module differently
+        # First get the state dict using the original method
+        state_dict = original_get_module_state_dict(self, module)
+
+        # Add "module." prefix to all keys
+        prefixed_state_dict = {}
+        for key, value in state_dict.items():
+            if not key.startswith("module."):
+                prefixed_state_dict[f"module.{key}"] = value
+            else:
+                prefixed_state_dict[key] = value
+
+        return prefixed_state_dict
+    else:
+        # For other strategies, use the original implementation
+        return original_get_module_state_dict(self, module)
+
+
+# Apply the monkeypatch
+Strategy.get_module_state_dict = custom_get_module_state_dict
+
 from lightning.fabric.strategies import DeepSpeedStrategy, FSDPStrategy
 from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
+from lightning.fabric.wrappers import _FabricDataLoader
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import name_to_config
@@ -20,7 +62,6 @@ from litgpt.pretrain import (
     get_dataloaders,
     get_lr,
     initialize_weights,
-    save_checkpoint,
     validate,
     validate_args,
 )
@@ -30,6 +71,7 @@ from litgpt.utils import (
     check_nvlink_connectivity,
     choose_logger,
     chunked_cross_entropy,
+    copy_config_files,
     extend_checkpoint_dir,
     find_resume_path,
     get_default_supported_precision,
@@ -37,6 +79,8 @@ from litgpt.utils import (
     instantiate_torch_optimizer,
     num_parameters,
     parse_devices,
+    save_config,
+    save_hyperparameters,
 )
 from syne_tune.config_space import lograndint, randint
 from torch.utils.data import DataLoader
@@ -169,7 +213,8 @@ def setup(
         log_interval=train.log_interval,
     )
 
-    if num_devices * num_nodes > 1:
+    # if num_devices * num_nodes > 1:
+    if True:
         if distributed_strategy == "fsdp":
             distributed_strategy = FSDPStrategy(
                 auto_wrap_policy={Block},
@@ -240,10 +285,6 @@ def fit(
 ) -> None:
     model = state["model"]
     optimizer = state["optimizer"]
-    # print("optimizer is ", optimizer)
-    # import pdb
-
-    # pdb.set_trace()
 
     if eval.initial_validation:
         model.reset_super_network()
@@ -417,40 +458,13 @@ def fit(
             and not is_accumulating
             and state["step_count"] % train.save_interval == 0
         ):
-            if isinstance(fabric.strategy, DeepSpeedStrategy):
-                from deepspeed.utils.zero_to_fp32 import (
-                    get_fp32_state_dict_from_zero_checkpoint,
-                )
-
-                fabric.save(
-                    out_dir / f"step-{state['step_count']:08d}",
-                    state,
-                )
-
-                fabric.barrier()
-                if fabric.global_rank == 0:
-                    # state_dict = get_fp32_state_dict_from_zero_checkpoint(
-                    #     out_dir / f"step-{state['step_count']:08d}", lazy_mode=True
-                    # )
-                    # import pdb
-
-                    # pdb.set_trace()
-                    # state_dict = adapter_v2_state_from_state_dict(state_dict)
-                    fabric.strategy.save_checkpoint(
-                        out_dir / f"step-{state['step_count']:08d}",
-                        state,
-                    )
-                    # torch.save(
-                    #     state_dict,
-                    #     out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth",
-                    # )
-            else:
-                save_checkpoint(
-                    fabric,
-                    state,
-                    tokenizer_dir,
-                    out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth",
-                )
+            ckpt_dir = out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth"
+            save_checkpoint(
+                fabric,
+                state,
+                tokenizer_dir,
+                ckpt_dir,
+            )
 
     # Final validation
     if eval.final_validation:
@@ -528,9 +542,6 @@ def main(
     train_dataloader, val_dataloader = get_dataloaders(
         fabric, data, tokenizer, train, model.max_seq_length
     )
-    train_dataloader, val_dataloader = fabric.setup_dataloaders(
-        train_dataloader, val_dataloader
-    )
 
     if initial_checkpoint_dir:
         fabric.load_raw(initial_checkpoint_dir / "lit_model.pth", model)
@@ -546,7 +557,24 @@ def main(
     resume = find_resume_path(resume, out_dir)
     if resume:
         fabric.print(f"Resuming training from {resume}")
-        fabric.load(resume, state)
+        if isinstance(fabric.strategy, DeepSpeedStrategy):
+            state.pop("train_dataloader")
+            fabric.load(resume, state, strict=False)
+
+            train_dataloader.load_state_dict(
+                torch.load(resume / "lit_model.pth", weights_only=False)[
+                    "train_dataloader"
+                ]
+            )
+            state["train_dataloader"] = train_dataloader
+        else:
+            fabric.load(resume, state)
+
+    train_dataloader, val_dataloader = fabric.setup_dataloaders(
+        state["train_dataloader"], val_dataloader
+    )
+
+    state["train_dataloader"] = train_dataloader
 
     train_time = time.perf_counter()
     fit(
@@ -570,47 +598,45 @@ def main(
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 
 
-# def save_model_checkpoint(fabric, model, file_path: Path):
-#     file_path = Path(file_path)
+def save_checkpoint(
+    fabric: L.Fabric,
+    state: dict,
+    tokenizer_dir: Path | str | None,
+    checkpoint_file: Path,
+):
+    model: GPT = state["model"]
+    checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+    fabric.print(f"Saving checkpoint to {str(checkpoint_file)!r}")
+    if not isinstance(fabric.strategy, DeepSpeedStrategy):
+        fabric.save(checkpoint_file, state)
+    else:
+        # Create a new state dict with the "module." prefix for each key
 
-#     if isinstance(fabric.strategy, DeepSpeedStrategy):
-#         from deepspeed.utils.zero_to_fp32 import get_fp32_state_dict_from_zero_checkpoint
+        fabric.strategy.save_checkpoint(checkpoint_file.parent, state)
 
-#         tmp_path = file_path.with_suffix(".tmp")
-#         fabric.save(tmp_path, {"model": model})
-#         fabric.barrier()
-#         if fabric.global_rank == 0:
-#             # Create a consolidated checkpoint with the same name next to the deepspeed checkpoint
-#             # and only keep the adapter weights
-#             state_dict = get_fp32_state_dict_from_zero_checkpoint(tmp_path)
-#             state_dict = adapter_state_from_state_dict(state_dict)
-#             torch.save(state_dict, file_path)
-#             shutil.rmtree(tmp_path)
-#     else:
-#         state_dict = adapter_state_from_state_dict(model.state_dict())
-#         if fabric.global_rank == 0:
-#             torch.save(state_dict, file_path)
-#         fabric.barrier()
+        # Get the FP32 state dict from the saved checkpoint
+        model_state = get_fp32_state_dict_from_zero_checkpoint(checkpoint_file.parent)
+        dataloader: _FabricDataLoader = state["train_dataloader"]._dataloader
 
+        with open(checkpoint_file, "wb") as f:
+            new_model_state = {}
+            for key, value in model_state.items():
+                new_model_state[f"module.{key}"] = value
 
-def get_adapter_substrings():
-    substrings = ["adapter_wte", "gating_factor"]  # regular adapter v1 parameters
-    substrings.extend(
-        ["adapter_scale", "adapter_bias"]
-    )  # adapter v2: new bias and scale used in Linear
-    substrings.extend(
-        ["norm_1", "norm_2", "ln_f"]
-    )  # adapter v2: Norm parameters are now trainable
-    return substrings
-
-
-def adapter_v2_state_from_state_dict(state_dict: dict) -> dict:
-    """Return the model state dict with only the adapter weights for saving"""
-    return {
-        name: param
-        for name, param in state_dict.items()
-        if any(s in name for s in get_adapter_substrings())
-    }
+            torch.save(
+                dict(
+                    model=new_model_state,
+                    train_dataloader=dataloader.state_dict(),
+                    iter_num=state["iter_num"],
+                    step_count=state["step_count"],
+                ),
+                f,
+            )
+    if fabric.global_rank == 0:
+        save_hyperparameters(setup, checkpoint_file.parent)
+        if tokenizer_dir is not None:
+            copy_config_files(tokenizer_dir, checkpoint_file.parent)
+        save_config(model.config, checkpoint_file.parent)
 
 
 if __name__ == "__main__":
