@@ -452,12 +452,11 @@ def fit(
             and not is_accumulating
             and state["step_count"] % train.save_interval == 0
         ):
-            ckpt_dir = out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth"
             save_checkpoint(
                 fabric,
                 state,
                 tokenizer_dir,
-                ckpt_dir,
+                out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth",
             )
 
     # Final validation
