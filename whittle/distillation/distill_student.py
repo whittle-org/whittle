@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import torch._dynamo
-torch._dynamo.config.suppress_errors = True
-
 import os
 import torch
 import math
@@ -59,32 +56,29 @@ from pathlib import Path
 def setup(
     model_name: str | None = None,
     model_config: Config | None = None,
-    load_from_checkpoint: bool = True,
-    out_dir: Path = Path("examples/gpt/out/distillation/standard-step-00190000"),
+    load_from_checkpoint: bool = False,
+    out_dir: Path = Path("../examples/gpt/out/distill"),
     precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
-    initial_checkpoint_dir: Path = Path('checkpoints/standard-step-00190000'),
+    initial_checkpoint_dir: Path | None = None,
     resume: bool | Literal["auto"] | Path = False,
     data: DataModule | None = None,
     train: TrainArgs = TrainArgs(
-        micro_batch_size=16,
-        log_interval=100,
-        epochs=10,
+        save_interval=1000,
+        log_interval=1,
+        global_batch_size=512,
+        micro_batch_size=4,
+        max_tokens=int(3e12),  # 3 trillion
         max_norm=1.0,
-        max_tokens=int(3e09),
-        max_steps=50000,
-        max_seq_length=256,
-        tie_embeddings=True
+        min_lr=4e-5,
+        lr_warmup_steps=2000,
+        tie_embeddings=False,
     ),
     distill: DistillArgs = DistillArgs(
         method='logits',
         temperature=5,
-        alpha=0.7, # Higher weight since dataset is small
+        alpha=0.7,
     ),
-    eval: EvalArgs = EvalArgs(
-        interval=1000, 
-        max_iters=100,
-        initial_validation=True,
-    ),
+    eval: EvalArgs = EvalArgs(interval=1000, max_iters=100),
     optimizer: str | dict = "AdamW",
     devices: int | str = "auto",
     num_nodes: int = 1,
@@ -98,6 +92,8 @@ def setup(
         model_name: The name of the model to pretrain. Choose from names in ``litgpt.config``. Use "list" to list the supported models.
         model_config: A ``litgpt.Config`` object to define the model architecture. Mutually exclusive with
             ``model_config``. Overrides the `model_name` if specified.
+        load_from_checkpoint: Whether to load the teacher model from a checkpoint. 
+            If True, the model will be loaded from the initial checkpoint directory.
         out_dir: Directory in which to save checkpoints and logs. If running in a Lightning Studio Job, look for it in
             /teamspace/jobs/<job-name>/share.
         precision: The precision to use for finetuning. Determines a compatible precision setting by default.
@@ -113,7 +109,7 @@ def setup(
         devices: How many devices/GPUs to use. Uses all GPUs by default.
         num_nodes: How many nodes the code is being run on.
         tokenizer_dir: Optional path to the tokenizer dir that was used for preprocessing the dataset. Only some data
-            module require this.
+            modules require this.
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
     """
@@ -201,12 +197,12 @@ def setup(
 
 def main(
     fabric: L.Fabric,
-    device: int,
+    devices: int,
     seed: int = 42,
     initial_checkpoint_dir: Path = Path('checkpoints/standard-step-00190000'),
     teacher_config: Config | None = None,
     dataset: DataModule | None = None,
-    out_dir: Path = Path("examples/gpt/out/distillation/standard-step-00190000"),
+    out_dir: Path = Path("examples/gpt/out/distillation"),
     tokenizer_dir: Path | None = None,
     tokenizer: Tokenizer | None = None,
     train: TrainArgs = TrainArgs(),
@@ -214,8 +210,6 @@ def main(
     eval: EvalArgs = EvalArgs(),
     optimizer: str | dict = "AdamW",
     resume: Path | bool = False,
-    student_ckpt_path: Path | None = None,
-    student_config_path: Path | None = None,
 ):  
     if fabric.global_rank == 0:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -224,62 +218,68 @@ def main(
 
     fabric.seed_everything(seed)
 
-    t0 = time.perf_counter()
-    with fabric.init_module(empty_init=(fabric.world_size > 1)):
-        teacher = GPT(teacher_config)
+    # Check if torch.compile() should be used for student model only
+    use_compile_student = hasattr(torch, "_dynamo") and not bool(os.environ.get("DISABLE_TORCH_COMPILE"))
     
-    fabric.print(f"Loaded teacher model from {initial_checkpoint_dir}") 
-    fabric.print(f"Teacher model has {compute_parameters(teacher)} parameters")
-
-    teacher = fabric.setup(teacher)
-    teacher = torch.compile(teacher)
-
-    extra_kwargs = {"fused": fabric.device.type == "cuda"}
-    optimizer = instantiate_torch_optimizer(optimizer, teacher.parameters(), **extra_kwargs)
-    optimizer = fabric.setup_optimizers(optimizer)
-
     train_dataloader, val_dataloader = get_dataloaders(
-        fabric, dataset, tokenizer, train, train.max_seq_length
+        fabric, dataset, tokenizer, train, teacher_config.block_size
     )
     train_dataloader, val_dataloader = fabric.setup_dataloaders(
         train_dataloader, val_dataloader
     )
+
+    with fabric.init_module(empty_init=(fabric.world_size > 1)):
+        teacher = GPT(teacher_config)
     
     if initial_checkpoint_dir:
         checkpoint = os.path.join(initial_checkpoint_dir, "lit_model.pth")
         ckpt = torch.load(checkpoint, map_location=fabric.device, weights_only=True)
         teacher.load_state_dict(ckpt, strict=False)
-        # fabric.load(checkpoint, teacher)
         teacher.reset_super_network()
+    
+    teacher = fabric.setup_module(teacher, move_to_device=True)
+    teacher.eval()
+    
+    # IMPORTANT: Don't compile the teacher model to avoid dynamo errors
+    fabric.print(f"Teacher model loaded from {initial_checkpoint_dir} (not compiled)")
+    fabric.print(f"Teacher model has {compute_parameters(teacher):,} parameters")
 
-    fabric.print("Teacher model loaded.")
-
-    # If no student model is provided, use a smallest subnet of the teacher model
-    fabric.print("No student model provided. Initializing student model with smallest subnet of teacher model.")
-
+    fabric.print("Initializing student model with subnet of teacher model.")
     search_space = get_search_space(teacher_config)
     sampler = RandomSampler(search_space, seed=seed)
-    # random_config = sampler.get_smallest_sub_network()
     random_config = sampler.sample()
 
-    student = GPT(teacher_config)
+    with fabric.init_module(empty_init=(fabric.world_size > 1)):
+        student = GPT(teacher_config)
 
     subnetwork = {
-            "sub_network_n_embd": random_config["embed_dim"],
-            "sub_network_intermediate_size": int(random_config["mlp_ratio"] * random_config["embed_dim"]),
-            "sub_network_num_heads": random_config["num_heads"],
-            "sub_network_n_layers": random_config["depth"]
-            }   
+        "sub_network_n_embd": random_config["embed_dim"],
+        "sub_network_intermediate_size": int(random_config["mlp_ratio"] * random_config["embed_dim"]),
+        "sub_network_num_heads": random_config["num_heads"],
+        "sub_network_n_layers": random_config["depth"]
+    }   
 
     student.set_sub_network(**subnetwork)
     initialize_weights(fabric, student, n_layer=random_config["depth"], n_embd=random_config["embed_dim"])
+    
+    student = fabric.setup_module(student, move_to_device=True)
+    
+    if use_compile_student:
+        try:
+            fabric.print("Compiling student model...")
+            student = torch.compile(student)
+            fabric.print("Student model compiled successfully")
+        except Exception as e:
+            fabric.print(f"Error compiling student model: {e}")
+            fabric.print("Continuing with uncompiled student model")
 
-    student = fabric.setup(student)
-    student = torch.compile(student)
+    extra_kwargs = {"fused": fabric.device.type == "cuda"}
+    optimizer = instantiate_torch_optimizer(optimizer, student.parameters(), **extra_kwargs)
+    optimizer = fabric.setup_optimizers(optimizer)
 
-    fabric.print(f"Student model has {compute_parameters(student)} parameters") 
+    fabric.print(f"Student model has {compute_parameters(student):,} parameters")
+    fabric.print(f"Model parameter reduction: {compute_parameters(student)/compute_parameters(teacher):.2%}")
 
-    # Log the subnet configuration as part of hyperparameters for this subnet.
     fabric.logger.log_hyperparams(subnetwork)
 
     state = {
@@ -291,29 +291,26 @@ def main(
         "step_count": 0,
     }
 
-    resume = find_resume_path(resume, out_dir)
-    if resume:
-        fabric.print(f"Resuming training from {resume}")
-        fabric.load(resume, state)
+    resume_path = find_resume_path(resume, out_dir)
+    if resume_path:
+        fabric.print(f"Resuming training from {resume_path}")
+        fabric.load(resume_path, state)
 
     train_time = time.perf_counter()
+    fit(fabric, devices, state, train_dataloader, val_dataloader, out_dir, tokenizer_dir, train, eval, distill)
 
-    # Requires only one model to save checkpoint, rewriting state
-    dummy_state = {
+    student_state = {
         "model": student,
         "optimizer": optimizer,
         "train_dataloader": train_dataloader,
-        "iter_num": 0,
-        "step_count": 0,
+        "iter_num": state["iter_num"],
+        "step_count": state["step_count"],
     }
 
-    fit(fabric, device, state, train_dataloader, val_dataloader, out_dir, tokenizer_dir, train, eval, distill, dummy_state=dummy_state)
+    save_checkpoint(fabric, student_state, tokenizer_dir, out_dir / "final" / "lit_model.pth")
 
-    save_checkpoint(fabric, dummy_state, tokenizer_dir, out_dir / "distillation" / "lit_model.pth")
+    total_tokens = state["iter_num"] * train.micro_batch_size * student.max_seq_length * fabric.world_size
 
-    total_tokens = state["iter_num"] * train.micro_batch_size * train.max_seq_length * fabric.world_size
-
-    # Print formatted output
     separator = "-" * 40
     fabric.print(separator)
     fabric.print("| Performance")
@@ -339,25 +336,36 @@ def fit(
     train: TrainArgs,
     eval: EvalArgs,
     distill: DistillArgs,
-    dummy_state: dict = None,
 ) -> None:
     teacher = state["teacher"]
     student = state["model"]
     optimizer = state["optimizer"]
 
+    teacher.eval()
+
+    distill_loss = DistillLoss(
+        temperature=distill.temperature,
+        distillation_weight=distill.alpha
+    )
+
     if eval.initial_validation:
-        fabric.print("Validating initial model ...")
         val_loss = validate(fabric, student, val_dataloader, max_iters=eval.max_iters)
         val_loss = f"{val_loss:.3f}"
     else:
-        fabric.print("Verifying settings ...")
-        validate(fabric, student, val_dataloader, max_iters=2, verbose=False)   # sanity check
+        fabric.print("Running quick sanity check...")
+        validate(fabric, student, val_dataloader, max_iters=2, verbose=False)
         val_loss = "n/a"
 
     throughput = ThroughputMonitor(fabric, window_size=5)
 
     with torch.device("meta"):
         meta_model = GPT(student.config)
+        meta_model.set_sub_network(**{
+            "sub_network_n_embd": student.config.n_embd,
+            "sub_network_intermediate_size": student.config.intermediate_size,
+            "sub_network_num_heads": student.config.n_head,
+            "sub_network_n_layers": student.config.n_layer,
+        })
         x = torch.randint(0, 1, (train.micro_batch_size, meta_model.max_seq_length))
         model_fwd = lambda: meta_model(x)
         model_loss = lambda y: chunked_cross_entropy(y, x, chunk_size=0)
@@ -366,7 +374,7 @@ def fit(
         del meta_model, x
 
     max_tokens_per_device = train.max_tokens // fabric.world_size
-    tokens_per_iter = train.micro_batch_size * train.max_seq_length
+    tokens_per_iter = train.micro_batch_size * student.max_seq_length
     max_iters = max_tokens_per_device // tokens_per_iter
     log_iter_interval = train.log_interval * train.gradient_accumulation_iters(devices)
     initial_iter = state["iter_num"]
@@ -375,6 +383,7 @@ def fit(
     running_loss = RunningMean(window=train.gradient_accumulation_iters(devices), sync_on_compute=False).to(
         fabric.device
     )
+    
     fabric.barrier()
     total_t0 = time.perf_counter()
 
@@ -384,7 +393,6 @@ def fit(
         if state["iter_num"] >= max_iters:
             break
 
-        # determine and set the learning rate for this iteration
         lr = get_lr(optimizer.defaults["lr"], state["iter_num"], warmup_iters, max_iters, train.min_lr)
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
@@ -392,17 +400,15 @@ def fit(
         state["iter_num"] += 1
         iter_t0 = time.perf_counter()
 
-        input_ids = train_data[:, 0 : train.max_seq_length].contiguous().long()
-        targets = train_data[:, 1 : (train.max_seq_length + 1)].contiguous().long()
-
-        distill_loss = DistillLoss(
-                    temperature=distill.temperature,
-                    distillation_weight=distill.alpha
-                )
+        input_ids = train_data[:, 0 : student.max_seq_length].contiguous().long()
+        targets = train_data[:, 1 : (student.max_seq_length + 1)].contiguous().long()
 
         is_accumulating = state["iter_num"] % train.gradient_accumulation_iters(devices) != 0
         with fabric.no_backward_sync(student, enabled=is_accumulating):
-            teacher_logits = teacher(input_ids)
+            teacher.eval()
+            with torch.inference_mode(): # no grads for teacher
+                teacher_logits = teacher(input_ids)
+                
             logits = student(input_ids)
             loss = distill_loss(logits, targets, teacher_logits)
             fabric.backward(loss / train.gradient_accumulation_iters(devices))
@@ -416,14 +422,14 @@ def fit(
             state["step_count"] += 1
 
         if state["iter_num"] % log_iter_interval == 0:
-            loss = running_loss.compute().item()  # expensive device-to-host synchronization
+            loss = running_loss.compute().item()
             t1 = time.perf_counter()
             throughput.update(
                 time=(t1 - total_t0),
                 flops=(measured_flops * log_iter_interval),
                 batches=state["iter_num"],
                 samples=(state["iter_num"] * train.micro_batch_size),
-                lengths=(state["iter_num"] * train.micro_batch_size * train.max_seq_length),
+                lengths=(state["iter_num"] * train.micro_batch_size * student.max_seq_length),
             )
             metrics = {
                 "loss": loss,
@@ -434,8 +440,8 @@ def fit(
                 "remaining_time": (
                     (t1 - total_t0) / (state["iter_num"] - initial_iter) * (max_iters - state["iter_num"])
                 ),
-                "tokens": state["iter_num"] * train.micro_batch_size * train.max_seq_length,
-                "total_tokens": (state["iter_num"] * train.micro_batch_size * train.max_seq_length * fabric.world_size),
+                "tokens": state["iter_num"] * train.micro_batch_size * student.max_seq_length,
+                "total_tokens": (state["iter_num"] * train.micro_batch_size * student.max_seq_length * fabric.world_size),
                 "learning_rate": lr,
             }
             if isinstance(val_loss, float):
@@ -465,9 +471,17 @@ def fit(
             fabric.barrier()
 
         if train.save_interval is not None and not is_accumulating and state["step_count"] % train.save_interval == 0:
-            save_checkpoint(fabric, dummy_state, tokenizer_dir, out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth")
+            student_state = {
+                "model": student,
+                "optimizer": optimizer,
+                "train_dataloader": train_dataloader,
+                "iter_num": state["iter_num"],
+                "step_count": state["step_count"],
+            }
+            save_checkpoint(fabric, student_state, tokenizer_dir, out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth")
+            fabric.log_dict(metrics, step=state["iter_num"] - 1)
+            fabric.barrier()
 
-    # Final validation
     if eval.final_validation:
         val_loss = validate(fabric, student, val_dataloader, max_iters=eval.max_iters)
         metrics = {"val_loss": val_loss, "val_ppl": math.exp(val_loss)}
