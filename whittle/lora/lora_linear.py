@@ -86,7 +86,7 @@ class LoRALinear(LoRALayer):
     def get_lora_AB(self) -> torch.Tensor:
         """Return merged lora_A and lora_B matrices with the same shape as the pretrained weights."""
         return (
-            self.lora_B[self.sub_network_out_features, :]
+            self.lora_B[: self.sub_network_out_features, :]
             @ self.lora_A[:, : self.sub_network_in_features]
         ) * self.scaling
 
@@ -189,7 +189,7 @@ class LoRALinearQKV(LoRALayer):
     def get_lora_AB(self) -> torch.Tensor:
         """Return merged lora_A and lora_B matrices with the same shape as the pretrained weights."""
         return (
-            self.lora_B[self.sub_network_out_features, :]
+            self.lora_B[: self.sub_network_out_features, :]
             @ self.lora_A[:, : self.sub_network_in_features]
         ) * self.scaling
 
@@ -296,7 +296,7 @@ class LoRALinearProj(LoRALayer):
     def get_lora_AB(self) -> torch.Tensor:
         """Return merged lora_A and lora_B matrices with the same shape as the pretrained weights."""
         return (
-            self.lora_B[self.sub_network_out_features, :]
+            self.lora_B[: self.sub_network_out_features, :]
             @ self.lora_A[:, : self.sub_network_in_features]
         ) * self.scaling
 
