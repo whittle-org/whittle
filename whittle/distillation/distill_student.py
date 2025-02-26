@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import os
+import random
 import torch
 import math
 import pprint
 import time
+import json
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal, Optional, Dict, Any
 
 from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
@@ -25,7 +27,6 @@ from litgpt.pretrain import (
     get_dataloaders,
     get_lr,
     initialize_weights,
-    save_checkpoint,
     validate,
 )
 
@@ -60,7 +61,7 @@ def setup(
     model_name: str | None = None,
     model_config: Config | None = None,
     load_from_checkpoint: bool = False,
-    out_dir: Path = Path("examples/gpt/out/distill"),
+    out_dir: Path = Path("examples/gpt/out/distill_experiments"),
     precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
     initial_checkpoint_dir: Path | None = None,
     resume: bool | Literal["auto"] | Path = False,
@@ -70,7 +71,7 @@ def setup(
         log_interval=1,
         global_batch_size=512,
         micro_batch_size=4,
-        max_tokens=int(3e12),  # 3 trillion
+        max_tokens=int(3e7),
         max_norm=1.0,
         min_lr=4e-5,
         lr_warmup_steps=2000,
@@ -89,7 +90,7 @@ def setup(
     logger_name: Literal["wandb", "tensorboard", "csv"] = "wandb",
     seed: int = 42,
 ):
-    """Pretrain a model.
+    """Run multiple distillation experiments with different subnetwork configurations.
 
     Arguments:
         model_name: The name of the model to pretrain. Choose from names in ``litgpt.config``. Use "list" to list the supported models.
@@ -149,7 +150,7 @@ def setup(
     logger = choose_logger(
         logger_name,
         out_dir,
-        name=f"distill-{config.name}",
+        name=f"manual-distill-experiments-{config.name}",
         resume=bool(resume),
         log_interval=train.log_interval,
     )
@@ -195,7 +196,9 @@ def setup(
         train,
         distill,
         eval,
-        optimizer
+        optimizer,
+        resume,
+        load_from_checkpoint,
     )
 
 def main(
@@ -205,19 +208,23 @@ def main(
     initial_checkpoint_dir: Path = Path('checkpoints/standard-step-00190000'),
     teacher_config: Config | None = None,
     dataset: DataModule | None = None,
-    out_dir: Path = Path("examples/gpt/out/distillation"),
+    out_dir: Path = Path("examples/gpt/out/distillation_experiments"),
     tokenizer_dir: Path | None = None,
     tokenizer: Tokenizer | None = None,
     train: TrainArgs = TrainArgs(),
     distill: DistillArgs = DistillArgs(),
     eval: EvalArgs = EvalArgs(),
     optimizer: str | dict = "AdamW",
-    resume: Path | bool = False,
+    resume: bool | Literal["auto"] | Path = False,
+    load_from_checkpoint: bool = False,
 ):  
     if fabric.global_rank == 0:
         out_dir.mkdir(parents=True, exist_ok=True)
 
     tokenizer = Tokenizer(initial_checkpoint_dir)
+    random.seed(random.randint(0, 2**32 - 1))
+    exp_seed = random.randint(0, 2**32 - 1)
+    fabric.print(f"Experiment seed: {exp_seed}")
 
     fabric.seed_everything(seed)
 
@@ -231,6 +238,7 @@ def main(
         train_dataloader, val_dataloader
     )
 
+    # Load the teacher model once
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
         teacher = GPT(teacher_config)
     
@@ -243,15 +251,18 @@ def main(
     teacher = fabric.setup_module(teacher, move_to_device=True)
     teacher.eval()
     
-    # IMPORTANT: Don't compile the teacher model to avoid dynamo errors
     fabric.print(f"Teacher model loaded from {initial_checkpoint_dir} (not compiled)")
     fabric.print(f"Teacher model has {compute_parameters(teacher):,} parameters")
 
-    fabric.print("Initializing student model with subnet of teacher model.")
+    # Get search space for creating different subnetworks
     search_space = get_search_space(teacher_config)
-    sampler = RandomSampler(search_space, seed=seed)
-    random_config = sampler.sample()
 
+    sampler = RandomSampler(search_space, seed=exp_seed)
+    random_config = sampler.sample()
+            
+    if fabric.global_rank == 0:
+        out_dir.mkdir(parents=True, exist_ok=True)
+    
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
         student = GPT(teacher_config)
 
@@ -280,10 +291,21 @@ def main(
     optimizer = instantiate_torch_optimizer(optimizer, student.parameters(), **extra_kwargs)
     optimizer = fabric.setup_optimizers(optimizer)
 
-    fabric.print(f"Student model has {compute_parameters(student):,} parameters")
-    fabric.print(f"Model parameter reduction: {compute_parameters(student)/compute_parameters(teacher):.2%}")
+    param_count = compute_parameters(student)
+    fabric.print(f"Student model has {param_count:,} parameters")
+    fabric.print(f"Model parameter reduction: {param_count/compute_parameters(teacher):.2%}")
 
-    fabric.logger.log_hyperparams(subnetwork)
+    # Log the subnetwork configuration to the logger
+    exp_config = {
+        "seed": exp_seed,
+        "embed_dim": random_config["embed_dim"],
+        "mlp_ratio": random_config["mlp_ratio"],
+        "num_heads": random_config["num_heads"],
+        "depth": random_config["depth"],
+        "parameter_count": param_count,
+        "reduction_ratio": param_count/compute_parameters(teacher)
+    }
+    fabric.logger.log_hyperparams(exp_config)
 
     state = {
         "teacher": teacher,
@@ -294,14 +316,18 @@ def main(
         "step_count": 0,
     }
 
-    resume_path = find_resume_path(resume, out_dir)
-    if resume_path:
-        fabric.print(f"Resuming training from {resume_path}")
-        fabric.load(resume_path, state)
+    resume = find_resume_path(resume, out_dir)
+    if resume:
+        fabric.print(f"Resuming training from {resume}")
+        fabric.load(resume, state)
 
     train_time = time.perf_counter()
-    fit(fabric, devices, state, train_dataloader, val_dataloader, out_dir, tokenizer_dir, train, eval, distill)
+    train_results = fit(
+        fabric, devices, state, train_dataloader, val_dataloader, 
+        out_dir, tokenizer_dir, train, eval, distill
+    )
 
+    # Save student model
     student_state = {
         "model": student,
         "optimizer": optimizer,
@@ -310,23 +336,45 @@ def main(
         "step_count": state["step_count"],
     }
 
-    save_checkpoint(fabric, student_state, tokenizer_dir, out_dir / "final" / "lit_model.pth")
+    save_checkpoint(
+        fabric, student_state, tokenizer_dir, 
+        out_dir / "final" / "lit_model.pth"
+    )
 
+    # Track experiment results
     total_tokens = state["iter_num"] * train.micro_batch_size * student.max_seq_length * fabric.world_size
-
-    separator = "-" * 40
-    fabric.print(separator)
-    fabric.print("| Performance")
-    fabric.print(f"| - Total tokens  : {total_tokens:,}")
-    fabric.print(f"| - Training Time : {(time.perf_counter()-train_time):.2f} s")
-    fabric.print(f"| - Tok/sec       : {total_tokens / train_time:.2f} tok/s")
-    fabric.print("| " + "-" * 40)
-
-    if fabric.device.type == "cuda":
-        memory_used = torch.cuda.max_memory_allocated() / 1e9
-        fabric.print("| Memory Usage")
-        fabric.print(f"| - Memory Used   : {memory_used:.2f} GB")
-    fabric.print(separator)
+    training_time = time.perf_counter() - train_time
+    
+    # Create a results summary
+    experiment_summary = {
+        "config": {
+            "embed_dim": random_config["embed_dim"],
+            "mlp_ratio": random_config["mlp_ratio"],
+            "num_heads": random_config["num_heads"],
+            "depth": random_config["depth"],
+        },
+        "subnetwork": subnetwork,
+        "parameters": param_count,
+        "parameter_reduction": float(param_count/compute_parameters(teacher)),
+        "training_time_seconds": training_time,
+        "total_tokens": total_tokens,
+        "tokens_per_second": total_tokens / training_time,
+        "final_train_loss": train_results.get("final_train_loss", None),
+        "final_val_loss": train_results.get("final_val_loss", None),
+        "final_val_ppl": train_results.get("final_val_ppl", None),
+    }
+    
+    experiment_results = []
+    experiment_results["students"].append(experiment_summary)
+    
+    for result in experiment_results["students"]:
+        fabric.print(f"\n Embed dim: {result['config']['embed_dim']}, Depth: {result['config']['depth']}")
+        fabric.print(f"  - Parameters: {result['parameters']:,} ({result['parameter_reduction']:.2%} of teacher)")
+        if result.get("final_val_loss") is not None:
+            fabric.print(f"  - Val loss: {result['final_val_loss']:.4f}, Val ppl: {result['final_val_ppl']:.4f}")
+        fabric.print(f"  - Training time: {result['training_time_seconds']:.2f}s")
+    
+    fabric.print("\n" + "=" * 80)
 
 def fit(
     fabric: L.Fabric,
@@ -339,7 +387,7 @@ def fit(
     train: TrainArgs,
     eval: EvalArgs,
     distill: DistillArgs,
-) -> None:
+) -> Dict[str, Any]:
     teacher = state["teacher"]
     student = state["model"]
     optimizer = state["optimizer"]
@@ -487,9 +535,13 @@ def fit(
 
     if eval.final_validation:
         val_loss = validate(fabric, student, val_dataloader, max_iters=eval.max_iters)
-        metrics = {"val_loss": val_loss, "val_ppl": math.exp(val_loss)}
+        val_loss_value = val_loss.item()
+        ppl = math.exp(val_loss_value)
+        metrics = {"val_loss": val_loss_value, "val_ppl": ppl}
+        
         fabric.log_dict(metrics, step=state["iter_num"])
-        fabric.print(f"Final evaluation | val loss: {val_loss.item():.3f} | val ppl: {math.exp(val_loss):.3f}")
+        fabric.print(f"Final evaluation | val loss: {val_loss_value:.3f} | val ppl: {ppl:.3f}")
+    
 
 def save_checkpoint(fabric, state, tokenizer_dir, checkpoint_file):
     model = state["model"]
@@ -501,6 +553,6 @@ def save_checkpoint(fabric, state, tokenizer_dir, checkpoint_file):
         if tokenizer_dir is not None:
             copy_config_files(tokenizer_dir, checkpoint_file.parent)
         save_config(model.config, checkpoint_file.parent)
-        
+
 if __name__ == "__main__":
     CLI(setup)
