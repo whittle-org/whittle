@@ -451,12 +451,8 @@ def main(
 
     tokenizer = Tokenizer(checkpoint_dir)
     train_dataloader, val_dataloader = get_dataloaders(fabric, data, tokenizer, train)
-    steps_per_epoch = len(train_dataloader) // train.gradient_accumulation_iters(
-        devices
-    )
-    lr_max_steps = min(
-        train.epochs * steps_per_epoch, (train.max_steps or float("inf"))
-    )
+    steps_per_epoch = len(train_dataloader) // train.gradient_accumulation_iters(devices)
+    lr_max_steps = min(train.epochs * steps_per_epoch, (train.max_steps or float("inf")))
 
     fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
 
@@ -530,7 +526,7 @@ def main(
         resume,
         moddel_path,
     )
-    fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
+    fabric.print(f"Training time: {(time.perf_counter() - train_time):.2f}s")
     if fabric.device.type == "cuda":
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 

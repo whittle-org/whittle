@@ -72,9 +72,7 @@ if __name__ == "__main__":
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     tokenizer = Tokenizer(checkpoint_dir=f"checkpoints/{args.model_id}")
-    config = Config.from_file(
-        str(f"checkpoints/{args.model_id}/" + "model_config.yaml")
-    )
+    config = Config.from_file(str(f"checkpoints/{args.model_id}/" + "model_config.yaml"))
     config.fix_head_size = True
 
     search_space = search_spaces[args.search_space](config)

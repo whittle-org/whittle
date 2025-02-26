@@ -30,9 +30,7 @@ class MEDIUM:
         }
 
         for li in range(gpt_model_specification.n_layer):
-            self.config_space[f"heads_{li}"] = randint(
-                1, gpt_model_specification.n_head
-            )
+            self.config_space[f"heads_{li}"] = randint(1, gpt_model_specification.n_head)
             self.config_space[f"intermediate_size_{li}"] = randint(
                 1, gpt_model_specification.intermediate_size
             )
@@ -65,8 +63,7 @@ class HWGPTBench:
         return {
             "sub_network_n_embd": config["embed_dim"],
             "sub_network_intermediate_size": [
-                config[f"mlp_ratio"] * config["embed_dim"]
-                for _ in range(config["depth"])
+                config[f"mlp_ratio"] * config["embed_dim"] for _ in range(config["depth"])
             ],
             "sub_network_num_heads": [
                 config[f"num_heads"] for _ in range(config["depth"])
@@ -93,8 +90,7 @@ class HWGPTBenchLlama:
         return {
             "sub_network_n_embd": config["embed_dim"],
             "sub_network_intermediate_size": [
-                config[f"mlp_ratio"] * config["embed_dim"]
-                for _ in range(config["depth"])
+                config[f"mlp_ratio"] * config["embed_dim"] for _ in range(config["depth"])
             ],
             "sub_network_num_heads": [
                 config[f"num_heads"] for _ in range(config["depth"])
@@ -184,7 +180,9 @@ class LlamaHeads:
     def cast(config):
         return {
             "sub_network_n_embd": config["embed_dim"],
-            "sub_network_intermediate_size": int(config[f"mlp_ratio"] * config["embed_dim"]),
+            "sub_network_intermediate_size": int(
+                config[f"mlp_ratio"] * config["embed_dim"]
+            ),
             "sub_network_num_heads": config[f"num_heads"],
             "sub_network_n_layers": config["depth"],
         }
@@ -215,8 +213,10 @@ class LlamaJoint:
             return config
         config_return = {
             "sub_network_n_embd": config["embed_dim"],
-            "sub_network_intermediate_size": int(config[f"mlp_ratio"] * config["embed_dim"]),
-            "sub_network_num_heads":config[f"num_heads"],
+            "sub_network_intermediate_size": int(
+                config[f"mlp_ratio"] * config["embed_dim"]
+            ),
+            "sub_network_num_heads": config[f"num_heads"],
             "sub_network_n_layers": config["depth"],
             "sub_network_head_size": config["head_size"],
         }
@@ -248,7 +248,9 @@ class LlamaHeadSize:
     def cast(config):
         return {
             "sub_network_n_embd": config["embed_dim"],
-            "sub_network_intermediate_size":int(config[f"mlp_ratio"] * config["embed_dim"]),
+            "sub_network_intermediate_size": int(
+                config[f"mlp_ratio"] * config["embed_dim"]
+            ),
             "sub_network_num_heads": config[f"num_heads"],
             "sub_network_n_layers": config["depth"],
             "sub_network_head_size": config["head_size"],
@@ -270,8 +272,10 @@ class HWGPTBenchLlama27b:
     def cast(config):
         return {
             "sub_network_n_embd": config["embed_dim"],
-            "sub_network_intermediate_size": int(config[f"mlp_ratio"] * config["embed_dim"]),
-            "sub_network_num_heads":config[f"num_heads"],
+            "sub_network_intermediate_size": int(
+                config[f"mlp_ratio"] * config["embed_dim"]
+            ),
+            "sub_network_num_heads": config[f"num_heads"],
             "sub_network_n_layers": config["depth"],
         }
 

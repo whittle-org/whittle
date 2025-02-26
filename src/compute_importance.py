@@ -19,10 +19,12 @@ from src.utils.search_spaces import search_spaces
 
 import hashlib
 
+
 # Serialize and hash the config
 def get_config_hash(config):
     json_str = json.dumps(config, sort_keys=True)
     return hashlib.sha256(json_str.encode()).hexdigest()
+
 
 def save_checkpoint(filename, data):
     with open(filename, "wb") as f:
@@ -47,6 +49,7 @@ def get_unique_configs(sampler, n, existing_configs):
 
     return configs
 
+
 def evaluate_config_largest(model, configs, search_space, layer_order=None):
     ppls = []
     params = []
@@ -58,14 +61,17 @@ def evaluate_config_largest(model, configs, search_space, layer_order=None):
         else:
             layer_order_top_k = sorted(layer_order[: int(c["sub_network_n_layers"])])
             model.set_sub_network(**c, sampled_layer_indices=layer_order_top_k)
-        
+
         param = compute_parameters(model)
-        ppl = evaluate_wikitext(args.max_seq_len, model, tokenizer, batch_size, num_batches)
+        ppl = evaluate_wikitext(
+            args.max_seq_len, model, tokenizer, batch_size, num_batches
+        )
         ppls.append(ppl)
         params.append(param)
         archs.append(c)
-    
+
     return ppls, params, archs
+
 
 def evaluate_configs(model, configs, search_space, layer_order=None):
     ppls = []
@@ -77,21 +83,31 @@ def evaluate_configs(model, configs, search_space, layer_order=None):
             model.set_sub_network(**search_space.cast(c))
         else:
             layer_order_top_k = sorted(layer_order[: int(c["depth"])])
-            model.set_sub_network(**search_space.cast(c), sampled_layer_indices=layer_order_top_k)
-        
+            model.set_sub_network(
+                **search_space.cast(c), sampled_layer_indices=layer_order_top_k
+            )
+
         param = compute_parameters(model)
-        ppl = evaluate_wikitext(args.max_seq_len, model, tokenizer, batch_size, num_batches)
+        ppl = evaluate_wikitext(
+            args.max_seq_len, model, tokenizer, batch_size, num_batches
+        )
         ppls.append(ppl)
         params.append(param)
         archs.append(c)
-    
+
     return ppls, params, archs
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Fine-grained Model Importance Computation and Permutation")
-    parser.add_argument("--model_id", type=str, required=True, help="ID of the model to be used")
-    parser.add_argument("--num_batches", type=int, default=10, help="Number of batches for evaluation")
+    parser = argparse.ArgumentParser(
+        description="Fine-grained Model Importance Computation and Permutation"
+    )
+    parser.add_argument(
+        "--model_id", type=str, required=True, help="ID of the model to be used"
+    )
+    parser.add_argument(
+        "--num_batches", type=int, default=10, help="Number of batches for evaluation"
+    )
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--objective", type=str, default="norm")
     parser.add_argument("--space", type=str, default="hw_gpt_bench")
@@ -114,9 +130,15 @@ if __name__ == "__main__":
     identifier = f"{args.space}_{args.objective}_{args.layer_scheme}"
 
     # Paths for checkpointing
-    sampled_configs_path = os.path.join(checkpoint_dir, f"sampled_configs_{identifier}.pkl")
-    eval_results_before_path = os.path.join(checkpoint_dir, f"eval_results_before_{identifier}.pkl")
-    eval_results_after_path = os.path.join(checkpoint_dir, f"eval_results_after_{identifier}.pkl")
+    sampled_configs_path = os.path.join(
+        checkpoint_dir, f"sampled_configs_{identifier}.pkl"
+    )
+    eval_results_before_path = os.path.join(
+        checkpoint_dir, f"eval_results_before_{identifier}.pkl"
+    )
+    eval_results_after_path = os.path.join(
+        checkpoint_dir, f"eval_results_after_{identifier}.pkl"
+    )
     orders_path = os.path.join(checkpoint_dir, f"importance_orders_{identifier}.pkl")
 
     config_path = os.path.join(checkpoint_dir, "model_config.yaml")
@@ -162,14 +184,16 @@ if __name__ == "__main__":
     }
     config_hash = get_config_hash(largest_model_config)
     if config_hash not in eval_results_before:
-        print(f"Evaluating largest model config before permutation: {largest_model_config}")
+        print(
+            f"Evaluating largest model config before permutation: {largest_model_config}"
+        )
         model.reset_super_network()
         ppls, params, _ = evaluate_config_largest(model, [largest_model_config], space)
-        
+
         eval_results_before[config_hash] = {
             "config": largest_model_config,
             "perplexity": ppls[0],
-            "parameters": params[0]
+            "parameters": params[0],
         }
         save_checkpoint(eval_results_before_path, eval_results_before)
     for sampled_config in configs:
@@ -181,26 +205,45 @@ if __name__ == "__main__":
         print(f"Evaluating config before permutation: {sampled_config}")
         model.reset_super_network()
         ppls, params, _ = evaluate_configs(model, [sampled_config], space)
-        
+
         eval_results_before[config_hash] = {
             "config": sampled_config,
             "perplexity": ppls[0],
-            "parameters": params[0]
+            "parameters": params[0],
         }
         save_checkpoint(eval_results_before_path, eval_results_before)
 
     # Compute Importance Orders
     if not os.path.exists(orders_path):
         orders = {
-            "embedding_order": compute_order_embd(args.max_seq_len, args.objective, model, tokenizer, batch_size, num_batches),
-            "mlp_order": compute_order_intermediate_dims(args.max_seq_len, args.objective, model, tokenizer, batch_size, num_batches),
+            "embedding_order": compute_order_embd(
+                args.max_seq_len,
+                args.objective,
+                model,
+                tokenizer,
+                batch_size,
+                num_batches,
+            ),
+            "mlp_order": compute_order_intermediate_dims(
+                args.max_seq_len,
+                args.objective,
+                model,
+                tokenizer,
+                batch_size,
+                num_batches,
+            ),
         }
 
-        #orders["layer_order"] = compute_order_block_importance(args.max_seq_len, args.objective, model, tokenizer, batch_size, num_batches)
+        # orders["layer_order"] = compute_order_block_importance(args.max_seq_len, args.objective, model, tokenizer, batch_size, num_batches)
         if args.layer_scheme == "block_importance":
             # compute layer order perplexity scheme
             layer_order = compute_order_block_importance(
-                args.max_seq_len, args.objective, model, tokenizer, batch_size, num_batches
+                args.max_seq_len,
+                args.objective,
+                model,
+                tokenizer,
+                batch_size,
+                num_batches,
             )
         elif args.layer_scheme == "perplexity":
             # compute layer order perplexity scheme
@@ -213,16 +256,27 @@ if __name__ == "__main__":
                 num_batches,
             )
         orders["layer_order"] = layer_order
-        orders["head_order"] = compute_order_head_groups(args.max_seq_len, args.objective, model, tokenizer, batch_size, num_batches)
-        
+        orders["head_order"] = compute_order_head_groups(
+            args.max_seq_len, args.objective, model, tokenizer, batch_size, num_batches
+        )
+
         save_checkpoint(orders_path, orders)
     else:
         orders = load_checkpoint(orders_path)
 
     # Permute Model with Head Order
     model.reset_super_network()
-    model = permute_model(orders["embedding_order"], orders["head_order"], orders["mlp_order"], model, model_id)
-    torch.save(model.state_dict(), os.path.join(checkpoint_dir, f"permuted_model_{identifier}.pth"))
+    model = permute_model(
+        orders["embedding_order"],
+        orders["head_order"],
+        orders["mlp_order"],
+        model,
+        model_id,
+    )
+    torch.save(
+        model.state_dict(),
+        os.path.join(checkpoint_dir, f"permuted_model_{identifier}.pth"),
+    )
 
     # Post-Permutation Evaluation
     if os.path.exists(eval_results_after_path):
@@ -238,17 +292,20 @@ if __name__ == "__main__":
     }
     config_hash = get_config_hash(largest_model_config)
     if config_hash not in eval_results_after:
-        print(f"Evaluating largest model config after permutation: {largest_model_config}")
+        print(
+            f"Evaluating largest model config after permutation: {largest_model_config}"
+        )
         model.reset_super_network()
-        ppls, params, _ = evaluate_config_largest(model, [largest_model_config], space, layer_order=orders["layer_order"])
-        
+        ppls, params, _ = evaluate_config_largest(
+            model, [largest_model_config], space, layer_order=orders["layer_order"]
+        )
+
         eval_results_after[config_hash] = {
             "config": largest_model_config,
             "perplexity": ppls[0],
-            "parameters": params[0]
+            "parameters": params[0],
         }
-        save_checkpoint(eval_results_after_path, eval_results_after
-        )
+        save_checkpoint(eval_results_after_path, eval_results_after)
     for sampled_config in configs:
         config_hash = get_config_hash(sampled_config)
         if config_hash in eval_results_after:
@@ -257,11 +314,13 @@ if __name__ == "__main__":
 
         print(f"Evaluating config after permutation: {sampled_config}")
         model.reset_super_network()
-        ppls, params, _ = evaluate_configs(model, [sampled_config], space, layer_order=orders["layer_order"])
-        
+        ppls, params, _ = evaluate_configs(
+            model, [sampled_config], space, layer_order=orders["layer_order"]
+        )
+
         eval_results_after[config_hash] = {
             "config": sampled_config,
             "perplexity": ppls[0],
-            "parameters": params[0]
+            "parameters": params[0],
         }
         save_checkpoint(eval_results_after_path, eval_results_after)

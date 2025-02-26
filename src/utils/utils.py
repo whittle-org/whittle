@@ -148,18 +148,20 @@ def plot_accuracies_custom(model, sampler, dataset, checkpoint_dir):
     val_loss_largest = compute_accuracy(model, dataset, checkpoint_dir)
     return val_loss_largest, 0.0, 0.0
 
+
 def plot_accuracies_slm(model, sampler, dataset, checkpoint_dir, subnet_config):
     model.eval()
     model.set_sub_network(**subnet_config)
     val_loss = compute_accuracy(model, dataset, checkpoint_dir)
     return val_loss
 
-def plot_validation_metrics_slm(model, val_dataloader, eval, sampler, subnet_config):
 
+def plot_validation_metrics_slm(model, val_dataloader, eval, sampler, subnet_config):
     model.eval()
     model.set_sub_network(**subnet_config)
     val_loss = compute_loss(model, val_dataloader, eval)
     return val_loss
+
 
 def compute_loss(model, val_dataloader, eval):
     losses = torch.zeros(min(len(val_dataloader), eval.max_iters))

@@ -245,8 +245,7 @@ def setup(
     architecture_idx: int = 0,
     grid_path: str = None,
     checkpoint_load_path: str = None,
-    sorted_ids_path: str = None
-
+    sorted_ids_path: str = None,
 ) -> None:
     """Finetune a model using the LoRA method.
 
@@ -350,13 +349,9 @@ def setup(
         loggers=logger,
         plugins=plugins,
     )
-    
 
     strategy = StandardStrategy(
-        config = None,
-        loss_function=chunked_cross_entropy,
-        lora=True,
-        sampler = None
+        config=None, loss_function=chunked_cross_entropy, lora=True, sampler=None
     )
 
     strategy.fabric = fabric
@@ -388,7 +383,7 @@ def setup(
         search_space_type,
         n_trials,
         num_configs,
-        sorted_ids_path
+        sorted_ids_path,
     )
 
 
@@ -416,18 +411,14 @@ def main(
     search_space_type: str,
     n_trials: int,
     num_configs: int,
-    sorted_ids_path: str
+    sorted_ids_path: str,
 ) -> None:
     validate_args(train, eval)
 
     tokenizer = Tokenizer(checkpoint_dir)
     train_dataloader, val_dataloader = get_dataloaders(fabric, data, tokenizer, train)
-    steps_per_epoch = len(train_dataloader) // train.gradient_accumulation_iters(
-        devices
-    )
-    lr_max_steps = min(
-        train.epochs * steps_per_epoch, (train.max_steps or float("inf"))
-    )
+    steps_per_epoch = len(train_dataloader) // train.gradient_accumulation_iters(devices)
+    lr_max_steps = min(train.epochs * steps_per_epoch, (train.max_steps or float("inf")))
 
     fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
 
@@ -459,10 +450,12 @@ def main(
                 configs = pickle.load(f)
             subnet_config = configs[architecture_idx]
         if sorted_ids_path:
-            with open(sorted_ids_path,"rb") as f:
-                    sorted_ids = pickle.load(f)
+            with open(sorted_ids_path, "rb") as f:
+                sorted_ids = pickle.load(f)
             layer_order = sorted_ids["layer_order"]
-            layer_ids_selected = sorted(layer_order[: int(subnet_config["sub_network_n_layers"])])
+            layer_ids_selected = sorted(
+                layer_order[: int(subnet_config["sub_network_n_layers"])]
+            )
             subnet_config["sampled_layer_indices"] = layer_ids_selected
         strategy.config = subnet_config
         print("Subnet config", subnet_config)
@@ -496,7 +489,7 @@ def main(
     }
     # strict=False because missing keys due to LoRA weights not contained in state dict
     if checkpoint_path is not None:
-       load_checkpoint(fabric, model, checkpoint_path, strict=False)
+        load_checkpoint(fabric, model, checkpoint_path, strict=False)
     load_checkpoint(
         fabric,
         model,
@@ -524,9 +517,9 @@ def main(
         sampling_strategy,
         resume,
         model_path,
-        subnet_config
+        subnet_config,
     )
-    fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
+    fabric.print(f"Training time: {(time.perf_counter() - train_time):.2f}s")
     if fabric.device.type == "cuda":
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 
@@ -551,7 +544,7 @@ def fit(
     sampling_strategy: str,
     resume: bool,
     model_path: str,
-    subnet_config: Dict
+    subnet_config: Dict,
 ) -> None:
     model = state["model"]
     optimizer = state["optimizer"]

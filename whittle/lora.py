@@ -20,7 +20,6 @@ from src.utils.sampler import (
     ImportanceCalibFixGridSampler,
     LlamaGridSampler,
 )
-from datasets_custom.llamamini import LLaMaMini
 from datetime import datetime
 from lightning.fabric.plugins import BitsandbytesPrecision
 from lightning.fabric.strategies import FSDPStrategy, DDPStrategy
@@ -38,8 +37,8 @@ from litgpt.lora import Config, lora_filter, mark_only_lora_as_trainable
 from litgpt.prompts import save_prompt_style
 from src.finetuning.sandwich_kd import SandwichStrategy as SandwichStrategyKD
 from src.finetuning.standard import StandardStrategy
-from src.utils.train_args import FineTuningArgs
-from src.utils.search_spaces import search_spaces
+from search.search_spaces import search_spaces
+from whittle.data.llamamini import LLaMaMini
 
 # from litgpt.scripts.merge_lora import merge_lora
 from litgpt.tokenizer import Tokenizer
@@ -136,7 +135,7 @@ def merge_lora(
     lora_path = checkpoint_dir / "lit_model.pth.lora"
     if "importance" in sampling_strategy:
         pretrained_checkpoint = torch.load(
-        "/hkfs/work/workspace/scratch/fr_rs1131-peftprune/compressing_llms/checkpoints/meta-llama/Meta-Llama-3.1-8B/permuted_model_llama_joint_mean_block_importance.pth"
+            "/hkfs/work/workspace/scratch/fr_rs1131-peftprune/compressing_llms/checkpoints/meta-llama/Meta-Llama-3.1-8B/permuted_model_llama_joint_mean_block_importance.pth"
         )
     else:
         pretrained_checkpoint = torch.load(
@@ -379,14 +378,14 @@ def setup(
                 "Quantization is currently not supported for multi-GPU training. Please set devices=1 and num_nodes=1"
                 " when using the --quantize flag."
             )
-        '''strategy = FSDPStrategy(
+        """strategy = FSDPStrategy(
             auto_wrap_policy={Block},
             activation_checkpointing_policy={Block},
             state_dict_type="full",
             limit_all_gathers=True,
             cpu_offload=False,
-        )'''
-        strategy = DDPStrategy(find_unused_parameters=True) 
+        )"""
+        strategy = DDPStrategy(find_unused_parameters=True)
     else:
         strategy = "auto"
 
@@ -417,9 +416,7 @@ def setup(
             seed=seed,
         )
     elif sampling_strategy == "importance-random":
-        sampler = ImportanceSampler(
-            sorted_ids_path, search_space, seed=seed
-        )
+        sampler = ImportanceSampler(sorted_ids_path, search_space, seed=seed)
     elif sampling_strategy == "importance-grid-params":
         sampler = ImportanceParamGridSampler(
             sorted_ids_path=sorted_ids_path,
@@ -520,12 +517,8 @@ def main(
 
     tokenizer = Tokenizer(checkpoint_dir)
     train_dataloader, val_dataloader = get_dataloaders(fabric, data, tokenizer, train)
-    steps_per_epoch = len(train_dataloader) // train.gradient_accumulation_iters(
-        devices
-    )
-    lr_max_steps = min(
-        train.epochs * steps_per_epoch, (train.max_steps or float("inf"))
-    )
+    steps_per_epoch = len(train_dataloader) // train.gradient_accumulation_iters(devices)
+    lr_max_steps = min(train.epochs * steps_per_epoch, (train.max_steps or float("inf")))
 
     fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
 
@@ -598,7 +591,7 @@ def main(
         resume,
         kd_loss,
     )
-    fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
+    fabric.print(f"Training time: {(time.perf_counter() - train_time):.2f}s")
     if fabric.device.type == "cuda":
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 

@@ -5,13 +5,10 @@ from typing import Any
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from whittle.modules.linear import Linear, LinearProj, LinearQKV
+
 from whittle.models.gpt import GPT
 from whittle.modules.embedding import Embedding
-<<<<<<< HEAD
-=======
 from whittle.modules.linear import Linear, LinearProj, LinearQKV
->>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
 from whittle.pruning.utils.catcher import Catcher
 
 

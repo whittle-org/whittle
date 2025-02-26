@@ -17,7 +17,6 @@ class StandardStrategy(BaseTrainingStrategy):
         self.config = config
         self.lora = lora
 
-
     def __call__(self, model, inputs, outputs):
         total_loss = 0
         # lora=False
@@ -41,6 +40,7 @@ class StandardStrategy(BaseTrainingStrategy):
 
         return total_loss
 
+
 class StandardStrategyImportance(BaseTrainingStrategy):
     """ """
 
@@ -54,8 +54,7 @@ class StandardStrategyImportance(BaseTrainingStrategy):
         super().__init__(**kwargs)
         self.config = config
         self.lora = lora
-        self.layer_ids =layer_ids
-
+        self.layer_ids = layer_ids
 
     def __call__(self, model, inputs, outputs):
         total_loss = 0

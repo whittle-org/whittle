@@ -1,20 +1,12 @@
-<<<<<<< HEAD
-=======
 from __future__ import annotations
 
->>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
 import math
 from typing import Any
 
 import torch
 import torch.nn as nn
-<<<<<<< HEAD
-
-from litgpt.lora import LoRALayer
-=======
 from litgpt.lora import LoRALayer
 
->>>>>>> 074a19985ea9c7b235ff1681ae2c1674d3774873
 from whittle.modules.linear import Linear, LinearProj, LinearQKV
 
 

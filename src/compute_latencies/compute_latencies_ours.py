@@ -18,15 +18,11 @@ def get_latency_from_string(s: str, sub_str: str = "CPU time total: "):
         if s[-2] == "s" and not flag_units:
             # print(s)
             unit = "s"
-            content = s[
-                index + len(sub_str) : -3
-            ]  # extract content following substring
+            content = s[index + len(sub_str) : -3]  # extract content following substring
         else:
             # print(s)
             unit = s[-3:-1]
-            content = s[
-                index + len(sub_str) : -3
-            ]  # extract content following substring
+            content = s[index + len(sub_str) : -3]  # extract content following substring
         return content, unit
     else:
         print("Substring not found")
