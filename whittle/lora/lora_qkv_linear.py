@@ -53,6 +53,8 @@ class LoRAQKVLinear(LoRALayer):
         self.q_per_kv = n_head // n_query_groups
         self.sub_network_q_per_kv = self.q_per_kv
         self.qkv_indices = None
+
+        self.merged = False
         # Actual trainable parameters
         # To better understand initialization let's imagine that we have such parameters:
         # ⚬ in_features: 128 (embeddings_size)
