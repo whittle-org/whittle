@@ -9,8 +9,6 @@ from syne_tune.optimizer.baselines import (
     MORandomScalarizationBayesOpt,
     RandomSearch,
 )
-
-# EHVI
 from syne_tune.optimizer.schedulers.multiobjective.linear_scalarizer import (
     LinearScalarizedScheduler,
 )

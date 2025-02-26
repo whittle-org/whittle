@@ -309,7 +309,7 @@ class Test_WhittleLM:
         # model = LitGPT(config)
         gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
         convert_and_evaluate(
-            gpt,
+            model=gpt,
             out_dir=out_dir,
             device=str(device),
             dtype=torch.float32,
@@ -367,7 +367,7 @@ class Test_WhittleLM:
         gpt = copy_subnetwork_weights(gpt_14m, gpt)
         gpt.max_seq_length = config_14m.block_size
         convert_and_evaluate(
-            gpt,
+            model=gpt,
             out_dir=out_dir,
             device=str(device),
             dtype=torch.float32,
