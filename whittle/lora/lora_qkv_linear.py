@@ -174,6 +174,7 @@ class LoRAQKVLinear(LoRALayer):
             else self.qkv_indices
         )
 
+        q_ind, k_ind, v_ind = [], [], []
         lora_ind = []
         if enable_q:
             q_ind = [
