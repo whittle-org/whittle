@@ -53,11 +53,11 @@ attention_configs = {
 def init_attention(config):
     attention = CausalSelfAttention(config, 2)
     torch.manual_seed(0)
-    attention.attn.linear.linear.weight.data = torch.randn_like(
-        attention.attn.linear.linear.weight.data
+    attention.attn.linear.weight.data = torch.randn_like(
+        attention.attn.linear.weight.data
     )
-    attention.attn.linear.linear.bias.data = torch.randn_like(
-        attention.attn.linear.linear.bias.data
+    attention.attn.linear.bias.data = torch.randn_like(
+        attention.attn.linear.bias.data
     )
     attention.proj.linear.bias.data = torch.randn_like(attention.proj.linear.bias.data)
     attention.proj.linear.weight.data = torch.randn_like(

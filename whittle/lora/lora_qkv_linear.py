@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from litgpt.lora import LoRALayer
-from whittle.lora.lora_linear import LoRALinearQKV
+from whittle.modules.linear import LinearQKV
 
 
 class LoRAQKVLinear(LoRALayer):
@@ -33,7 +33,7 @@ class LoRAQKVLinear(LoRALayer):
         super().__init__(r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout)
         self.config = config
         assert out_features == (n_head + 2 * n_query_groups) * head_size
-        self.linear = LoRALinearQKV(in_features, out_features, **kwargs)
+        self.linear = LinearQKV(in_features, out_features, **kwargs)
         self.use_bias = self.linear.use_bias
         self.head_size = head_size
         self.fix_head_size = fix_head_size
@@ -174,7 +174,7 @@ class LoRAQKVLinear(LoRALayer):
                 lora_ind.extend(v_ind)
             self.register_buffer(
                 "_lora_ind",
-                torch.tensor(lora_ind, device=self.linear.linear.weight.device),
+                torch.tensor(lora_ind, device=self.linear.weight.device),
                 persistent=False,
             )
 
@@ -337,13 +337,13 @@ class LoRAQKVLinear(LoRALayer):
     def merge(self) -> None:
         """Merges the LoRA weights into the full-rank weights (W = W + delta_W)."""
         if self.r > 0 and any(self.enable_lora) and not self.merged:
-            pretrained_dtype = self.linear.linear.weight.data.dtype
+            pretrained_dtype = self.linear.weight.data.dtype
             lora_data = self.get_lora_AB()
             # if only the pretrained are in quantized form - dequantize, sum with LoRA and quantize the result
             if pretrained_dtype == torch.uint8:
                 import bitsandbytes as bnb
 
-                weight = self.linear.linear.weight
+                weight = self.linear.weight
                 # dequantize the pretrained weights
                 weight_data = bnb.functional.dequantize_4bit(
                     weight.data, weight.quant_state
@@ -351,15 +351,15 @@ class LoRAQKVLinear(LoRALayer):
                 # add pretrained and LoRA weights
                 weight_data += lora_data
                 # assign updated weights and quantize by moving to CUDA device
-                self.linear.linear.weight = bnb.nn.Params4bit(
+                self.linear.weight = bnb.nn.Params4bit(
                     weight_data, requires_grad=False, **weight.__dict__
                 )
-                self.linear.linear.weight.cuda(weight.device)
+                self.linear.weight.cuda(weight.device)
             else:
                 # self.linear might be on CPU and lora_data on CUDA
                 # the inplace add will preserve the dtype of linear.weight
-                self.linear.linear.weight.data += lora_data.to(
-                    device=self.linear.linear.weight.data.device
+                self.linear.weight.data += lora_data.to(
+                    device=self.linear.weight.data.device
                 )
             self.merged = True
 
