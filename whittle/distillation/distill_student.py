@@ -119,22 +119,24 @@ def setup(
         print(f"Loading teacher model from {initial_checkpoint_dir}")
         config = Config.from_file(initial_checkpoint_dir / "model_config.yaml")
         config.fix_head_size = True
+        model_config = config
 
     elif model_name == "list":
         available_models = "\n".join(sorted(name_to_config))
         print(f"Available values:\n{available_models}")
         quit()
 
+    if model_config is None:
+        # Support both model_name options: meta-llama/Meta-Llama-3-8B & Meta-Llama-3-8B
+        try:
+            config = Config.from_name(model_name)
+        except ValueError:
+            print(f"Model name {model_name} is not supported.\n")
+            available_models = "\n".join(sorted(name_to_config))
+            print(f"Available values:\n{available_models}")
+            quit()
     else:
-        if model_config is None:
-            # Support both model_name options: meta-llama/Meta-Llama-3-8B & Meta-Llama-3-8B
-            try:
-                model_config = Config.from_name(model_name)
-            except ValueError:
-                print(f"Model name {model_name} is not supported.\n")
-                available_models = "\n".join(sorted(name_to_config))
-                print(f"Available values:\n{available_models}")
-                quit()
+        config = model_config
 
     hparams = capture_hparams()
     data = TinyStories() if data is None else data
@@ -219,7 +221,7 @@ def main(
     if fabric.global_rank == 0:
         out_dir.mkdir(parents=True, exist_ok=True)
 
-    tokenizer = Tokenizer(initial_checkpoint_dir)
+    tokenizer = Tokenizer(tokenizer_dir) if tokenizer_dir is not None else None
 
     fabric.seed_everything(seed)
 
