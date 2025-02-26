@@ -3,6 +3,9 @@ from __future__ import annotations
 import pytest
 from litgpt.config import Config
 
+# Skip if deepspeed not installed
+pytest.importorskip("deepspeed")
+
 from whittle.metrics import compute_flops
 from whittle.models.gpt import GPT
 
