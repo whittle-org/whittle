@@ -208,6 +208,8 @@ class CausalSelfAttention(nn.Module):
         self.attn.reset_super_network()
         self.proj.reset_super_network()
         self.sub_attention_scaler = self.config.attention_scores_scalar
+        self.qkv_indices = None
+        self.proj_indices = None
 
     def forward(
         self,

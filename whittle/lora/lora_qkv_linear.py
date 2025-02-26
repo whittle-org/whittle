@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from litgpt.lora import LoRALayer
 
-from whittle.lora.lora_linear import LoRALayer, LoRALinearQKV
+from whittle.modules.linear import LinearQKV
 
 
 class LoRAQKVLinear(LoRALayer):
@@ -31,7 +33,7 @@ class LoRAQKVLinear(LoRALayer):
         super().__init__(r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout)
         self.config = config
         assert out_features == (n_head + 2 * n_query_groups) * head_size
-        self.linear = LoRALinearQKV(in_features, out_features, **kwargs)
+        self.linear = LinearQKV(in_features, out_features, **kwargs)
         self.use_bias = self.linear.use_bias
         self.head_size = head_size
         self.fix_head_size = fix_head_size
@@ -51,6 +53,8 @@ class LoRAQKVLinear(LoRALayer):
         self.q_per_kv = n_head // n_query_groups
         self.sub_network_q_per_kv = self.q_per_kv
         self.qkv_indices = None
+
+        self.merged = False
         # Actual trainable parameters
         # To better understand initialization let's imagine that we have such parameters:
         # ⚬ in_features: 128 (embeddings_size)
@@ -66,7 +70,10 @@ class LoRAQKVLinear(LoRALayer):
             qkv_shapes = (
                 # if `head_size` is explicitly specified in the config, `n_embd` (or `in_features`)
                 # might not be equal to `head_size * n_head`, thus we use it directly here
-                head_size * n_head * self.enable_q,
+                self.sub_network_head_size
+                * self.sub_network_query_groups
+                * self.sub_network_q_per_kv
+                * self.enable_q,
                 head_size * n_query_groups * self.enable_k,
                 head_size * n_query_groups * self.enable_v,
             )
@@ -174,6 +181,14 @@ class LoRAQKVLinear(LoRALayer):
             )
 
         return self._lora_ind
+
+    def reset_parameters(self) -> None:
+        """Reset all the weights, even including pretrained ones."""
+        if hasattr(self, "lora_A"):
+            # initialize A the same way as the default for nn.Linear and B to zero
+            # Wondering why 'a' is equal to math.sqrt(5)?: https://github.com/pytorch/pytorch/issues/15314
+            nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
+            nn.init.zeros_(self.lora_B)
 
     def zero_pad(self, x: torch.Tensor) -> torch.Tensor:
         """Properly pad the last dimension of weight updates with zeros.
@@ -291,7 +306,10 @@ class LoRAQKVLinear(LoRALayer):
         qkv_shapes = [
             # if `head_size` is explicitly specified in the config, `n_embd` (or `in_features`)
             # might not be equal to `head_size * n_head`, thus we use it directly here
-            self.sub_network_head_size * self.sub_network_n_head * self.enable_q,
+            self.sub_network_head_size
+            * self.sub_network_query_groups
+            * self.sub_network_q_per_kv
+            * self.enable_q,
             self.sub_network_head_size * self.sub_network_query_groups * self.enable_k,
             self.sub_network_head_size * self.sub_network_query_groups * self.enable_v,
         ]
@@ -321,7 +339,31 @@ class LoRAQKVLinear(LoRALayer):
     def merge(self) -> None:
         """Merges the LoRA weights into the full-rank weights (W = W + delta_W)."""
         if self.r > 0 and any(self.enable_lora) and not self.merged:
-            super().merge()
+            pretrained_dtype = self.linear.weight.data.dtype
+            lora_data = self.get_lora_AB()
+            # if only the pretrained are in quantized form - dequantize, sum with LoRA and quantize the result
+            if pretrained_dtype == torch.uint8:
+                import bitsandbytes as bnb
+
+                weight = self.linear.weight
+                # dequantize the pretrained weights
+                weight_data = bnb.functional.dequantize_4bit(
+                    weight.data, weight.quant_state
+                ).to(lora_data.dtype)
+                # add pretrained and LoRA weights
+                weight_data += lora_data
+                # assign updated weights and quantize by moving to CUDA device
+                self.linear.weight = bnb.nn.Params4bit(
+                    weight_data, requires_grad=False, **weight.__dict__
+                )
+                self.linear.weight.cuda(weight.device)
+            else:
+                # self.linear might be on CPU and lora_data on CUDA
+                # the inplace add will preserve the dtype of linear.weight
+                self.linear.weight.data += lora_data.to(
+                    device=self.linear.weight.data.device
+                )
+            self.merged = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Do the forward pass.
