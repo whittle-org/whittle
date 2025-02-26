@@ -67,7 +67,7 @@ class SparseGPTPruner(Pruner):
             for j in range(nsamples):
                 with torch.no_grad():
                     outs[j] = layer(
-                        inps[j].unsqueeze(0),
+                        inps[j],
                         mask=attention_mask,
                         cos=model.cos,
                         sin=model.sin,
@@ -91,7 +91,7 @@ class SparseGPTPruner(Pruner):
 
             for j in range(nsamples):
                 outs[j] = layer(
-                    inps[j].unsqueeze(0),
+                    inps[j],
                     mask=attention_mask,
                     cos=model.cos,
                     sin=model.sin,
@@ -102,6 +102,3 @@ class SparseGPTPruner(Pruner):
             torch.cuda.empty_cache()
 
             inps, outs = outs, inps
-
-        model.config.use_cache = True
-        torch.cuda.empty_cache()
