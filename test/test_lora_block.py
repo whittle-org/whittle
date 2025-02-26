@@ -39,12 +39,10 @@ def test_block():
     block = Block(config, 0)
     input = torch.rand(8, 512, 64)
     mask = build_mask_cache(512)
-    block.attn.attn.linear.linear.weight.data = torch.ones_like(
-        block.attn.attn.linear.linear.weight.data
+    block.attn.attn.linear.weight.data = torch.ones_like(
+        block.attn.attn.linear.weight.data
     )
-    block.attn.attn.linear.linear.bias.data = torch.ones_like(
-        block.attn.attn.linear.linear.bias.data
-    )
+    block.attn.attn.linear.bias.data = torch.ones_like(block.attn.attn.linear.bias.data)
     block.attn.proj.linear.bias.data = torch.ones_like(block.attn.proj.linear.bias.data)
     block.attn.proj.linear.weight.data = torch.ones_like(
         block.attn.proj.linear.weight.data
