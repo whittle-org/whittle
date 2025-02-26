@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
-import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from litgpt.lora import LoRALayer
+
 from whittle.modules.linear import LinearQKV
 
 
@@ -53,6 +53,7 @@ class LoRAQKVLinear(LoRALayer):
         self.q_per_kv = n_head // n_query_groups
         self.sub_network_q_per_kv = self.q_per_kv
         self.qkv_indices = None
+        self.merged = False
         # Actual trainable parameters
         # To better understand initialization let's imagine that we have such parameters:
         # ⚬ in_features: 128 (embeddings_size)
@@ -120,7 +121,6 @@ class LoRAQKVLinear(LoRALayer):
         # trigger resetting the indices for LoRA
         self._set_lora_ind()
 
-
     def reset_super_network(self):
         """Resets the dimensionality of the current sub-network to the super-network dimensionality."""
         self.sub_network_in_features = self.in_features
@@ -149,19 +149,19 @@ class LoRAQKVLinear(LoRALayer):
             self._set_lora_ind()
 
         return self._q_ind
-    
+
     @property
     def k_ind(self) -> list[int]:
         if not hasattr(self, "_k_ind"):
             self._set_lora_ind()
 
         return self._k_ind
-    
+
     @property
     def v_ind(self) -> list[int]:
         if not hasattr(self, "_v_ind"):
             self._set_lora_ind()
-    
+
         return self._v_ind
 
     def _set_lora_ind(self) -> None:
@@ -179,8 +179,7 @@ class LoRAQKVLinear(LoRALayer):
             q_ind = [
                 x
                 for x in candidate_indices
-                if (x // self.sub_network_head_size) % qkv_group_size
-                < qkv_group_size - 2
+                if (x // self.sub_network_head_size) % qkv_group_size < qkv_group_size - 2
             ]
             lora_ind.extend(q_ind)
         if enable_k:
@@ -307,7 +306,7 @@ class LoRAQKVLinear(LoRALayer):
 
         for ind, weight in zip(active_inds, x):
             result = result.index_copy_(dim=-1, index=ind, source=weight)  # (64, 64, 384)
-        
+
         return result
 
     def conv1d(self, input: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
@@ -320,7 +319,7 @@ class LoRAQKVLinear(LoRALayer):
         corresponding input's part and concatenate the result.
 
         Compared to litgpt, we don't use `groups` in case the number of heads is equal to the number of query groups
-        (grouped queries are disabled). We still need the more complex indexing because of sub-network selection.       
+        (grouped queries are disabled). We still need the more complex indexing because of sub-network selection.
 
         Args:
             input: input matrix of shape (B, C, T)
@@ -340,7 +339,7 @@ class LoRAQKVLinear(LoRALayer):
         input_splitted = input.chunk(sum(self.enable_lora), dim=1)  # N * (B, C // N, T)
         # (256, 2) -> (256, 2, 1) -> split to (q, 2, 1), (k, 2, 1), (v, 2, 1)
         # (k + v + q = 256, k = v, q = self.q_per_kv * k)
-        
+
         active_inds = [self.q_ind, self.k_ind, self.v_ind]
         active_inds = [ind for ind in active_inds if len(ind) > 0]
 
@@ -360,7 +359,7 @@ class LoRAQKVLinear(LoRALayer):
             self.lora_B,  # (256, 2) -> (256, 2, 1) -> splitted (inside conv1d)
         )  # (1, 4, 128) @ (256, 2, 1) -> (1, 256, 128) -> (256, 128)
         return self.zero_pad(
-            [l.squeeze(0).T * self.scaling for l in lora.T]
+            [lora_w.squeeze(0).T * self.scaling for lora_w in lora.T]
         ).T  # (256, 128) after zero_pad (384, 128)
 
     def merge(self) -> None:
@@ -422,14 +421,14 @@ class LoRAQKVLinear(LoRALayer):
         # For F.conv1d:
         # ⚬ input: input tensor of shape (mini-batch, in_channels, iW)
         # ⚬ weight: filters of shape (out_channels, in_channels/groups, kW)
-        
+
         # changes compared to litgpt - we need more flexible indexing because of sub-network selection
         after_B = self.conv1d(
             after_A.transpose(-2, -1),  # (64, 64, 4) -> (64, 4, 64)
             self.lora_B,  # (256, 2) -> (256, 2, 1) -> split to (q, 2, 1), (k, 2, 1), (v, 2, 1)
-        ) # (64, 4, 64) @ (256, 2, 1) -> (64, 256, 64)
+        )  # (64, 4, 64) @ (256, 2, 1) -> (64, 256, 64)
 
-        lora = (
-            self.zero_pad([a.transpose(-2, -1) * self.scaling for a in after_B])
+        lora = self.zero_pad(
+            [a.transpose(-2, -1) * self.scaling for a in after_B]
         )  # (64, 64, 256) after zero_pad (64, 64, 384)
         return pretrained + lora

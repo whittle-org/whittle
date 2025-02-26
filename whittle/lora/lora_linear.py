@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from litgpt.lora import LoRALayer
 
-from whittle.modules.linear import Linear, LinearProj, LinearQKV
+from whittle.modules.linear import Linear, LinearProj
 
 
 class LoRALinear(LoRALayer):
