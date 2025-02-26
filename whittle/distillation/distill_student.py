@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import os
-import random
 import torch
 import math
 import pprint
 import time
-import json
 from datetime import timedelta
 from pathlib import Path
 from typing import Literal, Optional, Dict, Any
@@ -90,7 +88,7 @@ def setup(
     logger_name: Literal["wandb", "tensorboard", "csv"] = "wandb",
     seed: int = 42,
 ):
-    """Run multiple distillation experiments with different subnetwork configurations.
+    """Train a random subnet of the teacher model using knowledge distillation.
 
     Arguments:
         model_name: The name of the model to pretrain. Choose from names in ``litgpt.config``. Use "list" to list the supported models.
@@ -222,9 +220,6 @@ def main(
         out_dir.mkdir(parents=True, exist_ok=True)
 
     tokenizer = Tokenizer(initial_checkpoint_dir)
-    random.seed(random.randint(0, 2**32 - 1))
-    exp_seed = random.randint(0, 2**32 - 1)
-    fabric.print(f"Experiment seed: {exp_seed}")
 
     fabric.seed_everything(seed)
 
@@ -257,7 +252,7 @@ def main(
     # Get search space for creating different subnetworks
     search_space = get_search_space(teacher_config)
 
-    sampler = RandomSampler(search_space, seed=exp_seed)
+    sampler = RandomSampler(search_space, seed=seed)
     random_config = sampler.sample()
             
     if fabric.global_rank == 0:
@@ -297,7 +292,7 @@ def main(
 
     # Log the subnetwork configuration to the logger
     exp_config = {
-        "seed": exp_seed,
+        "seed": seed,
         "embed_dim": random_config["embed_dim"],
         "mlp_ratio": random_config["mlp_ratio"],
         "num_heads": random_config["num_heads"],
@@ -322,7 +317,7 @@ def main(
         fabric.load(resume, state)
 
     train_time = time.perf_counter()
-    train_results = fit(
+    fit(
         fabric, devices, state, train_dataloader, val_dataloader, 
         out_dir, tokenizer_dir, train, eval, distill
     )
@@ -343,38 +338,21 @@ def main(
 
     # Track experiment results
     total_tokens = state["iter_num"] * train.micro_batch_size * student.max_seq_length * fabric.world_size
-    training_time = time.perf_counter() - train_time
     
-    # Create a results summary
-    experiment_summary = {
-        "config": {
-            "embed_dim": random_config["embed_dim"],
-            "mlp_ratio": random_config["mlp_ratio"],
-            "num_heads": random_config["num_heads"],
-            "depth": random_config["depth"],
-        },
-        "subnetwork": subnetwork,
-        "parameters": param_count,
-        "parameter_reduction": float(param_count/compute_parameters(teacher)),
-        "training_time_seconds": training_time,
-        "total_tokens": total_tokens,
-        "tokens_per_second": total_tokens / training_time,
-        "final_train_loss": train_results.get("final_train_loss", None),
-        "final_val_loss": train_results.get("final_val_loss", None),
-        "final_val_ppl": train_results.get("final_val_ppl", None),
-    }
-    
-    experiment_results = []
-    experiment_results["students"].append(experiment_summary)
-    
-    for result in experiment_results["students"]:
-        fabric.print(f"\n Embed dim: {result['config']['embed_dim']}, Depth: {result['config']['depth']}")
-        fabric.print(f"  - Parameters: {result['parameters']:,} ({result['parameter_reduction']:.2%} of teacher)")
-        if result.get("final_val_loss") is not None:
-            fabric.print(f"  - Val loss: {result['final_val_loss']:.4f}, Val ppl: {result['final_val_ppl']:.4f}")
-        fabric.print(f"  - Training time: {result['training_time_seconds']:.2f}s")
-    
-    fabric.print("\n" + "=" * 80)
+    # Print formatted output
+    separator = "-" * 40
+    fabric.print(separator)
+    fabric.print("| Performance")
+    fabric.print(f"| - Total tokens  : {total_tokens:,}")
+    fabric.print(f"| - Training Time : {(time.perf_counter()-train_time):.2f} s")
+    fabric.print(f"| - Tok/sec       : {total_tokens / train_time:.2f} tok/s")
+    fabric.print("| " + "-" * 40)
+
+    if fabric.device.type == "cuda":
+        memory_used = torch.cuda.max_memory_allocated() / 1e9
+        fabric.print("| Memory Usage")
+        fabric.print(f"| - Memory Used   : {memory_used:.2f} GB")
+    fabric.print(separator)
 
 def fit(
     fabric: L.Fabric,
