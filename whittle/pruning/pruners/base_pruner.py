@@ -126,7 +126,11 @@ class Pruner:
                 with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
                     with torch.no_grad():
                         torch.cuda.empty_cache()
-                        model(batch[0].to(dev))
+                        if isinstance(batch, (tuple, list)):
+                            inputs = batch[0]
+                        elif isinstance(batch, dict):
+                            inputs = batch["input_ids"]
+                        model(inputs.to(dev))
             except ValueError:
                 pass
         layers[0] = layers[0].module
