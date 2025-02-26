@@ -42,9 +42,7 @@ def test_block():
     block.attn.attn.linear.weight.data = torch.ones_like(
         block.attn.attn.linear.weight.data
     )
-    block.attn.attn.linear.bias.data = torch.ones_like(
-        block.attn.attn.linear.bias.data
-    )
+    block.attn.attn.linear.bias.data = torch.ones_like(block.attn.attn.linear.bias.data)
     block.attn.proj.linear.bias.data = torch.ones_like(block.attn.proj.linear.bias.data)
     block.attn.proj.linear.weight.data = torch.ones_like(
         block.attn.proj.linear.weight.data

@@ -56,9 +56,7 @@ def init_attention(config):
     attention.attn.linear.weight.data = torch.randn_like(
         attention.attn.linear.weight.data
     )
-    attention.attn.linear.bias.data = torch.randn_like(
-        attention.attn.linear.bias.data
-    )
+    attention.attn.linear.bias.data = torch.randn_like(attention.attn.linear.bias.data)
     attention.proj.linear.bias.data = torch.randn_like(attention.proj.linear.bias.data)
     attention.proj.linear.weight.data = torch.randn_like(
         attention.proj.linear.weight.data
