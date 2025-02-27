@@ -37,6 +37,7 @@ from litgpt.utils import (
     get_default_supported_precision,
     init_out_dir,
     instantiate_torch_optimizer,
+    load_checkpoint,
     parse_devices,
     save_hyperparameters,
     copy_config_files,
@@ -65,7 +66,7 @@ def setup(
         log_interval=1,
         global_batch_size=512,
         micro_batch_size=4,
-        max_tokens=int(3e6),
+        max_tokens=int(7e7),
         max_norm=1.0,
         min_lr=4e-5,
         lr_warmup_steps=2000,
@@ -74,9 +75,9 @@ def setup(
     distill: DistillArgs = DistillArgs(
         method='logits',
         temperature=5,
-        alpha=0.7,
+        alpha=0.4,
     ),
-    eval: EvalArgs = EvalArgs(interval=1000, max_iters=100),
+    eval: EvalArgs = EvalArgs(interval=1000, max_iters=100, initial_validation=True),
     optimizer: str | dict = "AdamW",
     devices: int | str = "auto",
     num_nodes: int = 1,
@@ -219,11 +220,9 @@ def main(
         teacher = GPT(teacher_config)
     
     checkpoint = os.path.join(initial_checkpoint_dir, "lit_model.pth")
-    ckpt = torch.load(checkpoint, map_location=fabric.device, weights_only=True)
-    teacher.load_state_dict(ckpt, strict=False)
-    teacher.reset_super_network()
-
-    teacher = fabric.setup_module(teacher, move_to_device=True)
+    teacher = fabric.setup(teacher)
+    load_checkpoint(fabric, teacher, checkpoint, strict=False)
+    
     teacher.eval()
     teacher_val_loss = validate(fabric, teacher, val_dataloader, max_iters=eval.max_iters)
     teacher_val_loss = teacher_val_loss.item()
@@ -246,8 +245,8 @@ def main(
     student_checkpoint = os.path.join(student_dir, "lit_model.pth") if student_dir else None
 
     if student_checkpoint:
-        ckpt = torch.load(student_checkpoint, map_location=fabric.device, weights_only=True)
-        student.load_state_dict(ckpt, strict=False)
+        student = fabric.setup(student)
+        load_checkpoint(fabric, student, student_checkpoint)
         fabric.print(f"Student model loaded from {student_dir} (not compiled)")
     
     if student_config is None:
@@ -258,7 +257,7 @@ def main(
         subnetwork = {
             "sub_network_n_embd": random_config["embed_dim"],
             "sub_network_intermediate_size": int(random_config["mlp_ratio"] * random_config["embed_dim"]),
-            "sub_network_num_heads": random_config["num_heads"],
+            "sub_network_num_heads": teacher_config.n_head, # keep the same number of heads as teacher
             "sub_network_n_layers": random_config["depth"]
         }   
 
@@ -289,7 +288,6 @@ def main(
             "seed": seed,
             "embed_dim": student_config.n_embd,
             "mlp_ratio": student_config.intermediate_size / student_config.n_embd,
-            "num_heads": student_config.n_head,
             "depth": student_config.n_layer,
             "parameter_count": param_count,
             "reduction_ratio": param_count/compute_parameters(teacher)
@@ -299,14 +297,12 @@ def main(
             "seed": seed,
             "embed_dim": random_config["embed_dim"],
             "mlp_ratio": random_config["mlp_ratio"],
-            "num_heads": random_config["num_heads"],
             "depth": random_config["depth"],
             "parameter_count": param_count,
             "reduction_ratio": param_count/compute_parameters(teacher)
         }
         student.config.n_embd = exp_config["embed_dim"]
         student.config.intermediate_size = int(exp_config["mlp_ratio"] * exp_config["embed_dim"])
-        student.config.n_head = exp_config["num_heads"]
         student.config.n_layer = exp_config["depth"]
         
     fabric.logger.log_hyperparams(exp_config)
