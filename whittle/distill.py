@@ -48,6 +48,7 @@ from whittle.sampling.random_sampler import RandomSampler
 from whittle.pretrain_super_network import get_search_space
 from whittle.models.gpt.model import GPT
 from whittle.models.gpt.blocks import Block
+from whittle.models.gpt.extract import extract_current_sub_network
 from whittle.args import DistillArgs
 from whittle.loss.kd_loss import DistillLoss
 from whittle.metrics.parameters import compute_parameters
@@ -56,7 +57,7 @@ from jsonargparse import CLI
 from pathlib import Path
 
 def setup(
-    out_dir: Path = Path("examples/gpt/out/distill_experiments"),
+    out_dir: Path = Path("examples/gpt/out/distill"),
     precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
     initial_checkpoint_dir: Path | None = None,
     student_dir: Path | None = None,
@@ -66,7 +67,7 @@ def setup(
         log_interval=1,
         global_batch_size=512,
         micro_batch_size=4,
-        max_tokens=int(7e7),
+        max_tokens=int(5e8),
         max_norm=1.0,
         min_lr=4e-5,
         lr_warmup_steps=2000,
@@ -82,8 +83,10 @@ def setup(
     devices: int | str = "auto",
     num_nodes: int = 1,
     tokenizer_dir: Path | None = None,
-    logger_name: Literal["wandb", "tensorboard", "csv"] = "wandb",
+    logger_name: Literal["wandb", "tensorboard", "csv"] = "csv",
     seed: int = 42,
+    min_ratio: float = 0.3,
+    max_ratio: float = 0.7,
 ):
     """Train a (random) subnet of the teacher model using knowledge distillation.
 
@@ -106,6 +109,8 @@ def setup(
             modules require this.
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
+        min_ratio: Minimum allowed ratio (student_params / teacher_params).
+        max_ratio: Maximum allowed ratio (student_params / teacher_params).
     """
     if initial_checkpoint_dir is not None:
         print(f"Loading teacher model config from {initial_checkpoint_dir}")
@@ -119,6 +124,9 @@ def setup(
         student_config = Config.from_file(student_dir / "model_config.yaml")
     else:
         student_config = None
+        assert min_ratio < max_ratio, "min_ratio must be less than max_ratio"
+        assert 0 < min_ratio < 1, "min_ratio must be between 0 and 1"
+        assert 0 < max_ratio < 1, "max_ratio must be between 0 and 1"
 
     hparams = capture_hparams()
     data = TinyStories() if data is None else data
@@ -166,9 +174,9 @@ def setup(
 
     main(
         fabric,
+        initial_checkpoint_dir,
         num_devices,
         seed,
-        initial_checkpoint_dir,
         config,
         student_config,
         data,
@@ -180,13 +188,16 @@ def setup(
         eval,
         optimizer,
         student_dir,
+        min_ratio, 
+        max_ratio,
+        logger_name,
     )
 
 def main(
     fabric: L.Fabric,
+    initial_checkpoint_dir: Path,
     devices: int,
     seed: int = 42,
-    initial_checkpoint_dir: Path | None = None,
     teacher_config: Config | None = None,
     student_config: Config | None = None,
     dataset: DataModule | None = None,
@@ -198,6 +209,9 @@ def main(
     eval: EvalArgs = EvalArgs(),
     optimizer: str | dict = "AdamW",
     student_dir: Path | None = None,
+    min_ratio: float = 0.3,
+    max_ratio: float = 0.7,
+    logger_name: Literal["wandb", "tensorboard", "csv"] = "csv",
 ):  
     if fabric.global_rank == 0:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -250,20 +264,27 @@ def main(
         fabric.print(f"Student model loaded from {student_dir} (not compiled)")
     
     if student_config is None:
-        fabric.print(f"Student model set to a random subnetwork of the teacher model")
+        fabric.print(f"Student model set to a random subnetwork of the teacher model, within the given ratio bounds")
         search_space = get_search_space(teacher_config)
         sampler = RandomSampler(search_space, seed=seed)
-        random_config = sampler.sample()
-        subnetwork = {
-            "sub_network_n_embd": random_config["embed_dim"],
-            "sub_network_intermediate_size": int(random_config["mlp_ratio"] * random_config["embed_dim"]),
-            "sub_network_num_heads": teacher_config.n_head, # keep the same number of heads as teacher
-            "sub_network_n_layers": random_config["depth"]
-        }   
+        valid = False
+        while not valid:
+            random_config = sampler.sample()
+            subnetwork = {
+                "sub_network_n_embd": random_config["embed_dim"],
+                "sub_network_intermediate_size": int(random_config["mlp_ratio"] * random_config["embed_dim"]),
+                "sub_network_num_heads": teacher_config.n_head, # keep the same number of heads as teacher
+                "sub_network_n_layers": random_config["depth"]
+            }   
 
-        student.set_sub_network(**subnetwork)
-        initialize_weights(fabric, student, n_layer=random_config["depth"], n_embd=random_config["embed_dim"])
-        
+            student.set_sub_network(**subnetwork)
+            initialize_weights(fabric, student, n_layer=random_config["depth"], n_embd=random_config["embed_dim"])
+            param_count = compute_parameters(student)
+            ratio = param_count / compute_parameters(teacher)
+            if min_ratio <= ratio <= max_ratio:
+                valid = True
+
+    student = extract_current_sub_network(student) if student_config is None else student
     student = fabric.setup_module(student, move_to_device=True)
     
     if use_compile_student:
@@ -274,8 +295,13 @@ def main(
         except Exception as e:
             fabric.print(f"Error compiling student model: {e}")
             fabric.print("Continuing with uncompiled student model")
-
-    extra_kwargs = {"fused": fabric.device.type == "cuda"}
+    
+    # Use fused optimizer only if not compiling student to avoid dtype/device mismatches.
+    if use_compile_student:
+        extra_kwargs = {}
+    else:
+        extra_kwargs = {"fused": fabric.device.type == "cuda"}
+        
     optimizer = instantiate_torch_optimizer(optimizer, student.parameters(), **extra_kwargs)
     optimizer = fabric.setup_optimizers(optimizer)
 
@@ -283,29 +309,17 @@ def main(
     fabric.print(f"Student model has {param_count:,} parameters")
     fabric.print(f"Model parameter reduction: {param_count/compute_parameters(teacher):.2%}")
 
-    if student_config:
-        exp_config = {
+    exp_config = {
             "seed": seed,
-            "embed_dim": student_config.n_embd,
-            "mlp_ratio": student_config.intermediate_size / student_config.n_embd,
-            "depth": student_config.n_layer,
+            "embed_dim": student.config.n_embd,
+            "mlp_ratio": student.config.intermediate_size / student.config.n_embd,
+            "depth": student.config.n_layer,
             "parameter_count": param_count,
             "reduction_ratio": param_count/compute_parameters(teacher)
         }
-    else:
-        exp_config = {
-            "seed": seed,
-            "embed_dim": random_config["embed_dim"],
-            "mlp_ratio": random_config["mlp_ratio"],
-            "depth": random_config["depth"],
-            "parameter_count": param_count,
-            "reduction_ratio": param_count/compute_parameters(teacher)
-        }
-        student.config.n_embd = exp_config["embed_dim"]
-        student.config.intermediate_size = int(exp_config["mlp_ratio"] * exp_config["embed_dim"])
-        student.config.n_layer = exp_config["depth"]
         
-    fabric.logger.log_hyperparams(exp_config)
+    if logger_name in ("tensorboard", "wandb"):
+        fabric.logger.log_hyperparams(exp_config)
 
     state = {
         "teacher": teacher,
@@ -507,7 +521,6 @@ def fit(
                 "step_count": state["step_count"],
             }
             save_checkpoint(fabric, student_state, tokenizer_dir, out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth")
-            fabric.log_dict(metrics, step=state["iter_num"] - 1)
             fabric.barrier()
 
     if eval.final_validation:
@@ -517,6 +530,7 @@ def fit(
         metrics = {"val_loss": val_loss_value, "val_ppl": ppl, "params": compute_parameters(student)}
         
         fabric.log_dict(metrics, step=state["iter_num"])
+        fabric.print(f"Final evaluation | val loss: {val_loss_value:.3f} | val ppl: {ppl:.3f}")
         fabric.print(f"Final evaluation | val loss: {val_loss_value:.3f} | val ppl: {ppl:.3f}")
     
 
