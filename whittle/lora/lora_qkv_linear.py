@@ -164,6 +164,27 @@ class LoRAQKVLinear(LoRALayer):
 
         return self._v_ind
 
+    @property
+    def q_target(self) -> list[int]:
+        if not hasattr(self, "_q_target"):
+            self._set_lora_ind()
+
+        return self._q_target
+
+    @property
+    def k_target(self) -> list[int]:
+        if not hasattr(self, "_k_target"):
+            self._set_lora_ind()
+
+        return self._k_target
+
+    @property
+    def v_target(self) -> list[int]:
+        if not hasattr(self, "_v_target"):
+            self._set_lora_ind()
+
+        return self._v_target
+
     def _set_lora_ind(self) -> None:
         """Set the indices for LoRA."""
         enable_q, enable_k, enable_v = self.enable_lora
@@ -174,63 +195,56 @@ class LoRAQKVLinear(LoRALayer):
             else self.qkv_indices
         )
 
-        q_ind, k_ind, v_ind = [], [], []
-        lora_ind = []
+        q_ind: list[int] = []
+        k_ind: list[int] = []
+        v_ind: list[int] = []
+        q_target: list[int] = []
+        k_target: list[int] = []
+        v_target: list[int] = []
         if enable_q:
-            q_ind = [
-                x
-                for x in candidate_indices
-                if (x // self.sub_network_head_size) % qkv_group_size < qkv_group_size - 2
+            q_indices: list[tuple[int, int]] = [
+                (x, i)
+                for i, x in enumerate(candidate_indices)
+                if (i // self.sub_network_head_size) % qkv_group_size < qkv_group_size - 2
             ]
-            lora_ind.extend(q_ind)
+            q_ind, q_target = zip(*q_indices)  # type: ignore[assignment]
         if enable_k:
-            k_ind = [
-                x
-                for x in candidate_indices
-                if (x // self.sub_network_head_size) % qkv_group_size
+            k_indices: list[tuple[int, int]] = [
+                (x, i)
+                for i, x in enumerate(candidate_indices)
+                if (i // self.sub_network_head_size) % qkv_group_size
                 == qkv_group_size - 2
             ]
-            lora_ind.extend(k_ind)
+            k_ind, k_target = zip(*k_indices)  # type: ignore[assignment]
         if enable_v:
-            v_ind = [
-                x
-                for x in candidate_indices
-                if (x // self.sub_network_head_size) % qkv_group_size
+            v_indices: list[tuple[int, int]] = [
+                (x, i)
+                for i, x in enumerate(candidate_indices)
+                if (i // self.sub_network_head_size) % qkv_group_size
                 == qkv_group_size - 1
             ]
-            lora_ind.extend(v_ind)
+            v_ind, v_target = zip(*v_indices)  # type: ignore[assignment]
+
+        # *_ind indices are the same as self.qkv_indices, only splitted into 3 parts (for q, k and v)
+        # *_target indices serve for populating the resulting tensor -> since we do not index in super-network
+        # anymore, we need indices relative to the sub-network tensor (e.g. for out_features == 16)
+        # and sub-network out_features == 3, if qkv_indices are [0, 14, 15], our target indices will be [0, 1, 2]
+        all_indices = [
+            (q_ind, "_q_ind"),
+            (k_ind, "_k_ind"),
+            (v_ind, "_v_ind"),
+            (q_target, "_q_target"),
+            (k_target, "_k_target"),
+            (v_target, "_v_target"),
+        ]
 
         # lazy creation of a buffer with LoRA indices to overcome the limitation when FSDP with meta device is used
-        lora_ind = torch.tensor(lora_ind, device=self.linear.weight.device)
-        if not hasattr(self, "_lora_ind"):
-            self.register_buffer("_lora_ind", lora_ind, persistent=False)
-        else:
-            self._lora_ind = lora_ind
-
-        q_ind = torch.tensor(q_ind, device=self.linear.weight.device)
-        if not hasattr(self, "_q_ind"):
-            self.register_buffer("_q_ind", q_ind, persistent=False)
-        else:
-            self._q_ind = q_ind
-
-        k_ind = torch.tensor(k_ind, device=self.linear.weight.device)
-        if not hasattr(self, "_k_ind"):
-            self.register_buffer("_k_ind", k_ind, persistent=False)
-        else:
-            self._k_ind = k_ind
-
-        v_ind = torch.tensor(v_ind, device=self.linear.weight.device)
-        if not hasattr(self, "_v_ind"):
-            self.register_buffer("_v_ind", v_ind, persistent=False)
-        else:
-            self._v_ind = v_ind
-
-    @property
-    def lora_ind(self) -> torch.Tensor:
-        if not hasattr(self, "_lora_ind"):
-            self._set_lora_ind()
-
-        return self._lora_ind
+        for index_value, index_name in all_indices:
+            index_tensor = torch.tensor(index_value, device=self.linear.weight.device)
+            if not hasattr(self, index_name):
+                self.register_buffer(index_name, index_tensor, persistent=False)
+            else:
+                setattr(self, index_name, index_tensor)
 
     def reset_parameters(self) -> None:
         """Reset all the weights, even including pretrained ones."""
@@ -302,7 +316,7 @@ class LoRAQKVLinear(LoRALayer):
             *x[0].shape[:-1], self.sub_network_out_features
         )  # (64, 64, 384)
 
-        active_inds = [self.q_ind, self.k_ind, self.v_ind]
+        active_inds = [self.q_target, self.k_target, self.v_target]
         active_inds = [ind for ind in active_inds if len(ind) > 0]
 
         for ind, weight in zip(active_inds, x):
