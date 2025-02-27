@@ -83,19 +83,16 @@ def test_zero_pad(qkv_config):
 
     # now we check back the order
     assert torch.all(q_values < 1000)
-    assert torch.allclose(
-        q_values, qkv_weights[0].flatten()[: q_values.numel()], atol=1e-6
-    )
+    assert q_values.numel() == qkv_weights[0].numel()
+    assert torch.allclose(q_values, qkv_weights[0].flatten(), atol=1e-6)
 
     assert torch.all((1000 <= k_values) & (k_values < 10000))
-    assert torch.allclose(
-        k_values, qkv_weights[1].flatten()[: k_values.numel()], atol=1e-6
-    )
+    assert k_values.numel() == qkv_weights[1].numel()
+    assert torch.allclose(k_values, qkv_weights[1].flatten(), atol=1e-6)
 
     assert torch.all(v_values >= 10000)
-    assert torch.allclose(
-        v_values, qkv_weights[2].flatten()[: v_values.numel()], atol=1e-6
-    )
+    assert v_values.numel() == qkv_weights[2].numel()
+    assert torch.allclose(v_values, qkv_weights[2].flatten(), atol=1e-6)
 
     # Reshape and permute for final check
     result = result.view(
@@ -213,13 +210,16 @@ def test_zero_pad_sub_network(qkv_config):
 
     # assert conditions
     assert torch.all(q_values < 1000)
-    assert torch.all(q_values == qkv_weights[0][: q_values.numel()])
+    assert q_values.numel() == qkv_weights[0].numel()
+    assert torch.all(q_values == qkv_weights[0])
 
     assert torch.all((1000 <= k_values) & (k_values < 10000))
-    assert torch.all(k_values == qkv_weights[1][: k_values.numel()])
+    assert k_values.numel() == qkv_weights[1].numel()
+    assert torch.all(k_values == qkv_weights[1])
 
     assert torch.all(v_values >= 10000)
-    assert torch.all(v_values == qkv_weights[2][: v_values.numel()])
+    assert v_values.numel() == qkv_weights[2].numel()
+    assert torch.all(v_values == qkv_weights[2])
 
     # one last check to see what happens after splitting it in causal self attention
     result = result.view(
