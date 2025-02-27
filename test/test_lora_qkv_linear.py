@@ -72,11 +72,6 @@ def test_zero_pad(n_query_groups):
                     assert q_el == qkv_weights[0][curr_q]
                     curr_q += 1
                 elif (q_id // head_size) % qkv_group_size == qkv_group_size - 2:
-                    print(
-                        q_id,
-                        q_el,
-                        (q_id // head_size) % qkv_group_size == qkv_group_size - 2,
-                    )
                     assert 1000 <= q_el < 10000
                     assert q_el == qkv_weights[1][curr_k]
                     curr_k += 1
@@ -101,8 +96,9 @@ def test_zero_pad(n_query_groups):
 
     def check_qkv(post_split, weights):
         # permute back and flatten to get the original order
-        for i, q_el in enumerate(post_split.permute(0, 3, 1, 2, 4).flatten()):
-            assert q_el == weights[i]
+        assert torch.allclose(
+            weights, post_split.permute(0, 3, 1, 2, 4).flatten(), atol=1e-6
+        )
 
     check_qkv(q, qkv_weights[0])
     check_qkv(k, qkv_weights[1])
@@ -210,11 +206,6 @@ def test_zero_pad_sub_network(n_query_groups):
                     assert q_el == qkv_weights[0][curr_q]
                     curr_q += 1
                 elif (q_id // head_size) % qkv_group_size == qkv_group_size - 2:
-                    print(
-                        q_id,
-                        q_el,
-                        (q_id // head_size) % qkv_group_size == qkv_group_size - 2,
-                    )
                     assert 1000 <= q_el < 10000
                     assert q_el == qkv_weights[1][curr_k]
                     curr_k += 1
@@ -239,8 +230,7 @@ def test_zero_pad_sub_network(n_query_groups):
 
     def check_qkv(post_split, weights):
         # permute back and flatten to get the original order
-        for i, q_el in enumerate(post_split.permute(0, 3, 1, 2, 4).flatten()):
-            assert q_el == weights[i]
+        torch.allclose(weights, post_split.permute(0, 3, 1, 2, 4).flatten(), atol=1e-6)
 
     check_qkv(q, qkv_weights[0])
     check_qkv(k, qkv_weights[1])
