@@ -55,7 +55,6 @@ from jsonargparse import CLI
 from pathlib import Path
 
 def setup(
-    load_student_checkpoint: bool = False,
     out_dir: Path = Path("examples/gpt/out/distill_experiments"),
     precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
     initial_checkpoint_dir: Path | None = None,
@@ -66,7 +65,7 @@ def setup(
         log_interval=1,
         global_batch_size=512,
         micro_batch_size=4,
-        max_tokens=int(3e7),
+        max_tokens=int(3e6),
         max_norm=1.0,
         min_lr=4e-5,
         lr_warmup_steps=2000,
@@ -85,17 +84,19 @@ def setup(
     logger_name: Literal["wandb", "tensorboard", "csv"] = "wandb",
     seed: int = 42,
 ):
-    """Train a random subnet of the teacher model using knowledge distillation.
+    """Train a (random) subnet of the teacher model using knowledge distillation.
 
     Arguments:
-        load_student_checkpoint: Whether to load the student model from a checkpoint.
         out_dir: Directory in which to save checkpoints and logs. If running in a Lightning Studio Job, look for it in
             /teamspace/jobs/<job-name>/share.
         precision: The precision to use for finetuning. Determines a compatible precision setting by default.
         initial_checkpoint_dir: Path to a checkpoint directory to initialize the teacher model from.
-        student_dir: Optional path to a directory to initialize the student model from.
+        student_dir: Optional path to a directory to initialize the student model from. 
+            Checks for student model config and checkpoint.
+            If not provided, the student model will be initialized as a random subnetwork of the teacher model.
         data: Data-related arguments. If not provided, the default is ``litgpt.data.TinyStories``.
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
+        distill: Distillation-related arguments. See ``whittle.args.DistillArgs`` for details.
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
         optimizer: An optimizer name (such as "AdamW") or config.
         devices: How many devices/GPUs to use. Uses all GPUs by default.
@@ -115,7 +116,6 @@ def setup(
     if student_dir:
         print(f"Loading student model config from {student_dir}")
         student_config = Config.from_file(student_dir / "model_config.yaml")
-        student_config.fix_head_size = True
     else:
         student_config = None
 
@@ -131,7 +131,7 @@ def setup(
     logger = choose_logger(
         logger_name,
         out_dir,
-        name=f"one-model-distill-experiments-{config.name}",
+        name=f"distill-{config.name}",
         log_interval=train.log_interval,
     )
 
@@ -179,7 +179,6 @@ def setup(
         eval,
         optimizer,
         student_dir,
-        load_student_checkpoint,
     )
 
 def main(
@@ -198,7 +197,6 @@ def main(
     eval: EvalArgs = EvalArgs(),
     optimizer: str | dict = "AdamW",
     student_dir: Path | None = None,
-    load_student_checkpoint: bool = False,
 ):  
     if fabric.global_rank == 0:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -245,9 +243,10 @@ def main(
         else:
             student = GPT(teacher_config)
 
-    if load_student_checkpoint:
-        checkpoint = os.path.join(student_dir, "lit_model.pth")
-        ckpt = torch.load(checkpoint, map_location=fabric.device, weights_only=True)
+    student_checkpoint = os.path.join(student_dir, "lit_model.pth") if student_dir else None
+
+    if student_checkpoint:
+        ckpt = torch.load(student_checkpoint, map_location=fabric.device, weights_only=True)
         student.load_state_dict(ckpt, strict=False)
         fabric.print(f"Student model loaded from {student_dir} (not compiled)")
     

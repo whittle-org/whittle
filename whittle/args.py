@@ -21,7 +21,7 @@ class SearchArgs:
 class DistillArgs:
     """Distillation-related arguments"""
 
-    method: str = 'logits'
+    method: str = 'logits' # Only supports 'logits' for now
     """Distillation method to use ('logits' or 'hidden_states')"""
     temperature: float = 5
     """Temperature for distillation"""
