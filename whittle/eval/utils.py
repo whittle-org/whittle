@@ -27,7 +27,6 @@ def convert_and_evaluate(
     model: GPT,
     tasks: str | None = None,
     out_dir: Path | str = "evaluate",
-    force_conversion: bool = False,
     num_fewshot: int | None = None,
     batch_size: int | str = 1,
     device: str | None = None,
@@ -40,10 +39,9 @@ def convert_and_evaluate(
     """Evaluate a model with the LM Evaluation Harness.
 
     Arguments:
+        model: The instantiated model.
         out_dir: Directory in which to save the converted checkpoints for evaluation.
             Saves to `checkpoint_dir`/evaluate by default.
-        force_conversion: Set to `True` to reconvert the model and override
-            an existing model.pth from a previous evaluation call.
         tasks: CSV of task names to evaluate. Example: "hellaswag,truthfulqa_mc2,mmlu"
         num_fewshot: Number of examples in few-shot context.
         batch_size: Batch size configuration as positive integer value (default: 1),
@@ -82,7 +80,12 @@ def convert_and_evaluate(
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    model = WhittleLM(pretrained=model, device=device, batch_size=batch_size, dtype=dtype)
+    model = WhittleLM(
+        pretrained=model,
+        device=device,
+        batch_size=batch_size,
+        dtype=dtype,
+    )
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
