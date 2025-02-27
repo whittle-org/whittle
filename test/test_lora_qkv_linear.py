@@ -24,6 +24,18 @@ lora_qkv_configs = {
         "n_query_groups": 16,
         "enable_lora": [True, True, True],
     },
+    "mha_enable_q": {
+        "n_query_groups": 16,
+        "enable_lora": [True, False, False],
+    },
+    "mha_enable_k": {
+        "n_query_groups": 16,
+        "enable_lora": [False, True, False],
+    },
+    "mha_enable_v": {
+        "n_query_groups": 16,
+        "enable_lora": [False, False, True],
+    },
     "gqa_enable_qkv": {
         "n_query_groups": 4,
         "enable_lora": [True, True, True],
@@ -40,6 +52,18 @@ lora_qkv_configs = {
         "n_query_groups": 4,
         "enable_lora": [False, True, True],
     },
+    "gqa_enable_q": {
+        "n_query_groups": 4,
+        "enable_lora": [True, False, False],
+    },
+    "gqa_enable_k": {
+        "n_query_groups": 4,
+        "enable_lora": [False, True, False],
+    },
+    "gqa_enable_v": {
+        "n_query_groups": 4,
+        "enable_lora": [False, False, True],
+    },
     "mqa_enable_qkv": {
         "n_query_groups": 1,
         "enable_lora": [True, True, True],
@@ -55,6 +79,18 @@ lora_qkv_configs = {
     "mqa_enable_kv": {
         "n_query_groups": 1,
         "enable_lora": [False, True, True],
+    },
+    "mqa_enable_q": {
+        "n_query_groups": 1,
+        "enable_lora": [True, False, False],
+    },
+    "mqa_enable_k": {
+        "n_query_groups": 1,
+        "enable_lora": [False, True, False],
+    },
+    "mqa_enable_v": {
+        "n_query_groups": 1,
+        "enable_lora": [False, False, True],
     },
 }
 
@@ -93,11 +129,12 @@ def test_zero_pad(qkv_config):
     v_shape = (batch_size, seq_length, n_query_groups * head_size)
     # Init weights so that we know a) what's the original position in the pre-shuffle matrix
     # b) which one is from q, k or v
-    qkv_weights = [
-        (i + torch.arange(torch.prod(torch.tensor(shape)).item())).reshape(shape)
-        for i, shape in zip([1, 1000, 10000], [q_shape, k_shape, v_shape])
-    ]
-
+    qkv_weights = []
+    for j, (i, shape) in enumerate(zip([1, 1000, 10000], [q_shape, k_shape, v_shape])):
+        if enable_lora[j]:
+            qkv_weights.append(
+                (i + torch.arange(torch.prod(torch.tensor(shape)).item())).reshape(shape)
+            )
     result = qkv.zero_pad(qkv_weights)
     qkv_group_size = qkv.sub_network_q_per_kv + 2
 
@@ -117,22 +154,25 @@ def test_zero_pad(qkv_config):
         flat_result[cond_v],
     )
     # now we check back the order
+    qkv_idx = 0
     if enable_lora[0]:
         assert torch.all(q_values < 1000)
-        assert q_values.numel() == qkv_weights[0].numel()
-        assert torch.allclose(q_values, qkv_weights[0].flatten(), atol=1e-6)
+        assert q_values.numel() == qkv_weights[qkv_idx].numel()
+        assert torch.allclose(q_values, qkv_weights[qkv_idx].flatten(), atol=1e-6)
+        qkv_idx += 1
     else:
         assert torch.allclose(q_values, torch.zeros_like(q_values), atol=1e-6)
     if enable_lora[1]:
         assert torch.all((1000 <= k_values) & (k_values < 10000))
-        assert k_values.numel() == qkv_weights[1].numel()
-        assert torch.allclose(k_values, qkv_weights[1].flatten(), atol=1e-6)
+        assert k_values.numel() == qkv_weights[qkv_idx].numel()
+        assert torch.allclose(k_values, qkv_weights[qkv_idx].flatten(), atol=1e-6)
+        qkv_idx += 1
     else:
         assert torch.allclose(k_values, torch.zeros_like(k_values), atol=1e-6)
     if enable_lora[2]:
         assert torch.all(v_values >= 10000)
-        assert v_values.numel() == qkv_weights[2].numel()
-        assert torch.allclose(v_values, qkv_weights[2].flatten(), atol=1e-6)
+        assert v_values.numel() == qkv_weights[qkv_idx].numel()
+        assert torch.allclose(v_values, qkv_weights[qkv_idx].flatten(), atol=1e-6)
     else:
         assert torch.allclose(v_values, torch.zeros_like(v_values), atol=1e-6)
 
@@ -149,12 +189,15 @@ def test_zero_pad(qkv_config):
             weights, post_split.permute(0, 3, 1, 2, 4).flatten(), atol=1e-6
         )
 
+    qkv_idx = 0
     if enable_lora[0]:
-        check_qkv(q, qkv_weights[0].flatten())
+        check_qkv(q, qkv_weights[qkv_idx].flatten())
+        qkv_idx += 1
     if enable_lora[1]:
-        check_qkv(k, qkv_weights[1].flatten())
+        check_qkv(k, qkv_weights[qkv_idx].flatten())
+        qkv_idx += 1
     if enable_lora[2]:
-        check_qkv(v, qkv_weights[2].flatten())
+        check_qkv(v, qkv_weights[qkv_idx].flatten())
 
 
 @pytest.mark.parametrize("qkv_config", lora_qkv_configs.keys())
@@ -224,19 +267,14 @@ def test_zero_pad_sub_network(qkv_config):
     v_shape = (batch_size, seq_length, sub_n_query_groups * head_size)
 
     # **Generate sequential weights for easy tracking**
-    qkv_weights = [
-        (i + torch.arange(torch.prod(torch.tensor(shape)).item())).reshape(shape)
-        for i, shape in zip([1, 1000, 10000], [q_shape, k_shape, v_shape])
-    ]
-
+    qkv_weights = []
+    for j, (i, shape) in enumerate(zip([1, 1000, 10000], [q_shape, k_shape, v_shape])):
+        if enable_lora[j]:
+            qkv_weights.append(
+                (i + torch.arange(torch.prod(torch.tensor(shape)).item())).reshape(shape)
+            )
     result = qkv.zero_pad(qkv_weights)
-
-    # now we check back the order
-    qkv_weights = [
-        qkv_weights[0].flatten(),
-        qkv_weights[1].flatten(),
-        qkv_weights[2].flatten(),
-    ]
+    qkv_weights = [qkv_weights[i].flatten() for i in range(len(qkv_weights))]
     qkv_group_size = qkv.sub_network_q_per_kv + 2
 
     # need the indices to check if correct values are at correct places
@@ -254,22 +292,25 @@ def test_zero_pad_sub_network(qkv_config):
     v_values = flat_result[cond_v]
 
     # assert conditions
+    qkv_idx = 0
     if enable_lora[0]:
         assert torch.all(q_values < 1000)
-        assert q_values.numel() == qkv_weights[0].numel()
-        assert torch.all(q_values == qkv_weights[0])
+        assert q_values.numel() == qkv_weights[qkv_idx].numel()
+        assert torch.all(q_values == qkv_weights[qkv_idx])
+        qkv_idx += 1
     else:
         assert torch.all(q_values == 0)
     if enable_lora[1]:
         assert torch.all((1000 <= k_values) & (k_values < 10000))
-        assert k_values.numel() == qkv_weights[1].numel()
-        assert torch.all(k_values == qkv_weights[1])
+        assert k_values.numel() == qkv_weights[qkv_idx].numel()
+        assert torch.all(k_values == qkv_weights[qkv_idx])
+        qkv_idx += 1
     else:
         assert torch.all(k_values == 0)
     if enable_lora[2]:
         assert torch.all(v_values >= 10000)
-        assert v_values.numel() == qkv_weights[2].numel()
-        assert torch.all(v_values == qkv_weights[2])
+        assert v_values.numel() == qkv_weights[qkv_idx].numel()
+        assert torch.all(v_values == qkv_weights[qkv_idx])
     else:
         assert torch.all(v_values == 0)
 
@@ -287,9 +328,12 @@ def test_zero_pad_sub_network(qkv_config):
             weights, post_split.permute(0, 3, 1, 2, 4).flatten(), atol=1e-6
         )
 
+    qkv_idx = 0
     if enable_lora[0]:
-        check_qkv(q, qkv_weights[0])
+        check_qkv(q, qkv_weights[qkv_idx])
+        qkv_idx += 1
     if enable_lora[1]:
-        check_qkv(k, qkv_weights[1])
+        check_qkv(k, qkv_weights[qkv_idx])
+        qkv_idx += 1
     if enable_lora[2]:
-        check_qkv(v, qkv_weights[2])
+        check_qkv(v, qkv_weights[qkv_idx])
