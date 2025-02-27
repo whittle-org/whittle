@@ -34,7 +34,6 @@ from litgpt.utils import (
     check_nvlink_connectivity,
     choose_logger,
     chunked_cross_entropy,
-    find_resume_path,
     get_default_supported_precision,
     init_out_dir,
     instantiate_torch_optimizer,
@@ -56,13 +55,11 @@ from jsonargparse import CLI
 from pathlib import Path
 
 def setup(
-    model_name: str | None = None,
-    model_config: Config | None = None,
-    load_from_checkpoint: bool = False,
+    load_student_checkpoint: bool = False,
     out_dir: Path = Path("examples/gpt/out/distill_experiments"),
     precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
     initial_checkpoint_dir: Path | None = None,
-    resume: bool | Literal["auto"] | Path = False,
+    student_dir: Path | None = None,
     data: DataModule | None = None,
     train: TrainArgs = TrainArgs(
         save_interval=1000,
@@ -91,19 +88,12 @@ def setup(
     """Train a random subnet of the teacher model using knowledge distillation.
 
     Arguments:
-        model_name: The name of the model to pretrain. Choose from names in ``litgpt.config``. Use "list" to list the supported models.
-        model_config: A ``litgpt.Config`` object to define the model architecture. Mutually exclusive with
-            ``model_config``. Overrides the `model_name` if specified.
-        load_from_checkpoint: Whether to load the teacher model from a checkpoint. 
-            If True, the model will be loaded from the initial checkpoint directory.
+        load_student_checkpoint: Whether to load the student model from a checkpoint.
         out_dir: Directory in which to save checkpoints and logs. If running in a Lightning Studio Job, look for it in
             /teamspace/jobs/<job-name>/share.
         precision: The precision to use for finetuning. Determines a compatible precision setting by default.
-        initial_checkpoint_dir: Optional path to a checkpoint directory to initialize the model from.
-            Useful for continued pretraining. Mutually exclusive with ``resume``.
-        resume: Path to a checkpoint directory to resume from in case training was interrupted, or ``True`` to resume
-            from the latest checkpoint in ``out_dir``. An error will be raised if no checkpoint is found. Passing
-            ``'auto'`` will resume from the latest checkpoint but not error if no checkpoint exists.
+        initial_checkpoint_dir: Path to a checkpoint directory to initialize the teacher model from.
+        student_dir: Optional path to a directory to initialize the student model from.
         data: Data-related arguments. If not provided, the default is ``litgpt.data.TinyStories``.
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
@@ -115,28 +105,19 @@ def setup(
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
     """
-    if load_from_checkpoint:
-        print(f"Loading teacher model from {initial_checkpoint_dir}")
+    if initial_checkpoint_dir is not None:
+        print(f"Loading teacher model config from {initial_checkpoint_dir}")
         config = Config.from_file(initial_checkpoint_dir / "model_config.yaml")
         config.fix_head_size = True
-        model_config = config
-
-    elif model_name == "list":
-        available_models = "\n".join(sorted(name_to_config))
-        print(f"Available values:\n{available_models}")
-        quit()
-
-    if model_config is None:
-        # Support both model_name options: meta-llama/Meta-Llama-3-8B & Meta-Llama-3-8B
-        try:
-            config = Config.from_name(model_name)
-        except ValueError:
-            print(f"Model name {model_name} is not supported.\n")
-            available_models = "\n".join(sorted(name_to_config))
-            print(f"Available values:\n{available_models}")
-            quit()
     else:
-        config = model_config
+        raise ValueError("initial_checkpoint_dir is required")
+
+    if student_dir:
+        print(f"Loading student model config from {student_dir}")
+        student_config = Config.from_file(student_dir / "model_config.yaml")
+        student_config.fix_head_size = True
+    else:
+        student_config = None
 
     hparams = capture_hparams()
     data = TinyStories() if data is None else data
@@ -150,8 +131,7 @@ def setup(
     logger = choose_logger(
         logger_name,
         out_dir,
-        name=f"manual-distill-experiments-{config.name}",
-        resume=bool(resume),
+        name=f"one-model-distill-experiments-{config.name}",
         log_interval=train.log_interval,
     )
 
@@ -189,6 +169,7 @@ def setup(
         seed,
         initial_checkpoint_dir,
         config,
+        student_config,
         data,
         out_dir,
         tokenizer_dir,
@@ -197,26 +178,27 @@ def setup(
         distill,
         eval,
         optimizer,
-        resume,
-        load_from_checkpoint,
+        student_dir,
+        load_student_checkpoint,
     )
 
 def main(
     fabric: L.Fabric,
     devices: int,
     seed: int = 42,
-    initial_checkpoint_dir: Path = Path('checkpoints/standard-step-00190000'),
+    initial_checkpoint_dir: Path | None = None,
     teacher_config: Config | None = None,
+    student_config: Config | None = None,
     dataset: DataModule | None = None,
-    out_dir: Path = Path("examples/gpt/out/distillation_experiments"),
+    out_dir: Path | None = None,
     tokenizer_dir: Path | None = None,
     tokenizer: Tokenizer | None = None,
     train: TrainArgs = TrainArgs(),
     distill: DistillArgs = DistillArgs(),
     eval: EvalArgs = EvalArgs(),
     optimizer: str | dict = "AdamW",
-    resume: bool | Literal["auto"] | Path = False,
-    load_from_checkpoint: bool = False,
+    student_dir: Path | None = None,
+    load_student_checkpoint: bool = False,
 ):  
     if fabric.global_rank == 0:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -235,44 +217,55 @@ def main(
         train_dataloader, val_dataloader
     )
 
-    # Load the teacher model once
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
         teacher = GPT(teacher_config)
     
-    if initial_checkpoint_dir:
-        checkpoint = os.path.join(initial_checkpoint_dir, "lit_model.pth")
-        ckpt = torch.load(checkpoint, map_location=fabric.device, weights_only=True)
-        teacher.load_state_dict(ckpt, strict=False)
-        teacher.reset_super_network()
-    
+    checkpoint = os.path.join(initial_checkpoint_dir, "lit_model.pth")
+    ckpt = torch.load(checkpoint, map_location=fabric.device, weights_only=True)
+    teacher.load_state_dict(ckpt, strict=False)
+    teacher.reset_super_network()
+
     teacher = fabric.setup_module(teacher, move_to_device=True)
     teacher.eval()
-    
+    teacher_val_loss = validate(fabric, teacher, val_dataloader, max_iters=eval.max_iters)
+    teacher_val_loss = teacher_val_loss.item()
+    teacher_val_ppl = math.exp(teacher_val_loss)
+
     fabric.print(f"Teacher model loaded from {initial_checkpoint_dir} (not compiled)")
     fabric.print(f"Teacher model has {compute_parameters(teacher):,} parameters")
-
-    # Get search space for creating different subnetworks
-    search_space = get_search_space(teacher_config)
-
-    sampler = RandomSampler(search_space, seed=seed)
-    random_config = sampler.sample()
+    fabric.print(f"Teacher model validation loss: {teacher_val_loss:.3f}, validation PPL: {teacher_val_ppl:.3f}")
+    fabric.log_dict({"teacher_val_loss": teacher_val_loss, "teacher_val_ppl": teacher_val_ppl})
             
     if fabric.global_rank == 0:
         out_dir.mkdir(parents=True, exist_ok=True)
     
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
-        student = GPT(teacher_config)
+        if student_config:
+            student = GPT(student_config)
+        else:
+            student = GPT(teacher_config)
 
-    subnetwork = {
-        "sub_network_n_embd": random_config["embed_dim"],
-        "sub_network_intermediate_size": int(random_config["mlp_ratio"] * random_config["embed_dim"]),
-        "sub_network_num_heads": random_config["num_heads"],
-        "sub_network_n_layers": random_config["depth"]
-    }   
-
-    student.set_sub_network(**subnetwork)
-    initialize_weights(fabric, student, n_layer=random_config["depth"], n_embd=random_config["embed_dim"])
+    if load_student_checkpoint:
+        checkpoint = os.path.join(student_dir, "lit_model.pth")
+        ckpt = torch.load(checkpoint, map_location=fabric.device, weights_only=True)
+        student.load_state_dict(ckpt, strict=False)
+        fabric.print(f"Student model loaded from {student_dir} (not compiled)")
     
+    if student_config is None:
+        fabric.print(f"Student model set to a random subnetwork of the teacher model")
+        search_space = get_search_space(teacher_config)
+        sampler = RandomSampler(search_space, seed=seed)
+        random_config = sampler.sample()
+        subnetwork = {
+            "sub_network_n_embd": random_config["embed_dim"],
+            "sub_network_intermediate_size": int(random_config["mlp_ratio"] * random_config["embed_dim"]),
+            "sub_network_num_heads": random_config["num_heads"],
+            "sub_network_n_layers": random_config["depth"]
+        }   
+
+        student.set_sub_network(**subnetwork)
+        initialize_weights(fabric, student, n_layer=random_config["depth"], n_embd=random_config["embed_dim"])
+        
     student = fabric.setup_module(student, move_to_device=True)
     
     if use_compile_student:
@@ -292,16 +285,31 @@ def main(
     fabric.print(f"Student model has {param_count:,} parameters")
     fabric.print(f"Model parameter reduction: {param_count/compute_parameters(teacher):.2%}")
 
-    # Log the subnetwork configuration to the logger
-    exp_config = {
-        "seed": seed,
-        "embed_dim": random_config["embed_dim"],
-        "mlp_ratio": random_config["mlp_ratio"],
-        "num_heads": random_config["num_heads"],
-        "depth": random_config["depth"],
-        "parameter_count": param_count,
-        "reduction_ratio": param_count/compute_parameters(teacher)
-    }
+    if student_config:
+        exp_config = {
+            "seed": seed,
+            "embed_dim": student_config.n_embd,
+            "mlp_ratio": student_config.intermediate_size / student_config.n_embd,
+            "num_heads": student_config.n_head,
+            "depth": student_config.n_layer,
+            "parameter_count": param_count,
+            "reduction_ratio": param_count/compute_parameters(teacher)
+        }
+    else:
+        exp_config = {
+            "seed": seed,
+            "embed_dim": random_config["embed_dim"],
+            "mlp_ratio": random_config["mlp_ratio"],
+            "num_heads": random_config["num_heads"],
+            "depth": random_config["depth"],
+            "parameter_count": param_count,
+            "reduction_ratio": param_count/compute_parameters(teacher)
+        }
+        student.config.n_embd = exp_config["embed_dim"]
+        student.config.intermediate_size = int(exp_config["mlp_ratio"] * exp_config["embed_dim"])
+        student.config.n_head = exp_config["num_heads"]
+        student.config.n_layer = exp_config["depth"]
+        
     fabric.logger.log_hyperparams(exp_config)
 
     state = {
@@ -313,18 +321,6 @@ def main(
         "step_count": 0,
     }
 
-    resume = find_resume_path(resume, out_dir)
-    if resume:
-        fabric.print(f"Resuming training from {resume}")
-        fabric.load(resume, state)
-
-    train_time = time.perf_counter()
-    fit(
-        fabric, devices, state, train_dataloader, val_dataloader, 
-        out_dir, tokenizer_dir, train, eval, distill
-    )
-
-    # Save student model
     student_state = {
         "model": student,
         "optimizer": optimizer,
@@ -332,6 +328,12 @@ def main(
         "iter_num": state["iter_num"],
         "step_count": state["step_count"],
     }
+
+    train_time = time.perf_counter()
+    fit(
+        fabric, devices, state, train_dataloader, val_dataloader, 
+        out_dir, tokenizer_dir, train, eval, distill
+    )
 
     save_checkpoint(
         fabric, student_state, tokenizer_dir, 
@@ -517,7 +519,7 @@ def fit(
         val_loss = validate(fabric, student, val_dataloader, max_iters=eval.max_iters)
         val_loss_value = val_loss.item()
         ppl = math.exp(val_loss_value)
-        metrics = {"val_loss": val_loss_value, "val_ppl": ppl}
+        metrics = {"val_loss": val_loss_value, "val_ppl": ppl, "params": compute_parameters(student)}
         
         fabric.log_dict(metrics, step=state["iter_num"])
         fabric.print(f"Final evaluation | val loss: {val_loss_value:.3f} | val ppl: {ppl:.3f}")
