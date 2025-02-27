@@ -8,6 +8,18 @@ from whittle.lora.lora_attention import CausalSelfAttention
 from whittle.lora.lora_qkv_linear import LoRAQKVLinear
 
 lora_qkv_configs = {
+    "mha_enable_qk": {
+        "n_query_groups": 16,
+        "enable_lora": [True, True, False],
+    },
+    "mha_enable_qv": {
+        "n_query_groups": 16,
+        "enable_lora": [True, False, True],
+    },
+    "mha_enable_kv": {
+        "n_query_groups": 16,
+        "enable_lora": [False, True, True],
+    },
     "mha_enable_qkv": {
         "n_query_groups": 16,
         "enable_lora": [True, True, True],
@@ -16,9 +28,33 @@ lora_qkv_configs = {
         "n_query_groups": 4,
         "enable_lora": [True, True, True],
     },
+    "gqa_enable_qk": {
+        "n_query_groups": 4,
+        "enable_lora": [True, True, False],
+    },
+    "gqa_enable_qv": {
+        "n_query_groups": 4,
+        "enable_lora": [True, False, True],
+    },
+    "gqa_enable_kv": {
+        "n_query_groups": 4,
+        "enable_lora": [False, True, True],
+    },
     "mqa_enable_qkv": {
         "n_query_groups": 1,
         "enable_lora": [True, True, True],
+    },
+    "mqa_enable_qk": {
+        "n_query_groups": 1,
+        "enable_lora": [True, True, False],
+    },
+    "mqa_enable_qv": {
+        "n_query_groups": 1,
+        "enable_lora": [True, False, True],
+    },
+    "mqa_enable_kv": {
+        "n_query_groups": 1,
+        "enable_lora": [False, True, True],
     },
 }
 
@@ -80,19 +116,25 @@ def test_zero_pad(qkv_config):
         flat_result[cond_k],
         flat_result[cond_v],
     )
-
     # now we check back the order
-    assert torch.all(q_values < 1000)
-    assert q_values.numel() == qkv_weights[0].numel()
-    assert torch.allclose(q_values, qkv_weights[0].flatten(), atol=1e-6)
-
-    assert torch.all((1000 <= k_values) & (k_values < 10000))
-    assert k_values.numel() == qkv_weights[1].numel()
-    assert torch.allclose(k_values, qkv_weights[1].flatten(), atol=1e-6)
-
-    assert torch.all(v_values >= 10000)
-    assert v_values.numel() == qkv_weights[2].numel()
-    assert torch.allclose(v_values, qkv_weights[2].flatten(), atol=1e-6)
+    if enable_lora[0]:
+        assert torch.all(q_values < 1000)
+        assert q_values.numel() == qkv_weights[0].numel()
+        assert torch.allclose(q_values, qkv_weights[0].flatten(), atol=1e-6)
+    else:
+        assert torch.allclose(q_values, torch.zeros_like(q_values), atol=1e-6)
+    if enable_lora[1]:
+        assert torch.all((1000 <= k_values) & (k_values < 10000))
+        assert k_values.numel() == qkv_weights[1].numel()
+        assert torch.allclose(k_values, qkv_weights[1].flatten(), atol=1e-6)
+    else:
+        assert torch.allclose(k_values, torch.zeros_like(k_values), atol=1e-6)
+    if enable_lora[2]:
+        assert torch.all(v_values >= 10000)
+        assert v_values.numel() == qkv_weights[2].numel()
+        assert torch.allclose(v_values, qkv_weights[2].flatten(), atol=1e-6)
+    else:
+        assert torch.allclose(v_values, torch.zeros_like(v_values), atol=1e-6)
 
     # Reshape and permute for final check
     result = result.view(
@@ -107,9 +149,12 @@ def test_zero_pad(qkv_config):
             weights, post_split.permute(0, 3, 1, 2, 4).flatten(), atol=1e-6
         )
 
-    check_qkv(q, qkv_weights[0].flatten())
-    check_qkv(k, qkv_weights[1].flatten())
-    check_qkv(v, qkv_weights[2].flatten())
+    if enable_lora[0]:
+        check_qkv(q, qkv_weights[0].flatten())
+    if enable_lora[1]:
+        check_qkv(k, qkv_weights[1].flatten())
+    if enable_lora[2]:
+        check_qkv(v, qkv_weights[2].flatten())
 
 
 @pytest.mark.parametrize("qkv_config", lora_qkv_configs.keys())
@@ -159,7 +204,7 @@ def test_zero_pad_sub_network(qkv_config):
 
     attn = CausalSelfAttention(lora_config, 0)
     attn.set_sub_network(lora_config.n_embd, sub_n_head, sub_n_query_groups, head_size)
-    qkv_indices = attn.get_qkv_indices()
+    qkv_indices = attn.qkv_indices
     qkv.set_sub_network(
         in_features,
         (attn.sub_network_q_per_kv + 2) * head_size * sub_n_query_groups,
@@ -209,17 +254,24 @@ def test_zero_pad_sub_network(qkv_config):
     v_values = flat_result[cond_v]
 
     # assert conditions
-    assert torch.all(q_values < 1000)
-    assert q_values.numel() == qkv_weights[0].numel()
-    assert torch.all(q_values == qkv_weights[0])
-
-    assert torch.all((1000 <= k_values) & (k_values < 10000))
-    assert k_values.numel() == qkv_weights[1].numel()
-    assert torch.all(k_values == qkv_weights[1])
-
-    assert torch.all(v_values >= 10000)
-    assert v_values.numel() == qkv_weights[2].numel()
-    assert torch.all(v_values == qkv_weights[2])
+    if enable_lora[0]:
+        assert torch.all(q_values < 1000)
+        assert q_values.numel() == qkv_weights[0].numel()
+        assert torch.all(q_values == qkv_weights[0])
+    else:
+        assert torch.all(q_values == 0)
+    if enable_lora[1]:
+        assert torch.all((1000 <= k_values) & (k_values < 10000))
+        assert k_values.numel() == qkv_weights[1].numel()
+        assert torch.all(k_values == qkv_weights[1])
+    else:
+        assert torch.all(k_values == 0)
+    if enable_lora[2]:
+        assert torch.all(v_values >= 10000)
+        assert v_values.numel() == qkv_weights[2].numel()
+        assert torch.all(v_values == qkv_weights[2])
+    else:
+        assert torch.all(v_values == 0)
 
     # one last check to see what happens after splitting it in causal self attention
     result = result.view(
@@ -235,6 +287,9 @@ def test_zero_pad_sub_network(qkv_config):
             weights, post_split.permute(0, 3, 1, 2, 4).flatten(), atol=1e-6
         )
 
-    check_qkv(q, qkv_weights[0])
-    check_qkv(k, qkv_weights[1])
-    check_qkv(v, qkv_weights[2])
+    if enable_lora[0]:
+        check_qkv(q, qkv_weights[0])
+    if enable_lora[1]:
+        check_qkv(k, qkv_weights[1])
+    if enable_lora[2]:
+        check_qkv(v, qkv_weights[2])
