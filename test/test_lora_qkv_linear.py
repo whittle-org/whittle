@@ -55,7 +55,8 @@ def test_zero_pad(qkv_config):
     q_shape = (batch_size, seq_length, n_head * head_size)
     k_shape = (batch_size, seq_length, n_query_groups * head_size)
     v_shape = (batch_size, seq_length, n_query_groups * head_size)
-
+    # Init weights so that we know a) what's the original position in the pre-shuffle matrix
+    # b) which one is from q, k or v
     qkv_weights = [
         (i + torch.arange(torch.prod(torch.tensor(shape)).item())).reshape(shape)
         for i, shape in zip([1, 1000, 10000], [q_shape, k_shape, v_shape])
@@ -80,7 +81,7 @@ def test_zero_pad(qkv_config):
         flat_result[cond_v],
     )
 
-    # Perform assertions
+    # now we check back the order
     assert torch.all(q_values < 1000)
     assert torch.allclose(
         q_values, qkv_weights[0].flatten()[: q_values.numel()], atol=1e-6
@@ -145,16 +146,19 @@ def test_zero_pad_sub_network(qkv_config):
     )
     qkv.reset_super_network()
 
-    # **Determine sub-network configuration**
+    # determine sub-network configuration
     if n_query_groups == 1:  # MQA
+        # super-network has 16 heads and 1 group
         sub_n_query_groups = 1
         sub_n_head = 8
     elif n_query_groups == n_head:  # MHA
+        # super-network has 16 heads in 16 groups
         sub_n_query_groups = 8
         sub_n_head = 8
     else:  # GQA
+        # super-network has 16 heads in 4 groups (4 heads per group)
         sub_n_query_groups = 2
-        sub_n_head = 8
+        sub_n_head = 8  # 8/16 heads, 2/4 active groups (resulting into 2 heads per group)
 
     attn = CausalSelfAttention(lora_config, 0)
     attn.set_sub_network(lora_config.n_embd, sub_n_head, sub_n_query_groups, head_size)
@@ -185,7 +189,7 @@ def test_zero_pad_sub_network(qkv_config):
 
     result = qkv.zero_pad(qkv_weights)
 
-    # **Vectorized Assertions**
+    # now we check back the order
     qkv_weights = [
         qkv_weights[0].flatten(),
         qkv_weights[1].flatten(),
@@ -193,7 +197,7 @@ def test_zero_pad_sub_network(qkv_config):
     ]
     qkv_group_size = qkv.sub_network_q_per_kv + 2
 
-    # **Fix: Compute indexing conditions correctly**
+    # need the indices to check if correct values are at correct places
     flat_result = result.flatten()
     q_ids = torch.arange(flat_result.shape[0])  # Ensure correct shape
 
@@ -202,12 +206,12 @@ def test_zero_pad_sub_network(qkv_config):
     cond_k = group_ids == qkv.sub_network_q_per_kv
     cond_v = group_ids > qkv.sub_network_q_per_kv
 
-    # **Extract values correctly**
+    # extract q,k,v values
     q_values = flat_result[cond_q]
     k_values = flat_result[cond_k]
     v_values = flat_result[cond_v]
 
-    # **Assertions**
+    # assert conditions
     assert torch.all(q_values < 1000)
     assert torch.all(q_values == qkv_weights[0][: q_values.numel()])
 
@@ -217,13 +221,13 @@ def test_zero_pad_sub_network(qkv_config):
     assert torch.all(v_values >= 10000)
     assert torch.all(v_values == qkv_weights[2][: v_values.numel()])
 
-    # **Reshape and Permute for Final Check**
+    # one last check to see what happens after splitting it in causal self attention
     result = result.view(
         batch_size, seq_length, sub_n_query_groups, qkv_group_size, head_size
     )
     result = result.permute(0, 2, 3, 1, 4)  # (B, n_query_groups, total_qkv, T, hs)
 
-    # **Split into Q, K, V**
+    # split batched computation into three
     q, k, v = result.split((qkv.sub_network_q_per_kv, 1, 1), dim=2)
 
     def check_qkv(post_split, weights):
