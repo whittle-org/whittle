@@ -6,7 +6,6 @@ import torch
 from lightning.fabric import Fabric
 
 from whittle.loss import DistillLoss
-from whittle.sampling.random_sampler import RandomSampler
 
 
 class BaseTrainingStrategy:
@@ -18,10 +17,11 @@ class BaseTrainingStrategy:
 
     def __init__(
         self,
-        sampler: RandomSampler,
+        sampler,
         loss_function: Callable,
         kd_loss: Callable | None = None,
         device: str = "cuda",
+        lora: bool = False,
         fabric: Fabric = None,
         **kwargs,
     ):
@@ -37,12 +37,18 @@ class BaseTrainingStrategy:
         self.loss_function = loss_function
         self.device = device
         self.kd_loss = kd_loss
+        self.lora = lora
         self.fabric = fabric
         if isinstance(self.kd_loss, DistillLoss):
             if not isinstance(loss_function, torch.nn.CrossEntropyLoss):
                 raise TypeError(
                     "KD Loss not yet supported: Expected torch.nn.CrossEntropyLoss"
                 )
+
+    def chunked_loss(self, model, inputs, y):
+        y_hat = model(inputs, lm_head_chunk_size=128)
+        y_hat[-1] = y_hat[-1][..., :-1, :]
+        return self.loss_function(y_hat, y[..., 1:])
 
     def __call__(self, model, inputs, outputs, **kwargs):
         raise NotImplementedError

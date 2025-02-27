@@ -1,5 +1,8 @@
-from syne_tune.config_space import randint, lograndint, choice
+from __future__ import annotations
+
 import math
+
+from syne_tune.config_space import choice, lograndint, randint
 
 
 class SMALL:
@@ -15,9 +18,9 @@ class SMALL:
     def cast(config):
         return {
             "sub_network_n_embd": config["n_embd"],
-            "sub_network_intermediate_size": [config[f"intermediate_size"]]
+            "sub_network_intermediate_size": [config["intermediate_size"]]
             * config["n_layers"],
-            "sub_network_num_heads": [config[f"heads"]] * config["n_layers"],
+            "sub_network_num_heads": [config["heads"]] * config["n_layers"],
             "sub_network_n_layers": config["n_layers"],
         }
 
@@ -63,10 +66,10 @@ class HWGPTBench:
         return {
             "sub_network_n_embd": config["embed_dim"],
             "sub_network_intermediate_size": [
-                config[f"mlp_ratio"] * config["embed_dim"] for _ in range(config["depth"])
+                config["mlp_ratio"] * config["embed_dim"] for _ in range(config["depth"])
             ],
             "sub_network_num_heads": [
-                config[f"num_heads"] for _ in range(config["depth"])
+                config["num_heads"] for _ in range(config["depth"])
             ],
             "sub_network_n_layers": config["depth"],
         }
@@ -98,9 +101,9 @@ class Llama:
         config_return = {
             "sub_network_n_embd": config["embed_dim"],
             "sub_network_intermediate_size": int(
-                config[f"mlp_ratio"] * config["embed_dim"]
+                config["mlp_ratio"] * config["embed_dim"]
             ),
-            "sub_network_num_heads": config[f"num_heads"],
+            "sub_network_num_heads": config["num_heads"],
             "sub_network_n_layers": config["depth"],
             "sub_network_head_size": config["head_size"],
         }
@@ -133,9 +136,9 @@ class LlamaHeadSize:
         return {
             "sub_network_n_embd": config["embed_dim"],
             "sub_network_intermediate_size": int(
-                config[f"mlp_ratio"] * config["embed_dim"]
+                config["mlp_ratio"] * config["embed_dim"]
             ),
-            "sub_network_num_heads": config[f"num_heads"],
+            "sub_network_num_heads": config["num_heads"],
             "sub_network_n_layers": config["depth"],
             "sub_network_head_size": config["head_size"],
         }

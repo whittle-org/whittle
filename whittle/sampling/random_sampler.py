@@ -11,7 +11,7 @@ from whittle.args import ParamBinArgs
 from whittle.sampling.param_bins import ParamBins
 
 
-class RandomSampler:
+class WhittleRandomSampler:
     """
     RandomSampler samples configurations from a given search space using a random state.
 
@@ -83,7 +83,7 @@ class RandomSampler:
         return config
 
 
-class StratifiedRandomSampler(RandomSampler):
+class StratifiedRandomSampler(WhittleRandomSampler):
     """
     StratifiedRandomSampler samples configurations from a given search space using a random state.
     It maintains a set of bins to ensure that the configurations are sampled uniformly based on their parameter count.

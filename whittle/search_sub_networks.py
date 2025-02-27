@@ -292,9 +292,9 @@ def main(
 
     bins = None
     if param_bins is not None:
-        from whittle.sampling.random_sampler import RandomSampler
+        from whittle.sampling.random_sampler import WhittleRandomSampler
 
-        sampler = RandomSampler(search_space, seed=seed)
+        sampler = WhittleRandomSampler(search_space, seed=seed)
 
         # get bins limited by the smallest/largest config
         params_estimator = ParamsEstimator(model)

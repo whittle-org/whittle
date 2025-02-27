@@ -1,16 +1,16 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 """Implementation derived from https://github.com/tloen/alpaca-lora"""
 
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass, field
-from typing import List, Optional, Union
 
 import torch
-from torch.utils.data import DataLoader, random_split
-
-from litgpt.prompts import PromptStyle
 from litgpt.data import DataModule, SFTDataset, get_sft_collate_fn
+from litgpt.prompts import PromptStyle
 from litgpt.tokenizer import Tokenizer
+from torch.utils.data import DataLoader, random_split
 
 
 @dataclass
@@ -21,7 +21,7 @@ class LLaMaMini(DataModule):
     """Whether to mask the prompt section from the label (with ``ignore_index``)."""
     val_split_fraction: float = 0.1
     """The fraction of the dataset to use for the validation dataset. The rest is used for training."""
-    prompt_style: Union[str, PromptStyle] = "alpaca"
+    prompt_style: str | PromptStyle = "alpaca"
     """The style to apply to instruction prompts. See `litgpt.prompts` for a list of available styles."""
     ignore_index: int = -100
     """The index to use for elements to be ignored in the label."""
@@ -33,15 +33,15 @@ class LLaMaMini(DataModule):
     """Whether to include multi-turn conversations in the dataset."""
     repo_id: str = "MBZUAI/LaMini-instruction"
     """The Hugging Face dataset repository ID from where to download the data."""
-    access_token: Optional[str] = field(repr=False, default=os.getenv("HF_TOKEN"))
+    access_token: str | None = field(repr=False, default=os.getenv("HF_TOKEN"))
     """The Hugging Face API token to use for authentication. Can also be set through the
     `HF_TOKEN` environment variable."""
 
-    tokenizer: Optional[Tokenizer] = field(default=None, init=False, repr=False)
+    tokenizer: Tokenizer | None = field(default=None, init=False, repr=False)
     batch_size: int = field(default=1, init=False, repr=False)
     max_seq_length: int = field(default=-1, init=False, repr=False)
-    train_dataset: Optional[SFTDataset] = field(default=None, init=False, repr=False)
-    test_dataset: Optional[SFTDataset] = field(default=None, init=False, repr=False)
+    train_dataset: SFTDataset | None = field(default=None, init=False, repr=False)
+    test_dataset: SFTDataset | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
         super().__init__()
@@ -56,9 +56,9 @@ class LLaMaMini(DataModule):
 
     def connect(
         self,
-        tokenizer: Optional[Tokenizer] = None,
+        tokenizer: Tokenizer | None = None,
         batch_size: int = 1,
-        max_seq_length: Optional[int] = None,
+        max_seq_length: int | None = None,
     ) -> None:
         self.tokenizer = tokenizer
         self.batch_size = batch_size
@@ -126,7 +126,7 @@ class LLaMaMini(DataModule):
 
 def format_dataset(
     dataset_partition: dict, include_multi_turn_conversations: bool
-) -> List[dict]:
+) -> list[dict]:
     formatted_ds = []
 
     for entry in dataset_partition:

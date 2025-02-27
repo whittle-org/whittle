@@ -7,8 +7,8 @@ from litgpt.model import (
     LLaMAMLP as LitLLaMAMLP,
 )
 
-from whittle.lora.config import LoRAConfig as Config
-from whittle.lora.lora_mlps import (
+from whittle.lora_model.config import LoRAConfig as Config
+from whittle.lora_model.lora_mlps import (
     LoRAGemmaMLP as GemmaMLP,
     LoRAGptNeoxMLP as GptNeoxMLP,
     LoRALLaMAMLP as LLaMAMLP,

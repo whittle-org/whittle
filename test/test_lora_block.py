@@ -8,8 +8,8 @@ from litgpt.model import (
     build_rope_cache,
 )
 
-from whittle.lora.config import LoRAConfig as Config
-from whittle.lora.lora_block import LoRABlock as Block
+from whittle.lora_model.config import LoRAConfig as Config
+from whittle.lora_model.lora_block import LoRABlock as Block
 
 
 def test_block():

@@ -1,89 +1,157 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
+from __future__ import annotations
+
 import dataclasses
+import json
 import math
 import os
 import time
-from pathlib import Path
-from pprint import pprint
-from typing import Dict, List, Literal, Optional, Tuple, Union
 import warnings
-from syne_tune.config_space import randint, choice
-import lightning as L
-import torch
-from src.utils.sampler import (
-    RandomSampler,
-    FixGridSampler,
-    FixParamGridSampler,
-    CalibFixGridSampler,
-    ImportanceSampler,
-    ImportanceParamGridSampler,
-    ImportanceCalibFixGridSampler,
-    LlamaGridSampler,
-)
 from datetime import datetime
-from lightning.fabric.plugins import BitsandbytesPrecision
-from lightning.fabric.strategies import FSDPStrategy, DDPStrategy
-from lightning.fabric.utilities import ThroughputMonitor
-from lightning_utilities.core.imports import RequirementCache
-from torch.utils.data import DataLoader, ConcatDataset
-from torchmetrics import RunningMean
-from whittle.training_strategies.sandwich import SandwichStrategy
-from whittle.training_strategies.base_strategy import BaseTrainingStrategy
-from litgpt.args import EvalArgs, TrainArgs
-from litgpt.data import Alpaca, DataModule
-from litgpt.generate.base import generate
-from whittle.loss.loss_factory import LossFactory
-from litgpt.lora import Config, lora_filter, mark_only_lora_as_trainable
-from litgpt.prompts import save_prompt_style
-from src.finetuning.sandwich_kd import SandwichStrategy as SandwichStrategyKD
-from src.finetuning.standard import StandardStrategy
-from search.search_spaces import search_spaces
-from whittle.data.llamamini import LLaMaMini
-
-# from litgpt.scripts.merge_lora import merge_lora
-from litgpt.tokenizer import Tokenizer
-from litgpt.utils import (
-    auto_download_checkpoint,
-    check_nvlink_connectivity,
-    CycleIterator,
-    check_valid_checkpoint_dir,
-    choose_logger,
-    chunked_cross_entropy,
-    copy_config_files,
-    get_default_supported_precision,
-    load_checkpoint,
-    init_out_dir,
-    instantiate_torch_optimizer,
-    instantiate_bnb_optimizer,
-    num_parameters,
-    parse_devices,
-    save_hyperparameters,
-)
-from lora_whittle.lora_gpt import GPT
-from lora_whittle.lora_block import LoRABlock as Block
-# Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
-
-"""This script merges the LoRA weights with the base model"""
 from pathlib import Path
 from pprint import pprint
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Literal
 
 import lightning as L
 import torch
 import yaml
-from litgpt.lora import Config, lora_filter, merge_lora_weights
-from litgpt.utils import check_valid_checkpoint_dir, extend_checkpoint_dir
+from lightning.fabric.plugins import BitsandbytesPrecision
+from lightning.fabric.strategies import DDPStrategy
+from lightning_utilities.core.imports import RequirementCache
+from litgpt.args import EvalArgs, TrainArgs
+from litgpt.data import Alpaca, DataModule
+from litgpt.generate.base import generate
+from litgpt.lora import (
+    Config,
+    lora_filter,
+    mark_only_lora_as_trainable,
+    merge_lora_weights,
+)
+from litgpt.prompts import save_prompt_style
 
-from src.utils.utils import plot_validation_metrics, plot_accuracies
-from src.finetuning.sandwich import SandwichStrategy
+# from litgpt.scripts.merge_lora import merge_lora
+from litgpt.tokenizer import Tokenizer
+from litgpt.utils import (
+    CycleIterator,
+    auto_download_checkpoint,
+    check_nvlink_connectivity,
+    check_valid_checkpoint_dir,
+    choose_logger,
+    chunked_cross_entropy,
+    copy_config_files,
+    extend_checkpoint_dir,
+    get_default_supported_precision,
+    init_out_dir,
+    instantiate_bnb_optimizer,
+    instantiate_torch_optimizer,
+    load_checkpoint,
+    num_parameters,
+    parse_devices,
+    save_hyperparameters,
+)
+from whittle.training_strategies.sandwich import SandwichStrategy
+from whittle.training_strategies.standard import StandardStrategy
+from torch.utils.data import ConcatDataset, DataLoader
+from torchmetrics import RunningMean
+from whitte.lora_model.lora_gpt import GPT
+
+from search.search_spaces import search_spaces
+from whittle.data.llamamini import LLaMaMini
+from whittle.eval.utils import convert_and_evaluate
+from whittle.loss.loss_factory import LossFactory
+from whittle.sampling.sampler_factory import get_sampler
+from whittle.training_strategies.base_strategy import BaseTrainingStrategy
+
+# Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
+
+"""This script merges the LoRA weights with the base model"""
+
+
+def get_task_metric_map(dataset):
+    if dataset == "winogrande":
+        return "acc"
+    elif dataset == "arc_challenge":
+        return "acc_norm"
+    elif dataset == "mmlu":
+        return "acc"
+    elif dataset == "hellaswag":
+        return "acc_norm"
+    elif dataset == "gsm8k":
+        return "acc"
+    elif dataset == "truthfulqa_mc2":
+        return "acc"
+    else:
+        return "acc_norm"
+
+
+def compute_loss(model, val_dataloader, eval):
+    losses = torch.zeros(min(len(val_dataloader), eval.max_iters))
+    for k, batch in enumerate(val_dataloader):
+        if k >= eval.max_iters:
+            break
+        input_ids, targets = batch["input_ids"], batch["labels"]
+        logits = model(input_ids)
+        losses[k] = chunked_cross_entropy(
+            logits[..., :-1, :], targets[..., 1:], chunk_size=0
+        )
+
+    val_loss = losses.mean()
+    return val_loss
+
+
+def compute_accuracy(model, dataset, checkpoint_dir):
+    metric = get_task_metric_map(dataset)
+    convert_and_evaluate(
+        model,
+        out_dir=checkpoint_dir,
+        device=None,
+        dtype=torch.float32,
+        tasks=dataset,
+        batch_size=16,  # Test for non-positive integer
+    )
+    with open(str(checkpoint_dir / "results.json")) as f:
+        results = json.load(f)
+    acc = results["results"][dataset][f"{metric},none"]
+    return acc
+
+
+def plot_validation_metrics(model, val_dataloader, eval, sampler):
+    # compute loss for superent
+    model.eval()
+    model.reset_super_network()
+    val_loss_largest = compute_loss(model, val_dataloader, eval)
+    middle_config = sampler.get_medium_sub_network()
+    model.set_sub_network(**middle_config)
+    val_loss_medium = compute_loss(model, val_dataloader, eval)
+    model.reset_super_network()
+    smallest_config = sampler.get_smallest_sub_network()
+    model.set_sub_network(**smallest_config)
+    val_loss_smallest = compute_loss(model, val_dataloader, eval)
+    model.reset_super_network()
+    return val_loss_largest, val_loss_medium, val_loss_smallest
+
+
+def plot_accuracies(model, sampler, dataset, checkpoint_dir):
+    model.eval()
+    model.reset_super_network()
+    val_loss_largest = compute_accuracy(model, dataset, checkpoint_dir)
+    middle_config = sampler.get_medium_sub_network()
+    model.set_sub_network(**middle_config)
+    val_loss_medium = compute_accuracy(model, dataset, checkpoint_dir)
+    model.reset_super_network()
+    smallest_config = sampler.get_smallest_sub_network()
+    model.set_sub_network(**smallest_config)
+    val_loss_smallest = compute_accuracy(model, dataset, checkpoint_dir)
+    model.reset_super_network()
+    return val_loss_largest, val_loss_medium, val_loss_smallest
 
 
 def merge_lora(
     sampling_strategy: str,
     importance_objective: str,
     checkpoint_dir: Path,
-    pretrained_checkpoint_dir: Optional[Path] = None,
-    precision: Optional[str] = None,
+    pretrained_checkpoint_dir: Path | None = None,
+    precision: str | None = None,
 ) -> None:
     """Merges the LoRA weights with the base model.
 
@@ -166,7 +234,7 @@ def merge_lora(
 
 def load_lora_metadata(
     checkpoint_dir: Path,
-) -> Tuple[Dict[str, Any], Path, Optional[str]]:
+) -> tuple[dict[str, Any], Path, str | None]:
     hparams_file = checkpoint_dir / "hyperparameters.yaml"
     if not hparams_file.is_file():
         raise FileNotFoundError(
@@ -175,7 +243,7 @@ def load_lora_metadata(
             f" the `litgpt/finetune/lora.py` script."
         )
 
-    with open(hparams_file, "r", encoding="utf-8") as file:
+    with open(hparams_file, encoding="utf-8") as file:
         hparams = yaml.safe_load(file)
 
     lora_params = {k: v for k, v in hparams.items() if k.startswith("lora_")}
@@ -184,9 +252,7 @@ def load_lora_metadata(
     return lora_params, pretrained_checkpoint_dir, precision
 
 
-def find_resume_path(
-    resume: Union[bool, Literal["auto"], Path], out_dir: Path
-) -> Optional[Path]:
+def find_resume_path(resume: bool | Path, out_dir: Path) -> bool | Path:
     resume_path = out_dir / "final" / "lit_model.pth.lora"
     if not resume_path.exists():
         return False
@@ -196,11 +262,12 @@ def find_resume_path(
 def setup(
     checkpoint_dir: Path,
     out_dir: Path = Path("out/finetune/lora"),
-    precision: Optional[str] = None,
-    quantize: Optional[
-        Literal["bnb.nf4", "bnb.nf4-dq", "bnb.fp4", "bnb.fp4-dq", "bnb.int8-training"]
-    ] = None,
-    devices: Union[int, str] = 1,
+    precision: str | None = None,
+    quantize: Literal[
+        "bnb.nf4", "bnb.nf4-dq", "bnb.fp4", "bnb.fp4-dq", "bnb.int8-training"
+    ]
+    | None = None,
+    devices: int = 1,
     num_nodes: int = 1,
     lora_r: int = 8,
     lora_alpha: int = 16,
@@ -212,7 +279,7 @@ def setup(
     lora_mlp: bool = True,
     lora_head: bool = True,
     lora_emb: bool = True,
-    data: Optional[DataModule] = None,
+    data: DataModule | None = None,
     train: TrainArgs = TrainArgs(
         save_interval=100,
         log_interval=1,
@@ -226,16 +293,16 @@ def setup(
     search_space_type: str = "hw_gpt_bench",
     sampling_strategy: str = "random",
     eval: EvalArgs = EvalArgs(interval=10, max_new_tokens=100, max_iters=100),
-    optimizer: Union[str, Dict] = "AdamW",
+    optimizer: str | dict = "AdamW",
     logger_name: Literal["wandb", "tensorboard", "csv"] = "wandb",
     seed: int = 1337,
-    access_token: Optional[str] = None,
+    access_token: str | None = None,
     n_trials: int = 10000,
     downstream_test_iters: int = 500,
     downstream_dataset: str = "arc_easy",
     importance_objective: str = "norm",
     objective: str = "mag",
-    resume: Union[bool, Literal["auto"], Path] = True,
+    resume: bool | Path = True,
     kd_loss: str = "forward_kl",
     kd_temperature: float = 0.9,
     kd_alpha: float = 0.5,
@@ -313,7 +380,7 @@ def setup(
     nanoseconds = time.time_ns() % 1_000_000_000  # Extract only the nanosecond part
 
     # Create a timestamp with nanosecond precision
-    time_string = now.strftime(f"%Y%m%d_%H%M%S")
+    time_string = now.strftime("%Y%m%d_%H%M%S")
     search_space = search_spaces[search_space_type](config)
 
     if train_strategy == "sandwich-kd":
@@ -397,63 +464,21 @@ def setup(
         loggers=logger,
         plugins=plugins,
     )
-    if sampling_strategy == "random":
-        sampler = RandomSampler(search_space=search_space, seed=seed)
-    elif sampling_strategy == "grid":
-        sampler = FixGridSampler(search_space=search_space, seed=seed)
-    elif sampling_strategy == "grid-params":
-        sampler = FixParamGridSampler(
-            search_space=search_space,
-            seed=42,
-            n_trials=n_trials,
-            num_configs=num_configs,
-        )
-    elif sampling_strategy == "calibrate":
-        sampler = CalibFixGridSampler(
-            checkpoint_dir=checkpoint_dir,
-            search_space_type=search_space_type,
-            search_space=search_space,
-            seed=seed,
-        )
-    elif sampling_strategy == "importance-random":
-        sampler = ImportanceSampler(sorted_ids_path, search_space, seed=seed)
-    elif sampling_strategy == "importance-grid-params":
-        sampler = ImportanceParamGridSampler(
-            sorted_ids_path=sorted_ids_path,
-            search_space=search_space,
-            seed=42,
-            num_configs=num_configs,
-            n_trials=n_trials,
-        )
-    elif sampling_strategy == "importance-calibrate":
-        sampler = ImportanceCalibFixGridSampler(
-            objective=objective,
-            importance_objective=importance_objective,
-            sorted_ids_path=sorted_ids_path,
-            checkpoint_dir=checkpoint_dir,
-            search_space_type=search_space_type,
-            search_space=search_space,
-            num_configs=num_configs,
-            seed=seed,
-        )
-    elif sampling_strategy == "llama-grid":
-        sampler = LlamaGridSampler(
-            sorted_ids_path=os.path.join(checkpoint_dir, "sorted_ids.pkl"), seed=seed
-        )
+    sampler = get_sampler(
+        sampling_strategy,
+        sorted_ids_path=sorted_ids_path,
+        search_space=search_space,
+        seed=42,
+        num_configs=num_configs,
+        n_trials=n_trials,
+    )
     loss_factory = LossFactory(
         alpha=kd_alpha,
         beta=kd_beta,
         temperature=kd_temperature,
         weight_scheme=weight_scheme,
     )
-    if train_strategy == "sandwich-kd":
-        strategy = SandwichStrategyKD(
-            loss_function=loss_factory,
-            lora=True,
-            sampler=sampler,
-            weight_supernet_loss=weight_supernet_loss,
-        )
-    elif train_strategy == "sandwich":
+    if train_strategy == "sandwich":
         strategy = SandwichStrategy(
             loss_function=chunked_cross_entropy,
             lora=True,
@@ -467,6 +492,8 @@ def setup(
             lora=True,
             sampler=sampler,
         )
+    else:
+        raise ValueError(f"Invalid training strategy: {train_strategy}")
 
     strategy.fabric = fabric
     strategy.gradient_accumulation_step = train.gradient_accumulation_iters(devices)
@@ -504,7 +531,7 @@ def main(
     out_dir: Path,
     train: TrainArgs,
     eval: EvalArgs,
-    optimizer: Union[str, Dict],
+    optimizer: str | dict,
     sampling_strategy: str,
     strategy: BaseTrainingStrategy,
     downstream_dataset: str,
@@ -528,7 +555,7 @@ def main(
     if "importance" in sampling_strategy:
         checkpoint_path = "/hkfs/work/workspace/scratch/fr_rs1131-peftprune/compressing_llms/checkpoints/meta-llama/Meta-Llama-3.1-8B/permuted_model_llama_joint_mean_block_importance.pth"
     else:
-        checkpoint_path = checkpoint_dir / f"lit_model.pth"
+        checkpoint_path = checkpoint_dir / "lit_model.pth"
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
         model = GPT(config)
         if "grid-params" in sampling_strategy:
@@ -629,14 +656,14 @@ def main(
 
 def fit(
     fabric: L.Fabric,
-    state: Dict,
+    state: dict,
     model: GPT,
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler,
     train_dataloader: DataLoader,
     val_dataloader: DataLoader,
     devices: int,
-    checkpoint_dir: Path,
+    checkpoint_dir: Path | str,
     out_dir: Path,
     train: TrainArgs,
     eval: EvalArgs,
@@ -703,10 +730,8 @@ def fit(
         window=train.gradient_accumulation_iters(devices), sync_on_compute=False
     ).to(fabric.device)
     max_steps = train.max_steps or float("inf")
-    step_count = 0
-    iter_num = 0
     total_lengths = 0
-    total_t0 = time.perf_counter()
+    time.perf_counter()
 
     while state["step_count"] < max_steps and train_iterator.epoch < train.epochs:
         state["iter_num"] += 1
@@ -821,7 +846,7 @@ def fit(
             and not is_accumulating
             and state["step_count"] % train.save_interval == 0
         ):
-            checkpoint_file = out_dir / f"final" / "lit_model.pth.lora"
+            checkpoint_file = out_dir / "final" / "lit_model.pth.lora"
             checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
             fabric.save(checkpoint_file, state)
             if fabric.global_rank == 0:
@@ -918,7 +943,7 @@ def get_lr_scheduler(optimizer, warmup_steps: int, max_steps: int):
 
 def get_dataloaders(
     fabric: L.Fabric, data: DataModule, tokenizer: Tokenizer, train: TrainArgs
-) -> Tuple[DataLoader, DataLoader]:
+) -> tuple[DataLoader, DataLoader]:
     data.connect(
         tokenizer=tokenizer,
         batch_size=train.micro_batch_size,
@@ -935,7 +960,7 @@ def get_dataloaders(
     return train_dataloader, val_dataloader
 
 
-def get_longest_seq_length(data: List[Dict]) -> Tuple[int, int]:
+def get_longest_seq_length(data: list[dict]) -> tuple[int, int]:
     # find out the minimum max_seq_length required during fine-tuning (saves memory!)
     lengths = [len(d["input_ids"]) for d in data]
     longest_seq_length = max(lengths)

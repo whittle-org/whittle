@@ -8,8 +8,8 @@ from litgpt.model import (
     build_rope_cache,
 )
 
-from whittle.lora.config import LoRAConfig as Config
-from whittle.lora.lora_attention import CausalSelfAttention
+from whittle.lora_model.config import LoRAConfig as Config
+from whittle.lora_model.lora_attention import CausalSelfAttention
 
 attention_configs = {
     "mha_fix_head_size_sliding": {

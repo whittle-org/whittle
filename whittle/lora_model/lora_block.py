@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import torch.nn as nn
 
-from whittle.lora.config import LoRAConfig as Config
-from whittle.lora.lora_attention import CausalSelfAttention
-from whittle.lora.lora_mlps import (
+from whittle.lora_model.config import LoRAConfig as Config
+from whittle.lora_model.lora_attention import CausalSelfAttention
+from whittle.lora_model.lora_mlps import (
     LoRAGemmaMLP as GemmaMLP,
     LoRAGptNeoxMLP as GptNeoxMLP,
     LoRALLaMAMLP as LLaMAMLP,

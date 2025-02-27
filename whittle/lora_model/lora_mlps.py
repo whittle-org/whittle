@@ -6,7 +6,7 @@ import torch
 from litgpt.config import Config
 from litgpt.utils import map_old_state_dict_weights
 
-from whittle.lora.lora_linear import LoRALinear
+from whittle.lora_model.lora_linear import LoRALinear
 from whittle.models.gpt.blocks.mlp import (
     GptNeoxMLP as GptNeoxMLPBase,
     LLaMAMLP as LLaMAMLPBase,
