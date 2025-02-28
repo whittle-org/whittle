@@ -150,7 +150,7 @@ def merge_lora(
     sampling_strategy: str,
     importance_objective: str,
     checkpoint_dir: Path,
-    pretrained_checkpoint_dir=None,
+    pretrained_checkpoint_dir: str | None = None,
     precision: str | None = None,
 ) -> None:
     """Merges the LoRA weights with the base model.
@@ -188,8 +188,8 @@ def merge_lora(
     precision = precision if precision is not None else lora_precision
 
     if pretrained_checkpoint_dir is None:
-        pretrained_checkpoint_dir = meta_pretrained_checkpoint_dir
-        pretrained_checkpoint_dir = extend_checkpoint_dir(pretrained_checkpoint_dir)
+        pretrained_checkpoint_dir = meta_pretrained_checkpoint_dir  # type: ignore
+        pretrained_checkpoint_dir = extend_checkpoint_dir(pretrained_checkpoint_dir)  # type: ignore
 
     fabric = L.Fabric(devices=1, precision=precision, accelerator="cpu")
     config = Config.from_file(checkpoint_dir / "model_config.yaml", **lora_params)
@@ -207,7 +207,7 @@ def merge_lora(
         )
     else:
         pretrained_checkpoint = torch.load(
-            str(pretrained_checkpoint_dir / "lit_model.pth"), mmap=True
+            str(pretrained_checkpoint_dir + "/lit_model.pth"), mmap=True
         )
     lora_checkpoint = torch.load(str(lora_path), mmap=True)
     lora_checkpoint = lora_checkpoint.get("model", lora_checkpoint)
