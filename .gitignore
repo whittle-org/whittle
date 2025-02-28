@@ -1,5 +1,7 @@
 # project files
 **/examples/**/*.png
+**/checkpoints
+**/data
 
 *.DS_Store
 
@@ -136,4 +138,3 @@ Session.vim
 *~
 # Auto-generated tag files
 tags
-
