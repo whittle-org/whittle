@@ -117,7 +117,7 @@ if __name__ == "__main__":
     lc_valid = []
     lc_train = []
 
-    sampler = RandomSampler(search_space, seed=args.seed)
+    sampler = RandomSampler(search_space, seed=args.seed, cast_search_space=False)
     training_strategies = {
         "standard": StandardStrategy(
             sampler=sampler, loss_function=nn.functional.cross_entropy
