@@ -22,12 +22,12 @@ class DistillArgs:
     """Distillation-related arguments
 
     Args:
-       method: Distillation method to use ('logits' or 'hidden_states') - Only supports 'logits' for now
-       temperature: Controls softening of output probabilities. Higher values (>1) produce softer distributions,
-         emphasizing less confident predictions. Lower values (<1) make distributions sharper, focusing on
-         confident predictions.
-       alpha: Weight balancing distillation loss vs cross-entropy loss. Values closer to 1 give more importance
-         to matching teacher logits, while values closer to 0 prioritize true label prediction.
+        method: Distillation method to use ('logits' or 'hidden_states') - Only supports 'logits' for now
+        temperature: Controls softening of output probabilities. Higher values (>1) produce softer distributions,
+          emphasizing less confident predictions. Lower values (<1) make distributions sharper, focusing on
+          confident predictions.
+        alpha: Weight balancing distillation loss vs cross-entropy loss. Values closer to 1 give more importance
+          to matching teacher logits, while values closer to 0 prioritize true label prediction.
     """
 
     method: str = "logits"
