@@ -433,23 +433,15 @@ def fit(
 
     with torch.device("meta"):
         meta_model = GPT(student.config)
-        meta_model.set_sub_network(
-            **{
-                "sub_network_n_embd": student.config.n_embd,
-                "sub_network_intermediate_size": student.config.intermediate_size,
-                "sub_network_num_heads": student.config.n_head,
-                "sub_network_n_layers": student.config.n_layer,
-            }
-        )
         x = torch.randint(0, 1, (train.micro_batch_size, meta_model.max_seq_length))
 
-        def model_fwd(meta_model, x):
-            return meta_model(x)
+        def model_fwd():
+            return meta_model(x)  # noqa: F821
 
-        def model_loss(y, x):
-            return chunked_cross_entropy(y, x, chunk_size=0)
+        def model_loss(y):
+            return chunked_cross_entropy(y, x, chunk_size=0)  # noqa: F821
 
-        measured_flops = measure_flops(meta_model, model_fwd(meta_model, x), model_loss)
+        measured_flops = measure_flops(meta_model, model_fwd, model_loss)
         fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
         del meta_model, x
 
