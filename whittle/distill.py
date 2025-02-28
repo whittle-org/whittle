@@ -51,7 +51,7 @@ from whittle.sampling.random_sampler import RandomSampler
 
 
 def setup(
-    out_dir: Path = Path("examples/gpt/out/distill"),
+    out_dir: Path = Path("out/distill"),
     precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
     initial_checkpoint_dir: Path | None = None,
     student_dir: Path | None = None,
