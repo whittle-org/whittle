@@ -9,50 +9,50 @@ from typing import Any, Literal
 
 import lightning as L
 import torch
-
-# TODO: wrap this in a try-import in case deepspeed is not installed
-from deepspeed.utils.zero_to_fp32 import (
-    get_fp32_state_dict_from_zero_checkpoint,
-)
-
-# Monkeypatch Lightning Fabric's Strategy.get_module_state_dict method
-from lightning.fabric.strategies.strategy import Strategy
+from lightning.fabric.strategies.deepspeed import _DEEPSPEED_AVAILABLE
 from torch.nn import Module
 
-# Store the original method for later use
-original_get_module_state_dict = Strategy.get_module_state_dict
+if _DEEPSPEED_AVAILABLE:
+    from deepspeed.utils.zero_to_fp32 import (
+        get_fp32_state_dict_from_zero_checkpoint,
+    )
+    from lightning.fabric.strategies.strategy import Strategy
 
+    # Store the original method for later use
+    original_get_module_state_dict = Strategy.get_module_state_dict
 
-# Define our custom implementation
-def custom_get_module_state_dict(self, module: Module) -> dict[str, Any | torch.Tensor]:
-    """Custom implementation that handles DeepSpeed module state dict differently."""
+    # Define our custom implementation
+    def custom_get_module_state_dict(
+        self, module: Module
+    ) -> dict[str, Any | torch.Tensor]:
+        """Custom implementation that handles DeepSpeed module state dict differently."""
+        from lightning.fabric.strategies import DeepSpeedStrategy
+
+        if isinstance(self, DeepSpeedStrategy):
+            # For DeepSpeed, we need to handle the module differently
+            # First get the state dict using the original method
+            state_dict = original_get_module_state_dict(self, module)
+
+            # Add "module." prefix to all keys
+            prefixed_state_dict = {}
+            for key, value in state_dict.items():
+                if not key.startswith("module."):
+                    prefixed_state_dict[f"module.{key}"] = value
+                else:
+                    prefixed_state_dict[key] = value
+
+            return prefixed_state_dict
+        else:
+            # For other strategies, use the original implementation
+            return original_get_module_state_dict(self, module)
+
+    # Apply the monkeypatch
+    Strategy.get_module_state_dict = custom_get_module_state_dict
+
     from lightning.fabric.strategies import DeepSpeedStrategy
 
-    if isinstance(self, DeepSpeedStrategy):
-        # For DeepSpeed, we need to handle the module differently
-        # First get the state dict using the original method
-        state_dict = original_get_module_state_dict(self, module)
-
-        # Add "module." prefix to all keys
-        prefixed_state_dict = {}
-        for key, value in state_dict.items():
-            if not key.startswith("module."):
-                prefixed_state_dict[f"module.{key}"] = value
-            else:
-                prefixed_state_dict[key] = value
-
-        return prefixed_state_dict
-    else:
-        # For other strategies, use the original implementation
-        return original_get_module_state_dict(self, module)
-
-
-# Apply the monkeypatch
-Strategy.get_module_state_dict = custom_get_module_state_dict
-
-from lightning.fabric.strategies import DeepSpeedStrategy, FSDPStrategy
+from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
-from lightning.fabric.wrappers import _FabricDataLoader
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import name_to_config
@@ -367,12 +367,13 @@ def fit(
 
         with fabric.no_backward_sync(model, enabled=is_accumulating):
             loss = training_strategy(model, input_ids, targets, scale_loss=scale_loss)
-        #            fabric.backward(loss / train.gradient_accumulation_iters(devices))
 
         running_loss.update(loss)
 
         if not is_accumulating:
-            if isinstance(optimizer, torch.optim.Optimizer):
+            if isinstance(optimizer, torch.optim.Optimizer) and not isinstance(
+                fabric.strategy, DeepSpeedStrategy
+            ):
                 fabric.clip_gradients(model, optimizer, max_norm=train.max_norm)
             optimizer.step()
             optimizer.zero_grad()
@@ -555,7 +556,7 @@ def main(
             fabric.load(resume, state, strict=False)
 
             train_dataloader.load_state_dict(
-                torch.load(resume / "lit_model.pth", weights_only=False)[
+                torch.load(resume / "lit_model.pth", weights_only=False)[  # type: ignore[operator]
                     "train_dataloader"
                 ]
             )
@@ -597,6 +598,7 @@ def save_checkpoint(
     tokenizer_dir: Path | str | None,
     checkpoint_file: Path,
 ):
+    # TODO: add docstring
     model: GPT = state["model"]
     checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
     fabric.print(f"Saving checkpoint to {str(checkpoint_file)!r}")
@@ -609,16 +611,12 @@ def save_checkpoint(
 
         # Get the FP32 state dict from the saved checkpoint
         model_state = get_fp32_state_dict_from_zero_checkpoint(checkpoint_file.parent)
-        dataloader: _FabricDataLoader = state["train_dataloader"]._dataloader
+        dataloader: DataLoader = state["train_dataloader"]._dataloader
 
         with open(checkpoint_file, "wb") as f:
-            new_model_state = {}
-            for key, value in model_state.items():
-                new_model_state[f"module.{key}"] = value
-
             torch.save(
                 dict(
-                    model=new_model_state,
+                    model=model_state,
                     train_dataloader=dataloader.state_dict(),
                     iter_num=state["iter_num"],
                     step_count=state["step_count"],
