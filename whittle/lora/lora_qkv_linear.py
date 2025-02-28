@@ -71,10 +71,9 @@ class LoRAQKVLinear(LoRALayer):
                 # might not be equal to `head_size * n_head`, thus we use it directly here
                 self.sub_network_head_size
                 * self.sub_network_query_groups
-                * self.sub_network_q_per_kv
-                * self.enable_q,
-                head_size * n_query_groups * self.enable_k,
-                head_size * n_query_groups * self.enable_v,
+                * self.sub_network_q_per_kv,
+                head_size * n_query_groups,
+                head_size * n_query_groups,
             )
             self.qkv_shapes = [s for s in qkv_shapes if s]
             self.lora_B = nn.Parameter(torch.empty(sum(self.qkv_shapes), r))  # (256, 2))
