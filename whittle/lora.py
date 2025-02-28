@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 import lightning as L
 import torch
-import yaml
+import yaml  # type: ignore
 from lightning.fabric.plugins import BitsandbytesPrecision
 from lightning.fabric.strategies import DDPStrategy
 from lightning_utilities.core.imports import RequirementCache
@@ -49,8 +49,6 @@ from litgpt.utils import (
     parse_devices,
     save_hyperparameters,
 )
-from whittle.training_strategies.sandwich import SandwichStrategy
-from whittle.training_strategies.standard import StandardStrategy
 from torch.utils.data import ConcatDataset, DataLoader
 from torchmetrics import RunningMean
 from whitte.lora_model.lora_gpt import GPT
@@ -61,6 +59,8 @@ from whittle.eval.utils import convert_and_evaluate
 from whittle.loss.loss_factory import LossFactory
 from whittle.sampling.sampler_factory import get_sampler
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
+from whittle.training_strategies.sandwich import SandwichStrategy
+from whittle.training_strategies.standard import StandardStrategy
 
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 
@@ -150,7 +150,7 @@ def merge_lora(
     sampling_strategy: str,
     importance_objective: str,
     checkpoint_dir: Path,
-    pretrained_checkpoint_dir: Path | None = None,
+    pretrained_checkpoint_dir=None,
     precision: str | None = None,
 ) -> None:
     """Merges the LoRA weights with the base model.
@@ -555,7 +555,7 @@ def main(
     if "importance" in sampling_strategy:
         checkpoint_path = "/hkfs/work/workspace/scratch/fr_rs1131-peftprune/compressing_llms/checkpoints/meta-llama/Meta-Llama-3.1-8B/permuted_model_llama_joint_mean_block_importance.pth"
     else:
-        checkpoint_path = checkpoint_dir / "lit_model.pth"
+        checkpoint_path = checkpoint_dir / "lit_model.pth"  # type: ignore
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
         model = GPT(config)
         if "grid-params" in sampling_strategy:
@@ -594,7 +594,7 @@ def main(
     # strict=False because missing keys due to LoRA weights not contained in state dict
     load_checkpoint(fabric, model, checkpoint_path, strict=False)
     if resume:
-        resume = find_resume_path(resume, out_dir)
+        resume = find_resume_path(resume, out_dir)  # type: ignore
         if resume:
             fabric.load(resume, state)
     train_time = time.perf_counter()
@@ -748,7 +748,6 @@ def fit(
                 input_ids,
                 targets,
                 train.gradient_accumulation_iters(devices),
-                kd_loss,
             )
 
         running_loss.update(loss)

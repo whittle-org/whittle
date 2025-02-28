@@ -50,5 +50,5 @@ class BaseTrainingStrategy:
         y_hat[-1] = y_hat[-1][..., :-1, :]
         return self.loss_function(y_hat, y[..., 1:])
 
-    def __call__(self, model, inputs, outputs, **kwargs):
+    def __call__(self, model, inputs, outputs, scale_loss=1, **kwargs):
         raise NotImplementedError
