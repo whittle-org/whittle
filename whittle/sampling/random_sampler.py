@@ -28,8 +28,9 @@ class RandomSampler(BaseSampler):
     RandomSampler samples configurations from a given search space using a random state.
 
     Args:
-        config_space: The search space from which to sample.
+        search_space: The search space from which to sample.
         seed: Seed for the random number generator. Defaults to None.
+        cast_search_space: Whether to cast the search space. Defaults to True.
     """
 
     def __init__(

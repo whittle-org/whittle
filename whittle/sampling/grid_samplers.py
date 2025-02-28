@@ -17,9 +17,10 @@ class StratifiedRandomSampler(RandomSampler):
     It maintains a set of bins to ensure that the configurations are sampled uniformly based on their parameter count.
 
     Args:
-        config_space: The search space from which to sample.
+        search_space: The search space from which to sample.
         seed: Seed for the random number generator. Defaults to None.
         param_bins: The parameter bins that limit the sub-network params in the search.
+        cast_search_space: Whether to cast the search space. Defaults to True.
     """
 
     def __init__(
@@ -69,6 +70,18 @@ class StratifiedRandomSampler(RandomSampler):
 
 
 class FixedParamGridSampler(RandomSampler):
+    """
+    FixedParamGridSampler creates a fixed grid of sampled configurations, each at a different parameter range. It samples
+    uniformly just as StratifiedRandomSampler.
+
+    Args:
+        search_space: The search space from which to sample.
+        num_configs: The number of configurations to sample for the grid.
+        n_trials: The number of trials to sample before an error is thrown (not possible to find a network in a param range).
+        seed: Seed for the random number generator. Defaults to None.
+        cast_search_space: Whether to cast the search space. Defaults to True.
+    """
+
     def __init__(
         self,
         search_space: dict[str, Any] | Any,

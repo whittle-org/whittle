@@ -57,9 +57,9 @@ class MLP(nn.Module):
         x_ = self.output(x_)
         return x_
 
-    def select_sub_network(self, config):
-        self.input.set_sub_network(self.input_dim, config["num_units"])
-        self.output.set_sub_network(config["num_units"], 1)
+    def set_sub_network(self, num_units):
+        self.input.set_sub_network(self.input_dim, num_units)
+        self.output.set_sub_network(num_units, 1)
 
     def reset_super_network(self):
         self.output.reset_super_network()
