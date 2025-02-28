@@ -29,7 +29,7 @@ class RandomStrategy(BaseTrainingStrategy):
         y_supernet = model(inputs)
         for i in range(self.random_samples):
             config = self.sampler.sample()
-            model.select_sub_network(config)
+            model.set_sub_network(config)
             y_hat = model(inputs)
             if self.kd_loss is not None:
                 loss = self.kd_loss(y_hat, outputs, y_supernet)
