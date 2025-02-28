@@ -23,7 +23,7 @@ class MLP(nn.Module):
         x_ = self.output_layer(x_)
         return x_
 
-    def select_sub_network(self, config):
+    def set_sub_network(self, config):
         self.hidden_layer.set_sub_network(self.hidden_dim, config["num_units"])
         self.output_layer.set_sub_network(config["num_units"], 1)
 

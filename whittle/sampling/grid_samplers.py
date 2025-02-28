@@ -24,7 +24,7 @@ class StratifiedRandomSampler(RandomSampler):
 
     def __init__(
         self,
-        search_space,
+        search_space: dict[str, Any] | Any,
         params_estimator: Callable,
         seed: int | None = None,
         param_bins: ParamBinArgs | None = None,
@@ -71,7 +71,7 @@ class StratifiedRandomSampler(RandomSampler):
 class FixedParamGridSampler(RandomSampler):
     def __init__(
         self,
-        search_space,
+        search_space: dict[str, Any] | Any,
         num_configs: int = 21,
         n_trials: int = 5000,
         seed: int | None = None,

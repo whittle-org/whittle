@@ -33,7 +33,10 @@ class RandomSampler(BaseSampler):
     """
 
     def __init__(
-        self, search_space, seed: int | None = None, cast_search_space: bool = True
+        self,
+        search_space: dict[str, Any] | Any,
+        seed: int | None = None,
+        cast_search_space: bool = True,
     ):
         self.search_space = (
             SimpleSearchSpace(search_space)

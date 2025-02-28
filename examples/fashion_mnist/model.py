@@ -27,7 +27,7 @@ class LeNet(nn.Module):
         x = self.fc3(x)
         return x
 
-    def select_sub_network(self, config: dict[Literal["fc1_out", "fc2_out"], int]):
+    def set_sub_network(self, config: dict[Literal["fc1_out", "fc2_out"], int]):
         fc1_out = config["fc1_out"]
         fc2_out = config["fc2_out"]
 

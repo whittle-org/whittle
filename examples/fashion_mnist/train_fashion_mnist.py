@@ -196,7 +196,7 @@ if __name__ == "__main__":
     )
     for i, k in enumerate(lottery_grid):
         config = {"fc1_out": k[0], "fc2_out": k[1]}
-        model.select_sub_network(config=config)
+        model.set_sub_network(config=config)
         acc, loss = validate(
             model=model,
             test_loader=test_loader,

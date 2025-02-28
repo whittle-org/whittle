@@ -58,7 +58,7 @@ if __name__ == "__main__":
     model.eval()
 
     def objective(config):
-        model.select_sub_network(config)
+        model.set_sub_network(config)
         loss = validate(model, valid_dataloader, device)
 
         mac = 0

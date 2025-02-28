@@ -14,7 +14,7 @@ class SimpleSearchSpace:
         return config
 
 
-class SMALL:
+class SMALL(SimpleSearchSpace):
     def __init__(self, gpt_model_specification):
         self.config_space = {
             "n_embd": lograndint(64, gpt_model_specification.n_embd),
@@ -34,7 +34,7 @@ class SMALL:
         }
 
 
-class MEDIUM:
+class MEDIUM(SimpleSearchSpace):
     def __init__(self, gpt_model_specification):
         self.config_space = {
             "n_embd": lograndint(64, gpt_model_specification.n_embd),
@@ -61,7 +61,7 @@ class MEDIUM:
         }
 
 
-class HWGPTBench:
+class HWGPTBench(SimpleSearchSpace):
     def __init__(self, gpt_model_specification):
         self.config_space = {
             "embed_dim": lograndint(1, gpt_model_specification.n_embd),
@@ -84,7 +84,7 @@ class HWGPTBench:
         }
 
 
-class Llama:
+class Llama(SimpleSearchSpace):
     def __init__(self, gpt_model_specification):
         self.config_space = {
             "embed_dim": choice(
@@ -121,7 +121,7 @@ class Llama:
         return config_return
 
 
-class LlamaHeadSize:
+class LlamaHeadSize(SimpleSearchSpace):
     def __init__(self, gpt_model_specification):
         self.config_space = {
             "embed_dim": choice(
