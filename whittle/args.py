@@ -31,11 +31,8 @@ class DistillArgs:
     """
 
     method: str = "logits"
-    """Distillation method to use ('logits' or 'hidden_states')"""
     temperature: float = 5
-    """Temperature for distillation"""
     alpha: float = 0.5
-    """Weight for KL-Divergence (distillation) loss"""
 
 
 class PruningArgs:
