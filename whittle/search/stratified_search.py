@@ -4,7 +4,7 @@ from typing import Any
 
 from syne_tune.optimizer.schedulers import FIFOScheduler
 from syne_tune.optimizer.schedulers.searchers.random_grid_searcher import (
-    RandomSearcher,
+    LegacyRandomSearcher as RandomSearcher,
 )
 
 from whittle.sampling.param_bins import ParamBins
