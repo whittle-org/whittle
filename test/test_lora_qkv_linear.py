@@ -419,7 +419,6 @@ def test_qkv_linear_forward(qkv_config):
     )
     inp = torch.rand(batch_size, seq_length, whittle_config.n_embd)
     qkv_out_whittle = whittle_attention.attn(inp)
-    print(qkv_out_whittle.shape)
     total_qkv = (whittle_attention.sub_network_q_per_kv) + 2
     qkv_out_whittle_reshaped = qkv_out_whittle.view(
         batch_size,
@@ -439,7 +438,6 @@ def test_qkv_linear_forward(qkv_config):
     )
     after_B = qkv.conv1d(after_A.transpose(-2, -1), qkv.lora_B)
     lora = qkv.zero_pad([a.transpose(-2, -1) * qkv.scaling for a in after_B])
-    print(lora.shape)
     lora_reshaped = lora.view(
         batch_size,
         seq_length,
