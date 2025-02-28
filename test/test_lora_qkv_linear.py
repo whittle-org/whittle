@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import pytest
 import torch
+import torch.nn as nn
+from litgpt import Config
 
 from whittle.lora.config import LoRAConfig
 from whittle.lora.lora_attention import CausalSelfAttention
 from whittle.lora.lora_qkv_linear import LoRAQKVLinear
+from whittle.models.gpt.blocks import CausalSelfAttention as CausalSelfAttentionWhittle
 
 lora_qkv_configs = {
     "mha_enable_qk": {
@@ -349,3 +352,123 @@ def test_zero_pad_sub_network(qkv_config):
         check_qkv(v, qkv_weights[qkv_idx])
     else:
         assert torch.allclose(v, torch.zeros_like(v), atol=1e-6)  # V should be zero
+
+
+@pytest.mark.parametrize("qkv_config", lora_qkv_configs.keys())
+def test_qkv_linear_forward(qkv_config):
+    config = lora_qkv_configs[qkv_config]
+    seq_length, batch_size = 4, 2
+    in_features, n_head, head_size, r = 128, 16, 2, 8
+    enable_lora = config["enable_lora"]
+    n_query_groups = config["n_query_groups"]
+    sub_network_n_head = 8
+    if n_head == n_query_groups:
+        sub_network_query_groups = sub_network_n_head
+    elif n_query_groups == 1:
+        sub_network_query_groups = 1
+    else:
+        sub_network_query_groups = 2
+
+    out_features = (n_head + 2 * n_query_groups) * head_size
+    lora_config = LoRAConfig(
+        n_embd=in_features,
+        n_head=n_head,
+        n_query_groups=n_query_groups,
+        head_size=head_size,
+    )
+    lora_config.fix_head_size = True
+    whittle_config = Config(
+        n_embd=in_features,
+        n_head=n_head,
+        n_query_groups=n_query_groups,
+        head_size=head_size,
+    )
+    whittle_attention = CausalSelfAttentionWhittle(whittle_config, 0)
+    qkv = LoRAQKVLinear(
+        lora_config,
+        in_features,
+        out_features,
+        head_size,
+        n_head,
+        n_query_groups,
+        True,
+        r=r,
+        enable_lora=enable_lora,
+    )
+    qkv.reset_super_network()
+    whittle_attention.reset_super_network()
+    whittle_attention.set_sub_network(
+        whittle_config.n_embd,
+        sub_network_n_head,
+        sub_network_query_groups,
+        head_size,
+    )
+    sub_network_out_features = (
+        (whittle_attention.sub_network_q_per_kv + 2)
+        * head_size
+        * sub_network_query_groups
+    )
+    qkv.set_sub_network(
+        in_features,
+        sub_network_out_features,
+        whittle_attention.qkv_indices,
+        sub_network_query_groups=sub_network_query_groups,
+        sub_network_n_head=sub_network_n_head,
+        sub_network_head_size=head_size,
+        sub_network_q_per_kv=whittle_attention.sub_network_q_per_kv,
+    )
+    inp = torch.rand(batch_size, seq_length, whittle_config.n_embd)
+    qkv_out_whittle = whittle_attention.attn(inp)
+    print(qkv_out_whittle.shape)
+    total_qkv = (whittle_attention.sub_network_q_per_kv) + 2
+    qkv_out_whittle_reshaped = qkv_out_whittle.view(
+        batch_size,
+        seq_length,
+        whittle_attention.sub_network_query_groups,
+        total_qkv,
+        whittle_attention.sub_network_head_size,
+    )
+    qkv_out_whittle_reshaped = qkv_out_whittle_reshaped.permute(0, 2, 3, 1, 4)
+    q, k, v = qkv_out_whittle_reshaped.split(
+        (whittle_attention.sub_network_q_per_kv, 1, 1), dim=2
+    )
+    nn.init.xavier_uniform_(qkv.lora_A)
+    nn.init.xavier_uniform_(qkv.lora_B)
+    after_A = torch.nn.functional.linear(
+        qkv.lora_dropout(inp), qkv.lora_A[:, : qkv.sub_network_in_features]
+    )
+    after_B = qkv.conv1d(after_A.transpose(-2, -1), qkv.lora_B)
+    lora = qkv.zero_pad([a.transpose(-2, -1) * qkv.scaling for a in after_B])
+    print(lora.shape)
+    lora_reshaped = lora.view(
+        batch_size,
+        seq_length,
+        whittle_attention.sub_network_query_groups,
+        total_qkv,
+        whittle_attention.sub_network_head_size,
+    )
+    lora_reshaped = lora_reshaped.permute(0, 2, 3, 1, 4)
+    q_lora, k_lora, v_lora = lora_reshaped.split(
+        (whittle_attention.sub_network_q_per_kv, 1, 1), dim=2
+    )
+    qkv_out_lora = qkv_out_whittle + lora
+    qkv_out_lora_reshaped = qkv_out_lora.view(
+        batch_size,
+        seq_length,
+        whittle_attention.sub_network_query_groups,
+        total_qkv,
+        whittle_attention.sub_network_head_size,
+    )
+    qkv_out_lora_reshaped = qkv_out_lora_reshaped.permute(0, 2, 3, 1, 4)
+    q_lora_and_whittle, k_lora_and_whittle, v_lora_and_whittle = (
+        qkv_out_lora_reshaped.split((whittle_attention.sub_network_q_per_kv, 1, 1), dim=2)
+    )
+    assert torch.allclose(q_lora_and_whittle - q_lora, q, atol=1e-6)
+    assert torch.allclose(k_lora_and_whittle - k_lora, k, atol=1e-6)
+    assert torch.allclose(v_lora_and_whittle - v_lora, v, atol=1e-6)
+    if not enable_lora[0]:
+        assert torch.allclose(q_lora_and_whittle, q, atol=1e-6)
+    if not enable_lora[1]:
+        assert torch.allclose(k_lora_and_whittle, k, atol=1e-6)
+    if not enable_lora[2]:
+        assert torch.allclose(v_lora_and_whittle, v, atol=1e-6)
