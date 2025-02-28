@@ -22,7 +22,7 @@ class DistillArgs:
     """Distillation-related arguments"""
 
     method: str = "logits"  # Only supports 'logits' for now
-    """Distillation method to use ('logits' or 'hidden_states')"""
+    """Distillation method to use ('logits' or 'hidden_states') - Only supports 'logits' for now"""
     temperature: float = 5
     """Temperature for softening output probabilities. Higher values (>1) produce softer distributions,
     emphasizing less confident predictions. Lower values (<1) make distributions sharper, focusing on
