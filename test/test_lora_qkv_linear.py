@@ -193,11 +193,17 @@ def test_zero_pad(qkv_config):
     if enable_lora[0]:
         check_qkv(q, qkv_weights[qkv_idx].flatten())
         qkv_idx += 1
+    else:
+        assert torch.allclose(q, torch.zeros_like(q), atol=1e-6)  # Q should be zero
     if enable_lora[1]:
         check_qkv(k, qkv_weights[qkv_idx].flatten())
         qkv_idx += 1
+    else:
+        assert torch.allclose(k, torch.zeros_like(k), atol=1e-6)  # K should be zero
     if enable_lora[2]:
         check_qkv(v, qkv_weights[qkv_idx].flatten())
+    else:
+        assert torch.allclose(v, torch.zeros_like(v), atol=1e-6)  # V should be zero
 
 
 @pytest.mark.parametrize("qkv_config", lora_qkv_configs.keys())
@@ -332,8 +338,14 @@ def test_zero_pad_sub_network(qkv_config):
     if enable_lora[0]:
         check_qkv(q, qkv_weights[qkv_idx])
         qkv_idx += 1
+    else:
+        assert torch.allclose(q, torch.zeros_like(q), atol=1e-6)  # Q should be zero
     if enable_lora[1]:
         check_qkv(k, qkv_weights[qkv_idx])
         qkv_idx += 1
+    else:
+        assert torch.allclose(k, torch.zeros_like(k), atol=1e-6)  # K should be zero
     if enable_lora[2]:
         check_qkv(v, qkv_weights[qkv_idx])
+    else:
+        assert torch.allclose(v, torch.zeros_like(v), atol=1e-6)  # V should be zero
