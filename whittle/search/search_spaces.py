@@ -5,6 +5,15 @@ import math
 from syne_tune.config_space import choice, lograndint, randint
 
 
+class SimpleSearchSpace:
+    def __init__(self, config_space):
+        self.config_space = config_space
+
+    @staticmethod
+    def cast(config):
+        return config
+
+
 class SMALL:
     def __init__(self, gpt_model_specification):
         self.config_space = {

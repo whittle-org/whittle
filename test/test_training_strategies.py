@@ -9,7 +9,7 @@ from syne_tune.config_space import choice, randint
 from whittle.loss import DistillLoss
 from whittle.models.gpt import GPT
 from whittle.modules.linear import Linear
-from whittle.sampling.random_sampler import RandomSampler
+from whittle.sampling.samplers import RandomSampler
 from whittle.training_strategies import (
     ATS,
     RandomLinearStrategy,
@@ -28,7 +28,9 @@ methods = [
 
 search_space_mlp = {"num_units": randint(1, 64)}
 
-sampler_mlp = RandomSampler(config_space=search_space_mlp, seed=42)
+sampler_mlp = RandomSampler(
+    search_space=search_space_mlp, seed=42, cast_search_space=False
+)
 
 loss_function = torch.nn.functional.mse_loss
 search_space_gpt = {
@@ -37,7 +39,9 @@ search_space_gpt = {
     "mlp_ratio": randint(1, 2),
     "depth": randint(1, 2),
 }
-sampler_gpt = RandomSampler(config_space=search_space_gpt, seed=42)
+sampler_gpt = RandomSampler(
+    search_space=search_space_gpt, seed=42, cast_search_space=False
+)
 
 
 class MLP(nn.Module):
