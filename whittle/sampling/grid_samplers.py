@@ -8,7 +8,7 @@ from whittle.metrics.parameters import (
     compute_parameters,
 )
 from whittle.sampling.param_bins import ParamBins
-from whittle.sampling.samplers import RandomSampler
+from whittle.sampling.random_sampler import RandomSampler
 
 
 class StratifiedRandomSampler(RandomSampler):

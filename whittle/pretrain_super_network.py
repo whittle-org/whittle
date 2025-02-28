@@ -44,7 +44,7 @@ from torchmetrics.aggregation import RunningMean
 
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
-from whittle.sampling.samplers import RandomSampler
+from whittle.sampling.random_sampler import RandomSampler
 from whittle.training_strategies import (
     RandomStrategy,
     SandwichStrategy,

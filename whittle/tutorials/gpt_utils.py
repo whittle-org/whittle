@@ -10,7 +10,7 @@ from syne_tune.config_space import randint
 from torch.nn import functional as F
 from tqdm import tqdm
 
-from whittle.sampling.samplers import RandomSampler
+from whittle.sampling.random_sampler import RandomSampler
 from whittle.training_strategies.sandwich import SandwichStrategy
 
 

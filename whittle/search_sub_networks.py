@@ -295,7 +295,7 @@ def main(
 
     bins = None
     if param_bins is not None:
-        from whittle.sampling.samplers import RandomSampler
+        from whittle.sampling.random_sampler import RandomSampler
 
         sampler = RandomSampler(search_space, seed=seed)
 

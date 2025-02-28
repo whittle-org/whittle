@@ -9,7 +9,7 @@ from syne_tune.config_space import choice, randint
 from whittle.loss import DistillLoss
 from whittle.models.gpt import GPT
 from whittle.modules.linear import Linear
-from whittle.sampling.samplers import RandomSampler
+from whittle.sampling.random_sampler import RandomSampler
 from whittle.training_strategies import (
     ATS,
     RandomLinearStrategy,

@@ -19,7 +19,7 @@ from torchvision.transforms import ToTensor
 from tqdm import trange
 
 from examples.fashion_mnist.model import LeNet
-from whittle.sampling.samplers import RandomSampler
+from whittle.sampling.random_sampler import RandomSampler
 from whittle.training_strategies import (
     RandomStrategy,
     SandwichStrategy,
