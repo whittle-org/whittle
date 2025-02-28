@@ -19,17 +19,23 @@ class SearchArgs:
 
 @dataclass
 class DistillArgs:
-    """Distillation-related arguments"""
+    """Distillation-related arguments
 
-    method: str = "logits"  # Only supports 'logits' for now
-    """Distillation method to use ('logits' or 'hidden_states') - Only supports 'logits' for now"""
+    Args:
+       method: Distillation method to use ('logits' or 'hidden_states') - Only supports 'logits' for now
+       temperature: Controls softening of output probabilities. Higher values (>1) produce softer distributions,
+         emphasizing less confident predictions. Lower values (<1) make distributions sharper, focusing on
+         confident predictions.
+       alpha: Weight balancing distillation loss vs cross-entropy loss. Values closer to 1 give more importance
+         to matching teacher logits, while values closer to 0 prioritize true label prediction.
+    """
+
+    method: str = "logits"
+    """Distillation method to use ('logits' or 'hidden_states')"""
     temperature: float = 5
-    """Temperature for softening output probabilities. Higher values (>1) produce softer distributions,
-    emphasizing less confident predictions. Lower values (<1) make distributions sharper, focusing on
-    confident predictions."""
+    """Temperature for distillation"""
     alpha: float = 0.5
-    """Weight balancing distillation loss vs cross-entropy loss. Values closer to 1 give more importance 
-    to matching teacher logits, while values closer to 0 prioritize true label prediction."""
+    """Weight for KL-Divergence (distillation) loss"""
 
 
 class PruningArgs:
