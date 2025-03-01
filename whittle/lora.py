@@ -185,6 +185,7 @@ def setup(
         lora_r: The LoRA rank.
         lora_alpha: The LoRA alpha.
         lora_dropout: The LoRA dropout value.
+        "lora_emb": Whether to apply LoRA to the embedding weights in the model.
         lora_query: Whether to apply LoRA to the query weights in attention.
         lora_key: Whether to apply LoRA to the key weights in attention.
         lora_value: Whether to apply LoRA to the value weights in attention.
@@ -193,11 +194,18 @@ def setup(
         lora_head: Whether to apply LoRA to output head in GPT.
         data: Data-related arguments. If not provided, the default is ``litgpt.data.Alpaca``.
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
+        train_strategy: The training strategy to use. Possible choices: "sandwich", "standard".
+        search_space_type: The search space to use. Possible choices: "small", "medium", "hw_gpt_bench", "llama_joint".
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
         optimizer: An optimizer name (such as "AdamW") or config.
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
         access_token: Optional API token to access models with restrictions.
+        downstream_test_iters: The number of iterations after which to test the model on a downstream dataset.
+        downstream_dataset: The downstream dataset to test on.
+        resume: Whether to resume training from the last checkpoint.
+        dataset: The dataset to use for finetuning. Possible choices: "alpaca", "llamamini".
+        sampler: Sampler-related arguments. See ``whittle.args.SamplerArgs`` for details.
     """
 
     checkpoint_dir = auto_download_checkpoint(

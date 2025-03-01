@@ -46,7 +46,13 @@ class ParamBinArgs:
 
 @dataclass
 class SamplerArgs:
+    """sampler-related arguments"""
+
+    """Number of configurations to sample"""
     num_configs: int = 21
+    """Seed for the random sampler"""
     seed_sampler: int = 42
+    """Number of trials to run for each bin"""
     n_trials: int = 10000
+    """Sampling strategy"""
     sampling_strategy: str = "random"
