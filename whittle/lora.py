@@ -6,7 +6,6 @@ import json
 import math
 import os
 import time
-import warnings
 from datetime import datetime
 from pathlib import Path
 from pprint import pprint
@@ -17,7 +16,6 @@ import torch
 import yaml  # type: ignore
 from lightning.fabric.plugins import BitsandbytesPrecision
 from lightning.fabric.strategies import DDPStrategy
-from lightning_utilities.core.imports import RequirementCache
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.data import Alpaca, DataModule
 from litgpt.generate.base import generate
@@ -257,10 +255,6 @@ def setup(
     checkpoint_dir: Path,
     out_dir: Path = Path("out/finetune/lora"),
     precision: str | None = None,
-    quantize: Literal[
-        "bnb.nf4", "bnb.nf4-dq", "bnb.fp4", "bnb.fp4-dq", "bnb.int8-training"
-    ]
-    | None = None,
     devices: int = 1,
     num_nodes: int = 1,
     lora_r: int = 8,
@@ -306,7 +300,6 @@ def setup(
         out_dir: Directory in which to save checkpoints and logs. If running in a Lightning Studio Job, look for it in
             /teamspace/jobs/<job-name>/share.
         precision: The precision to use for finetuning. Possible choices: "bf16-true", "bf16-mixed", "32-true".
-        quantize: If set, quantize the model with this algorithm. See ``tutorials/quantize.md`` for more information.
         devices: How many devices/GPUs to use.
         num_nodes: How many nodes the code is being run on.
         lora_r: The LoRA rank.
@@ -391,28 +384,8 @@ def setup(
     )
 
     plugins = None
-    if quantize is not None and quantize.startswith("bnb."):
-        if "mixed" in precision:
-            raise ValueError("Quantization and mixed precision is not supported.")
-        if RequirementCache("bitsandbytes != 0.42.0"):
-            warnings.warn(
-                "LitGPT only supports bitsandbytes v0.42.0. "
-                "This may result in errors when using quantization."
-            )
-        dtype = {
-            "16-true": torch.float16,
-            "bf16-true": torch.bfloat16,
-            "32-true": torch.float32,
-        }[precision]
-        plugins = BitsandbytesPrecision(quantize[4:], dtype)
-        precision = None
 
     if devices * num_nodes > 1:
-        if quantize:
-            raise NotImplementedError(
-                "Quantization is currently not supported for multi-GPU training. Please set devices=1 and num_nodes=1"
-                " when using the --quantize flag."
-            )
         strategy = DDPStrategy(find_unused_parameters=True)
     else:
         strategy = "auto"
