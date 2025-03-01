@@ -185,7 +185,7 @@ def setup(
         lora_r: The LoRA rank.
         lora_alpha: The LoRA alpha.
         lora_dropout: The LoRA dropout value.
-        "lora_emb": Whether to apply LoRA to the embedding weights in the model.
+        lora_emb: Whether to apply LoRA to the embedding weights in the model.
         lora_query: Whether to apply LoRA to the query weights in attention.
         lora_key: Whether to apply LoRA to the key weights in attention.
         lora_value: Whether to apply LoRA to the value weights in attention.
