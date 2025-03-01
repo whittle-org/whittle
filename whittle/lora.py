@@ -47,6 +47,7 @@ from torchmetrics import RunningMean
 from whitte.lora_model.lora_gpt import GPT
 
 from search.search_spaces import search_spaces
+from whittle.args import SamplerArgs
 from whittle.data.llamamini import LLaMaMini
 from whittle.eval.utils import compute_accuracy
 from whittle.lora_model.merge import merge_lora
@@ -161,20 +162,16 @@ def setup(
     ),
     train_strategy: str = "sandwich",
     search_space_type: str = "hw_gpt_bench",
-    sampling_strategy: str = "random",
     eval: EvalArgs = EvalArgs(interval=10, max_new_tokens=100, max_iters=100),
     optimizer: str | dict = "AdamW",
     logger_name: Literal["wandb", "tensorboard", "csv"] = "wandb",
     seed: int = 1337,
-    seed_sampler: int = 42,
     access_token: str | None = None,
-    n_trials: int = 10000,
     downstream_test_iters: int = 500,
     downstream_dataset: str = "arc_easy",
     resume: bool | Path = True,
     dataset: str = "alpaca",
-    weight_supernet_loss: bool = False,
-    num_configs: int = 21,
+    sampler: SamplerArgs = SamplerArgs(),
 ) -> None:
     """Finetune a model using the LoRA method.
 
@@ -235,6 +232,10 @@ def setup(
     config.tie_embeddings = False
     config.model_type = "gpt"
     now = datetime.now()
+    sampling_strategy = sampler.sampling_strategy
+    seed_sampler = sampler.seed_sampler
+    num_configs = sampler.num_configs
+    n_trials = sampler.n_trials
     # Create a timestamp with nanosecond precision
     time_string = now.strftime("%Y%m%d_%H%M%S")
     search_space = search_spaces[search_space_type](config)
@@ -255,7 +256,6 @@ def setup(
             search_space_type=search_space_type,
             sampling_strategy=sampling_strategy,
             data=data_str,
-            weight_supernet_loss=weight_supernet_loss,
             lora_r=lora_r,
             lora_alpha=lora_alpha,
             lora_emb=lora_emb,
@@ -281,6 +281,7 @@ def setup(
         loggers=logger,
         plugins=plugins,
     )
+
     sampler = get_sampler(
         sampling_strategy,
         search_space=search_space,
@@ -293,7 +294,6 @@ def setup(
             loss_function=chunked_cross_entropy,
             lora=True,
             sampler=sampler,
-            weight_supernet_loss=weight_supernet_loss,
         )
 
     elif train_strategy == "standard":

@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 from pathlib import Path
+
+
 def merge_lora(
     sampling_strategy: str,
     checkpoint_dir: Path,
