@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import dataclasses
-import json
 import math
 import os
 import time
@@ -23,11 +22,8 @@ from litgpt.lora import (
     Config,
     lora_filter,
     mark_only_lora_as_trainable,
-    merge_lora_weights,
 )
 from litgpt.prompts import save_prompt_style
-
-# from litgpt.scripts.merge_lora import merge_lora
 from litgpt.tokenizer import Tokenizer
 from litgpt.utils import (
     CycleIterator,
@@ -37,7 +33,6 @@ from litgpt.utils import (
     choose_logger,
     chunked_cross_entropy,
     copy_config_files,
-    extend_checkpoint_dir,
     get_default_supported_precision,
     init_out_dir,
     instantiate_bnb_optimizer,
@@ -53,7 +48,8 @@ from whitte.lora_model.lora_gpt import GPT
 
 from search.search_spaces import search_spaces
 from whittle.data.llamamini import LLaMaMini
-from whittle.eval.utils import convert_and_evaluate
+from whittle.eval.utils import compute_accuracy
+from whittle.lora_model.merge import merge_lora
 from whittle.sampling.sampler_factory import get_sampler
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 from whittle.training_strategies.sandwich import SandwichStrategy
@@ -62,23 +58,6 @@ from whittle.training_strategies.standard import StandardStrategy
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 
 """This script merges the LoRA weights with the base model"""
-
-
-def get_task_metric_map(dataset):
-    if dataset == "winogrande":
-        return "acc"
-    elif dataset == "arc_challenge":
-        return "acc_norm"
-    elif dataset == "mmlu":
-        return "acc"
-    elif dataset == "hellaswag":
-        return "acc_norm"
-    elif dataset == "gsm8k":
-        return "acc"
-    elif dataset == "truthfulqa_mc2":
-        return "acc"
-    else:
-        return "acc_norm"
 
 
 def compute_loss(model, val_dataloader, eval):
@@ -94,22 +73,6 @@ def compute_loss(model, val_dataloader, eval):
 
     val_loss = losses.mean()
     return val_loss
-
-
-def compute_accuracy(model, dataset, checkpoint_dir):
-    metric = get_task_metric_map(dataset)
-    convert_and_evaluate(
-        model,
-        out_dir=checkpoint_dir,
-        device=None,
-        dtype=torch.float32,
-        tasks=dataset,
-        batch_size=16,  # Test for non-positive integer
-    )
-    with open(str(checkpoint_dir / "results.json")) as f:
-        results = json.load(f)
-    acc = results["results"][dataset][f"{metric},none"]
-    return acc
 
 
 def plot_validation_metrics(model, val_dataloader, eval, sampler):
@@ -141,87 +104,6 @@ def plot_accuracies(model, sampler, dataset, checkpoint_dir):
     val_loss_smallest = compute_accuracy(model, dataset, checkpoint_dir)
     model.reset_super_network()
     return val_loss_largest, val_loss_medium, val_loss_smallest
-
-
-def merge_lora(
-    sampling_strategy: str,
-    checkpoint_dir: Path,
-    pretrained_checkpoint_dir: str | None = None,
-    precision: str | None = None,
-) -> None:
-    """Merges the LoRA weights with the base model.
-
-    See ``litgpt finetune lora``.
-
-    Creates a new ``lit_model.pth`` file by merging the LoRA weights (``lit_model.pth.lora``)
-    with the original checkpoint weights.
-
-    Arguments:
-        checkpoint_dir: Path to the checkpoint directory with trained LoRA weights, which is the output of
-            ``litgpt finetune lora``.
-        pretrained_checkpoint_dir: Optional path to the checkpoint directory with the weights of the base model
-            corresponding to the LoRA checkpoint. By default, this will automatically be inferred from the metadata
-            in the given `checkpoint_dir` directory. Only set this if the base model's checkpoint directory
-            has moved or was renamed.
-        precision: Optional precision setting to instantiate the model weights in. By default, this will
-            automatically be inferred from the metadata in the given ``checkpoint_dir`` directory.
-    """
-    checkpoint_dir = extend_checkpoint_dir(checkpoint_dir)
-    if pretrained_checkpoint_dir is not None:
-        pretrained_checkpoint_dir = extend_checkpoint_dir(pretrained_checkpoint_dir)
-    pprint(locals())
-
-    check_valid_checkpoint_dir(checkpoint_dir, model_filename="lit_model.pth.lora")
-    if pretrained_checkpoint_dir is not None:
-        check_valid_checkpoint_dir(pretrained_checkpoint_dir)
-    if (checkpoint_dir / "lit_model.pth").is_file():
-        print("LoRA weights have already been merged in this checkpoint.")
-        return
-
-    lora_params, meta_pretrained_checkpoint_dir, lora_precision = load_lora_metadata(
-        checkpoint_dir
-    )
-    precision = precision if precision is not None else lora_precision
-
-    if pretrained_checkpoint_dir is None:
-        pretrained_checkpoint_dir = meta_pretrained_checkpoint_dir  # type: ignore
-        pretrained_checkpoint_dir = extend_checkpoint_dir(pretrained_checkpoint_dir)  # type: ignore
-
-    fabric = L.Fabric(devices=1, precision=precision, accelerator="cpu")
-    config = Config.from_file(checkpoint_dir / "model_config.yaml", **lora_params)
-    config.fix_head_size = True
-    with fabric.init_module(), torch.device("meta"):
-        model = GPT(config)
-        # we don't care about these to perform merging
-        model.cos = None
-        model.sin = None
-
-    lora_path = checkpoint_dir / "lit_model.pth.lora"
-
-    pretrained_checkpoint = torch.load(
-        str(pretrained_checkpoint_dir + "/lit_model.pth"), mmap=True
-    )
-    lora_checkpoint = torch.load(str(lora_path), mmap=True)
-    lora_checkpoint = lora_checkpoint.get("model", lora_checkpoint)
-
-    # Merge LoRA weights into the base model
-    pretrained_checkpoint.update(lora_checkpoint)
-    model.load_state_dict(pretrained_checkpoint, assign=True)
-    # since LoRA finetuning only saves the LoRA weights, we treat the lora weights dtype as the expected dtype
-    lora_dtype = next(iter(lora_checkpoint.values())).dtype
-    model.to(dtype=lora_dtype, device="cpu")
-    merge_lora_weights(model)
-
-    # Remove LoRA parameters and the LoRA linear substring
-    state_dict = {
-        k.replace("linear.", ""): v
-        for k, v in model.state_dict().items()
-        if not lora_filter(k, v)
-    }
-    save_path = checkpoint_dir / "lit_model.pth"
-    torch.save(state_dict, save_path)
-
-    fabric.print(f"Saved merged weights to {str(checkpoint_dir / 'lit_model.pth')!r}")
 
 
 def load_lora_metadata(
@@ -284,6 +166,7 @@ def setup(
     optimizer: str | dict = "AdamW",
     logger_name: Literal["wandb", "tensorboard", "csv"] = "wandb",
     seed: int = 1337,
+    seed_sampler: int = 42,
     access_token: str | None = None,
     n_trials: int = 10000,
     downstream_test_iters: int = 500,
@@ -401,7 +284,7 @@ def setup(
     sampler = get_sampler(
         sampling_strategy,
         search_space=search_space,
-        seed=42,
+        seed=seed_sampler,
         num_configs=num_configs,
         n_trials=n_trials,
     )

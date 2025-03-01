@@ -14,7 +14,7 @@ class SimpleSearchSpace:
         return config
 
 
-class SMALL(SimpleSearchSpace):
+class SmallSearchSpace(SimpleSearchSpace):
     def __init__(self, gpt_model_specification):
         self.config_space = {
             "n_embd": lograndint(64, gpt_model_specification.n_embd),
@@ -34,7 +34,7 @@ class SMALL(SimpleSearchSpace):
         }
 
 
-class MEDIUM(SimpleSearchSpace):
+class MediumSearchSpace(SimpleSearchSpace):
     def __init__(self, gpt_model_specification):
         self.config_space = {
             "n_embd": lograndint(64, gpt_model_specification.n_embd),
@@ -84,7 +84,7 @@ class HWGPTBench(SimpleSearchSpace):
         }
 
 
-class Llama(SimpleSearchSpace):
+class LlamaJoint(SimpleSearchSpace):
     def __init__(self, gpt_model_specification):
         self.config_space = {
             "embed_dim": choice(
@@ -105,8 +105,6 @@ class Llama(SimpleSearchSpace):
 
     @staticmethod
     def cast(config):
-        if "embed_dim" not in config:
-            return config
         config_return = {
             "sub_network_n_embd": config["embed_dim"],
             "sub_network_intermediate_size": int(
@@ -116,46 +114,12 @@ class Llama(SimpleSearchSpace):
             "sub_network_n_layers": config["depth"],
             "sub_network_head_size": config["head_size"],
         }
-        if "sampled_layer_indices" in config:
-            config_return["sampled_layer_indices"] = config["sampled_layer_indices"]
         return config_return
 
 
-class LlamaHeadSize(SimpleSearchSpace):
-    def __init__(self, gpt_model_specification):
-        self.config_space = {
-            "embed_dim": choice(
-                [
-                    2**i
-                    for i in range(
-                        5, int(math.log(gpt_model_specification.n_embd, 2)) + 1
-                    )
-                ]
-            ),
-            "num_heads": choice([32]),
-            "mlp_ratio": choice(
-                [1.0, 2.0, 3.0, 3.5]
-            ),  # gpt_model_specification.intermediate_size//gpt_model_specification.n_embd),
-            "head_size": choice([8, 16, 32, 64, 128]),
-            "depth": randint(1, gpt_model_specification.n_layer),
-        }
-
-    @staticmethod
-    def cast(config):
-        return {
-            "sub_network_n_embd": config["embed_dim"],
-            "sub_network_intermediate_size": int(
-                config["mlp_ratio"] * config["embed_dim"]
-            ),
-            "sub_network_num_heads": config["num_heads"],
-            "sub_network_n_layers": config["depth"],
-            "sub_network_head_size": config["head_size"],
-        }
-
-
 search_spaces = {
-    "small": SMALL,
-    "medium": MEDIUM,
+    "small": SmallSearchSpace,
+    "medium": MediumSearchSpace,
     "hw_gpt_bench": HWGPTBench,
-    "llama_head_size": LlamaHeadSize,
+    "llama_head_size": LlamaJoint,
 }

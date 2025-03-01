@@ -23,6 +23,39 @@ def prepare_results(results, save_filepath, print_results=True):
     save_filepath.open("w", encoding="utf-8").write(json_result)
 
 
+def get_task_metric_map(dataset):
+    if dataset == "winogrande":
+        return "acc"
+    elif dataset == "arc_challenge":
+        return "acc_norm"
+    elif dataset == "mmlu":
+        return "acc"
+    elif dataset == "hellaswag":
+        return "acc_norm"
+    elif dataset == "gsm8k":
+        return "acc"
+    elif dataset == "truthfulqa_mc2":
+        return "acc"
+    else:
+        return "acc_norm"
+
+
+def compute_accuracy(model, dataset, checkpoint_dir):
+    metric = get_task_metric_map(dataset)
+    convert_and_evaluate(
+        model,
+        out_dir=checkpoint_dir,
+        device=None,
+        dtype=torch.float32,
+        tasks=dataset,
+        batch_size=16,  # Test for non-positive integer
+    )
+    with open(str(checkpoint_dir / "results.json")) as f:
+        results = json.load(f)
+    acc = results["results"][dataset][f"{metric},none"]
+    return acc
+
+
 def convert_and_evaluate(
     model: GPT,
     tasks: str | None = None,
