@@ -50,5 +50,13 @@ class BaseTrainingStrategy:
         y_hat[-1] = y_hat[-1][..., :-1, :]
         return self.loss_function(y_hat, y[..., 1:])
 
+    def compute_loss(self, model, inputs, outputs):
+        if self.lora:
+            loss = self.chunked_loss(model, inputs, outputs)
+        else:
+            y_hat = model(inputs)
+            loss = self.loss_function(y_hat, outputs)
+        return loss
+
     def __call__(self, model, inputs, outputs, scale_loss=1, **kwargs):
         raise NotImplementedError

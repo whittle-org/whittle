@@ -34,26 +34,15 @@ class SandwichStrategy(BaseTrainingStrategy):
         total_loss = 0
         # update super-network
         model.reset_super_network()
-        if self.lora:
-            loss = self.chunked_loss(model, inputs, outputs) * scale_loss
-        else:
-            y_supernet = model(inputs)
-            loss = self.loss_function(y_supernet, outputs) * scale_loss
+        loss = self.compute_loss(model, inputs, outputs)
+        loss *= scale_loss
         loss.backward() if self.fabric is None else self.fabric.backward(loss)
         total_loss += loss.item()
-
         # update random sub-networks
         for i in range(self.random_samples):
             config = self.sampler.sample()
             model.set_sub_network(**config)
-            y_hat = model(inputs)
-            if self.kd_loss is not None:
-                loss = self.kd_loss(y_hat, outputs, y_supernet)
-            else:
-                if self.lora:
-                    loss = self.chunked_loss(model, inputs, outputs)
-                else:
-                    loss = self.loss_function(y_hat, outputs)
+            loss = self.compute_loss(model, inputs, outputs)
 
             loss *= scale_loss
             loss.backward() if self.fabric is None else self.fabric.backward(loss)
@@ -63,14 +52,7 @@ class SandwichStrategy(BaseTrainingStrategy):
         # smallest network
         config = self.sampler.get_smallest_sub_network()
         model.set_sub_network(**config)
-        y_hat = model(inputs)
-        if self.kd_loss is not None:
-            loss = self.kd_loss(y_hat, outputs, y_supernet)
-        else:
-            if self.lora:
-                loss = self.chunked_loss(model, inputs, outputs)
-            else:
-                loss = self.loss_function(y_hat, outputs)
+        loss = self.compute_loss(model, inputs, outputs)
         loss *= scale_loss
         loss.backward() if self.fabric is None else self.fabric.backward(loss)
         model.reset_super_network()

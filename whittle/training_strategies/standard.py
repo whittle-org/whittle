@@ -22,11 +22,7 @@ class StandardStrategy(BaseTrainingStrategy):
         super().__init__(**kwargs)
 
     def __call__(self, model, inputs, outputs, scale_loss=1, **kwargs):
-        if self.lora:
-            loss = self.chunked_loss(model, inputs, outputs)
-        else:
-            y_hat = model(inputs)
-            loss = self.loss_function(y_hat, outputs)
+        loss = self.compute_loss(model, inputs, outputs)
         loss *= scale_loss
         loss.backward() if self.fabric is None else self.fabric.backward(loss)
         return loss.item()
