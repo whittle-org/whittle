@@ -56,7 +56,6 @@ from whitte.lora_model.lora_gpt import GPT
 from search.search_spaces import search_spaces
 from whittle.data.llamamini import LLaMaMini
 from whittle.eval.utils import convert_and_evaluate
-from whittle.loss.loss_factory import LossFactory
 from whittle.sampling.sampler_factory import get_sampler
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 from whittle.training_strategies.sandwich import SandwichStrategy
@@ -148,7 +147,6 @@ def plot_accuracies(model, sampler, dataset, checkpoint_dir):
 
 def merge_lora(
     sampling_strategy: str,
-    importance_objective: str,
     checkpoint_dir: Path,
     pretrained_checkpoint_dir: str | None = None,
     precision: str | None = None,
@@ -201,14 +199,10 @@ def merge_lora(
         model.sin = None
 
     lora_path = checkpoint_dir / "lit_model.pth.lora"
-    if "importance" in sampling_strategy:
-        pretrained_checkpoint = torch.load(
-            "/hkfs/work/workspace/scratch/fr_rs1131-peftprune/compressing_llms/checkpoints/meta-llama/Meta-Llama-3.1-8B/permuted_model_llama_joint_mean_block_importance.pth"
-        )
-    else:
-        pretrained_checkpoint = torch.load(
-            str(pretrained_checkpoint_dir + "/lit_model.pth"), mmap=True
-        )
+
+    pretrained_checkpoint = torch.load(
+        str(pretrained_checkpoint_dir + "/lit_model.pth"), mmap=True
+    )
     lora_checkpoint = torch.load(str(lora_path), mmap=True)
     lora_checkpoint = lora_checkpoint.get("model", lora_checkpoint)
 
@@ -289,7 +283,7 @@ def setup(
         epochs=1,
         max_seq_length=None,
     ),
-    train_strategy: str = "sandwich-kd",
+    train_strategy: str = "sandwich",
     search_space_type: str = "hw_gpt_bench",
     sampling_strategy: str = "random",
     eval: EvalArgs = EvalArgs(interval=10, max_new_tokens=100, max_iters=100),
@@ -300,19 +294,10 @@ def setup(
     n_trials: int = 10000,
     downstream_test_iters: int = 500,
     downstream_dataset: str = "arc_easy",
-    importance_objective: str = "norm",
-    objective: str = "mag",
     resume: bool | Path = True,
-    kd_loss: str = "forward_kl",
-    kd_temperature: float = 0.9,
-    kd_alpha: float = 0.5,
-    kd_beta: float = 2,
-    weight_scheme: str = "custom",
     dataset: str = "alpaca",
     weight_supernet_loss: bool = False,
     num_configs: int = 21,
-    checkpoint_load_path: str = "/hkfs/work/workspace/scratch/fr_rs1131-peftprune/compressing_llms/checkpoints/meta-llama/Meta-Llama-3.1-8B/permuted_model_llama_joint_mean_block_importance.pth",
-    sorted_ids_path: str = "/hkfs/work/workspace/scratch/fr_rs1131-peftprune/compressing_llms/checkpoints/meta-llama/Meta-Llama-3.1-8B/importance_orders_llama_joint_mean_block_importance.pkl",
 ) -> None:
     """Finetune a model using the LoRA method.
 
@@ -353,7 +338,6 @@ def setup(
         data = LLaMaMini()
     else:
         data = None
-    print(data)
     devices = parse_devices(devices)
     out_dir = init_out_dir(out_dir)
 
@@ -375,24 +359,13 @@ def setup(
     config.tie_embeddings = False
     config.model_type = "gpt"
     now = datetime.now()
-
-    # Additional nanosecond precision by extracting nanoseconds from time.time_ns()
-    nanoseconds = time.time_ns() % 1_000_000_000  # Extract only the nanosecond part
-
     # Create a timestamp with nanosecond precision
     time_string = now.strftime("%Y%m%d_%H%M%S")
     search_space = search_spaces[search_space_type](config)
-
-    if train_strategy == "sandwich-kd":
-        out_dir = Path(
-            f"{config.name}-{train_strategy}-{search_space_type}-{sampling_strategy}-{kd_loss}-{kd_alpha}-{kd_beta}-{kd_temperature}-{weight_scheme}-{weight_supernet_loss}-{data_str}/finetune/lora/"
-        )
-        id = f"{train_strategy}-{search_space_type}-{sampling_strategy}-{kd_loss}-{kd_alpha}-{kd_beta}-{kd_temperature}-{weight_scheme}-{weight_supernet_loss}-{data_str}-lora"
-    else:
-        out_dir = Path(
-            f"{config.name}-{train_strategy}-{search_space_type}-{sampling_strategy}-{data_str}/finetune/lora/"
-        )
-        id = f"{train_strategy}-{search_space_type}-{sampling_strategy}-{time_string}-{data_str}-lora"
+    out_dir = Path(
+        f"{config.name}-{train_strategy}-{search_space_type}-{sampling_strategy}-{data_str}/finetune/lora/"
+    )
+    id = f"{train_strategy}-{search_space_type}-{sampling_strategy}-{time_string}-{data_str}-lora"
     precision = precision or get_default_supported_precision(training=True)
     logger = choose_logger(
         logger_name,
@@ -405,11 +378,6 @@ def setup(
             train_strategy=train_strategy,
             search_space_type=search_space_type,
             sampling_strategy=sampling_strategy,
-            kd_loss=kd_loss,
-            kd_alpha=kd_alpha,
-            kd_beta=kd_beta,
-            temperature=kd_temperature,
-            weight_scheme=weight_scheme,
             data=data_str,
             weight_supernet_loss=weight_supernet_loss,
             lora_r=lora_r,
@@ -445,13 +413,6 @@ def setup(
                 "Quantization is currently not supported for multi-GPU training. Please set devices=1 and num_nodes=1"
                 " when using the --quantize flag."
             )
-        """strategy = FSDPStrategy(
-            auto_wrap_policy={Block},
-            activation_checkpointing_policy={Block},
-            state_dict_type="full",
-            limit_all_gathers=True,
-            cpu_offload=False,
-        )"""
         strategy = DDPStrategy(find_unused_parameters=True)
     else:
         strategy = "auto"
@@ -466,17 +427,10 @@ def setup(
     )
     sampler = get_sampler(
         sampling_strategy,
-        sorted_ids_path=sorted_ids_path,
         search_space=search_space,
         seed=42,
         num_configs=num_configs,
         n_trials=n_trials,
-    )
-    loss_factory = LossFactory(
-        alpha=kd_alpha,
-        beta=kd_beta,
-        temperature=kd_temperature,
-        weight_scheme=weight_scheme,
     )
     if train_strategy == "sandwich":
         strategy = SandwichStrategy(
@@ -515,9 +469,7 @@ def setup(
         strategy,
         downstream_dataset,
         downstream_test_iters,
-        importance_objective,
         resume,
-        kd_loss,
     )
 
 
@@ -536,9 +488,7 @@ def main(
     strategy: BaseTrainingStrategy,
     downstream_dataset: str,
     downstream_test_iters: int,
-    importance_objective: str,
     resume: bool,
-    kd_loss: str,
 ) -> None:
     validate_args(train, eval)
 
@@ -552,10 +502,7 @@ def main(
     if fabric.global_rank == 0:
         os.makedirs(out_dir, exist_ok=True)
 
-    if "importance" in sampling_strategy:
-        checkpoint_path = "/hkfs/work/workspace/scratch/fr_rs1131-peftprune/compressing_llms/checkpoints/meta-llama/Meta-Llama-3.1-8B/permuted_model_llama_joint_mean_block_importance.pth"
-    else:
-        checkpoint_path = checkpoint_dir / "lit_model.pth"  # type: ignore
+    checkpoint_path = checkpoint_dir / "lit_model.pth"  # type: ignore
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
         model = GPT(config)
         if "grid-params" in sampling_strategy:
@@ -616,7 +563,6 @@ def main(
         downstream_dataset,
         downstream_test_iters,
         resume,
-        kd_loss,
     )
     fabric.print(f"Training time: {(time.perf_counter() - train_time):.2f}s")
     if fabric.device.type == "cuda":
@@ -649,7 +595,6 @@ def main(
         save_prompt_style(data.prompt_style, save_path.parent)
         merge_lora(
             checkpoint_dir=save_path.parent,
-            importance_objective=importance_objective,
             sampling_strategy=sampling_strategy,
         )
 
@@ -672,7 +617,6 @@ def fit(
     downstream_dataset: str,
     downstream_test_iters: int,
     resume: bool,
-    kd_loss: str,
 ) -> None:
     model = state["model"]
     optimizer = state["optimizer"]
