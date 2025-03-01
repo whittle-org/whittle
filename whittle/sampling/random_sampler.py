@@ -107,3 +107,26 @@ class RandomSampler(BaseSampler):
                     config[k] = v.upper
 
         return self.search_space.cast(config) if self.cast_search_space else config
+
+    def get_medium_sub_network(self) -> dict[str, Any]:
+        """
+        Gets the medium sub-network configuration from the search space.
+
+        Returns:
+            The medium sub-network configuration.
+        """
+        config = {}
+        for k, v in self.search_space.config_space.items():
+            if isinstance(v, Domain):
+                if isinstance(v, Categorical):
+                    if all(isinstance(e, (int, float)) for e in v.categories):
+                        config[k] = int(np.median(v.categories))
+                    else:
+                        warnings.warn(
+                            "Warning: Categoricals are non-integers, check if medium network is as intended"
+                        )
+                        config[k] = v.categories[len(v.categories) // 2]
+                else:
+                    config[k] = (v.lower + v.upper) // 2
+
+        return self.search_space.cast(config) if self.cast_search_space else config

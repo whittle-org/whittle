@@ -7,6 +7,7 @@ from whittle.args import ParamBinArgs
 from whittle.metrics.parameters import (
     compute_parameters,
 )
+from whittle.models.gpt import GPT
 from whittle.sampling.param_bins import ParamBins
 from whittle.sampling.random_sampler import RandomSampler
 
@@ -65,8 +66,7 @@ class StratifiedRandomSampler(RandomSampler):
                 raise ValueError(
                     "Could not find a valid configuration in StratifiedRandomSampler. Try increasing max_tries or increasing empty_bin_tolerance."
                 )
-
-        return self.search_space.cast(config) if self.cast_search_space else config
+        return config
 
 
 class FixedParamGridSampler(RandomSampler):
@@ -113,8 +113,8 @@ class FixedParamGridSampler(RandomSampler):
         )
 
         # add smallest/largest sub-networks, update param bins from outside
-        self.grid.append(self.get_smallest_sub_network())
-        self.grid.append(self.get_largest_sub_network())
+        self.grid.append(sampler.get_smallest_sub_network())
+        self.grid.append(sampler.get_largest_sub_network())
 
         sampler.param_bins.bins[0] += 1
         sampler.param_bins.bins[-1] += 1
@@ -127,8 +127,6 @@ class FixedParamGridSampler(RandomSampler):
         self.grid_params = [self.get_parameters(model, config) for config in self.grid]
         self.grid = [config for _, config in sorted(zip(self.grid_params, self.grid))]
         self.grid_params.sort()
-
-    from whittle.models.gpt import GPT
 
     def get_parameters(self, model: GPT, config):
         if self.cast_search_space:

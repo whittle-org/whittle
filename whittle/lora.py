@@ -19,7 +19,6 @@ from litgpt.args import EvalArgs, TrainArgs
 from litgpt.data import Alpaca, DataModule
 from litgpt.generate.base import generate
 from litgpt.lora import (
-    Config,
     lora_filter,
     mark_only_lora_as_trainable,
 )
@@ -44,14 +43,15 @@ from litgpt.utils import (
 )
 from torch.utils.data import ConcatDataset, DataLoader
 from torchmetrics import RunningMean
-from whitte.lora_model.lora_gpt import GPT
 
 from search.search_spaces import search_spaces
 from whittle.args import SamplerArgs
 from whittle.data.llamamini import LLaMaMini
 from whittle.eval.utils import compute_accuracy
+from whittle.lora_model.config import LoRAConfig as Config
+from whittle.lora_model.lora_gpt import GPT
 from whittle.lora_model.merge import merge_lora
-from whittle.sampling.sampler_factory import get_sampler
+from whittle.sampling.samplers import get_sampler
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 from whittle.training_strategies.sandwich import SandwichStrategy
 from whittle.training_strategies.standard import StandardStrategy
@@ -369,10 +369,9 @@ def main(
     checkpoint_path = checkpoint_dir / "lit_model.pth"  # type: ignore
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
         model = GPT(config)
-        if "grid-params" in sampling_strategy:
+        if "grid_params" in sampling_strategy:
             print("Initializing params grid....")
             strategy.sampler.initialize_grid(model)
-            print("Requested configs:", len(strategy.sampler.values))
             print("Grid Size", len(strategy.sampler.grid))
     model.name_or_path = checkpoint_dir
     mark_only_lora_as_trainable(model)
@@ -488,8 +487,8 @@ def fit(
     tokenizer = Tokenizer(checkpoint_dir)
     longest_seq_length, longest_seq_ix = get_longest_seq_length(
         ConcatDataset([train_dataloader.dataset, val_dataloader.dataset])
-    )
-    model.max_seq_length = min(longest_seq_length, train.max_seq_length or float("inf"))
+    )  # type: ignore
+    model.max_seq_length = min(longest_seq_length, train.max_seq_length or float("inf"))  # type: ignore
     fabric.print(
         f"The longest sequence length in the train data is {longest_seq_length}, the model's maximum sequence length is"
         f" {model.max_seq_length} and context length is {model.config.block_size}"
@@ -550,12 +549,19 @@ def fit(
         is_accumulating = (
             state["iter_num"] % train.gradient_accumulation_iters(devices) != 0
         )
+        if hasattr(train_strategy, "random_samples"):
+            # if we update multiple sub-networks in each step, we need to further scale the gradient
+            scale_loss = 1 / (
+                train.gradient_accumulation_iters(devices) * train_strategy.random_samples
+            )
+        else:
+            scale_loss = 1 / train.gradient_accumulation_iters(devices)
         with fabric.no_backward_sync(model, enabled=is_accumulating):
             loss = train_strategy(
                 model,
                 input_ids,
                 targets,
-                train.gradient_accumulation_iters(devices),
+                scale_loss=scale_loss,
             )
 
         running_loss.update(loss)

@@ -121,5 +121,5 @@ search_spaces = {
     "small": SmallSearchSpace,
     "medium": MediumSearchSpace,
     "hw_gpt_bench": HWGPTBench,
-    "llama_head_size": LlamaJoint,
+    "llama_joint": LlamaJoint,
 }
