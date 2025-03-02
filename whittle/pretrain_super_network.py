@@ -617,15 +617,25 @@ def save_checkpoint(
     tokenizer_dir: Path | str | None,
     checkpoint_file: Path,
 ):
-    # TODO: add docstring
-    model: GPT = state["model"]
+    """Save model checkpoint and related files.
+
+    Args:
+        fabric: Lightning Fabric instance for distributed training.
+        state: Dictionary containing model state, optimizer state, and training state.
+        tokenizer_dir: Path to the tokenizer directory to copy config files from.
+        checkpoint_file: Path where the checkpoint should be saved.
+
+    This function handles saving checkpoints differently based on the distributed strategy:
+    - For DeepSpeed: Saves using DeepSpeed's checkpoint mechanism and extracts FP32 weights
+    - For other strategies: Uses Fabric's standard save method
+
+    Additionally saves hyperparameters, tokenizer config, and model config when appropriate.
+    """
     checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
     fabric.print(f"Saving checkpoint to {str(checkpoint_file)!r}")
     if not isinstance(fabric.strategy, DeepSpeedStrategy):
         fabric.save(checkpoint_file, state)
     else:
-        # Create a new state dict with the "module." prefix for each key
-
         fabric.strategy.save_checkpoint(checkpoint_file.parent, state)
 
         # Get the FP32 state dict from the saved checkpoint
@@ -646,7 +656,7 @@ def save_checkpoint(
         save_hyperparameters(setup, checkpoint_file.parent)
         if tokenizer_dir is not None:
             copy_config_files(tokenizer_dir, checkpoint_file.parent)
-        save_config(model.config, checkpoint_file.parent)
+        save_config(state["model"].config, checkpoint_file.parent)
 
 
 if __name__ == "__main__":
