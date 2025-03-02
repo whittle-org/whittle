@@ -135,10 +135,10 @@ def setup(
     optimizer: str | dict = "AdamW",
     devices: int | str = "auto",
     num_nodes: int = 1,
-    training_strategy: str = "sandwich",
+    training_strategy: Literal["sandwich", "random", "standard"] = "sandwich",
     distributed_strategy: Literal["auto", "fsdp", "deepspeed"] = "auto",
     tokenizer_dir: Path | None = None,
-    logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
+    logger_name: Literal["wandb", "tensorboard", "csv"] = "wandb",
     seed: int = 42,
 ):
     """Pretrain a model.
@@ -167,6 +167,11 @@ def setup(
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
     """
+    if not _DEEPSPEED_AVAILABLE and distributed_strategy == "deepspeed":
+        raise ValueError(
+            "DeepSpeed is not available. Please set distributed_strategy to 'fsdp'."
+        )
+
     if model_name == "list":
         available_models = "\n".join(sorted(name_to_config))
         print(f"Available values:\n{available_models}")
