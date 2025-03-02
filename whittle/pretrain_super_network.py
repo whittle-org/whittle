@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import pprint
 import time
+from contextlib import nullcontext
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Literal
@@ -12,6 +13,10 @@ import torch
 from lightning.fabric.strategies.deepspeed import _DEEPSPEED_AVAILABLE
 from torch.nn import Module
 
+# Note: this is a patch to handle the saving and loading of the model state dict when using DeepSpeed.
+# Essentially, the DeepSpeed strategy expects the model state dict to have a "module." prefix when loading
+# the model state dict. However, when saving the model state dict (on checkpoint), the "module." prefix is
+# not present. This patch fixes this on load time.
 if _DEEPSPEED_AVAILABLE:
     from deepspeed.utils.zero_to_fp32 import (
         get_fp32_state_dict_from_zero_checkpoint,
@@ -139,6 +144,7 @@ def setup(
     distributed_strategy: Literal["auto", "fsdp", "deepspeed"] = "auto",
     tokenizer_dir: Path | None = None,
     logger_name: Literal["wandb", "tensorboard", "csv"] = "wandb",
+    compile_model: bool = True,
     seed: int = 42,
 ):
     """Pretrain a model.
@@ -159,12 +165,14 @@ def setup(
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
         optimizer: An optimizer name (such as "AdamW") or config.
-        training_strategy:
         devices: How many devices/GPUs to use. Uses all GPUs by default.
         num_nodes: How many nodes the code is being run on.
+        training_strategy: The training strategy to use.
+        distributed_strategy: The distributed strategy to use.
         tokenizer_dir: Optional path to the tokenizer dir that was used for preprocessing the dataset. Only some data
             module require this.
         logger_name: The name of the logger to send metrics to.
+        compile_model: Whether to compile the model.
         seed: The random seed to use for reproducibility.
     """
     if not _DEEPSPEED_AVAILABLE and distributed_strategy == "deepspeed":
@@ -269,6 +277,7 @@ def setup(
         eval,
         optimizer,
         training_strategy,
+        compile_model,
     )
 
 
@@ -370,7 +379,11 @@ def fit(
         else:
             scale_loss = 1 / train.gradient_accumulation_iters(devices)
 
-        with fabric.no_backward_sync(model, enabled=is_accumulating):
+        with (
+            fabric.no_backward_sync(model, enabled=is_accumulating)
+            if not isinstance(fabric.strategy, DeepSpeedStrategy)
+            else nullcontext()
+        ):
             loss = training_strategy(model, input_ids, targets, scale_loss=scale_loss)
 
         running_loss.update(loss)
@@ -491,6 +504,7 @@ def main(
     eval: EvalArgs,
     optimizer: str | dict,
     training_strategy: str,
+    compile_model: bool,
 ) -> None:
     validate_args(train, eval, initial_checkpoint_dir, resume)
 
@@ -513,11 +527,11 @@ def main(
     fabric.print(f"Time to instantiate model: {time.perf_counter() - t0:.02f} seconds.")
     fabric.print(f"Total parameters: {num_parameters(model):,}")
 
-    # model = torch.compile(model, mode="max-autotune")
+    if compile_model:
+        model = torch.compile(model, mode="max-autotune")
 
     extra_kwargs = {"fused": fabric.device.type == "cuda"}
     if isinstance(fabric.strategy, DeepSpeedStrategy):
-        # model = fabric.setup(model, move_to_device=False)
         optimizer = instantiate_torch_optimizer(
             optimizer, model.parameters(), **extra_kwargs
         )
