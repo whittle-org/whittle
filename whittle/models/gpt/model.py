@@ -257,7 +257,6 @@ class GPT(nn.Module):
             device=self.cos.device,
         )
 
-
     def select_sub_network(self, config: dict[str, Any]) -> None:
         """
         Selects and sets the sub-network configuration based on the provided configuration.
