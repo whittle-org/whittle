@@ -10,6 +10,7 @@ from typing import Any, Literal
 
 import lightning as L
 import torch
+import torch._dynamo
 from jsonargparse import CLI
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
@@ -49,6 +50,8 @@ from whittle.models.gpt.model import GPT
 from whittle.pretrain_super_network import get_search_space
 from whittle.sampling.random_sampler import RandomSampler
 
+torch._dynamo.config.suppress_errors = True
+
 
 def setup(
     out_dir: Path = Path("out/distill"),
@@ -85,8 +88,7 @@ def setup(
     """Train a (random) subnet of the teacher model using knowledge distillation.
 
     Arguments:
-        out_dir: Directory in which to save checkpoints and logs. If running in a Lightning Studio Job, look for it in
-            /teamspace/jobs/<job-name>/share.
+        out_dir: Directory in which to save checkpoints and logs.
         precision: The precision to use for finetuning. Determines a compatible precision setting by default.
         initial_checkpoint_dir: Path to a checkpoint directory to initialize the teacher model from.
         student_dir: Optional path to a directory to initialize the student model from.
@@ -490,7 +492,14 @@ def fit(
                 teacher_logits = teacher(input_ids)
 
             logits = student(input_ids)
-            loss = distill_loss(logits, targets, teacher_logits)
+            # Reshape so that it fits the loss function
+            logits_reshaped = logits.view(-1, logits.size(-1))
+            targets_reshaped = targets.view(-1)
+            teacher_logits_reshaped = teacher_logits.view(-1, teacher_logits.size(-1))
+
+            loss = distill_loss(
+                logits_reshaped, targets_reshaped, teacher_logits_reshaped
+            )
             fabric.backward(loss / train.gradient_accumulation_iters(devices))
 
         running_loss.update(loss.detach())
