@@ -34,6 +34,7 @@ class DistillArgs:
     temperature: float = 5
     alpha: float = 0.5
 
+
 @dataclass
 class PruningArgs:
     """pruning-related arguments"""

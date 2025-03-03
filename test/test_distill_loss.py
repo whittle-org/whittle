@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import torch
-import pytest
 
 from whittle.loss.kd_loss import DistillLoss
+
 
 def test_distill_loss():
     student_logits = torch.tensor([[0.0, 0.0]], requires_grad=True)
