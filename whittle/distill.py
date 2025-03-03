@@ -20,7 +20,6 @@ from litgpt.data import DataModule, TinyStories
 from litgpt.pretrain import (
     get_dataloaders,
     get_lr,
-    initialize_weights,
     validate,
 )
 from litgpt.utils import (
@@ -64,7 +63,8 @@ def setup(
         log_interval=1,
         global_batch_size=512,
         micro_batch_size=4,
-        max_tokens=int(5e8),
+        max_tokens=int(5e7),
+        # max_tokens=int(5e8),
         max_norm=1.0,
         min_lr=4e-5,
         lr_warmup_steps=2000,
@@ -88,7 +88,8 @@ def setup(
     """Train a (random) subnet of the teacher model using knowledge distillation.
 
     Arguments:
-        out_dir: Directory in which to save checkpoints and logs.
+        out_dir: Directory in which to save checkpoints and logs. If running in a Lightning Studio Job, look for it in
+            /teamspace/jobs/<job-name>/share.
         precision: The precision to use for finetuning. Determines a compatible precision setting by default.
         initial_checkpoint_dir: Path to a checkpoint directory to initialize the teacher model from.
         student_dir: Optional path to a directory to initialize the student model from.
@@ -253,20 +254,9 @@ def main(
     if fabric.global_rank == 0 and out_dir is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
 
-    with fabric.init_module(empty_init=(fabric.world_size > 1)):
-        if student_config:
-            student = GPT(student_config)
-        else:
-            student = GPT(teacher_config)
-
     student_checkpoint = (
         os.path.join(student_dir, "lit_model.pth") if student_dir else None
     )
-
-    if student_checkpoint:
-        student = fabric.setup(student)
-        load_checkpoint(fabric, student, student_checkpoint)
-        fabric.print(f"Student model loaded from {student_dir} (not compiled)")
 
     if student_config is None:
         fabric.print(
@@ -278,28 +268,25 @@ def main(
         while not valid:
             random_config = sampler.sample()
             subnetwork = {
-                "sub_network_n_embd": random_config["embed_dim"],
-                "sub_network_intermediate_size": int(
-                    random_config["mlp_ratio"] * random_config["embed_dim"]
-                ),
-                "sub_network_num_heads": teacher_config.n_head,  # keep the same number of heads as teacher
-                "sub_network_n_layers": random_config["depth"],
+                "embed_dim": random_config["embed_dim"],
+                "mlp_ratio": random_config["mlp_ratio"],
+                "num_heads": teacher_config.n_head,  # keep the same number of heads as teacher
+                "depth": random_config["depth"],
             }
+            teacher.select_sub_network(subnetwork)
+            student = extract_current_sub_network(teacher)
 
-            student.set_sub_network(**subnetwork)
-            initialize_weights(
-                fabric,
-                student,
-                n_layer=random_config["depth"],
-                n_embd=random_config["embed_dim"],
-            )
             param_count = compute_parameters(student)
+            teacher.reset_super_network()
             ratio = param_count / compute_parameters(teacher)
             if min_ratio <= ratio <= max_ratio:
                 valid = True
 
-    student = extract_current_sub_network(student) if student_config is None else student
     student = fabric.setup_module(student, move_to_device=True)
+
+    if student_checkpoint:
+        load_checkpoint(fabric, student, student_checkpoint)
+        fabric.print(f"Student model loaded from {student_dir} (not compiled)")
 
     if use_compile_student:
         try:
@@ -492,7 +479,6 @@ def fit(
                 teacher_logits = teacher(input_ids)
 
             logits = student(input_ids)
-            # Reshape so that it fits the loss function
             logits_reshaped = logits.view(-1, logits.size(-1))
             targets_reshaped = targets.view(-1)
             teacher_logits_reshaped = teacher_logits.view(-1, teacher_logits.size(-1))
