@@ -102,12 +102,18 @@ class Pruner:
         Prepare inputs for calibration during model pruning.
         """
 
-        use_cache = model.config.use_cache
-        model.config.use_cache = False
+        if hasattr(model.config, "use_cache"):
+            use_cache = model.config.use_cache
+            model.config.use_cache = False
         layers = model.transformer.h
         dtype = next(iter(model.parameters())).dtype
         inps = torch.zeros(
-            (nsamples, model.max_seq_length, model.config.n_embd),
+            (
+                nsamples,
+                dataloader.batch_size,
+                model.max_seq_length,
+                model.config.n_embd,
+            ),
             dtype=dtype,
             device=dev,
         )
@@ -120,7 +126,11 @@ class Pruner:
                 with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
                     with torch.no_grad():
                         torch.cuda.empty_cache()
-                        model(batch[0].to(dev))
+                        if isinstance(batch, (tuple, list)):
+                            inputs = batch[0]
+                        elif isinstance(batch, dict):
+                            inputs = batch["input_ids"]
+                        model(inputs.to(dev))
             except ValueError:
                 pass
         layers[0] = layers[0].module
@@ -128,6 +138,8 @@ class Pruner:
         outs = torch.zeros_like(inps)
         attention_mask = cache["attention_mask"]
         position_ids = cache["position_ids"]
-        model.config.use_cache = use_cache
+
+        if hasattr(model.config, "use_cache"):
+            model.config.use_cache = use_cache
 
         return inps, outs, attention_mask, position_ids
