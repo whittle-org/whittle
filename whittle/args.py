@@ -28,11 +28,13 @@ class DistillArgs:
                 confident predictions.
         alpha: Weight balancing distillation loss vs cross-entropy loss. Values closer to 1 give more importance
                 to matching teacher logits, while values closer to 0 prioritize true label prediction.
+        loss: Loss function to use for distillation.
     """
 
     method: str = "logits"
     temperature: float = 5
     alpha: float = 0.5
+    loss: str = "kld"
 
 
 @dataclass
