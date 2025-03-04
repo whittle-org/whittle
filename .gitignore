@@ -2,7 +2,10 @@
 **/examples/**/*.png
 **/checkpoints
 **/data
-
+**/slurm_logs
+**/out
+**/wandb
+**/*.yaml
 *.DS_Store
 
 # Log files
