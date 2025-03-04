@@ -80,7 +80,7 @@ def test_integration_training_strategies_mlp(strategy):
 
 
 @pytest.mark.parametrize("strategy", methods)
-@pytest.mark.parametrize("kd_loss", [None, DistillLoss(0.5, 0.5)])
+@pytest.mark.parametrize("kd_loss", [None, DistillLoss(0.5, 0.5, "kld")])
 def test_integration_training_strategies_gpt(strategy, kd_loss):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
