@@ -19,7 +19,7 @@ class DistillLoss(nn.Module):
         kldiv (nn.KLDivLoss): The KL divergence loss function.
     """
 
-    def __init__(self, temperature, distillation_weight):
+    def __init__(self, temperature, distillation_weight, loss):
         """
         Initializes the DistillLoss module.
 
@@ -31,7 +31,7 @@ class DistillLoss(nn.Module):
 
         self.temperature = temperature
         self.distillation_weight = distillation_weight
-        self.kldiv = nn.KLDivLoss(reduction="batchmean")
+        self.distill_loss = loss
 
     def forward(self, outputs, labels, outputs_teacher) -> nn.Tensor:
         """
@@ -53,10 +53,48 @@ class DistillLoss(nn.Module):
         outputs_teacher = outputs_teacher.detach()
 
         if outputs_teacher is not None and self.distillation_weight > 0:
-            soft_target_loss = self.kldiv(
-                F.log_softmax(outputs / self.temperature, dim=1),
-                F.softmax(outputs_teacher / self.temperature, dim=1),
-            ) * (self.temperature**2)
+            if self.distill_loss == "kld":
+                soft_target_loss = F.kl_div(
+                    F.log_softmax(outputs / self.temperature, dim=1),
+                    F.softmax(outputs_teacher / self.temperature, dim=1),
+                    reduction="batchmean",
+                ) * (self.temperature**2)
+
+            elif self.distill_loss == "reverse_kld":
+                soft_target_loss = F.kl_div(
+                    F.log_softmax(outputs_teacher / self.temperature, dim=1),
+                    F.softmax(outputs / self.temperature, dim=1),
+                    reduction="batchmean",
+                ) * (self.temperature**2)
+
+            elif self.distill_loss == "l1" or self.distill_loss == "mae":
+                soft_target_loss = F.l1_loss(outputs, outputs_teacher, reduction="mean")
+
+            elif self.distill_loss == "l2" or self.distill_loss == "mse":
+                soft_target_loss = F.mse_loss(outputs, outputs_teacher, reduction="mean")
+
+            elif self.distill_loss == "cosine":
+                soft_target_loss = (
+                    1 - F.cosine_similarity(outputs, outputs_teacher, dim=1).mean()
+                )
+
+            elif self.distill_loss == "jsd":
+                m = 0.5 * (outputs + outputs_teacher)
+                soft_target_loss = 0.5 * (
+                    F.kl_div(
+                        F.log_softmax(outputs, dim=1),
+                        F.softmax(m, dim=1),
+                        reduction="batchmean",
+                    )
+                    + F.kl_div(
+                        F.log_softmax(outputs_teacher, dim=1),
+                        F.softmax(m, dim=1),
+                        reduction="batchmean",
+                    )
+                )
+
+            else:
+                raise ValueError(f"Invalid distillation loss: {self.distill_loss}")
 
         hard_target_loss = F.cross_entropy(outputs, labels, reduction="mean")
 
