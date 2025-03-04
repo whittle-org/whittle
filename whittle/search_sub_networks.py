@@ -21,20 +21,18 @@ from litgpt.utils import (
     check_nvlink_connectivity,
     check_valid_checkpoint_dir,
     choose_logger,
-    copy_config_files as copy_config_files_func,
     find_resume_path,
     get_default_supported_precision,
     init_out_dir,
     load_checkpoint,
     parse_devices,
-    save_config,
 )
 from torch.utils.data import DataLoader
 
 from whittle.args import ParamBinArgs, SearchArgs
 from whittle.metrics import compute_latency, compute_parameters
 from whittle.models.gpt import GPT, Block
-from whittle.models.gpt.extract import extract_current_sub_network
+from whittle.models.gpt.checkpoint import save_sub_network
 from whittle.pretrain_super_network import get_search_space
 from whittle.sampling.param_bins import ParamBins, ParamsEstimator
 from whittle.search import multi_objective_search
@@ -342,33 +340,19 @@ def main(
     pareto_optimal_paths = []
     for i, sub_network_dict in enumerate(search_results["configs"]):
         save_path = out_dir / f"sub_network_{i}" / "lit_model.pth"
-        save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        save_sub_network(
+            model,
+            sub_network_dict,
+            checkpoint_dir,
+            save_path.parent,
+            save_checkpoints=save_checkpoints,
+            copy_config_files=copy_config_files,
+            fabric=fabric,
+        )
 
         if search_results["is_pareto_optimal"][i]:
             pareto_optimal_paths.append(str(save_path.absolute()))
-
-        # either save the extracted checkpoint, or the config + path to super-network
-        if save_checkpoints:
-            model.select_sub_network(sub_network_dict)
-            sub_network = extract_current_sub_network(model)
-            model.reset_super_network()
-
-            # either save everything including config files, or only model_config.yaml and the weights
-            if copy_config_files:
-                copy_config_files_func(checkpoint_dir, save_path.parent)
-                fabric.save(save_path, {"model": sub_network})
-            else:
-                fabric.save(
-                    save_path, {"model": sub_network, "parent_dir": checkpoint_dir}
-                )
-            # the new model_config.yaml is different from the original one, so we rewrite it
-            save_config(sub_network.config, save_path.parent)
-        else:
-            # minimalistic checkpoint - only sub-network config and path to super-network
-            fabric.save(
-                save_path,
-                {"sub_network_config": sub_network_dict, "parent_dir": checkpoint_dir},
-            )
 
     # save all paths to pareto optimal sub-networks
     with open(out_dir / "pareto_optimal_paths.json", "w") as f:

@@ -1,9 +1,12 @@
-from pathlib import Path
-from litgpt.utils import lazy_load, copy_config_files, save_config
-from litgpt import Config
+from __future__ import annotations
+
 import shutil
+from pathlib import Path
+
 import torch
-from typing import Any
+from litgpt import Config
+from litgpt.utils import copy_config_files, lazy_load, save_config
+
 from whittle.models.gpt import GPT
 from whittle.models.gpt.extract import extract_current_sub_network
 
@@ -11,6 +14,8 @@ from whittle.models.gpt.extract import extract_current_sub_network
 def setup(
     sub_network_dir: Path,
     out_dir: Path | None = None,
+    parent_dir: Path | None = None,
+    super_network_cls: type[GPT] = GPT,
 ) -> None:
     """
     Convert a sub-network to a LitGPT model checkpoint.
@@ -37,17 +42,18 @@ def setup(
     Arguments:
         sub_network_dir: The path to the sub-network directory to convert.
         out_dir: Directory in which to save the converted sub-network. If not provided, saving to `sub_network_dir` by default.
+        parent_dir: The parent directory of the sub-network. Required if the checkpoint is in the format b) or c). If not provided, the parent directory is extracted from the checkpoint.
+        super_network_cls: The super-network class to instantiate the super-network model. Defaults to `GPT`.
     """
 
     if out_dir is None:
         out_dir = sub_network_dir
 
-    sub_network_config: dict[str, Any] | None = None
     ckp = lazy_load(sub_network_dir / "lit_model.pth")
 
     # sub-network config loading (contains the config and checkpoint path of the parent)
 
-    parent_dir = ckp.get("parent_dir", None)
+    parent_dir = ckp.get("parent_dir", None) if parent_dir is None else parent_dir
 
     if "model" in ckp:
         model_path = sub_network_dir / "lit_model.pth"
@@ -84,7 +90,7 @@ def setup(
         # instantiate the super-network
         config = Config.from_file(model_path / "model_config.yaml")
         config.fix_head_size = True
-        model = GPT(config)
+        model = super_network_cls(config)
 
         # set the sub-network via the saved sub-network config
         model.select_sub_network(sub_network_config)
