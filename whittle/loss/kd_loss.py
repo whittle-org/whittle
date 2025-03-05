@@ -19,7 +19,7 @@ class DistillLoss(nn.Module):
         loss (str): The loss function to use for distillation. Default is 'kld'.
     """
 
-    def __init__(self, temperature: float, distillation_weight: float, loss: str):
+    def __init__(self, temperature, distillation_weight, loss):
         """
         Initializes the DistillLoss module.
 
