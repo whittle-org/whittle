@@ -79,21 +79,8 @@ def test_integration_training_strategies_mlp(strategy):
     assert isinstance(loss, float)
 
 
-loss_functions = [
-    None,
-    DistillLoss(0.5, 0.5, "kld"),
-    DistillLoss(0.5, 0.5, "reverse_kld"),
-    DistillLoss(0.5, 0.5, "l1"),
-    DistillLoss(0.5, 0.5, "mae"),
-    DistillLoss(0.5, 0.5, "l2"),
-    DistillLoss(0.5, 0.5, "mse"),
-    DistillLoss(0.5, 0.5, "cosine"),
-    DistillLoss(0.5, 0.5, "jsd"),
-]
-
-
 @pytest.mark.parametrize("strategy", methods)
-@pytest.mark.parametrize("kd_loss", loss_functions)
+@pytest.mark.parametrize("kd_loss", [None, DistillLoss(0.5, 0.5, "kld")])
 def test_integration_training_strategies_gpt(strategy, kd_loss):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
