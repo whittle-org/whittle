@@ -26,13 +26,6 @@ class DistillLoss(nn.Module):
         Args:
             temperature (float): The temperature for distillation.
             distillation_weight (float): The weight factor for the distillation loss.
-            loss (str): The distillation loss function to use. Options are:
-                - 'kld' (KL divergence)
-                - 'mse' (mean squared error) or 'l2'
-                - 'mae' (mean absolute error) or 'l1'
-                - 'reverse_kld' (reverse KL divergence)
-                - 'cosine' (cosine similarity)
-                - 'jsd' (Jensen-Shannon divergence)
         """
         super().__init__()
 
