@@ -89,12 +89,14 @@ def test_param_bins(bin_t, bin_s, bin_n):
 
     # fill up to bin_n - 1 bins
     for j in range(bin_s):
-        for i in range(bin_n - bin_t - 1):
+        for i in range(bin_n - bin_t):
+            if i == 1:
+                continue
             assert bins.put_in_bin({"a": 1 + i * bin_width})
 
         # fill the last one unless it'd be filled fully (leave 1 not full)
         if j < bin_s - 1:
-            assert bins.put_in_bin({"a": 1 + (bin_n - bin_t - 1) * bin_width})
+            assert bins.put_in_bin({"a": 1 + bin_width})
 
     assert bins.current_bin_length == bin_s
 
@@ -106,7 +108,7 @@ def test_param_bins(bin_t, bin_s, bin_n):
     assert sum([b == bin_s for b in bins.bins]) == bin_n - bin_t - 1
 
     # last bin is filled fully -> this should be true
-    assert bins.put_in_bin({"a": 2 + bin_width * (bin_n - bin_t - 1)})
+    assert bins.put_in_bin({"a": 2 + bin_width})
     # all filled
     assert sum([b == bin_s for b in bins.bins]) == bin_n - bin_t
 
