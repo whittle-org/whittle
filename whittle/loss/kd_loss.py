@@ -16,16 +16,18 @@ class DistillLoss(nn.Module):
                              produce softer probability distributions.
         distillation_weight (float): The weight factor that balances the importance of
                                      the distillation loss and the hard target loss.
-        loss (str): The loss function to use for distillation. Default is 'kld'.
+        kldiv (nn.KLDivLoss): The KL divergence loss function.
     """
 
     def __init__(self, temperature, distillation_weight, loss):
         """
         Initializes the DistillLoss module.
-
         Args:
             temperature (float): The temperature for distillation.
             distillation_weight (float): The weight factor for the distillation loss.
+            loss (str): The distillation loss function to use. Options are 'kld' (KL divergence), 'mse' (mean squared error) or 'l2',
+                'mae' (mean absolute error) or 'l1', 'reverse_kld' (reverse KL divergence), 'cosine' (cosine similarity)
+                or 'jsd' (Jensen-Shannon divergence)
         """
         super().__init__()
 
