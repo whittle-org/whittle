@@ -102,7 +102,15 @@ def test_param_bins(bin_t, bin_s, bin_n):
     assert not bins.put_in_bin({"a": 3})
     assert bins.current_bin_length == bin_s
 
+    # all but one filled (- tolerance)
+    assert sum([b == bin_s for b in bins.bins]) == bin_n - bin_t - 1
+
     # last bin is filled fully -> this should be true
     assert bins.put_in_bin({"a": 2 + bin_width * (bin_n - bin_t - 1)})
+    # all filled
+    assert sum([b == bin_s for b in bins.bins]) == bin_n - bin_t
+
     assert bins.put_in_bin({"a": 3})
     assert bins.current_bin_length == bin_s + 1
+    # all almost filled - 1 filled (- tolerance)
+    assert sum([b == bin_s for b in bins.bins]) == bin_n - bin_t - 1
