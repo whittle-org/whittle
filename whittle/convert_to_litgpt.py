@@ -16,6 +16,7 @@ def setup(
     out_dir: Path | None = None,
     parent_dir: Path | None = None,
     super_network_cls: type[GPT] = GPT,
+    no_model_key: bool = True,
 ) -> None:
     """
     Convert a sub-network to a LitGPT model checkpoint.
@@ -23,7 +24,7 @@ def setup(
 
     a) same as litgpt models:
         sub_network_dir/
-        - lit_model.pth ... {model: sub_network.state_dict()}
+        - lit_model.pth ... {model: sub_network.state_dict()} or sub_network.state_dict() (former - whittle model, latter - litgpt model)
         - configs (model_config.yaml, tokenizer.json, etc.)
     b) litgpt model with saving space (not copying the tokenizer and other configs):
         sub_network_dir/
@@ -44,6 +45,7 @@ def setup(
         out_dir: Directory in which to save the converted sub-network. If not provided, saving to `sub_network_dir` by default.
         parent_dir: The parent directory of the sub-network. Required if the checkpoint is in the format b) or c). If not provided, the parent directory is extracted from the checkpoint.
         super_network_cls: The super-network class to instantiate the super-network model. Defaults to `GPT`.
+        no_model_key: Convert strictly to litgpt - lit_model.pth will contain only the sub-network weights, and not {'model': sub_network_weights}.
     """
 
     if out_dir is None:
@@ -62,8 +64,14 @@ def setup(
         )  # config files were copied
 
         # copy model only if the destination is different
-        if out_dir != sub_network_dir:
+        if out_dir != sub_network_dir and not no_model_key:
             shutil.copy(model_path, out_dir / "lit_model.pth")
+        # re-save the model if the required format is state_dict instead of {'model': state_dict}
+        elif no_model_key:
+            ckp = torch.load(
+                model_path
+            )  # this time not lazy loading because we're re-saving the weights
+            torch.save(ckp["model"], out_dir / "lit_model.pth")
 
         if configs_path == parent_dir:
             # we don't want to overwrite the sub-network config in case `out_dir` == `sub_network_dir`
@@ -88,7 +96,7 @@ def setup(
         sub_network_config = ckp["sub_network_config"]
 
         # instantiate the super-network
-        config = Config.from_file(model_path / "model_config.yaml")
+        config = Config.from_file(model_path.parent / "model_config.yaml")
         config.fix_head_size = True
         model = super_network_cls(config)
 
@@ -98,5 +106,11 @@ def setup(
 
         # copy the config files, save the sub-network, and overwrite model_config.yaml with the sub-network config
         copy_config_files(configs_path, out_dir)
-        torch.save({"model": sub_network.state_dict()}, out_dir / "lit_model.pth")
+        # save the sub-network in the litgpt vs whittle format
+        save_data = (
+            sub_network.state_dict()
+            if no_model_key
+            else {"model": sub_network.state_dict()}
+        )
+        torch.save(save_data, out_dir / "lit_model.pth")
         save_config(sub_network.config, out_dir)

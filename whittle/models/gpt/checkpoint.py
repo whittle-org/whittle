@@ -109,8 +109,7 @@ def load_checkpoint(
         # not None: sub-network, None: raw state dict
         if parent_dir is not None:
             checkpoint_dir = Path(parent_dir)
-
-        ckp = lazy_load(checkpoint_dir / "lit_model.pth")
+            ckp = lazy_load(checkpoint_dir / "lit_model.pth")
 
     config = config_cls.from_file(checkpoint_dir / "model_config.yaml")
     config_attr = {"fix_head_size": True} if config_attr is None else config_attr

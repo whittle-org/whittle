@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import os
 import pathlib
+from contextlib import redirect_stdout
+from io import StringIO
 
 import pytest
 import torch
 from litgpt import Config
+from litgpt.model import GPT as LitGPT
 from litgpt.scripts.download import download_from_hub
-from litgpt.utils import lazy_load
+from litgpt.utils import check_valid_checkpoint_dir, lazy_load
 
+from whittle import convert_to_litgpt
 from whittle.models.gpt.checkpoint import load_checkpoint, save_sub_network
 from whittle.models.gpt.model import GPT
 
@@ -106,3 +110,57 @@ def test_checkpoints(tmp_path, checkpoint_dir, copy_config_files, save_checkpoin
         out_after_save = loaded_model(input)
 
         assert torch.allclose(out_pre_save, out_after_save, atol=1e-3)
+
+
+@pytest.mark.parametrize("no_model_key", [True, False])
+@pytest.mark.parametrize("copy_config_files", [True, False])
+@pytest.mark.parametrize("save_checkpoints", [True, False])
+def test_convert_to_litgpt(
+    tmp_path, checkpoint_dir, copy_config_files, save_checkpoints, no_model_key
+):
+    out_dir = tmp_path / f"out_{copy_config_files}_{save_checkpoints}"
+    out_dir.mkdir(exist_ok=True)
+
+    litgpt_dir = tmp_path / "litgpt"
+    litgpt_dir.mkdir(exist_ok=True)
+
+    config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
+    config.fix_head_size = True
+
+    model = GPT(config)
+    ckp = lazy_load(checkpoint_dir / "lit_model.pth")
+    model.load_state_dict(ckp)
+
+    sub_network_dict = {"embed_dim": 8, "mlp_ratio": 2, "num_heads": 2, "depth": 2}
+    save_sub_network(
+        model,
+        checkpoint_dir,
+        out_dir,
+        save_checkpoints=save_checkpoints,
+        copy_config_files=copy_config_files,
+        sub_network_config=sub_network_dict,
+    )
+
+    for target_dir in [litgpt_dir, out_dir]:
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            convert_to_litgpt.setup(
+                out_dir, out_dir=target_dir, no_model_key=no_model_key
+            )
+
+            # everything should be in there - tokenizer, config files, and the model
+            check_valid_checkpoint_dir(target_dir)
+            ckp = lazy_load(target_dir / "lit_model.pth")
+            assert "model" in ckp if not no_model_key else "model" not in ckp
+            ckp = ckp["model"] if not no_model_key else ckp
+
+            # it should work for both litgpt and whittle models
+            cfg = Config.from_file(target_dir / "model_config.yaml")
+            model = LitGPT(cfg)
+            model.load_state_dict(ckp)
+
+            model = GPT(cfg)
+            model.load_state_dict(ckp)
+
+            # this should still work even for checkpoints in litgpt format
+            load_checkpoint(target_dir)
