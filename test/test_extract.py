@@ -12,7 +12,7 @@ from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
 
 
-def test_extract_sub_network() -> None:
+def test_extract_sub_network_mha() -> None:
     config = Config.from_name("pythia-70m")
     config.fix_head_size = False
 
@@ -49,7 +49,7 @@ def test_extract_sub_network() -> None:
     )
 
 
-def test_extract_sub_network_llamamlp() -> None:
+def test_extract_sub_network_llamamlp_gqa() -> None:
     config = Config.from_name("micro-llama-300M")
     config.fix_head_size = False
 
@@ -69,7 +69,56 @@ def test_extract_sub_network_llamamlp() -> None:
     n_embd = 128
     intermediate_size = 1024
     n_layer = 6
-    n_head = 12
+    n_head = 8
+    n_query_groups = 3
+
+    super_network.eval()
+    super_network.set_sub_network(
+        sub_network_n_embd=n_embd,
+        sub_network_intermediate_size=intermediate_size,
+        sub_network_num_heads=n_head,
+        sub_network_n_layers=n_layer,
+        sub_network_query_groups=n_query_groups,
+    )
+
+    # instantiate a new model
+    sub_network = extract_current_sub_network(super_network)
+    sub_network.eval()
+    input = torch.randint(0, 512, (1, 20))
+    out_super_net = super_network(input).detach()
+    out_sub_net = sub_network(input).detach()
+    assert torch.all(
+        torch.round(out_sub_net, decimals=9) == torch.round(out_super_net, decimals=9)
+    )
+
+
+def test_extract_sub_network_gemmamlp_mqa() -> None:
+    config = Config.from_name("Gemma-2b")
+    config.fix_head_size = True
+
+    # simulate a smaller network
+    config.vocab_size = 256
+    config.n_embd = 32
+    config.n_layer = 6
+    config.n_head = 8
+
+    super_network = GPT(config)
+
+    # set norm weights to random
+    # the default is unit/zero vector which does not test the extract
+    make_norm_weights_random(super_network.transformer.ln_f)
+    for i in range(config.n_layer):
+        block = super_network.transformer.h[i]
+        make_norm_weights_random(block.norm_1)
+        make_norm_weights_random(block.post_attention_norm)
+        make_norm_weights_random(block.norm_2)
+        make_norm_weights_random(block.post_mlp_norm)
+
+    # simulate a smaller network
+    n_embd = 8
+    intermediate_size = 32
+    n_layer = 3
+    n_head = 4
 
     super_network.eval()
     super_network.set_sub_network(

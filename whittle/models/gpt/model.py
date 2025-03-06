@@ -270,6 +270,7 @@ class GPT(nn.Module):
             config["num_heads"],
             config["depth"],
             sub_network_head_size=config.get("head_size", None),
+            sub_network_query_groups=config.get("n_query_groups", None),
         )
 
     def reset_super_network(self):
@@ -324,7 +325,7 @@ class GPT(nn.Module):
 
         x = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
         if self.config.scale_embeddings:
-            x = x * torch.tensor(self.config.n_embd**0.5, dtype=x.dtype)
+            x = x * torch.tensor(self.sub_network_n_embd**0.5, dtype=x.dtype)
         for i in range(self.sub_network_n_layers):
             block = self.transformer.h[i]
 

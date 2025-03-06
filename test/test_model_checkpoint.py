@@ -10,18 +10,68 @@ import torch
 from litgpt import Config
 from litgpt.model import GPT as LitGPT
 from litgpt.scripts.download import download_from_hub
-from litgpt.utils import check_valid_checkpoint_dir, lazy_load
+from litgpt.utils import check_valid_checkpoint_dir, lazy_load, save_config
 
 from whittle import convert_to_litgpt
 from whittle.models.gpt.checkpoint import load_checkpoint, save_sub_network
 from whittle.models.gpt.model import GPT
 
 
+def random_init_weights(gpt):
+    gpt.transformer.wte.weight.data = torch.randn_like(gpt.transformer.wte.weight.data)
+    gpt.lm_head.weight.data = torch.randn_like(gpt.lm_head.weight.data)
+    gpt.transformer.ln_f.weight.data = torch.randn_like(gpt.transformer.ln_f.weight.data)
+
+    for block in gpt.transformer.h:
+        block.attn.attn.weight.data = torch.randn_like(block.attn.attn.weight.data)
+        block.attn.proj.weight.data = torch.randn_like(block.attn.proj.weight.data)
+        block.mlp.fc_1.weight.data = torch.randn_like(block.mlp.fc_1.weight.data)
+        block.mlp.fc_2.weight.data = torch.randn_like(block.mlp.fc_2.weight.data)
+        block.mlp.proj.weight.data = torch.randn_like(block.mlp.proj.weight.data)
+        block.norm_1.weight.data = torch.randn_like(block.norm_1.weight.data)
+        block.norm_2.weight.data = torch.randn_like(block.norm_2.weight.data)
+
+
 @pytest.fixture(scope="session")
 def checkpoint_dir(tmp_path_factory):
     checkpoint_dir = tmp_path_factory.getbasetemp()
     download_from_hub(repo_id="EleutherAI/pythia-14m", checkpoint_dir=checkpoint_dir)
-    return pathlib.Path(checkpoint_dir) / "EleutherAI" / "pythia-14m"
+
+    # microllama and gemma-2b are too large to download, so we'll create a dummy checkpoint
+    llama_dir = checkpoint_dir / "keeeeenw" / "MicroLlama"
+    llama_dir.mkdir(parents=True, exist_ok=True)
+    config = Config.from_name("micro-llama-300M")
+    config.intermediate_size = 1024
+    config.fix_head_size = True
+    save_config(config, llama_dir)
+    model = GPT(config)
+    random_init_weights(model)
+
+    torch.save(model.state_dict(), llama_dir / "lit_model.pth")
+    download_from_hub(
+        repo_id="keeeeenw/MicroLlama", checkpoint_dir=checkpoint_dir, tokenizer_only=True
+    )
+
+    gemma_dir = checkpoint_dir / "google" / "gemma-2b"
+    gemma_dir.mkdir(parents=True, exist_ok=True)
+    config = Config.from_name("gemma-2b")
+    config.fix_head_size = True
+    # simulate a smaller network
+    config.vocab_size = 256
+    config.n_embd = 32
+    config.n_layer = 6
+    config.n_head = 8
+    save_config(config, gemma_dir)
+    model = GPT(config)
+    random_init_weights(model)
+
+    torch.save(model.state_dict(), gemma_dir / "lit_model.pth")
+
+    download_from_hub(
+        repo_id="google/gemma-2b", checkpoint_dir=checkpoint_dir, tokenizer_only=True
+    )
+
+    return pathlib.Path(checkpoint_dir)
 
 
 def get_checkpoint_contents(copy_config_files, save_checkpoints):
@@ -43,6 +93,7 @@ def get_checkpoint_contents(copy_config_files, save_checkpoints):
 @pytest.mark.parametrize("copy_config_files", [True, False])
 @pytest.mark.parametrize("save_checkpoints", [True, False])
 def test_checkpoints(tmp_path, checkpoint_dir, copy_config_files, save_checkpoints):
+    checkpoint_dir = checkpoint_dir / "EleutherAI" / "pythia-14m"
     config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
     config.fix_head_size = True
 
@@ -112,12 +163,17 @@ def test_checkpoints(tmp_path, checkpoint_dir, copy_config_files, save_checkpoin
         assert torch.allclose(out_pre_save, out_after_save, atol=1e-3)
 
 
+@pytest.mark.parametrize(
+    "model_dir", ["EleutherAI/pythia-14m", "google/gemma-2b", "keeeeenw/MicroLlama"]
+)
 @pytest.mark.parametrize("no_model_key", [True, False])
 @pytest.mark.parametrize("copy_config_files", [True, False])
 @pytest.mark.parametrize("save_checkpoints", [True, False])
 def test_convert_to_litgpt(
-    tmp_path, checkpoint_dir, copy_config_files, save_checkpoints, no_model_key
+    tmp_path, checkpoint_dir, copy_config_files, save_checkpoints, no_model_key, model_dir
 ):
+    checkpoint_dir = checkpoint_dir / model_dir
+
     out_dir = tmp_path / f"out_{copy_config_files}_{save_checkpoints}"
     out_dir.mkdir(exist_ok=True)
 
@@ -131,7 +187,21 @@ def test_convert_to_litgpt(
     ckp = lazy_load(checkpoint_dir / "lit_model.pth")
     model.load_state_dict(ckp)
 
-    sub_network_dict = {"embed_dim": 8, "mlp_ratio": 2, "num_heads": 2, "depth": 2}
+    if "pythia" in model_dir:
+        sub_network_dict = {"embed_dim": 8, "mlp_ratio": 2, "num_heads": 2, "depth": 2}
+    elif "gemma" in model_dir:
+        sub_network_dict = {"embed_dim": 8, "mlp_ratio": 2, "num_heads": 4, "depth": 3}
+    elif "MicroLlama" in model_dir:
+        sub_network_dict = {
+            "embed_dim": 128,
+            "depth": 6,
+            "num_heads": 8,
+            "mlp_ratio": 1.5,
+            "n_query_groups": 3,
+        }
+    else:
+        raise NotImplementedError(f"Test not implemented for {model_dir}")
+
     save_sub_network(
         model,
         checkpoint_dir,
@@ -154,13 +224,18 @@ def test_convert_to_litgpt(
             assert "model" in ckp if not no_model_key else "model" not in ckp
             ckp = ckp["model"] if not no_model_key else ckp
 
+            input = torch.randint(0, 512, (1, 20))
             # it should work for both litgpt and whittle models
             cfg = Config.from_file(target_dir / "model_config.yaml")
             model = LitGPT(cfg)
             model.load_state_dict(ckp)
+            lit_out = model(input)
 
             model = GPT(cfg)
             model.load_state_dict(ckp)
+            whittle_out = model(input)
+
+            assert torch.allclose(lit_out, whittle_out, atol=1e-3)
 
             # this should still work even for checkpoints in litgpt format
             load_checkpoint(target_dir)
