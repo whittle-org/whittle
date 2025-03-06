@@ -73,6 +73,7 @@ def setup(
         method="logits",
         temperature=5,
         alpha=0.6,
+        loss="kld",
     ),
     eval: EvalArgs = EvalArgs(interval=1000, max_iters=100, initial_validation=True),
     optimizer: str | dict = "AdamW",
@@ -266,6 +267,7 @@ def main(
         valid = False
         while not valid:
             random_config = sampler.sample()
+            fabric.print(f"Random subnetwork config: {random_config}")
             subnetwork = {
                 "embed_dim": random_config["embed_dim"],
                 "mlp_ratio": random_config["mlp_ratio"],
@@ -406,7 +408,9 @@ def fit(
     teacher.eval()
 
     distill_loss = DistillLoss(
-        temperature=distill.temperature, distillation_weight=distill.alpha
+        temperature=distill.temperature,
+        distillation_weight=distill.alpha,
+        loss=distill.loss,
     )
 
     if eval.initial_validation:
@@ -477,6 +481,7 @@ def fit(
             with torch.inference_mode():  # no grads for teacher
                 teacher_logits = teacher(input_ids)
 
+            teacher_logits = teacher_logits.clone()
             logits = student(input_ids)
             logits_reshaped = logits.view(-1, logits.size(-1))
             targets_reshaped = targets.view(-1)

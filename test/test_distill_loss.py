@@ -13,7 +13,7 @@ def test_distill_loss():
     temperature = 1.0
     distill_weight = 0.5
 
-    loss_fn = DistillLoss(temperature, distill_weight)
+    loss_fn = DistillLoss(temperature, distill_weight, "kld")
     loss = loss_fn(student_logits, labels, teacher_logits)
 
     expected_loss = 0.6931
