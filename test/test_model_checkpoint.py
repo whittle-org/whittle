@@ -43,6 +43,9 @@ def test_checkpoints(tmp_path, checkpoint_dir, copy_config_files, save_checkpoin
     config.fix_head_size = True
 
     model = GPT(config)
+    ckp = lazy_load(checkpoint_dir / "lit_model.pth")
+    model.load_state_dict(ckp)
+
     sub_network_dict = {"embed_dim": 8, "mlp_ratio": 2, "num_heads": 2, "depth": 2}
 
     for set_subnet_before_call in [True, False]:
@@ -94,9 +97,9 @@ def test_checkpoints(tmp_path, checkpoint_dir, copy_config_files, save_checkpoin
             assert "parent_dir" in checkpoint
 
         loaded_model = load_checkpoint(out_dir)
-        assert loaded_model.fix_head_size is True  # by default this should be set
+        assert loaded_model.config.fix_head_size is True  # by default this should be set
 
-        model.set_sub_network(**sub_network_dict)
+        model.select_sub_network(sub_network_dict)
 
         input = torch.randint(0, 64, (1, 64))
         out_pre_save = model(input)

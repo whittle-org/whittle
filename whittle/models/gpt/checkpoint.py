@@ -60,10 +60,12 @@ def save_sub_network(
         # either save everything including config files, or only model_config.yaml and the weights
         if copy_config_files:
             copy_config_files_func(checkpoint_dir, save_dir)
-            _save_checkpoint({"model": sub_network}, save_path, fabric=fabric)
+            _save_checkpoint(
+                {"model": sub_network.state_dict()}, save_path, fabric=fabric
+            )
         else:
             _save_checkpoint(
-                {"model": sub_network, "parent_dir": checkpoint_dir},
+                {"model": sub_network.state_dict(), "parent_dir": checkpoint_dir},
                 save_path,
                 fabric=fabric,
             )
@@ -92,9 +94,11 @@ def load_checkpoint(
     parent_dir = ckp.get("parent_dir", None)
 
     # check if the checkpoint is valid only if it is not a sub-network config
-    if sub_network_config is not None:
+    if sub_network_config is None:
         check_valid_checkpoint_dir(
-            checkpoint_dir, ignore_tokenizer_files=parent_dir is None
+            checkpoint_dir,
+            ignore_tokenizer_files=parent_dir
+            is not None,  # if parent_dir is not None, tokenizer files were not copied
         )
     # always check the parent config validity
     if parent_dir is not None:
