@@ -51,6 +51,7 @@ class DistillLoss(nn.Module):
         """
         soft_target_loss = 0
         outputs_teacher = outputs_teacher.detach()
+
         if outputs_teacher is not None and self.distillation_weight > 0:
             soft_target_loss = self.kldiv(
                 F.log_softmax(outputs / self.temperature, dim=1),
