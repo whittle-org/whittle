@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from warnings import warn
 
 import lightning as L
 import torch
@@ -29,20 +30,30 @@ def _save_checkpoint(
 
 def save_sub_network(
     super_network: GPT,
-    sub_network_config: dict[str, Any],
     checkpoint_dir: Path,
     save_dir: Path,
+    sub_network_config: dict[str, Any] | None = None,
     save_checkpoints: bool = True,
     copy_config_files: bool = False,
     fabric: L.Fabric | None = None,
 ):
+    if not save_checkpoints and sub_network_config is None:
+        raise ValueError(
+            "sub_network_config must be provided when save_checkpoints is False"
+        )
+
     assert checkpoint_dir != save_dir, "Checkpoint and save directories must be different"
     save_path = save_dir / "lit_model.pth"
     save_dir.mkdir(parents=True, exist_ok=True)
 
     # either save the extracted checkpoint, or the config + path to super-network
     if save_checkpoints:
-        super_network.select_sub_network(sub_network_config)
+        if sub_network_config is not None:
+            super_network.select_sub_network(sub_network_config)
+        else:
+            warn(
+                "No sub-network config provided - saving the current active sub-network instead (assuming the user called .set_sub_network() before). If this is not the intended behavior, pass `sub_network_config` to `save_sub_network`."
+            )
         sub_network = extract_current_sub_network(super_network)
         super_network.reset_super_network()
 
@@ -71,7 +82,6 @@ def load_checkpoint(
     checkpoint_dir: Path,
     model_cls: type[GPT] = GPT,
     config_cls: type[Config] | type[LoRAConfig] = Config,
-    fabric: L.Fabric | None = None,
     config_attr: dict[str, Any] | None = None,
 ) -> GPT:
     sub_network_config: dict[str, Any] | None = None
