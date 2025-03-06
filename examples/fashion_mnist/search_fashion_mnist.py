@@ -24,7 +24,7 @@ def compute_mac_linear_layer(in_features: int, out_features: int):
 def objective(
     config: dict[Literal["fc1_out", "fc2_out"], int], model: LeNet, device: torch.device
 ) -> tuple[int, float]:
-    model.select_sub_network(config=config)
+    model.set_sub_network(**config)
 
     _, loss = validate(
         test_loader=test_loader,

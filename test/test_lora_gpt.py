@@ -4,8 +4,8 @@ import torch
 from litgpt import Config as LitConfig
 from litgpt.model import GPT as LitGPT
 
-from whittle.lora.config import LoRAConfig as Config
-from whittle.lora.lora_gpt import GPT
+from whittle.lora_model.config import LoRAConfig as Config
+from whittle.lora_model.lora_gpt import GPT
 
 
 def test_gpt():

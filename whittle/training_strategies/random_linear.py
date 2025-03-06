@@ -44,28 +44,19 @@ class RandomLinearStrategy(BaseTrainingStrategy):
 
     def __call__(self, model, inputs, outputs, scale_loss=1, **kwargs):
         total_loss = 0
-        y_supernet = model(inputs)
         if np.random.rand() <= self.rate[self.current_step]:
             # update random sub-networks
             for i in range(self.random_samples):
                 config = self.sampler.sample()
-                model.select_sub_network(config)
-                y_hat = model(inputs)
-                if self.kd_loss is not None:
-                    loss = self.kd_loss(y_hat, outputs, y_supernet)
-                else:
-                    loss = self.loss_function(y_hat, outputs)
+                model.set_sub_network(**config)
+                loss = self.compute_loss(model, inputs, outputs)
                 loss *= scale_loss
                 loss.backward() if self.fabric is None else self.fabric.backward(loss)
                 model.reset_super_network()
 
                 total_loss += loss.item()
         else:
-            y_hat = model(inputs)
-            if self.kd_loss is not None:
-                loss = self.kd_loss(y_hat, outputs, y_supernet)
-            else:
-                loss = self.loss_function(y_hat, outputs)
+            loss = self.compute_loss(model, inputs, outputs)
             loss *= scale_loss
             loss.backward() if self.fabric is None else self.fabric.backward(loss)
             total_loss = loss.item()

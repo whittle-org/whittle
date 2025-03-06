@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from litgpt.config import Config as BaseConfig
 
-from whittle.lora.lora_mlps import (
+from whittle.lora_model.lora_mlps import (
     LoRAGemmaMLP as GemmaMLP,
     LoRAGptNeoxMLP as GptNeoxMLP,
     LoRALLaMAMLP as LLaMAMLP,

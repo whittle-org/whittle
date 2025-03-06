@@ -5,9 +5,9 @@ from typing import Any
 from litgpt.model import KVCache
 from litgpt.utils import map_old_state_dict_weights
 
-from whittle.lora.config import LoRAConfig as Config
-from whittle.lora.lora_linear import LoRALinearProj
-from whittle.lora.lora_qkv_linear import LoRAQKVLinear
+from whittle.lora_model.config import LoRAConfig as Config
+from whittle.lora_model.lora_linear import LoRALinearProj
+from whittle.lora_model.lora_qkv_linear import LoRAQKVLinear
 from whittle.models.gpt.blocks.causal_self_attention import (
     CausalSelfAttention as BaseCausalSelfAttention,
 )
