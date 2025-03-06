@@ -14,6 +14,7 @@ from lm_eval import utils
 from lm_eval.api.instance import Instance
 from lm_eval.api.model import TemplateLM
 from lm_eval.api.registry import register_model
+from lm_eval.evaluator_utils import eval_logger
 from lm_eval.models.utils import (
     Collator,
     clear_torch_cache,
@@ -28,8 +29,6 @@ from transformers.models.auto.modeling_auto import (
 )
 
 from whittle.models.gpt import GPT
-
-eval_logger = utils.eval_logger
 
 
 def _get_accelerate_args(
