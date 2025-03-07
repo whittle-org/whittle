@@ -37,6 +37,37 @@ def save_sub_network(
     copy_config_files: bool = False,
     fabric: L.Fabric | None = None,
 ):
+    """
+    Save a sub-network to a new directory. The sub-network can be saved in three different formats:
+
+    a) same as litgpt models:
+        sub_network_dir/
+        - lit_model.pth ... {model: sub_network.state_dict()} or sub_network.state_dict() (former - whittle model, latter - litgpt model)
+        - configs (model_config.yaml, tokenizer.json, etc.)
+    b) litgpt model with saving space (not copying the tokenizer and other configs):
+        sub_network_dir/
+        - lit_model.pth ... {model: sub_network.state_dict(), parent_dir: super-network checkpoint dir}
+        - model_config.yaml
+    c) compressed checkpoint:
+        sub_network_dir/
+        - lit_model.pth ... {sub_network_config: sub_network_config, parent_dir: super-network checkpoint dir}
+        - model_config.yaml
+
+    Args:
+        super_network: The super-network model.
+        checkpoint_dir: The directory of the parent super-network checkpoint (for copying config files in a), as a parent dir in b), c)).
+        save_dir: The directory to save the sub-network checkpoint.
+        sub_network_config: The sub-network config to save. If None, the current active sub-network checkpoint is saved
+            (i.e. it is necessary to call .set_sub_network before calling this function).
+            Required if `save_checkpoints` is False.
+            Defaults to None.
+        save_checkpoints: Whether to save the sub-network as a full checkpoint, or only the config and super-network path.
+            Defaults to True.
+        copy_config_files: Whether to copy the config files (e.g. tokenizer.json) to the save directory.
+            Defaults to False.
+        fabric: The fabric to use for saving the checkpoint. If None, torch.save is used.
+            Defaults to None.
+    """
     if not save_checkpoints and sub_network_config is None:
         raise ValueError(
             "sub_network_config must be provided when save_checkpoints is False"
@@ -86,6 +117,19 @@ def load_checkpoint(
     config_cls: type[Config] | type[LoRAConfig] = Config,
     config_attr: dict[str, Any] | None = None,
 ) -> GPT:
+    """
+    Load a whittle or litgpt model from a checkpoint directory.
+
+    Args:
+        checkpoint_dir: The directory of the checkpoint.
+        model_cls: The model class to instantiate. Defaults to GPT. For LoRA, use whittle.lora.lora_model.GPT.
+        config_cls: The config class to instantiate. Defaults to Config. For LoRA, use whittle.lora.config.LoRAConfig.
+        config_attr: The attributes to set in the config after __init__. If None, config.fix_head_size is set to True.
+            Defaults to None.
+
+    Returns:
+        GPT: The loaded model.
+    """
     sub_network_config: dict[str, Any] | None = None
     ckp = lazy_load(checkpoint_dir / "lit_model.pth")
 

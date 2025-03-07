@@ -138,7 +138,6 @@ def test_checkpoints(tmp_path, checkpoint_dir, copy_config_files, save_checkpoin
 
         # Check that the checkpoint directory contains the expected files
         contents = get_checkpoint_contents(copy_config_files, save_checkpoints)
-        print(set(os.listdir(out_dir)))
         assert contents.issubset(set(os.listdir(out_dir)))
 
         # Check the contents of lit_model.pth
