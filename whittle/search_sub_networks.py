@@ -343,9 +343,9 @@ def main(
 
         save_sub_network(
             model,
-            sub_network_dict,
             checkpoint_dir,
             save_path.parent,
+            sub_network_config=sub_network_dict,
             save_checkpoints=save_checkpoints,
             copy_config_files=copy_config_files,
             fabric=fabric,

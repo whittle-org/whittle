@@ -66,10 +66,10 @@ def checkpoint_dir(tmp_path_factory):
     random_init_weights(model)
 
     torch.save(model.state_dict(), gemma_dir / "lit_model.pth")
-
-    download_from_hub(
-        repo_id="google/gemma-2b", checkpoint_dir=checkpoint_dir, tokenizer_only=True
-    )
+    tokenizer_path = gemma_dir / "tokenizer.json"
+    tokenizer_cfg_path = gemma_dir / "tokenizer_config.json"
+    tokenizer_path.touch()
+    tokenizer_cfg_path.touch()
 
     return pathlib.Path(checkpoint_dir)
 
