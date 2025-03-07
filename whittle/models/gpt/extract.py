@@ -38,6 +38,9 @@ def extract_current_sub_network(model: GPT) -> GPT:
     subnet_config.head_size = model.sub_network_head_size
     subnet_config.n_query_groups = model.sub_network_query_groups
     subnet_config.rope_n_elem = model.sub_network_rope_n_elem
+    subnet_config.attention_scores_scalar = model.transformer.h[
+        0
+    ].attn.sub_attention_scaler
 
     return extract_sub_network(model, subnet_config)
 

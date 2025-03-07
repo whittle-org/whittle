@@ -243,6 +243,10 @@ class GPT(nn.Module):
                 self.sub_network_query_groups,
                 self.sub_network_head_size,
             )
+        # these change inside causal_self_attention
+        if self.sub_network_n_layers > 0:
+            self.sub_network_query_groups = block.attn.sub_network_query_groups
+
         self.lm_head.set_sub_network(
             self.sub_network_n_embd, self.config.padded_vocab_size
         )
@@ -267,6 +271,7 @@ class GPT(nn.Module):
             config["num_heads"],
             config["depth"],
             sub_network_head_size=config.get("head_size", None),
+            sub_network_query_groups=config.get("n_query_groups", None),
         )
 
     def reset_super_network(self):
@@ -321,7 +326,7 @@ class GPT(nn.Module):
 
         x = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
         if self.config.scale_embeddings:
-            x = x * torch.tensor(self.config.n_embd**0.5, dtype=x.dtype)
+            x = x * torch.tensor(self.sub_network_n_embd**0.5, dtype=x.dtype)
         for i in range(self.sub_network_n_layers):
             block = self.transformer.h[i]
 
