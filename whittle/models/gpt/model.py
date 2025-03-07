@@ -244,7 +244,8 @@ class GPT(nn.Module):
                 self.sub_network_head_size,
             )
         # these change inside causal_self_attention
-        self.sub_network_query_groups = block.attn.sub_network_query_groups
+        if self.sub_network_n_layers > 0:
+            self.sub_network_query_groups = block.attn.sub_network_query_groups
 
         self.lm_head.set_sub_network(
             self.sub_network_n_embd, self.config.padded_vocab_size
