@@ -62,6 +62,9 @@ class ParamBins:
         placed = False
         at_max_length = 0
         for i, value in enumerate(self.values):
+            if i == 0:
+                continue
+
             # get the first bin
             if not found and params <= value:
                 found = True
