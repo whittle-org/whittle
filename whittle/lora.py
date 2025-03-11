@@ -173,7 +173,7 @@ def setup(
     dataset: str = "alpaca",
     sampler: SamplerArgs = SamplerArgs(),
 ) -> None:
-    """Finetune a model using the LoRA method.
+    """Finetune a model using the LoRA method using super-network training strategies.
 
     Arguments:
         checkpoint_dir: The path to the base model's checkpoint directory to load for finetuning.
