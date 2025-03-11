@@ -11,9 +11,18 @@ def test_distill_loss():
     labels = torch.tensor([0])
 
     temperature = 1.0
-    distill_weight = 0.5
+    alpha = 0.5
+    beta = 0.5
+    loss_type = "forward_kld"
+    weight_scheme = "other"
 
-    loss_fn = DistillLoss(temperature, distill_weight, "kld")
+    loss_fn = DistillLoss(
+        alpha=alpha,
+        beta=beta,
+        temperature=temperature,
+        loss=loss_type,
+        weight_scheme=weight_scheme,
+    )
     loss = loss_fn(student_logits, labels, teacher_logits)
 
     expected_loss = 0.6931

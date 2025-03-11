@@ -26,17 +26,18 @@ class DistillArgs:
         temperature: Controls softening of output probabilities. Higher values (>1) produce softer distributions,
                 emphasizing less confident predictions. Lower values (<1) make distributions sharper, focusing on
                 confident predictions.
-        alpha: Weight balancing distillation loss vs cross-entropy loss. Values closer to 1 give more importance
-                to matching teacher logits, while values closer to 0 prioritize true label prediction.
-        loss: Loss function to use for distillation. Options are 'kld' (KL divergence), 'mse' (mean squared error) or 'l2',
-                'mae' (mean absolute error) or 'l1', 'reverse_kld' (reverse KL divergence), 'cosine' (cosine similarity)
-                or 'jsd' (Jensen-Shannon divergence).
+        alpha: Weight for the cross-entropy loss. Higher values give more importance to the loss between student logits and ground truth labels.
+        beta: Weight for the distillation loss. Higher values give more importance to the loss between student and teacher logits.
+        loss: Loss function to use for distillation. Options are 'forward_kld', 'reverse_kld', 'symmetric_kld', 'js_distance', 'simple_cross_entropy', 'cosine_similarity', 'l1_loss', 'l2_loss', 'mmd_loss'.
+        weight_scheme: Weight scheme to use for the distillation loss. Options are 'default' (use alpha=1 and beta=hard_target_loss/soft_target_loss).
     """
 
     method: str = "logits"
-    temperature: float = 5
     alpha: float = 0.5
-    loss: str = "kld"
+    beta: float = 0.5
+    temperature: float = 5
+    loss: str = "forward_kld"
+    weight_scheme: str = "default"
 
 
 @dataclass

@@ -73,7 +73,9 @@ def setup(
         method="logits",
         temperature=5,
         alpha=0.6,
-        loss="kld",
+        beta=0.4,
+        loss="forward_kld",
+        weight_scheme="other",
     ),
     eval: EvalArgs = EvalArgs(interval=1000, max_iters=100, initial_validation=True),
     optimizer: str | dict = "AdamW",
@@ -408,9 +410,11 @@ def fit(
     teacher.eval()
 
     distill_loss = DistillLoss(
+        alpha=distill.alpha,
+        beta=distill.beta,
         temperature=distill.temperature,
-        distillation_weight=distill.alpha,
         loss=distill.loss,
+        weight_scheme=distill.weight_scheme,
     )
 
     if eval.initial_validation:
