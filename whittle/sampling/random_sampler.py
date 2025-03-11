@@ -10,6 +10,16 @@ from whittle.search.search_spaces import SimpleSearchSpace
 
 
 class BaseSampler:
+    """
+    BaseSampler is the base class that all samplers inherit from.
+    """
+
+    def __init__(self):
+        self.grid = None
+
+    def initialize_grid(self, model):
+        raise NotImplementedError
+
     def sample(self):
         raise NotImplementedError
 

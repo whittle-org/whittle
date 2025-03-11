@@ -21,7 +21,7 @@ class StratifiedRandomSampler(RandomSampler):
         search_space: The search space from which to sample.
         seed: Seed for the random number generator. Defaults to None.
         param_bins: The parameter bins that limit the sub-network params in the search.
-        cast_search_space: Whether to cast the search space. Defaults to True.
+        cast_search_space: Whether to cast the search space to config aligned with arguments of GPT.set_sub_network(). Defaults to True.
     """
 
     def __init__(

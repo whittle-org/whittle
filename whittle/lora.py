@@ -45,7 +45,6 @@ from litgpt.utils import (
 from torch.utils.data import ConcatDataset, DataLoader
 from torchmetrics import RunningMean
 
-from whittle.search.search_spaces import search_spaces
 from whittle.args import SamplerArgs
 from whittle.data.llamamini import LLaMaMini
 from whittle.eval.utils import compute_accuracy
@@ -53,10 +52,10 @@ from whittle.lora_model.config import LoRAConfig as Config
 from whittle.lora_model.lora_gpt import GPT
 from whittle.lora_model.merge import merge_lora
 from whittle.sampling.samplers import get_sampler
+from whittle.search.search_spaces import search_spaces
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 from whittle.training_strategies.sandwich import SandwichStrategy
 from whittle.training_strategies.standard import StandardStrategy
-
 
 """This script merges the LoRA weights with the base model"""
 
@@ -76,7 +75,7 @@ def compute_loss(model, val_dataloader, eval):
     return val_loss
 
 
-def plot_validation_metrics(model, val_dataloader, eval, sampler):
+def compute_validation_metrics(model, val_dataloader, eval, sampler):
     # compute loss for superent
     model.eval()
     model.reset_super_network()
@@ -92,7 +91,7 @@ def plot_validation_metrics(model, val_dataloader, eval, sampler):
     return val_loss_largest, val_loss_medium, val_loss_smallest
 
 
-def plot_accuracies(model, sampler, dataset, checkpoint_dir):
+def compute_accuracies(model, sampler, dataset, checkpoint_dir):
     model.eval()
     model.reset_super_network()
     val_loss_largest = compute_accuracy(model, dataset, checkpoint_dir)
@@ -370,9 +369,9 @@ def main(
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
         model = GPT(config)
         if "grid_params" in sampling_strategy:
-            print("Initializing params grid....")
+            fabric.print("Initializing params grid....")
             strategy.sampler.initialize_grid(model)
-            print("Grid Size", len(strategy.sampler.grid))
+            fabric.print("Grid Size", len(strategy.sampler.grid))
     model.name_or_path = checkpoint_dir
     mark_only_lora_as_trainable(model)
 
@@ -640,7 +639,7 @@ def fit(
         if not is_accumulating and state["step_count"] % downstream_test_iters == 0:
             t0 = time.perf_counter()
             acc_largest, acc_medium, acc_smallest = test_downstream(
-                fabric, model, downstream_dataset, train_strategy.sampler, out_dir
+                model, downstream_dataset, train_strategy.sampler, out_dir
             )
             t1 = time.perf_counter() - t0
             fabric.print(
@@ -681,7 +680,7 @@ def validate(
     if verbose:
         fabric.print("Validating ...")
     model.eval()
-    val_loss_largest, val_loss_middle, val_loss_smallest = plot_validation_metrics(
+    val_loss_largest, val_loss_middle, val_loss_smallest = compute_validation_metrics(
         model, val_dataloader, eval, sampler
     )
     model.train()
@@ -690,14 +689,13 @@ def validate(
 
 @torch.no_grad()
 def test_downstream(
-    fabric: L.Fabric,
     model: GPT,
     dataset: str = "arc_easy",
     sampler=None,
     checkpoint_dir=None,
 ) -> torch.Tensor:
     model.eval()
-    acc_largest, acc_middle, acc_smallest = plot_accuracies(
+    acc_largest, acc_middle, acc_smallest = compute_accuracies(
         model, sampler, dataset, checkpoint_dir
     )
     model.train()

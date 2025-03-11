@@ -16,8 +16,9 @@ TASK_METRIC_MAP = {
     "mmlu": "acc",
     "hellaswag": "acc_norm",
     "gsm8k": "acc",
-    "truthfulqa_mc2": "acc"
+    "truthfulqa_mc2": "acc",
 }
+
 
 def get_task_metric_map(dataset):
     return TASK_METRIC_MAP.get(dataset, "acc_norm")
@@ -33,7 +34,6 @@ def prepare_results(results, save_filepath, print_results=True):
 
     json_result = json.dumps(results, indent=2, ensure_ascii=False, default=str)
     save_filepath.open("w", encoding="utf-8").write(json_result)
-
 
 
 def compute_accuracy(model, dataset, checkpoint_dir):

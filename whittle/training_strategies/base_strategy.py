@@ -6,6 +6,7 @@ import torch
 from lightning.fabric import Fabric
 
 from whittle.loss import DistillLoss
+from whittle.sampling.random_sampler import BaseSampler
 
 
 class BaseTrainingStrategy:
@@ -17,7 +18,7 @@ class BaseTrainingStrategy:
 
     def __init__(
         self,
-        sampler,
+        sampler: BaseSampler,
         loss_function: Callable,
         kd_loss: Callable | None = None,
         device: str = "cuda",
