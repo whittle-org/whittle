@@ -54,8 +54,7 @@ from whittle.lora_model.merge import merge_lora
 from whittle.sampling.samplers import get_sampler
 from whittle.search.search_spaces import search_spaces
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
-from whittle.training_strategies.sandwich import SandwichStrategy
-from whittle.training_strategies.standard import StandardStrategy
+from whittle.training_strategies.strategies import get_training_strategy
 
 """This script merges the LoRA weights with the base model"""
 
@@ -296,22 +295,9 @@ def setup(
         num_configs=num_configs,
         n_trials=n_trials,
     )
-    if train_strategy == "sandwich":
-        strategy = SandwichStrategy(
-            loss_function=chunked_cross_entropy,
-            lora=True,
-            sampler=sampler,
-        )
-
-    elif train_strategy == "standard":
-        strategy = StandardStrategy(
-            loss_function=chunked_cross_entropy,
-            lora=True,
-            sampler=sampler,
-        )
-    else:
-        raise ValueError(f"Invalid training strategy: {train_strategy}")
-
+    strategy = get_training_strategy(
+        train_strategy, loss_function=chunked_cross_entropy, lora=True, sampler=sampler
+    )
     strategy.fabric = fabric
     strategy.gradient_accumulation_step = train.gradient_accumulation_iters(devices)
     if torch.cuda.is_available() and devices > 1:
