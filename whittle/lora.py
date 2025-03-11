@@ -577,13 +577,6 @@ def fit(
                 running_loss.compute().item()
             )  # expensive device-to-host synchronization
             t1 = time.perf_counter()
-            # throughput.update(
-            #    time=t1 - total_t0,
-            #    batches=state["iter_num"],
-            #    samples=state["iter_num"] * train.micro_batch_size,
-            #    lengths=total_lengths,
-            # )
-            # throughput.compute_and_log(step=state["iter_num"])
             metrics = {
                 "loss": loss,
                 "iter": state["iter_num"],
