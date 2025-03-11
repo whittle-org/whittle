@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .ats import ATS
 from .random import RandomStrategy
 from .random_linear import RandomLinearStrategy
@@ -11,6 +13,7 @@ class TrainingStrategies:
     SANDWICH = "sandwich"
     RANDOM_LINEAR = "random_linear"
     ATS = "ats"
+
 
 def get_training_strategy(strategy_type, **kwargs):
     if strategy_type == TrainingStrategies.RANDOM:
