@@ -1,4 +1,5 @@
-# Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
+# LoRA adapted for whiitle from https://github.com/Lightning-AI/litgpt/blob/v0.5.0/litgpt/finetune/lora.py
+
 from __future__ import annotations
 
 import dataclasses
@@ -44,7 +45,7 @@ from litgpt.utils import (
 from torch.utils.data import ConcatDataset, DataLoader
 from torchmetrics import RunningMean
 
-from search.search_spaces import search_spaces
+from whittle.search.search_spaces import search_spaces
 from whittle.args import SamplerArgs
 from whittle.data.llamamini import LLaMaMini
 from whittle.eval.utils import compute_accuracy
@@ -56,7 +57,6 @@ from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 from whittle.training_strategies.sandwich import SandwichStrategy
 from whittle.training_strategies.standard import StandardStrategy
 
-# Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 
 """This script merges the LoRA weights with the base model"""
 

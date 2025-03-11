@@ -10,6 +10,18 @@ import torch
 from whittle.eval.whittle_llms import WhittleLM
 from whittle.models.gpt import GPT
 
+TASK_METRIC_MAP = {
+    "winogrande": "acc",
+    "arc_challenge": "acc_norm",
+    "mmlu": "acc",
+    "hellaswag": "acc_norm",
+    "gsm8k": "acc",
+    "truthfulqa_mc2": "acc"
+}
+
+def get_task_metric_map(dataset):
+    return TASK_METRIC_MAP.get(dataset, "acc_norm")
+
 
 def prepare_results(results, save_filepath, print_results=True):
     from lm_eval.utils import make_table
@@ -22,22 +34,6 @@ def prepare_results(results, save_filepath, print_results=True):
     json_result = json.dumps(results, indent=2, ensure_ascii=False, default=str)
     save_filepath.open("w", encoding="utf-8").write(json_result)
 
-
-def get_task_metric_map(dataset):
-    if dataset == "winogrande":
-        return "acc"
-    elif dataset == "arc_challenge":
-        return "acc_norm"
-    elif dataset == "mmlu":
-        return "acc"
-    elif dataset == "hellaswag":
-        return "acc_norm"
-    elif dataset == "gsm8k":
-        return "acc"
-    elif dataset == "truthfulqa_mc2":
-        return "acc"
-    else:
-        return "acc_norm"
 
 
 def compute_accuracy(model, dataset, checkpoint_dir):

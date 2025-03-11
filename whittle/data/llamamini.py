@@ -1,4 +1,3 @@
-# Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 """Implementation derived from https://github.com/tloen/alpaca-lora"""
 
 from __future__ import annotations
@@ -15,7 +14,7 @@ from torch.utils.data import DataLoader, random_split
 
 @dataclass
 class LLaMaMini(DataModule):
-    """LIMA data module for supervised finetuning."""
+    """LLaMaMini data module for supervised finetuning."""
 
     mask_prompt: bool = False
     """Whether to mask the prompt section from the label (with ``ignore_index``)."""
