@@ -36,21 +36,21 @@ class DistillLoss(nn.Module):
 
     def __init__(
         self,
-        alpha: float = 0.5,
-        beta: float = 0.5,
+        alpha: float = 1.0,
+        beta: float = 0.0,
         temperature: float = 1.0,
         loss: str = "forward_kld",
-        weight_scheme: str = "default",
+        weight_scheme: str = "other",
     ):
         """
         Initializes the DistillLoss module.
 
         Args:
-            alpha (float): The weight factor for the hard target loss. Default is 0.5.
-            beta (float): The weight factor for the soft target loss. Default is 0.5.
+            alpha (float): The weight factor for the hard target loss. Default is 1.0.
+            beta (float): The weight factor for the soft target loss. Default is 0.0.
             temperature (float): The temperature for distillation. Default is 1.0.
             loss (str): The distillation loss function to use. Default is 'forward_kld'.
-            weight_scheme (str): The weight scheme to use. Default is 'default'.
+            weight_scheme (str): The weight scheme to use. Default is 'other'.
         """
         super().__init__()
 

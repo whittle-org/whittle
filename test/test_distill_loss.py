@@ -14,14 +14,12 @@ def test_distill_loss():
     alpha = 0.5
     beta = 0.5
     loss_type = "forward_kld"
-    weight_scheme = "other"
 
     loss_fn = DistillLoss(
         alpha=alpha,
         beta=beta,
         temperature=temperature,
         loss=loss_type,
-        weight_scheme=weight_scheme,
     )
     loss = loss_fn(student_logits, labels, teacher_logits)
 

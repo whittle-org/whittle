@@ -75,7 +75,6 @@ def setup(
         alpha=0.6,
         beta=0.4,
         loss="forward_kld",
-        weight_scheme="other",
     ),
     eval: EvalArgs = EvalArgs(interval=1000, max_iters=100, initial_validation=True),
     optimizer: str | dict = "AdamW",
@@ -414,7 +413,6 @@ def fit(
         beta=distill.beta,
         temperature=distill.temperature,
         loss=distill.loss,
-        weight_scheme=distill.weight_scheme,
     )
 
     if eval.initial_validation:
