@@ -20,6 +20,7 @@ and allows to compress many state-of-the-art models.
 
 - **Neural Architecture Search:** Workflows for [pre-training super-networks](whittle/pretrain_super_network.py) and [multi-objective search](whittle/search_sub_networks.py) to select sub-networks.
 - **Structural Pruning:** State-of-the-art approaches to [pruning](whittle/prune.py) structural components of pre-trained LLMs.
+- **Distillation:** Workflow to [distill](whittle/distill.py) a student model given a trained teacher model.
 - **Evaluation**: Easy extraction of sub-networks checkpoint and evaluation using LM-Eval-Harness
 - **Efficiency**: Different metrics to estimate efficiency of sub-networks, such as latency, FLOPs, or energy consumption.
 
