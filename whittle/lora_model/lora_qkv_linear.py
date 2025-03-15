@@ -184,6 +184,21 @@ class LoRAQKVLinear(LoRALayer):
 
         return self._v_target
 
+    def _get_lora_indices(self, candidate_indices, qkv_group_size, enable_flag, target_mod):
+        """
+        Helper function to generate LoRA indices (q, k, v).
+        """
+        if enable_flag:
+            group_index = qkv_group_size - target_mod
+            indices = [
+                (x, i)
+                for i, x in enumerate(candidate_indices)
+                if (i // self.sub_network_head_size) % qkv_group_size == group_index
+            ]
+            ind, target = zip(*indices)  # Unzip into two lists
+            return list(ind), list(target)
+        return [], []
+    
     def _set_lora_ind(self) -> None:
         """Set the indices for LoRA."""
         enable_q, enable_k, enable_v = self.enable_lora
@@ -193,41 +208,13 @@ class LoRAQKVLinear(LoRALayer):
             if self.qkv_indices is None
             else self.qkv_indices
         )
-
-        q_ind: list[int] = []
-        k_ind: list[int] = []
-        v_ind: list[int] = []
-        q_target: list[int] = []
-        k_target: list[int] = []
-        v_target: list[int] = []
-        if enable_q:
-            q_indices: list[tuple[int, int]] = [
-                (x, i)
-                for i, x in enumerate(candidate_indices)
-                if (i // self.sub_network_head_size) % qkv_group_size < qkv_group_size - 2
-            ]
-            q_ind, q_target = zip(*q_indices)  # type: ignore[assignment]
-        if enable_k:
-            k_indices: list[tuple[int, int]] = [
-                (x, i)
-                for i, x in enumerate(candidate_indices)
-                if (i // self.sub_network_head_size) % qkv_group_size
-                == qkv_group_size - 2
-            ]
-            k_ind, k_target = zip(*k_indices)  # type: ignore[assignment]
-        if enable_v:
-            v_indices: list[tuple[int, int]] = [
-                (x, i)
-                for i, x in enumerate(candidate_indices)
-                if (i // self.sub_network_head_size) % qkv_group_size
-                == qkv_group_size - 1
-            ]
-            v_ind, v_target = zip(*v_indices)  # type: ignore[assignment]
-
-        # *_ind indices are the same as self.qkv_indices, only splitted into 3 parts (for q, k and v)
-        # *_target indices serve for populating the resulting tensor -> since we do not index in super-network
-        # anymore, we need indices relative to the sub-network tensor (e.g. for out_features == 16)
-        # and sub-network out_features == 3, if qkv_indices are [0, 14, 15], our target indices will be [0, 1, 2]
+    
+        # Get indices and targets for q, k, v
+        q_ind, q_target = self._get_lora_indices(candidate_indices, qkv_group_size, enable_q, 2)
+        k_ind, k_target = self._get_lora_indices(candidate_indices, qkv_group_size, enable_k, 1)
+        v_ind, v_target = self._get_lora_indices(candidate_indices, qkv_group_size, enable_v, 0)
+    
+        # Define the mapping for buffer creation
         all_indices = [
             (q_ind, "_q_ind"),
             (k_ind, "_k_ind"),
@@ -236,14 +223,15 @@ class LoRAQKVLinear(LoRALayer):
             (k_target, "_k_target"),
             (v_target, "_v_target"),
         ]
-
-        # lazy creation of a buffer with LoRA indices to overcome the limitation when FSDP with meta device is used
+    
+        # Efficient buffer creation for LoRA indices
         for index_value, index_name in all_indices:
-            index_tensor = torch.tensor(index_value, device=self.linear.weight.device)
-            if not hasattr(self, index_name):
-                self.register_buffer(index_name, index_tensor, persistent=False)
-            else:
-                setattr(self, index_name, index_tensor)
+            if index_value:  # Check to avoid empty indices
+                index_tensor = torch.tensor(index_value, device=self.linear.weight.device)
+                if not hasattr(self, index_name):
+                    self.register_buffer(index_name, index_tensor, persistent=False)
+                else:
+                    setattr(self, index_name, index_tensor)
 
     def reset_parameters(self) -> None:
         """Reset all the weights, even including pretrained ones."""
@@ -316,10 +304,12 @@ class LoRAQKVLinear(LoRALayer):
         )  # (64, 64, 384)
 
         active_inds = [self.q_target, self.k_target, self.v_target]
-        active_inds = [ind for ind in active_inds if len(ind) > 0]
-
-        for ind, weight in zip(active_inds, x):
-            result = result.index_copy_(dim=-1, index=ind, source=weight)  # (64, 64, 384)
+        active_inds = list(filter(lambda ind: len(ind) > 0, active_inds))  # Filter non-empty indices
+        
+        if active_inds:
+            indices = torch.cat(active_inds)  # Concatenate all indices
+            sources = torch.cat(x[:len(active_inds)], dim=-1)  # Concatenate corresponding weights
+            result = result.index_copy_(dim=-1, index=indices, source=sources)
 
         return result
 
@@ -350,15 +340,18 @@ class LoRAQKVLinear(LoRALayer):
         # ⚬ C_output': embeddings size for each LoRA layer (not equal in size)
         # ⚬ r: rank of all LoRA layers (equal in size)
 
+        # Split input tensor along the specified dimension
         input_splitted = input.chunk(sum(self.enable_lora), dim=1)  # N * (B, C // N, T)
-        # (256, 2) -> (256, 2, 1) -> split to (q, 2, 1), (k, 2, 1), (v, 2, 1)
-        # (k + v + q = 256, k = v, q = self.q_per_kv * k)
+        
+        # Filter out empty indices and get corresponding weights
+        active_inds = filter(lambda ind: len(ind) > 0, [self.q_ind, self.k_ind, self.v_ind])
+        
+        # Use indexing directly without `.data` and unsqueeze in the same operation
+        weight_splitted = [weight[ind].unsqueeze(-1) for ind in active_inds]
+        
+        # Perform convolution in a single pass with a list comprehension
+        return [F.conv1d(inp, w) for inp, w in zip(input_splitted, weight_splitted)]
 
-        active_inds = [self.q_ind, self.k_ind, self.v_ind]
-        active_inds = [ind for ind in active_inds if len(ind) > 0]
-
-        weight_splitted = [weight[ind].data.unsqueeze(-1) for ind in active_inds]
-        return [F.conv1d(a, b) for a, b in zip(input_splitted, weight_splitted)]
 
     def get_lora_AB(self) -> torch.Tensor:
         """Return merged lora_A and lora_B matrices with the same shape as the pretrained weights."""
