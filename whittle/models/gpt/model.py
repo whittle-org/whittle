@@ -284,8 +284,8 @@ class GPT(nn.Module):
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
         self.sub_network_n_layers = self.config.n_layer
-        self.sub_network_head_size: int | None = self.config.head_size
-        self.sub_network_query_groups: int | None = self.config.n_query_groups
+        self.sub_network_head_size: int | None = self.config.head_size  # type: ignore
+        self.sub_network_query_groups: int | None = self.config.n_query_groups  # type: ignore
         self.sub_network_rope_n_elem = self.config.rope_n_elem
         self.transformer.wte.reset_super_network()
         self.transformer.ln_f.reset_super_network()

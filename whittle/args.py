@@ -65,3 +65,17 @@ class ParamBinArgs:
     start_bin_size: int = 1
     """The total limit will be increased even if K bins are not full yet (some param counts may have only few nets)"""
     empty_bin_tolerance: int = 4
+
+
+@dataclass
+class SamplerArgs:
+    """sampler-related arguments"""
+
+    """Number of configurations to sample"""
+    num_configs: int = 21
+    """Seed for the random sampler"""
+    seed_sampler: int = 42
+    """Number of trials to run for each bin"""
+    n_trials: int = 10000
+    """Sampling strategy"""
+    sampling_strategy: str = "random"

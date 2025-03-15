@@ -28,16 +28,20 @@ methods = [
 
 search_space_mlp = {"num_units": randint(1, 64)}
 
-sampler_mlp = RandomSampler(config_space=search_space_mlp, seed=42)
+sampler_mlp = RandomSampler(
+    search_space=search_space_mlp, seed=42, cast_search_space=False
+)
 
 loss_function = torch.nn.functional.mse_loss
 search_space_gpt = {
-    "embed_dim": randint(1, 32),
-    "num_heads": choice([2, 4]),
-    "mlp_ratio": randint(1, 2),
-    "depth": randint(1, 2),
+    "sub_network_n_embd": randint(1, 32),
+    "sub_network_num_heads": choice([2, 4]),
+    "sub_network_intermediate_size": randint(1, 64),
+    "sub_network_n_layers": randint(1, 2),
 }
-sampler_gpt = RandomSampler(config_space=search_space_gpt, seed=42)
+sampler_gpt = RandomSampler(
+    search_space=search_space_gpt, seed=42, cast_search_space=False
+)
 
 
 class MLP(nn.Module):
@@ -53,9 +57,9 @@ class MLP(nn.Module):
         x_ = self.output(x_)
         return x_
 
-    def select_sub_network(self, config):
-        self.input.set_sub_network(self.input_dim, config["num_units"])
-        self.output.set_sub_network(config["num_units"], 1)
+    def set_sub_network(self, num_units):
+        self.input.set_sub_network(self.input_dim, num_units)
+        self.output.set_sub_network(num_units, 1)
 
     def reset_super_network(self):
         self.output.reset_super_network()

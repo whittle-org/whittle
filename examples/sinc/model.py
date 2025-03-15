@@ -23,9 +23,9 @@ class MLP(nn.Module):
         x_ = self.output_layer(x_)
         return x_
 
-    def select_sub_network(self, config):
-        self.hidden_layer.set_sub_network(self.hidden_dim, config["num_units"])
-        self.output_layer.set_sub_network(config["num_units"], 1)
+    def set_sub_network(self, num_units):
+        self.hidden_layer.set_sub_network(self.hidden_dim, num_units)
+        self.output_layer.set_sub_network(num_units, 1)
 
     def reset_super_network(self):
         self.hidden_layer.reset_super_network()

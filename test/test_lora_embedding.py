@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from whittle.lora.lora_embedding import LoRAEmbedding as Embedding
+from whittle.lora_model.lora_embedding import LoRAEmbedding as Embedding
 
 
 def test_embedding():

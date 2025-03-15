@@ -7,12 +7,12 @@ import torch
 import torch.nn as nn
 from litgpt.utils import map_old_state_dict_weights
 
-from whittle.lora.config import LoRAConfig as Config
-from whittle.lora.lora_block import LoRABlock as Block
-from whittle.lora.lora_embedding import LoRAEmbedding
+from whittle.lora_model.config import LoRAConfig as Config
+from whittle.lora_model.lora_block import LoRABlock as Block
+from whittle.lora_model.lora_embedding import LoRAEmbedding
 
 # from whittle.models.gpt.blocks import Block
-from whittle.lora.lora_linear import LoRALinear
+from whittle.lora_model.lora_linear import LoRALinear
 from whittle.models.gpt.model import GPT as BaseModel
 
 
