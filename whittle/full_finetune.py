@@ -62,8 +62,12 @@ def setup(
         lr_warmup_steps=100,
         epochs=5,
         max_seq_length=None,
+        max_steps=10000,
+        #        max_tokens=int(3e12),  # 3 trillion
+        #        max_norm=1.0,
+        min_lr=4e-5,
     ),
-    eval: EvalArgs = EvalArgs(interval=600, max_new_tokens=100, max_iters=100),
+    eval: EvalArgs = EvalArgs(interval=600, max_new_tokens=100),
     optimizer: str | dict = "AdamW",
     training_strategy: str = "sandwich",
     logger_name: Literal["wandb", "tensorboard", "csv"] = "csv",
@@ -327,9 +331,9 @@ def fit(
         fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
         del meta_model, x
 
-    max_tokens_per_device = train.max_tokens // fabric.world_size
-    tokens_per_iter = train.micro_batch_size * model.max_seq_length
-    max_iters = max_tokens_per_device // tokens_per_iter
+    #   max_tokens_per_device = train.max_tokens // fabric.world_size
+    train.micro_batch_size * model.max_seq_length
+    #    max_iters = max_tokens_per_device // tokens_per_iter
     log_iter_interval = train.log_interval * train.gradient_accumulation_iters(devices)
     initial_iter = state["iter_num"]
     max_steps = train.max_steps or float("inf")
@@ -400,6 +404,7 @@ def fit(
                     state["iter_num"] * train.micro_batch_size * model.max_seq_length
                 ),
             )
+
             metrics = {
                 "loss": loss,
                 "iter": state["iter_num"],
@@ -409,7 +414,7 @@ def fit(
                 "remaining_time": (
                     (t1 - total_t0)
                     / (state["iter_num"] - initial_iter)
-                    * (max_iters - state["iter_num"])
+                    * (max_steps - state["iter_num"])
                 ),
                 "tokens": state["iter_num"]
                 * train.micro_batch_size
@@ -420,9 +425,10 @@ def fit(
                     * model.max_seq_length
                     * fabric.world_size
                 ),
-                "learning_rate": scheduler.get_last_lr()[0],
+                "learning_rate": scheduler.get_last_lr(),
             }
-            if isinstance(val_loss, torch.Tensor):
+            print(metrics)
+            if isinstance(val_loss, float):
                 val_loss = f"{val_loss:.3f}"
             fabric.print(
                 f"Epoch {metrics['epoch'] + 1} | iter {metrics['iter']} step {metrics['step']} |"
@@ -440,7 +446,7 @@ def fit(
         if not is_accumulating and state["step_count"] % eval.interval == 0:
             t0 = time.perf_counter()
             model.reset_super_network()
-            val_loss = validate(fabric, model, val_dataloader, max_iters=eval.max_iters)
+            val_loss = validate(fabric, model, val_dataloader, eval=eval)
             val_loss = val_loss.item()
             td = time.perf_counter() - t0
 
