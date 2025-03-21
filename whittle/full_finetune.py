@@ -200,7 +200,7 @@ def main(
         optimizer, warmup_steps=train.lr_warmup_steps, max_steps=lr_max_steps
     )
 
-    sampler = RandomSampler(config_space=get_search_space(config), seed=seed)
+    sampler = RandomSampler(search_space=get_search_space(config), seed=seed)
     training_strategy_kwargs = {
         "loss_function": chunked_cross_entropy,
         "sampler": sampler,
