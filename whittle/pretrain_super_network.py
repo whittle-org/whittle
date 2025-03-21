@@ -451,7 +451,7 @@ def main(
     optimizer = instantiate_torch_optimizer(optimizer, model.parameters(), **extra_kwargs)
     optimizer = fabric.setup_optimizers(optimizer)
 
-    sampler = RandomSampler(config_space=get_search_space(config), seed=seed)
+    sampler = RandomSampler(search_space=get_search_space(config), seed=seed)
     training_strategy_kwargs = {
         "loss_function": chunked_cross_entropy,
         "sampler": sampler,

@@ -26,13 +26,18 @@ class DistillArgs:
         temperature: Controls softening of output probabilities. Higher values (>1) produce softer distributions,
                 emphasizing less confident predictions. Lower values (<1) make distributions sharper, focusing on
                 confident predictions.
-        alpha: Weight balancing distillation loss vs cross-entropy loss. Values closer to 1 give more importance
-                to matching teacher logits, while values closer to 0 prioritize true label prediction.
+        alpha: Weight for the cross-entropy loss. Higher values give more importance to the loss between student logits and ground truth labels.
+        beta: Weight for the distillation loss. Higher values give more importance to the loss between student and teacher logits.
+        loss: Loss function to use for distillation. Options are 'forward_kld', 'reverse_kld', 'symmetric_kld', 'js_distance', 'simple_cross_entropy', 'cosine_similarity', 'l1_loss', 'l2_loss', 'mmd_loss'.
+        weight_scheme: Weight scheme to use for the distillation loss. Options are 'default' (use alpha=1 and beta=hard_target_loss/soft_target_loss). Default is 'other' (use alpha and beta as provided).
     """
 
     method: str = "logits"
+    alpha: float = 1.0
+    beta: float = 0.0
     temperature: float = 5
-    alpha: float = 0.5
+    loss: str = "forward_kld"
+    weight_scheme: str = "other"
 
 
 @dataclass
@@ -60,3 +65,17 @@ class ParamBinArgs:
     start_bin_size: int = 1
     """The total limit will be increased even if K bins are not full yet (some param counts may have only few nets)"""
     empty_bin_tolerance: int = 4
+
+
+@dataclass
+class SamplerArgs:
+    """sampler-related arguments"""
+
+    """Number of configurations to sample"""
+    num_configs: int = 21
+    """Seed for the random sampler"""
+    seed_sampler: int = 42
+    """Number of trials to run for each bin"""
+    n_trials: int = 10000
+    """Sampling strategy"""
+    sampling_strategy: str = "random"

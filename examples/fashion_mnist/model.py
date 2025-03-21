@@ -27,10 +27,7 @@ class LeNet(nn.Module):
         x = self.fc3(x)
         return x
 
-    def select_sub_network(self, config: dict[Literal["fc1_out", "fc2_out"], int]):
-        fc1_out = config["fc1_out"]
-        fc2_out = config["fc2_out"]
-
+    def set_sub_network(self, fc1_out: int, fc2_out: int):
         self.fc1.set_sub_network(
             sub_network_in_features=self.fc_base_out, sub_network_out_features=fc1_out
         )

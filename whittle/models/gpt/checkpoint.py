@@ -14,7 +14,7 @@ from litgpt.utils import (
     save_config,
 )
 
-from whittle.lora.config import LoRAConfig
+from whittle.lora_model.config import LoRAConfig
 from whittle.models.gpt import GPT
 from whittle.models.gpt.extract import extract_current_sub_network
 

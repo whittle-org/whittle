@@ -5,9 +5,9 @@ import torch
 import torch.nn as nn
 from litgpt import Config
 
-from whittle.lora.config import LoRAConfig
-from whittle.lora.lora_attention import CausalSelfAttention
-from whittle.lora.lora_qkv_linear import LoRAQKVLinear
+from whittle.lora_model.config import LoRAConfig
+from whittle.lora_model.lora_attention import CausalSelfAttention
+from whittle.lora_model.lora_qkv_linear import LoRAQKVLinear
 from whittle.models.gpt.blocks import CausalSelfAttention as CausalSelfAttentionWhittle
 
 lora_qkv_configs = {

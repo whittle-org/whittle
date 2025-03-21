@@ -10,6 +10,19 @@ import torch
 from whittle.eval.whittle_llms import WhittleLM
 from whittle.models.gpt import GPT
 
+TASK_METRIC_MAP = {
+    "winogrande": "acc",
+    "arc_challenge": "acc_norm",
+    "mmlu": "acc",
+    "hellaswag": "acc_norm",
+    "gsm8k": "acc",
+    "truthfulqa_mc2": "acc",
+}
+
+
+def get_task_metric_map(dataset):
+    return TASK_METRIC_MAP.get(dataset, "acc_norm")
+
 
 def prepare_results(results, save_filepath, print_results=True):
     from lm_eval.utils import make_table
@@ -21,6 +34,22 @@ def prepare_results(results, save_filepath, print_results=True):
 
     json_result = json.dumps(results, indent=2, ensure_ascii=False, default=str)
     save_filepath.open("w", encoding="utf-8").write(json_result)
+
+
+def compute_accuracy(model, dataset, checkpoint_dir):
+    metric = get_task_metric_map(dataset)
+    convert_and_evaluate(
+        model,
+        out_dir=checkpoint_dir,
+        device=None,
+        dtype=torch.float32,
+        tasks=dataset,
+        batch_size=16,  # Test for non-positive integer
+    )
+    with open(str(checkpoint_dir / "results.json")) as f:
+        results = json.load(f)
+    acc = results["results"][dataset][f"{metric},none"]
+    return acc
 
 
 def convert_and_evaluate(
