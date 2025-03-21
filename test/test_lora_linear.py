@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from whittle.lora.lora_linear import LoRALinear as Linear
+from whittle.lora_model.lora_linear import LoRALinear as Linear
 
 
 def test_linear():

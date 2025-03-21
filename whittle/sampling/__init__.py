@@ -1,5 +1,5 @@
 from __future__ import annotations
 
-from .random_sampler import RandomSampler
+from .samplers import Samplers, get_sampler
 
-__all__ = ["RandomSampler"]
+__all__ = ["Samplers", "get_sampler"]

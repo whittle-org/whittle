@@ -66,7 +66,7 @@ def test_compute_parameters_sub_network(mlp_type, norm_type):
         sub_network_n_embd=config.n_embd // 2,
         sub_network_intermediate_size=config.intermediate_size,
         sub_network_num_heads=config.n_head - 5,
-        sub_network_n_layers=config.n_layer - 2,
+        sub_network_n_layers=config.n_layer - 1,
     )
     params_sub_network = compute_parameters(gpt)
     assert params_sub_network < params_super_network
