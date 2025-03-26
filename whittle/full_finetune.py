@@ -14,7 +14,7 @@ import torch
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
 from litgpt.args import EvalArgs, TrainArgs
-from litgpt.data import Alpaca, DataModule
+from litgpt.data import DataModule
 from litgpt.generate.base import generate
 from litgpt.model import Config
 from litgpt.prompts import save_prompt_style
@@ -39,6 +39,7 @@ from litgpt.utils import (
 from torch.utils.data import ConcatDataset, DataLoader
 from torchmetrics import RunningMean
 
+from whittle.data.llamamini import LLaMaMini
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.pretrain_super_network import get_search_space, training_strategies_cls
@@ -99,7 +100,7 @@ def setup(
         model_name=checkpoint_dir, access_token=access_token
     )
     pprint(locals())
-    data = Alpaca() if data is None else data
+    data = LLaMaMini() if data is None else data
     num_devices = parse_devices(devices)
     out_dir = init_out_dir(out_dir)
 
@@ -331,9 +332,6 @@ def fit(
         fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
         del meta_model, x
 
-    #   max_tokens_per_device = train.max_tokens // fabric.world_size
-    train.micro_batch_size * model.max_seq_length
-    #    max_iters = max_tokens_per_device // tokens_per_iter
     log_iter_interval = train.log_interval * train.gradient_accumulation_iters(devices)
     initial_iter = state["iter_num"]
     max_steps = train.max_steps or float("inf")
