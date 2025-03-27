@@ -187,30 +187,17 @@ class LoRAQKVLinear(LoRALayer):
     def _get_lora_indices(
         self, candidate_indices, qkv_group_size, enable_flag, target_mod
     ):
-        """
-        Helper function to generate LoRA indices (q, k, v).
-        """
-        if enable_flag:
-            if target_mod == "q":  # handle query indices
-                group_index = qkv_group_size - 2
-                indices = [
-                    (x, i)
-                    for i, x in enumerate(candidate_indices)
-                    if (i // self.sub_network_head_size) % qkv_group_size < group_index
-                ]
-            else:
-                if target_mod == "k":  # handle key indices
-                    group_index = qkv_group_size - 2
-                else:  # handle value indices
-                    group_index = qkv_group_size - 1
-                indices = [
-                    (x, i)
-                    for i, x in enumerate(candidate_indices)
-                    if (i // self.sub_network_head_size) % qkv_group_size == group_index
-                ]
-            ind, target = zip(*indices)  # Unzip into two lists
-            return list(ind), list(target)
-        return [], []
+        if not enable_flag:
+            return [], []
+        
+        group_index = qkv_group_size - (2 if target_mod in {"q", "k"} else 1)
+        mod_array = np.arange(len(candidate_indices)) // self.sub_network_head_size % qkv_group_size
+        
+        mask = (mod_array < group_index) if target_mod == "q" else (mod_array == group_index)
+        indices = np.array(candidate_indices)[mask]
+        target = np.nonzero(mask)[0]
+
+        return indices.tolist(), target.tolist()
 
     def _set_lora_ind(self) -> None:
         """Set the indices for LoRA."""
