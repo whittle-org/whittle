@@ -316,16 +316,10 @@ class LoRAQKVLinear(LoRALayer):
         )  # (64, 64, 384)
 
         active_inds = [self.q_target, self.k_target, self.v_target]
-        active_inds = list(
-            filter(lambda ind: len(ind) > 0, active_inds)
-        )  # Filter non-empty indices
+        active_inds = [ind for ind in active_inds if len(ind) > 0]
 
-        if active_inds:
-            indices = torch.cat(active_inds)  # Concatenate all indices
-            sources = torch.cat(
-                x[: len(active_inds)], dim=-1
-            )  # Concatenate corresponding weights
-            result = result.index_copy_(dim=-1, index=indices, source=sources)
+        for ind, weight in zip(active_inds, x):
+            result = result.index_copy_(dim=-1, index=ind, source=weight)  # (64, 64, 384)
 
         return result
 
