@@ -76,7 +76,9 @@ class LoRAQKVLinear(LoRALayer):
                 head_size * n_query_groups,
             )
             self.qkv_shapes = [s for s in qkv_shapes if s]
-            self.lora_B = nn.Parameter(torch.empty(sum(self.qkv_shapes), r))  # (256, 2))
+            self.lora_B = nn.Parameter(
+                torch.empty(sum(self.qkv_shapes), r)
+            )  # (256, 2))
             # Notes about shapes above
             # - self.lora_A has shape (4, 128): 4 because rank is 2 and LoRA is applied only to two matrices;
             # 128 is the input size of the x (embedding size). (4, 128) and not (128, 4) because later on in
@@ -189,11 +191,19 @@ class LoRAQKVLinear(LoRALayer):
     ):
         if not enable_flag:
             return [], []
-        
+
         group_index = qkv_group_size - (2 if target_mod in {"q", "k"} else 1)
-        mod_array = np.arange(len(candidate_indices)) // self.sub_network_head_size % qkv_group_size
-        
-        mask = (mod_array < group_index) if target_mod == "q" else (mod_array == group_index)
+        mod_array = (
+            np.arange(len(candidate_indices))
+            // self.sub_network_head_size
+            % qkv_group_size
+        )
+
+        mask = (
+            (mod_array < group_index)
+            if target_mod == "q"
+            else (mod_array == group_index)
+        )
         indices = np.array(candidate_indices)[mask]
         target = np.nonzero(mask)[0]
 
