@@ -187,27 +187,27 @@ class LoRAQKVLinear(LoRALayer):
         return self._v_target
 
     def _get_lora_indices(
-        self, candidate_indices, qkv_group_size, enable_flag, target_mod
+        self, candidate_indices, qkv_group_size, enable_flag, target_mod, device
     ):
         if not enable_flag:
-            return [], []
-
+            return torch.tensor([], dtype=torch.long, device=device), torch.tensor([], dtype=torch.long, device=device)
+        
         group_index = qkv_group_size - (2 if target_mod in {"q", "k"} else 1)
-        mod_array = (
-            np.arange(len(candidate_indices))
-            // self.sub_network_head_size
-            % qkv_group_size
-        )
+        
+        candidate_tensor = torch.tensor(candidate_indices, dtype=torch.long, device=device)
+        indices = torch.arange(len(candidate_indices), dtype=torch.long, device=device)
+        
+        mod_tensor = (indices // self.sub_network_head_size) % qkv_group_size
+        
+        if target_mod == "q":
+            mask = mod_tensor < group_index
+        else:
+            mask = mod_tensor == group_index
+        
+        selected_indices = candidate_tensor[mask]
+        selected_targets = indices[mask]
 
-        mask = (
-            (mod_array < group_index)
-            if target_mod == "q"
-            else (mod_array == group_index)
-        )
-        indices = np.array(candidate_indices)[mask]
-        target = np.nonzero(mask)[0]
-
-        return indices.tolist(), target.tolist()
+        return selected_indices, selected_targets
 
     def _set_lora_ind(self) -> None:
         """Set the indices for LoRA."""
@@ -221,13 +221,13 @@ class LoRAQKVLinear(LoRALayer):
 
         # Get indices and targets for q, k, v
         q_ind, q_target = self._get_lora_indices(
-            candidate_indices, qkv_group_size, enable_q, "q"
+            candidate_indices, qkv_group_size, enable_q, "q", self.linear.weight.device
         )
         k_ind, k_target = self._get_lora_indices(
-            candidate_indices, qkv_group_size, enable_k, "k"
+            candidate_indices, qkv_group_size, enable_k, "k", self.linear.weight.device
         )
         v_ind, v_target = self._get_lora_indices(
-            candidate_indices, qkv_group_size, enable_v, "v"
+            candidate_indices, qkv_group_size, enable_v, "v", self.linear.weight.device
         )
 
         # Define the mapping for buffer creation
@@ -241,8 +241,8 @@ class LoRAQKVLinear(LoRALayer):
         ]
 
         # Efficient buffer creation for LoRA indices
-        for index_value, index_name in all_indices:
-            index_tensor = torch.tensor(index_value, device=self.linear.weight.device)
+        for index_tensor, index_name in all_indices:
+            #index_tensor = index_value.to(self.linear.weight.device)
             setattr(self, index_name, index_tensor)
 
     def reset_parameters(self) -> None:
