@@ -7,8 +7,8 @@ from typing import Any
 
 import numpy as np
 from syne_tune.config_space import Domain
-from syne_tune.optimizer.schedulers import FIFOScheduler
-from syne_tune.optimizer.schedulers.searchers import StochasticSearcher
+from syne_tune.optimizer.schedulers import LegacyFIFOScheduler
+from syne_tune.optimizer.schedulers.searchers.searcher_base import StochasticSearcher
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class PopulationElement:
     result: dict
 
 
-class LS(FIFOScheduler):
+class LS(LegacyFIFOScheduler):
     """
     Local Search Scheduler for hyperparameter optimization.
 
@@ -221,44 +221,3 @@ class LocalSearch(StochasticSearcher):
 
     def clone_from_state(self, state: dict[str, Any]):
         raise NotImplementedError
-
-
-if __name__ == "__main__":
-    from nas_fine_tuning.sampling import SmallSearchSpace
-    from syne_tune.config_space import Categorical
-    from syne_tune.tuner import Trial
-    from transformers import AutoConfig
-
-    config = AutoConfig.from_pretrained("bert-base-cased")
-    ss = SmallSearchSpace(config)
-
-    start_point = {"num_layers": 12, "num_heads": 12, "num_units": 3072}
-
-    ls = LS(
-        ss.get_syne_tune_config_space(),
-        start_point=start_point,
-        metric=["a", "b"],
-        random_seed=412,
-        mode=["min", "min"],
-    )
-
-    def get_default(config_space):
-        config = {}
-        for k, v in config_space.items():
-            if isinstance(v, Domain):
-                if isinstance(v, Categorical):
-                    config[k] = v.categories[0]
-                else:
-                    config[k] = v.upper
-        return config
-
-    print(get_default(ss.get_syne_tune_config_space()))
-
-    for i in range(10):
-        trial = ls.suggest(trial_id=i)
-        print(trial)
-        # ls._update(trial_id=i, config=config, result={'a': np.random.rand(), 'b':np.random.rand()})
-        result = {"a": np.random.rand(), "b": np.random.rand()}
-        ls.on_trial_result(
-            Trial(trial_id=i, config=trial.config, creation_time=None), result=result
-        )
