@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from typing import Any
-import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -245,7 +245,10 @@ class LoRAQKVLinear(LoRALayer):
         # Efficient buffer creation for LoRA indices
         for index_tensor, index_name in all_indices:
             # index_tensor = index_value.to(self.linear.weight.device)
-            setattr(self, index_name, index_tensor)
+            if not hasattr(self, index_name):
+                self.register_buffer(index_name, index_tensor, persistent=False)
+            else:
+                setattr(self, index_name, index_tensor)
 
     def reset_parameters(self) -> None:
         """Reset all the weights, even including pretrained ones."""
