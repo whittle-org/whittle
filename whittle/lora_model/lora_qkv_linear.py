@@ -76,9 +76,7 @@ class LoRAQKVLinear(LoRALayer):
                 head_size * n_query_groups,
             )
             self.qkv_shapes = [s for s in qkv_shapes if s]
-            self.lora_B = nn.Parameter(
-                torch.empty(sum(self.qkv_shapes), r)
-            )  # (256, 2))
+            self.lora_B = nn.Parameter(torch.empty(sum(self.qkv_shapes), r))  # (256, 2))
             # Notes about shapes above
             # - self.lora_A has shape (4, 128): 4 because rank is 2 and LoRA is applied only to two matrices;
             # 128 is the input size of the x (embedding size). (4, 128) and not (128, 4) because later on in
@@ -190,20 +188,24 @@ class LoRAQKVLinear(LoRALayer):
         self, candidate_indices, qkv_group_size, enable_flag, target_mod, device
     ):
         if not enable_flag:
-            return torch.tensor([], dtype=torch.long, device=device), torch.tensor([], dtype=torch.long, device=device)
-        
+            return torch.tensor([], dtype=torch.long, device=device), torch.tensor(
+                [], dtype=torch.long, device=device
+            )
+
         group_index = qkv_group_size - (2 if target_mod in {"q", "k"} else 1)
-        
-        candidate_tensor = torch.tensor(candidate_indices, dtype=torch.long, device=device)
+
+        candidate_tensor = torch.tensor(
+            candidate_indices, dtype=torch.long, device=device
+        )
         indices = torch.arange(len(candidate_indices), dtype=torch.long, device=device)
-        
+
         mod_tensor = (indices // self.sub_network_head_size) % qkv_group_size
-        
+
         if target_mod == "q":
             mask = mod_tensor < group_index
         else:
             mask = mod_tensor == group_index
-        
+
         selected_indices = candidate_tensor[mask]
         selected_targets = indices[mask]
 
@@ -242,7 +244,7 @@ class LoRAQKVLinear(LoRALayer):
 
         # Efficient buffer creation for LoRA indices
         for index_tensor, index_name in all_indices:
-            #index_tensor = index_value.to(self.linear.weight.device)
+            # index_tensor = index_value.to(self.linear.weight.device)
             setattr(self, index_name, index_tensor)
 
     def reset_parameters(self) -> None:
