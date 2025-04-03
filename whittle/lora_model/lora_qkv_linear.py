@@ -187,6 +187,9 @@ class LoRAQKVLinear(LoRALayer):
     def _get_lora_indices(
         self, candidate_indices, qkv_group_size, enable_flag, target_mod, device
     ):
+        # target_mod=q corresponds to indices [0, q_per_kv), [q_per_kv + 2, 2 * q_per_kv + 2)...
+        # target_mod=k corresponds to indices q_per_kv, 2 * q_per_kv + 1, ...
+        # target_mod=v corresponds to indices q_per_kv + 1, 2 * q_per_kv + 2, 3 * q_per_kv + 4...
         if not enable_flag:
             return torch.tensor([], dtype=torch.long, device=device), torch.tensor(
                 [], dtype=torch.long, device=device
@@ -244,7 +247,6 @@ class LoRAQKVLinear(LoRALayer):
 
         # Efficient buffer creation for LoRA indices
         for index_tensor, index_name in all_indices:
-            # index_tensor = index_value.to(self.linear.weight.device)
             if not hasattr(self, index_name):
                 self.register_buffer(index_name, index_tensor, persistent=False)
             else:
