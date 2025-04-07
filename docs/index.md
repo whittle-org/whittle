@@ -1,12 +1,17 @@
 # Whittle
 
 
-Whittle is a library for Neural Architecture Search (NAS) aimed at compressing large language models (LLMs). The core idea is to treat the network as a super-network and select sub-networks that optimally balance performance and efficiency. Whittle provides the following functionalities:
+Whittle is a Python library for compressing large language models (LLMs) 
+by extracting sub-networks to balance performance and efficiency. It is based on [LitGPT](https://github.com/Lightning-AI/litgpt)
+and allows to compress many state-of-the-art models.
 
-- Support for a variety of LLMs to define super-networks
-- Checkpoint generation for sub-networks, enabling deployment
-- Downstream evaluation of sub-networks using LM-Eval-Harness
-- A simple interface for various super-network training strategies and multi-objective search methods
+
+- **Neural Architecture Search:** Workflows for [pre-training super-networks](whittle/pretrain_super_network.py) and [multi-objective search](whittle/search_sub_networks.py) to select sub-networks.
+- **Structural Pruning:** State-of-the-art approaches to [pruning](whittle/prune.py) structural components of pre-trained LLMs.
+- **Distillation:** Workflow to [distill](whittle/distill.py) a student model given a trained teacher model.
+- **Evaluation**: Easy extraction of sub-networks checkpoint and evaluation using LM-Eval-Harness
+- **Efficiency**: Different metrics to estimate efficiency of sub-networks, such as latency, FLOPs, or energy consumption.
+
 
 ## Installation
 
