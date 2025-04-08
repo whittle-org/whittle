@@ -3,12 +3,59 @@ from __future__ import annotations
 import math
 import pprint
 import time
+from contextlib import nullcontext
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import lightning as L
 import torch
+from lightning.fabric.strategies.deepspeed import _DEEPSPEED_AVAILABLE
+from torch.nn import Module
+
+# Note: this is a patch to handle the saving and loading of the model state dict when using DeepSpeed.
+# Essentially, the DeepSpeed strategy expects the model state dict to have a "module." prefix when loading
+# the model state dict. However, when saving the model state dict (on checkpoint), the "module." prefix is
+# not present. This patch fixes this on load time.
+if _DEEPSPEED_AVAILABLE:
+    from deepspeed.utils.zero_to_fp32 import (
+        get_fp32_state_dict_from_zero_checkpoint,
+    )
+    from lightning.fabric.strategies.strategy import Strategy
+
+    # Store the original method for later use
+    original_get_module_state_dict = Strategy.get_module_state_dict
+
+    # Define our custom implementation
+    def custom_get_module_state_dict(
+        self, module: Module
+    ) -> dict[str, Any | torch.Tensor]:
+        """Custom implementation that handles DeepSpeed module state dict differently."""
+        from lightning.fabric.strategies import DeepSpeedStrategy
+
+        if isinstance(self, DeepSpeedStrategy):
+            # For DeepSpeed, we need to handle the module differently
+            # First get the state dict using the original method
+            state_dict = original_get_module_state_dict(self, module)
+
+            # Add "module." prefix to all keys
+            prefixed_state_dict = {}
+            for key, value in state_dict.items():
+                if not key.startswith("module."):
+                    prefixed_state_dict[f"module.{key}"] = value
+                else:
+                    prefixed_state_dict[key] = value
+
+            return prefixed_state_dict
+        else:
+            # For other strategies, use the original implementation
+            return original_get_module_state_dict(self, module)
+
+    # Apply the monkeypatch
+    Strategy.get_module_state_dict = custom_get_module_state_dict
+
+    from lightning.fabric.strategies import DeepSpeedStrategy
+
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
 from litgpt import Tokenizer
@@ -20,7 +67,6 @@ from litgpt.pretrain import (
     get_dataloaders,
     get_lr,
     initialize_weights,
-    save_checkpoint,
     validate,
     validate_args,
 )
@@ -30,6 +76,7 @@ from litgpt.utils import (
     check_nvlink_connectivity,
     choose_logger,
     chunked_cross_entropy,
+    copy_config_files,
     extend_checkpoint_dir,
     find_resume_path,
     get_default_supported_precision,
@@ -37,6 +84,8 @@ from litgpt.utils import (
     instantiate_torch_optimizer,
     num_parameters,
     parse_devices,
+    save_config,
+    save_hyperparameters,
 )
 from syne_tune.config_space import lograndint, randint
 from torch.utils.data import DataLoader
@@ -91,9 +140,11 @@ def setup(
     optimizer: str | dict = "AdamW",
     devices: int | str = "auto",
     num_nodes: int = 1,
-    training_strategy: str = "sandwich",
+    training_strategy: Literal["sandwich", "random", "standard"] = "sandwich",
+    distributed_strategy: Literal["auto", "fsdp", "deepspeed"] = "auto",
     tokenizer_dir: Path | None = None,
-    logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
+    logger_name: Literal["wandb", "tensorboard", "csv"] = "wandb",
+    compile_model: bool = True,
     seed: int = 42,
 ):
     """Pretrain a model.
@@ -114,14 +165,21 @@ def setup(
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
         optimizer: An optimizer name (such as "AdamW") or config.
-        training_strategy:
         devices: How many devices/GPUs to use. Uses all GPUs by default.
         num_nodes: How many nodes the code is being run on.
+        training_strategy: The training strategy to use.
+        distributed_strategy: The distributed strategy to use.
         tokenizer_dir: Optional path to the tokenizer dir that was used for preprocessing the dataset. Only some data
             module require this.
         logger_name: The name of the logger to send metrics to.
+        compile_model: Whether to compile the model.
         seed: The random seed to use for reproducibility.
     """
+    if not _DEEPSPEED_AVAILABLE and distributed_strategy == "deepspeed":
+        raise ValueError(
+            "DeepSpeed is not available. Please set distributed_strategy to 'fsdp'."
+        )
+
     if model_name == "list":
         available_models = "\n".join(sorted(name_to_config))
         print(f"Available values:\n{available_models}")
@@ -168,18 +226,29 @@ def setup(
     )
 
     if num_devices * num_nodes > 1:
-        strategy = FSDPStrategy(
-            auto_wrap_policy={Block},
-            state_dict_type="full",
-            sharding_strategy="HYBRID_SHARD",
-        )
+        if distributed_strategy == "fsdp":
+            distributed_strategy = FSDPStrategy(
+                auto_wrap_policy={Block},
+                state_dict_type="full",
+                sharding_strategy="HYBRID_SHARD",
+            )
+        elif distributed_strategy == "deepspeed":
+            ds_config = {
+                "train_micro_batch_size_per_gpu": train.micro_batch_size,
+                "gradient_accumulation_steps": train.gradient_accumulation_iters(
+                    num_devices
+                ),
+                "zero_optimization": {"stage": 2},
+                "gradient_clipping": train.max_norm,
+            }
+            distributed_strategy = DeepSpeedStrategy(config=ds_config)
     else:
-        strategy = "auto"
+        distributed_strategy = "auto"
 
     fabric = L.Fabric(
         devices=num_devices,
         num_nodes=num_nodes,
-        strategy=strategy,
+        strategy=distributed_strategy,
         precision=precision,
         loggers=[logger],
     )
@@ -208,6 +277,7 @@ def setup(
         eval,
         optimizer,
         training_strategy,
+        compile_model,
     )
 
 
@@ -275,14 +345,20 @@ def fit(
 
         # determine and set the learning rate for this iteration
         lr = get_lr(
-            optimizer.defaults["lr"],
+            optimizer.defaults["lr"]
+            if isinstance(optimizer, torch.optim.Optimizer)
+            else optimizer.optimizer.optimizer.defaults["lr"],
             state["iter_num"],
             warmup_iters,
             max_iters,
             train.min_lr,
         )
-        for param_group in optimizer.param_groups:
-            param_group["lr"] = lr
+        if isinstance(optimizer, torch.optim.Optimizer):
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = lr
+        else:
+            for param_group in optimizer.optimizer.optimizer.param_groups:
+                param_group["lr"] = lr
 
         state["iter_num"] += 1
         iter_t0 = time.perf_counter()
@@ -303,14 +379,20 @@ def fit(
         else:
             scale_loss = 1 / train.gradient_accumulation_iters(devices)
 
-        with fabric.no_backward_sync(model, enabled=is_accumulating):
+        with (
+            fabric.no_backward_sync(model, enabled=is_accumulating)
+            if not isinstance(fabric.strategy, DeepSpeedStrategy)
+            else nullcontext()
+        ):
             loss = training_strategy(model, input_ids, targets, scale_loss=scale_loss)
-        #            fabric.backward(loss / train.gradient_accumulation_iters(devices))
 
         running_loss.update(loss)
 
         if not is_accumulating:
-            fabric.clip_gradients(model, optimizer, max_norm=train.max_norm)
+            if isinstance(optimizer, torch.optim.Optimizer) and not isinstance(
+                fabric.strategy, DeepSpeedStrategy
+            ):
+                fabric.clip_gradients(model, optimizer, max_norm=train.max_norm)
             optimizer.step()
             optimizer.zero_grad()
             state["step_count"] += 1
@@ -422,6 +504,7 @@ def main(
     eval: EvalArgs,
     optimizer: str | dict,
     training_strategy: str,
+    compile_model: bool,
 ) -> None:
     validate_args(train, eval, initial_checkpoint_dir, resume)
 
@@ -444,12 +527,22 @@ def main(
     fabric.print(f"Time to instantiate model: {time.perf_counter() - t0:.02f} seconds.")
     fabric.print(f"Total parameters: {num_parameters(model):,}")
 
-    model = torch.compile(model)
-    model = fabric.setup(model)
+    if compile_model:
+        model = torch.compile(model, mode="max-autotune")
 
     extra_kwargs = {"fused": fabric.device.type == "cuda"}
-    optimizer = instantiate_torch_optimizer(optimizer, model.parameters(), **extra_kwargs)
-    optimizer = fabric.setup_optimizers(optimizer)
+    if isinstance(fabric.strategy, DeepSpeedStrategy):
+        optimizer = instantiate_torch_optimizer(
+            optimizer, model.parameters(), **extra_kwargs
+        )
+        model, optimizer = fabric.setup(model, optimizer)
+    else:
+        model = fabric.setup(model)
+
+        optimizer = instantiate_torch_optimizer(
+            optimizer, model.parameters(), **extra_kwargs
+        )
+        optimizer = fabric.setup_optimizers(optimizer)
 
     sampler = RandomSampler(search_space=get_search_space(config), seed=seed)
     training_strategy_kwargs = {
@@ -461,9 +554,6 @@ def main(
 
     train_dataloader, val_dataloader = get_dataloaders(
         fabric, data, tokenizer, train, model.max_seq_length
-    )
-    train_dataloader, val_dataloader = fabric.setup_dataloaders(
-        train_dataloader, val_dataloader
     )
 
     if initial_checkpoint_dir:
@@ -480,7 +570,24 @@ def main(
     resume = find_resume_path(resume, out_dir)
     if resume:
         fabric.print(f"Resuming training from {resume}")
-        fabric.load(resume, state)
+        if isinstance(fabric.strategy, DeepSpeedStrategy):
+            state.pop("train_dataloader")
+            fabric.load(resume, state, strict=False)
+
+            train_dataloader.load_state_dict(
+                torch.load(resume / "lit_model.pth", weights_only=False)[  # type: ignore[operator]
+                    "train_dataloader"
+                ]
+            )
+            state["train_dataloader"] = train_dataloader
+        else:
+            fabric.load(resume, state)
+
+    train_dataloader, val_dataloader = fabric.setup_dataloaders(
+        state["train_dataloader"], val_dataloader
+    )
+
+    state["train_dataloader"] = train_dataloader
 
     train_time = time.perf_counter()
     fit(
@@ -502,6 +609,54 @@ def main(
     fabric.print(f"Training time: {(time.perf_counter() - train_time):.2f}s")
     if fabric.device.type == "cuda":
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
+
+
+def save_checkpoint(
+    fabric: L.Fabric,
+    state: dict,
+    tokenizer_dir: Path | str | None,
+    checkpoint_file: Path,
+):
+    """Save model checkpoint and related files.
+
+    Args:
+        fabric: Lightning Fabric instance for distributed training.
+        state: Dictionary containing model state, optimizer state, and training state.
+        tokenizer_dir: Path to the tokenizer directory to copy config files from.
+        checkpoint_file: Path where the checkpoint should be saved.
+
+    This function handles saving checkpoints differently based on the distributed strategy:
+    - For DeepSpeed: Saves using DeepSpeed's checkpoint mechanism and extracts FP32 weights
+    - For other strategies: Uses Fabric's standard save method
+
+    Additionally saves hyperparameters, tokenizer config, and model config when appropriate.
+    """
+    checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+    fabric.print(f"Saving checkpoint to {str(checkpoint_file)!r}")
+    if not isinstance(fabric.strategy, DeepSpeedStrategy):
+        fabric.save(checkpoint_file, state)
+    else:
+        fabric.strategy.save_checkpoint(checkpoint_file.parent, state)
+
+        # Get the FP32 state dict from the saved checkpoint
+        model_state = get_fp32_state_dict_from_zero_checkpoint(checkpoint_file.parent)
+        dataloader: DataLoader = state["train_dataloader"]._dataloader
+
+        with open(checkpoint_file, "wb") as f:
+            torch.save(
+                dict(
+                    model=model_state,
+                    train_dataloader=dataloader.state_dict(),
+                    iter_num=state["iter_num"],
+                    step_count=state["step_count"],
+                ),
+                f,
+            )
+    if fabric.global_rank == 0:
+        save_hyperparameters(setup, checkpoint_file.parent)
+        if tokenizer_dir is not None:
+            copy_config_files(tokenizer_dir, checkpoint_file.parent)
+        save_config(state["model"].config, checkpoint_file.parent)
 
 
 if __name__ == "__main__":
