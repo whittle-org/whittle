@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Literal
-
 import torch
 from lightning.fabric.utilities.throughput import measure_flops
 
@@ -12,7 +10,6 @@ def compute_flops(
     model: GPT,
     batch_size: int = 1,
     sequence_length: int = 512,
-    metric: Literal["flops"] = "flops",
     device: str = "cpu",
     previous_device: str | None = None,
     verbose: bool = False,
@@ -30,15 +27,11 @@ def compute_flops(
         sequence_length: The sequence length for the input tensor.
         device: The device on which to run the FLOPs calculation ("cpu", "cuda", etc.).
         previous_device: Optional device to move the model back to after profiling.
-        metric: Currently only "flops" is supported.
         verbose: If True, prints debug information about profiling.
 
     Returns:
         The estimated number of floating-point operations (FLOPs) for the model's forward pass.
     """
-    if metric != "flops":
-        raise ValueError("Only 'flops' metric is supported.")
-
     if device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA requested but is not available.")
 

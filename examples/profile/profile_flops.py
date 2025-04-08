@@ -35,8 +35,6 @@ if __name__ == "__main__":
     config.n_layer = 4
     model = GPT(config)
     print(f"Full model {compute_flops(model=model, metric='flops')} flops")
-    print(f"Full model {compute_flops(model=model, metric='macs')} macs")
     config = update_config(config, 64, 64 * 4, 4, 2, 4)
     model = GPT(config)
     print(f"Mini model {compute_flops(model=model, metric='flops')} flops")
-    print(f"Mini model {compute_flops(model=model, metric='macs')} macs")
