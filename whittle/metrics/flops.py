@@ -34,7 +34,7 @@ def compute_flops(
         verbose: If True, prints debug information about profiling.
 
     Returns:
-        A dictionary containing FLOPs, batch size, sequence length, and device used.
+        The estimated number of floating-point operations (FLOPs) for the model's forward pass.
     """
     if metric != "flops":
         raise ValueError("Only 'flops' metric is supported.")
