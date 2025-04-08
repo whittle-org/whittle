@@ -13,7 +13,7 @@ def compute_flops(
     batch_size: int = 1,
     sequence_length: int = 512,
     metric: Literal["flops"] = "flops",
-    device: str = "cuda",
+    device: str = "cpu",
     previous_device: str | None = None,
     verbose: bool = False,
 ) -> float:
