@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from syne_tune.optimizer.schedulers import FIFOScheduler
-from syne_tune.optimizer.schedulers.searchers.random_grid_searcher import (
+from syne_tune.optimizer.schedulers import LegacyFIFOScheduler
+from syne_tune.optimizer.schedulers.searchers.legacy_random_grid_searcher import (
     LegacyRandomSearcher as RandomSearcher,
 )
 
 from whittle.sampling.param_bins import ParamBins
 
 
-class StratifiedRandomSearch(FIFOScheduler):
+class StratifiedRandomSearch(LegacyFIFOScheduler):
     """
     Stratified Random Search (SRS) is a search strategy that samples configurations
     uniformly at random from the search space. It is a simple baseline for
