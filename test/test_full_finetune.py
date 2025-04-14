@@ -10,40 +10,88 @@ from io import StringIO
 from unittest import mock
 from unittest.mock import Mock
 
+import pytest
 import torch
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import Config
-from torch.utils.data import DataLoader
+from litgpt.utils import auto_download_checkpoint, check_valid_checkpoint_dir
+from torch.utils.data import DataLoader, Dataset
 
 from test.conftest import RunIf
 from whittle import full_finetune
 
+MODEL_NAME = "EleutherAI/pythia-14m"
 
-@RunIf(min_cuda_gpus=1, standalone=True)
-@mock.patch("litgpt.pretrain.save_hyperparameters")
-def test_training_strategies(_, tmp_path):
+
+class MockDataset(Dataset):
+    """Custom dataset to return dictionary format expected by full_finetune.py."""
+
+    def __init__(self, data):
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        # Input: tensor([x1, x2, x3]), Labels: tensor([x2, x3, x4])
+        input_ids = self.data[idx]
+        # Shift labels by one and append a token (use 0 as a placeholder)
+        labels = torch.cat([input_ids[1:], torch.tensor([0], dtype=input_ids.dtype)])
+        return {"input_ids": input_ids, "labels": labels}
+
+
+@pytest.fixture(params=["cpu", "cuda"])
+def device(request):
+    if request.param == "cuda" and not torch.cuda.is_available():
+        pytest.skip("CUDA not available")
+    return request.param
+
+
+@pytest.fixture(scope="module")
+def ensure_checkpoint():
+    """Fixture to ensure the model checkpoint is downloaded."""
+    try:
+        checkpoint_dir = auto_download_checkpoint(MODEL_NAME)
+        check_valid_checkpoint_dir(checkpoint_dir)
+    except Exception as e:
+        pytest.skip(f"Failed to download or verify checkpoint for {MODEL_NAME}: {str(e)}")
+    return checkpoint_dir
+
+
+@mock.patch("whittle.full_finetune.save_hyperparameters")
+@pytest.mark.parametrize("strategy", ["standard", "random", "sandwich"])
+def test_training_strategies(
+    save_hyper_mock, strategy, tmp_path, device, ensure_checkpoint
+):
     Config(block_size=2, n_layer=2, n_embd=4, n_head=2, padded_vocab_size=8)
 
-    dataset = torch.tensor([[0, 1, 2], [3, 4, 5], [0, 1, 2]])
+    # Use tokens within vocab size (0 to 7)
+    dataset = MockDataset(torch.tensor([[0, 1, 2], [2, 3, 4], [4, 5, 6]]))
     dataloader = DataLoader(dataset)
     full_finetune.get_dataloaders = Mock(return_value=(dataloader, dataloader))
 
-    for strategy in ("standard", "random", "sandwich"):
-        full_finetune.setup(
-            "pythia-14m",
-            devices=1,
-            optimizer="RMSprop",
-            training_strategy=strategy,
-            out_dir=tmp_path,
-            train=TrainArgs(
-                global_batch_size=2,
-                max_tokens=16,
-                save_interval=1,
-                micro_batch_size=1,
-                max_norm=1.0,
-            ),
-            eval=EvalArgs(interval=1, max_iters=1, final_validation=False),
-        )
+    full_finetune.setup(
+        MODEL_NAME,
+        devices=1,
+        optimizer="RMSprop",
+        training_strategy=strategy,
+        out_dir=tmp_path,
+        train=TrainArgs(
+            global_batch_size=2,
+            epochs=5,  # Required by validate_args
+            save_interval=1,
+            micro_batch_size=1,
+            max_steps=4,  # Set to ensure termination
+        ),
+        eval=EvalArgs(
+            interval=1,
+            max_new_tokens=10,  # Required by validate_args
+            max_iters=1,
+            final_validation=False,
+        ),
+        precision="32-true",  # Full precision for CPU compatibility
+        accelerator=device,
+    )
 
 
 @RunIf(min_cuda_gpus=1, standalone=True)
@@ -52,11 +100,12 @@ def test_training_strategies(_, tmp_path):
 # If we were to use `save_hyperparameters()`, we would have to patch `sys.argv` or otherwise
 # the CLI would capture pytest args, but unfortunately patching would mess with subprocess
 # launching, so we need to mock `save_hyperparameters()`
-@mock.patch("litgpt.pretrain.save_hyperparameters")
-def test_full_finetune(_, tmp_path):
+@mock.patch("whittle.full_finetune.save_hyperparameters")
+def test_full_finetune(save_hyper_mock, tmp_path, device, ensure_checkpoint):
     Config(block_size=2, n_layer=2, n_embd=8, n_head=4, padded_vocab_size=8)
 
-    dataset = torch.tensor([[0, 1, 2], [3, 4, 5], [0, 1, 2]])
+    # Use tokens within vocab size (0 to 7)
+    dataset = MockDataset(torch.tensor([[0, 1, 2], [2, 3, 4], [4, 5, 6]]))
     dataloader = DataLoader(dataset)
     full_finetune.get_dataloaders = Mock(return_value=(dataloader, dataloader))
 
@@ -64,20 +113,27 @@ def test_full_finetune(_, tmp_path):
     stdout = StringIO()
     with redirect_stdout(stdout):
         full_finetune.setup(
-            "pythia-14m",
+            MODEL_NAME,
             devices=1,
             out_dir=out_dir,
             train=TrainArgs(
                 global_batch_size=2,
-                max_tokens=16,
+                epochs=5,  # Required by validate_args
                 save_interval=1,
                 micro_batch_size=1,
-                max_norm=1.0,
+                max_steps=4,  # Set to ensure termination
             ),
-            eval=EvalArgs(interval=1, max_iters=1, final_validation=False),
+            eval=EvalArgs(
+                interval=1,
+                max_new_tokens=10,  # Required by validate_args
+                max_iters=1,
+                final_validation=False,
+            ),
+            precision="32-true",  # Full precision for CPU compatibility
+            accelerator=device,
         )
 
-        # tmp_path is not the same across all ranks, run assert only on rank 0
+    # tmp_path is not the same across all ranks, run assert only on rank 0
     out_dir_contents = set(os.listdir(out_dir))
     checkpoint_dirs = {
         "step-00000001",

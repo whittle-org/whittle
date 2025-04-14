@@ -95,6 +95,7 @@ def setup(
     tokenizer_dir: Path | None = None,
     logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
     seed: int = 42,
+    accelerator: str | None = None,
 ):
     """Pretrain a model.
 
@@ -167,7 +168,12 @@ def setup(
         log_interval=train.log_interval,
     )
 
-    if num_devices * num_nodes > 1:
+    # Default to CPU if accelerator not specified
+    if accelerator is None:
+        accelerator = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # Use FSDP only for multi-device CUDA setups
+    if num_devices * num_nodes > 1 and accelerator == "cuda":
         strategy = FSDPStrategy(
             auto_wrap_policy={Block},
             state_dict_type="full",
@@ -182,9 +188,11 @@ def setup(
         strategy=strategy,
         precision=precision,
         loggers=[logger],
+        accelerator=accelerator,
     )
 
-    if torch.cuda.is_available() and num_devices > 1:
+    # Skip NVLink check for CPU or single-device setups
+    if accelerator == "cuda" and num_devices > 1 and torch.cuda.is_available():
         check_nvlink_connectivity(fabric)
 
     fabric.launch()

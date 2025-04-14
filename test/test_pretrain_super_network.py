@@ -10,18 +10,24 @@ from io import StringIO
 from unittest import mock
 from unittest.mock import ANY, Mock
 
+import pytest
 import torch
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import Config
 from torch.utils.data import DataLoader
 
-from test.conftest import RunIf
 from whittle import pretrain_super_network
 
 
-@RunIf(min_cuda_gpus=1, standalone=True)
+@pytest.fixture(params=["cpu", "cuda"])
+def device(request):
+    if request.param == "cuda" and not torch.cuda.is_available():
+        pytest.skip("CUDA not available")
+    return request.param
+
+
 @mock.patch("litgpt.pretrain.save_hyperparameters")
-def test_training_strategies(_, tmp_path):
+def test_training_strategies(save_hyperparameters_mock, tmp_path, device):
     model_config = Config(
         block_size=2, n_layer=2, n_embd=4, n_head=2, padded_vocab_size=8
     )
@@ -32,7 +38,7 @@ def test_training_strategies(_, tmp_path):
 
     for strategy in ("standard", "random", "sandwich"):
         pretrain_super_network.setup(
-            "pythia-14m",
+            model_name="pythia-14m",
             devices=1,
             optimizer="RMSprop",
             training_strategy=strategy,
@@ -46,17 +52,20 @@ def test_training_strategies(_, tmp_path):
                 max_norm=1.0,
             ),
             eval=EvalArgs(interval=1, max_iters=1, final_validation=False),
+            precision="32-true",  # Full precision for CPU compatibility
+            accelerator=device,
         )
 
+    save_hyperparameters_mock.assert_called()
 
-@RunIf(min_cuda_gpus=1, standalone=True)
+
 # Set CUDA_VISIBLE_DEVICES for FSDP hybrid-shard, if fewer GPUs are used than are available
 @mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0"})
 # If we were to use `save_hyperparameters()`, we would have to patch `sys.argv` or otherwise
 # the CLI would capture pytest args, but unfortunately patching would mess with subprocess
 # launching, so we need to mock `save_hyperparameters()`
 @mock.patch("litgpt.pretrain.save_hyperparameters")
-def test_pretrain(_, tmp_path):
+def test_pretrain(save_hyperparameters_mock, tmp_path, device):
     model_config = Config(
         block_size=2, n_layer=2, n_embd=8, n_head=4, padded_vocab_size=8
     )
@@ -69,7 +78,7 @@ def test_pretrain(_, tmp_path):
     stdout = StringIO()
     with redirect_stdout(stdout):
         pretrain_super_network.setup(
-            "pythia-14m",
+            model_name="pythia-14m",
             devices=1,
             model_config=model_config,
             out_dir=out_dir,
@@ -81,9 +90,11 @@ def test_pretrain(_, tmp_path):
                 max_norm=1.0,
             ),
             eval=EvalArgs(interval=1, max_iters=1, final_validation=False),
+            precision="32-true",
+            accelerator=device,
         )
 
-        # tmp_path is not the same across all ranks, run assert only on rank 0
+    # tmp_path is not the same across all ranks, run assert only on rank 0
     out_dir_contents = set(os.listdir(out_dir))
     checkpoint_dirs = {
         "step-00000001",
@@ -110,7 +121,6 @@ def test_pretrain(_, tmp_path):
     assert "Total parameters: 1,888" in logs
 
 
-@RunIf(min_cuda_gpus=1, standalone=True)
 # Set CUDA_VISIBLE_DEVICES for FSDP hybrid-shard, if fewer GPUs are used than are available
 @mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0,1"})
 @mock.patch("litgpt.pretrain.L.Fabric.load_raw")

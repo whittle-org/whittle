@@ -28,7 +28,7 @@ class RandomStrategy(BaseTrainingStrategy):
         total_loss = 0
         for i in range(self.random_samples):
             config = self.sampler.sample()
-            model.set_sub_network(**config)
+            model.select_sub_network(config)
             loss = self.compute_loss(model, inputs, outputs)
             loss *= scale_loss
             loss.backward() if self.fabric is None else self.fabric.backward(loss)
