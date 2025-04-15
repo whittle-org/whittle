@@ -18,6 +18,8 @@ from torch.utils.data import DataLoader
 
 from whittle import pretrain_super_network
 
+MODEL_NAME = "EleutherAI/pythia-14m"
+
 
 @pytest.fixture(params=["cpu", "cuda"])
 def device(request):
@@ -27,7 +29,8 @@ def device(request):
 
 
 @mock.patch("litgpt.pretrain.save_hyperparameters")
-def test_training_strategies(save_hyperparameters_mock, tmp_path, device):
+@pytest.mark.parametrize("strategy", ["standard", "random", "sandwich"])
+def test_training_strategies(save_hyperparameters_mock, strategy, tmp_path, device):
     model_config = Config(
         block_size=2, n_layer=2, n_embd=4, n_head=2, padded_vocab_size=8
     )
@@ -36,25 +39,24 @@ def test_training_strategies(save_hyperparameters_mock, tmp_path, device):
     dataloader = DataLoader(dataset)
     pretrain_super_network.get_dataloaders = Mock(return_value=(dataloader, dataloader))
 
-    for strategy in ("standard", "random", "sandwich"):
-        pretrain_super_network.setup(
-            model_name="pythia-14m",
-            devices=1,
-            optimizer="RMSprop",
-            training_strategy=strategy,
-            model_config=model_config,
-            out_dir=tmp_path,
-            train=TrainArgs(
-                global_batch_size=2,
-                max_tokens=16,
-                save_interval=1,
-                micro_batch_size=1,
-                max_norm=1.0,
-            ),
-            eval=EvalArgs(interval=1, max_iters=1, final_validation=False),
-            precision="32-true",  # Full precision for CPU compatibility
-            accelerator=device,
-        )
+    pretrain_super_network.setup(
+        model_name=MODEL_NAME,
+        devices=1,
+        optimizer="RMSprop",
+        training_strategy=strategy,
+        model_config=model_config,
+        out_dir=tmp_path,
+        train=TrainArgs(
+            global_batch_size=2,
+            max_tokens=16,
+            save_interval=1,
+            micro_batch_size=1,
+            max_norm=1.0,
+        ),
+        eval=EvalArgs(interval=1, max_iters=1, final_validation=False),
+        precision="32-true",  # Full precision for CPU compatibility
+        accelerator=device,
+    )
 
     save_hyperparameters_mock.assert_called()
 
@@ -78,7 +80,7 @@ def test_pretrain(save_hyperparameters_mock, tmp_path, device):
     stdout = StringIO()
     with redirect_stdout(stdout):
         pretrain_super_network.setup(
-            model_name="pythia-14m",
+            model_name=MODEL_NAME,
             devices=1,
             model_config=model_config,
             out_dir=out_dir,

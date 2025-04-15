@@ -61,10 +61,10 @@ training_strategies_cls = {
 
 def get_search_space(config):
     return {
-        "embed_dim": lograndint(1, config.n_embd),
-        "num_heads": randint(1, config.n_head),
-        "mlp_ratio": randint(1, 4),
-        "depth": randint(1, config.n_layer),
+        "sub_network_n_embd": lograndint(1, config.n_embd),
+        "sub_network_intermediate_size": randint(1, config.n_embd),
+        "sub_network_num_heads": randint(1, config.n_head),
+        "sub_network_n_layers": randint(1, config.n_layer),
     }
 
 
