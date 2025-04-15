@@ -6,7 +6,7 @@ from litgpt.model import KVCache
 from litgpt.utils import map_old_state_dict_weights
 
 from whittle.lora_model.config import LoRAConfig as Config
-from whittle.lora_model.lora_linear import LoRALinearProj
+from whittle.lora_model.lora_linear import LoRALinear
 from whittle.lora_model.lora_qkv_linear import LoRAQKVLinear
 from whittle.models.gpt.blocks.causal_self_attention import (
     CausalSelfAttention as BaseCausalSelfAttention,
@@ -20,7 +20,7 @@ class CausalSelfAttention(BaseCausalSelfAttention):
         super().__init__(config=config, block_idx=block_idx)
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
-        self.attn = LoRAQKVLinear(
+        self.qkv = LoRAQKVLinear(
             config=config,
             in_features=config.n_embd,
             out_features=shape,
@@ -37,7 +37,7 @@ class CausalSelfAttention(BaseCausalSelfAttention):
         )
         # output projection
         # if `head_size` is explicitly specified in the config, `n_emd` might not be equal to `head_size * n_head`
-        self.proj = LoRALinearProj(
+        self.proj = LoRALinear(
             config.head_size * config.n_head,
             config.n_embd,
             bias=config.bias,

@@ -45,14 +45,21 @@ def copy_subnetwork_weights(sub_network, super_network):
         )
     for i, block_orig in enumerate(sub_network.transformer.h):
         block = super_network.transformer.h[i]
-        block.attn.attn.weight.data[block.attn.qkv_indices, :][:, :embd] = (
-            block_orig.attn.attn.weight.data
+        q_per_kv = block_orig.attn.sub_network_q_per_kv
+        sub_network_head_size = block_orig.attn.sub_network_head_size
+        sub_network_query_groups = block_orig.attn.sub_network_query_groups
+        shape = (
+            (q_per_kv + 2) * sub_network_head_size * sub_network_query_groups
         )
-        if block.attn.attn.bias is not None:
-            block.attn.attn.bias.data[block.attn.qkv_indices] = (
-                block_orig.attn.attn.bias.data
+        proj_shape = q_per_kv* sub_network_head_size * sub_network_query_groups
+        block.attn.qkv.weight.data[:shape, :embd] = (
+            block_orig.attn.qkv.weight.data
+        )
+        if block.attn.qkv.bias is not None:
+            block.attn.qkv.bias.data[:shape] = (
+                block_orig.attn.qkv.bias.data
             )
-        block.attn.proj.weight.data[:, block.attn.proj_indices][:embd, :] = (
+        block.attn.proj.weight.data[:embd, :proj_shape] = (
             block_orig.attn.proj.weight.data
         )
         if block.attn.proj.bias is not None:

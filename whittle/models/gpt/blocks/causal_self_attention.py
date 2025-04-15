@@ -289,22 +289,13 @@ class CausalSelfAttention(nn.Module):
         dtype: torch.dtype | None = None,
         rope_n_elem: int | None = None,
     ) -> KVCache:
-        heads = (
-            1
-            if self.sub_network_query_groups == 1
-            else self.sub_network_q_per_kv * self.sub_network_query_groups
-        )
-        v_shape = (batch_size, heads, max_seq_length, self.sub_network_head_size)
+        v_shape = (batch_size, self.sub_network_query_groups, max_seq_length, self.sub_network_head_size)
+        rope_n_elem = int(self.sub_network_head_size * self.config.rotary_percentage)
         if rope_cache_length is None:
             if self.config.rotary_percentage != 1.0:
-                raise TypeError(
-                    "Please pass the `rope_cache_length=gpt.cos.size(-1)` value"
-                )
+                raise TypeError("Please pass the `rope_cache_length=gpt.cos.size(-1)` value")
             k_shape = v_shape
         else:
-            rope_n_elem = (
-                rope_n_elem if rope_n_elem is not None else self.config.rope_n_elem
-            )
             k_shape = (
                 batch_size,
                 self.sub_network_query_groups,

@@ -331,7 +331,7 @@ class GPT(nn.Module):
             # `cos`, `sin` have shape (1, T, config.rope_n_elem)
             mask = None  # defaults to causal mask
             input_pos_maxp1 = None
-        return cos, sin, mask
+        return cos, sin, mask, input_pos_maxp1
 
     def forward(
         self,
@@ -352,13 +352,11 @@ class GPT(nn.Module):
         for i in range(self.sub_network_n_layers):
             block = self.transformer.h[i]
 
-            cos, sin, mask = self.process_rope_cache(
+            cos, sin, mask, input_pos_maxp1_block = self.process_rope_cache(
                 self.cos, self.sin, input_pos, input_pos_maxp1, T
             )
-            print(cos.shape)
-            print(sin.shape)
 
-            x = block(x, cos, sin, mask, input_pos)
+            x = block(x, cos, sin, mask, input_pos, input_pos_maxp1_block)
         x = self.transformer.ln_f(x)
         clamp_head = (
             partial(do_softcapping, thresh=self.config.final_logit_softcapping)
