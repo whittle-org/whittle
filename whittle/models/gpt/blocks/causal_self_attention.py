@@ -45,7 +45,6 @@ class CausalSelfAttention(nn.Module):
         self.sub_attention_scaler = self.config.attention_scores_scalar
 
     def get_qkv_indices(self):
-        indices = []
         hs = self.config.head_size
         snhs = self.sub_network_head_size
         n_head = self.config.n_head
@@ -55,56 +54,82 @@ class CausalSelfAttention(nn.Module):
         heads_per_group = n_head // n_qg
 
         if n_head == n_qg:
-            for h in range(snh):
-                base = 3 * h * hs
-                indices.append(torch.arange(base, base + snhs))  # q
-                indices.append(torch.arange(base + hs, base + hs + snhs))  # k
-                indices.append(torch.arange(base + 2 * hs, base + 2 * hs + snhs))  # v
+            # Interleave q, k, v for each sub-network head
+            h = torch.arange(snh).unsqueeze(1)
+            base = 3 * h * hs
+            q = base
+            k = base + hs
+            v = base + 2 * hs
+
+            offsets = torch.arange(snhs)
+            indices = torch.cat([q + offsets, k + offsets, v + offsets], dim=0).flatten()
 
         elif n_qg == 1:
-            for h in range(snh):
-                start = h * hs
-                indices.append(torch.arange(start, start + snhs))  # q
+            # All Qs first, then single K, V
+            h = torch.arange(snh).unsqueeze(1)
+            q_start = h * hs
+            q = q_start + torch.arange(snhs)
+            q = q.flatten()
+
             end_queries = n_head * hs
-            indices.append(torch.arange(end_queries, end_queries + snhs))  # k
-            indices.append(torch.arange(end_queries + hs, end_queries + hs + snhs))  # v
+            k = torch.arange(end_queries, end_queries + snhs)
+            v = torch.arange(end_queries + hs, end_queries + hs + snhs)
+
+            indices = torch.cat([q, k, v])
 
         else:
-            for g in range(self.sub_network_query_groups):
-                base_q = g * (heads_per_group + 2) * hs
-                for h in range(self.sub_network_q_per_kv):
-                    indices.append(
-                        torch.arange(base_q + h * hs, base_q + h * hs + snhs)
-                    )  # q
-                base_k = base_q + heads_per_group * hs
-                indices.append(torch.arange(base_k, base_k + snhs))  # k
-                indices.append(torch.arange(base_k + hs, base_k + hs + snhs))  # v
+            q_per_kv = self.sub_network_q_per_kv
+            qg = self.sub_network_query_groups
+            hs_tensor = torch.arange(snhs)
 
-        return torch.cat(indices)
+            heads_per_group = n_head // n_qg
+            group_offset = (heads_per_group + 2) * hs
+
+            # Group indices (0 to qg-1)
+            g = torch.arange(qg)
+
+            # ---- Q ----
+            # Each group has `q_per_kv` Q heads, each spaced by `hs`
+            q_offsets = torch.arange(q_per_kv) * hs  # shape: [q_per_kv]
+            q_base = g[:, None] * group_offset + q_offsets  # shape: [qg, q_per_kv]
+            q_indices = q_base[:, :, None] + hs_tensor  # [qg, q_per_kv, snhs]
+            q_indices = q_indices.reshape(-1, snhs)  # [qg * q_per_kv, snhs]
+
+            # ---- K ----
+            k_base = g * group_offset + heads_per_group * hs  # [qg]
+            k_indices = k_base[:, None] + hs_tensor  # [qg, snhs]
+
+            # ---- V ----
+            v_base = k_base + hs
+            v_indices = v_base[:, None] + hs_tensor  # [qg, snhs]
+
+            # ---- Combine in correct order: Q...Q, K, V per group ----
+            indices = torch.cat([q_indices, k_indices, v_indices], dim=0).reshape(-1)
+
+        return indices
 
     def get_proj_indices(self):
         n_head = self.config.n_head
         n_query_groups = self.config.n_query_groups
-        sub_network_n_head = self.sub_network_n_head
-        heads_per_group = n_head // n_query_groups
-        sub_network_query_groups = self.sub_network_query_groups
-        sub_network_head_size = self.sub_network_head_size
-        head_size = self.config.head_size
-
-        indices = []
+        sub_n_head = self.sub_network_n_head
+        hpg = n_head // n_query_groups  # heads per group
+        sn_qg = self.sub_network_query_groups
+        sn_hs = self.sub_network_head_size
+        hs = self.config.head_size
 
         if n_head == n_query_groups:
-            for i in range(sub_network_n_head):
-                start = i * head_size
-                indices.append(torch.arange(start, start + sub_network_head_size))
+            # Each head starts at i * head_size
+            starts = torch.arange(sub_n_head) * hs
         else:
-            for g in range(sub_network_query_groups):
-                base = g * heads_per_group * head_size
-                for h in range(self.sub_network_q_per_kv):
-                    start = base + h * head_size
-                    indices.append(torch.arange(start, start + sub_network_head_size))
+            # Compute starting positions for all heads across query groups
+            g_idx = torch.arange(sn_qg).repeat_interleave(self.sub_network_q_per_kv)
+            h_idx = torch.arange(self.sub_network_q_per_kv).repeat(sn_qg)
+            starts = (g_idx * hpg + h_idx) * hs
 
-        return torch.cat(indices)
+        # Expand each start to a range of sub_network_head_size
+        offsets = torch.arange(sn_hs)
+        indices = starts.unsqueeze(1) + offsets  # shape: (N, sn_hs)
+        return indices.flatten()
 
     def set_sub_network(
         self,
