@@ -4,15 +4,14 @@ import os
 import pathlib
 from contextlib import redirect_stdout
 from io import StringIO
-from unittest import mock
 from unittest.mock import Mock
 
 import pytest
 import torch
+from litgpt.data import DataModule
 from litgpt.scripts.download import download_from_hub
 from torch.utils.data import DataLoader, TensorDataset
 
-from test.conftest import RunIf
 from whittle import prune
 from whittle.args import PruningArgs
 
@@ -26,35 +25,67 @@ def checkpoint_dir(tmp_path_factory):
     return pathlib.Path(checkpoint_dir) / "EleutherAI" / "pythia-14m"
 
 
-@RunIf(min_cuda_gpus=1, standalone=True)
-# Set CUDA_VISIBLE_DEVICES for FSDP hybrid-shard, if fewer GPUs are used than are available
-@mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0"})
+class MockDataModule(DataModule):
+    def __init__(self):
+        pass
+
+    def connect(self, tokenizer, batch_size, max_seq_length):
+        pass
+
+    def setup(self):
+        pass
+
+    def train_dataloader(self):
+        dataset = TensorDataset(
+            torch.randint(0, 1000, size=(128, 512)),
+            torch.randint(0, 1000, size=(128, 1)),
+        )
+        return DataLoader(dataset, batch_size=8)
+
+    def val_dataloader(self):
+        dataset = TensorDataset(
+            torch.randint(0, 1000, size=(128, 512)),
+            torch.randint(0, 1000, size=(128, 1)),
+        )
+        return DataLoader(dataset, batch_size=8)
+
+
 @pytest.mark.parametrize("pruning_strategy", methods)
-def test_checkpoints(tmp_path, checkpoint_dir, pruning_strategy):
+def test_checkpoints(tmp_path, checkpoint_dir, pruning_strategy, accelerator_device):
     out_dir = tmp_path / "out"
-    num_sequences = 128
-    max_seq_length = 512
+    # Dynamically adjust the number of sequences based on the device to prevent OOM issue on CPU
+    num_sequences = 32 if accelerator_device == "cpu" else 128
     batch_size = 8
     nsamples = int(num_sequences / batch_size)
-    dataset = TensorDataset(
-        torch.randint(0, 1000, size=(num_sequences, max_seq_length)),
-        torch.randint(0, 1000, size=(num_sequences, 1)),
-    )
 
-    dataloader = DataLoader(dataset, batch_size=batch_size)
-    prune.get_dataloaders = Mock(return_value=(dataloader, dataloader))
+    data_module = MockDataModule()
+    prune.get_dataloaders = Mock(
+        return_value=(data_module.train_dataloader(), data_module.val_dataloader())
+    )
 
     stdout = StringIO()
     with redirect_stdout(stdout):
         prune.setup(
-            checkpoint_dir,
+            checkpoint_dir=checkpoint_dir,
             devices=1,
             out_dir=out_dir,
-            data="test",
-            prune=PruningArgs(pruning_strategy=pruning_strategy, n_samples=nsamples),
+            data=data_module,
+            prune=PruningArgs(
+                pruning_strategy=pruning_strategy,
+                n_samples=nsamples,
+                prune_n_weights_per_group=2,
+                weights_per_group=4,
+            ),
+            precision="32-true",  # Full precision for CPU compatibility
+            accelerator=accelerator_device,
         )
 
     out_dir_content = {
         "lit_model.pth",
+        "model_config.yaml",
     }
     assert out_dir_content.issubset(set(os.listdir(out_dir)))
+
+    logs = stdout.getvalue()
+    assert "Total time for pruning" in logs
+    assert "Sparsity ratio" in logs

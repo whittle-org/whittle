@@ -39,13 +39,6 @@ class MockDataset(Dataset):
         return {"input_ids": input_ids, "labels": labels}
 
 
-@pytest.fixture(params=["cpu", "cuda"])
-def device(request):
-    if request.param == "cuda" and not torch.cuda.is_available():
-        pytest.skip("CUDA not available")
-    return request.param
-
-
 @pytest.fixture(scope="module")
 def ensure_checkpoint():
     """Fixture to ensure the model checkpoint is downloaded."""
@@ -60,7 +53,7 @@ def ensure_checkpoint():
 @mock.patch("whittle.full_finetune.save_hyperparameters")
 @pytest.mark.parametrize("strategy", ["standard", "random", "sandwich"])
 def test_training_strategies(
-    save_hyper_mock, strategy, tmp_path, device, ensure_checkpoint
+    save_hyper_mock, strategy, tmp_path, accelerator_device, ensure_checkpoint
 ):
     Config(block_size=2, n_layer=2, n_embd=4, n_head=2, padded_vocab_size=8)
 
@@ -89,7 +82,7 @@ def test_training_strategies(
             final_validation=False,
         ),
         precision="32-true",  # Full precision for CPU compatibility
-        accelerator=device,
+        accelerator=accelerator_device,
     )
 
 
@@ -99,7 +92,7 @@ def test_training_strategies(
 # the CLI would capture pytest args, but unfortunately patching would mess with subprocess
 # launching, so we need to mock `save_hyperparameters()`
 @mock.patch("whittle.full_finetune.save_hyperparameters")
-def test_full_finetune(save_hyper_mock, tmp_path, device, ensure_checkpoint):
+def test_full_finetune(save_hyper_mock, tmp_path, accelerator_device, ensure_checkpoint):
     Config(block_size=2, n_layer=2, n_embd=8, n_head=4, padded_vocab_size=8)
 
     # Use tokens within vocab size (0 to 7)
@@ -128,7 +121,7 @@ def test_full_finetune(save_hyper_mock, tmp_path, device, ensure_checkpoint):
                 final_validation=False,
             ),
             precision="32-true",  # Full precision for CPU compatibility
-            accelerator=device,
+            accelerator=accelerator_device,
         )
 
     # tmp_path is not the same across all ranks, run assert only on rank 0
