@@ -17,7 +17,7 @@ class CausalSelfAttention(nn.Module):
         super().__init__()
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
-        self.attn = LinearQKV(config.n_embd, shape, bias=config.bias)
+        self.attn = LinearQKV(config.n_embd, shape, bias=config.bias  or config.attn_bias)
         # output projection
         # if `head_size` is explicitly specified in the config, `n_emd` might not be equal to `head_size * n_head`
         self.proj = LinearProj(
@@ -30,6 +30,12 @@ class CausalSelfAttention(nn.Module):
             and block_idx % config.sliding_window_layer_placing == 0
         )
         self.config = config
+        self.block_idx = block_idx
+        if config.norm_qk:
+            self.norm_q = config.norm_class(config.head_size * config.n_head, eps=config.norm_eps)
+            self.norm_k = config.norm_class(config.head_size * config.n_query_groups, eps=config.norm_eps)
+        else:
+            self.norm_q = self.norm_k = None
         # Set current sub-network to super-network
         self.q_per_kv = config.n_head // config.n_query_groups
         self.sub_network_n_embd = self.config.n_embd
