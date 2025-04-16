@@ -34,7 +34,7 @@ class LoRAConfig(BaseConfig):
     lora_alpha: int = 1
     lora_dropout: float = 0.0
     lora_query: bool = False
-    lora_key: bool = False
+    lora_key: bool = True
     lora_value: bool = False
     lora_projection: bool = False
     lora_mlp: bool = False

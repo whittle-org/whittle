@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict
 
 from litgpt.model import KVCache
 from litgpt.utils import map_old_state_dict_weights
-
+from litgpt.scripts.convert_hf_checkpoint import qkv_reassemble
 from whittle.lora_model.config import LoRAConfig as Config
-from whittle.lora_model.lora_linear import LoRALinear
+from whittle.lora_model.lora_linear import LoRALinearProj
 from whittle.lora_model.lora_qkv_linear import LoRAQKVLinear
 from whittle.models.gpt.blocks.causal_self_attention import (
     CausalSelfAttention as BaseCausalSelfAttention,
@@ -37,7 +37,7 @@ class CausalSelfAttention(BaseCausalSelfAttention):
         )
         # output projection
         # if `head_size` is explicitly specified in the config, `n_emd` might not be equal to `head_size * n_head`
-        self.proj = LoRALinear(
+        self.proj = LoRALinearProj(
             config.head_size * config.n_head,
             config.n_embd,
             bias=config.bias,
@@ -51,7 +51,7 @@ class CausalSelfAttention(BaseCausalSelfAttention):
         self.config = config
         self.apply_sliding_window_attention = (
             config.sliding_window_size is not None
-            and block_idx % config.sliding_window_layer_placing == 0
+            and block_idx % config.sliding_window_layer_stride == 0
         )
 
         # Set current sub-network to super-network
@@ -121,7 +121,7 @@ class CausalSelfAttention(BaseCausalSelfAttention):
         )
         self.sub_network_q_per_kv = int(q_per_kv)
         self.qkv_indices = self.get_qkv_indices()
-        self.attn.set_sub_network(
+        self.qkv.set_sub_network(
             self.sub_network_n_embd,
             self.sub_network_qkv_shape,
             qkv_indices=self.qkv_indices,
@@ -143,15 +143,20 @@ class CausalSelfAttention(BaseCausalSelfAttention):
         else:
             self.sub_attention_scaler = self.config.attention_scores_scalar
 
-    def _load_from_state_dict(
-        self, state_dict: dict, prefix: str, *args: Any, **kwargs: Any
-    ) -> None:
-        """For compatibility with base checkpoints."""
+    def _load_from_state_dict(self, state_dict: Dict, prefix: str, *args: Any, **kwargs: Any) -> None:
+        """For compatibility with base and/or legacy checkpoints."""
         mapping = {
-            "attn.weight": "attn.linear.weight",
-            "attn.bias": "attn.linear.bias",
+            "qkv.weight": "qkv.linear.weight",
+            "qkv.bias": "qkv.linear.bias",
             "proj.weight": "proj.linear.weight",
             "proj.bias": "proj.linear.bias",
         }
         state_dict = map_old_state_dict_weights(state_dict, mapping, prefix)
+
+        for attr in ("weight", "bias"):
+            legacy_key = f"{prefix}attn.linear.{attr}"
+            current_key = f"{prefix}qkv.linear.{attr}"
+            if legacy_key in state_dict:
+                state_dict[current_key] = qkv_reassemble(state_dict.pop(legacy_key), self.config)
+
         super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)

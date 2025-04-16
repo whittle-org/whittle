@@ -39,8 +39,8 @@ def test_compute_weight_magnitude(mlp_type, norm_type):
         gpt.transformer.ln_f.bias.data = torch.ones_like(gpt.transformer.ln_f.bias.data)
 
     for block in gpt.transformer.h:
-        block.attn.attn.weight.data = torch.ones_like(block.attn.attn.weight.data)
-        block.attn.attn.bias.data = torch.ones_like(block.attn.attn.bias.data)
+        block.attn.qkv.weight.data = torch.ones_like(block.attn.qkv.weight.data)
+        block.attn.qkv.bias.data = torch.ones_like(block.attn.qkv.bias.data)
         block.attn.proj.bias.data = torch.ones_like(block.attn.proj.bias.data)
         block.attn.proj.weight.data = torch.ones_like(block.attn.proj.weight.data)
 

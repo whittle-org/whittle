@@ -101,21 +101,38 @@ def test_gpt():
 
     for i, block in enumerate(lit_gpt_small.transformer.h):
         block_orig = gpt.transformer.h[i]
-
-        block.attn.qkv.weight.data = block_orig.attn.qkv.weight.data[
-            : block_orig.attn.qkv.sub_network_out_features,
-            : block_orig.attn.qkv.sub_network_in_features,
-        ]
-        block.attn.qkv.bias.data = block_orig.attn.qkv.bias.data[
-            : block_orig.attn.qkv.sub_network_out_features
-        ]
-        block.attn.proj.bias.data = block_orig.attn.proj.bias.data[
-            : block_orig.attn.proj.sub_network_out_features
-        ]
-        block.attn.proj.weight.data = block_orig.attn.proj.weight.data[
-            : block_orig.attn.proj.sub_network_out_features,
-            : block_orig.attn.proj.sub_network_in_features,
-        ]
+        if block_orig.attn.qkv_indices is not None:
+             block.attn.qkv.weight.data = block_orig.attn.qkv.weight.data[
+                block_orig.attn.qkv_indices,
+                : block_orig.attn.qkv.sub_network_in_features,
+            ]
+             block.attn.qkv.bias.data = block_orig.attn.qkv.bias.data[
+                block_orig.attn.qkv_indices
+            ]
+        else:
+            block.attn.qkv.weight.data = block_orig.attn.qkv.weight.data[
+                : block_orig.attn.qkv.sub_network_out_features,
+                : block_orig.attn.qkv.sub_network_in_features,
+            ]
+            block.attn.qkv.bias.data = block_orig.attn.qkv.bias.data[
+                : block_orig.attn.qkv.sub_network_out_features
+            ]
+        if block_orig.attn.proj_indices is not None:
+            block.attn.proj.weight.data = block_orig.attn.proj.weight.data[
+                : block_orig.attn.proj.sub_network_out_features,
+                block_orig.attn.proj_indices,
+            ]
+            block.attn.proj.bias.data = block_orig.attn.proj.bias.data[
+                : block_orig.attn.proj.sub_network_out_features
+            ]
+        else:
+            block.attn.proj.bias.data = block_orig.attn.proj.bias.data[
+                : block_orig.attn.proj.sub_network_out_features
+            ]
+            block.attn.proj.weight.data = block_orig.attn.proj.weight.data[
+                : block_orig.attn.proj.sub_network_out_features,
+                : block_orig.attn.proj.sub_network_in_features,
+            ]
         block.mlp.fc_1.weight.data = block_orig.mlp.fc_1.weight.data[
             : block_orig.mlp.fc_1.sub_network_out_features,
             : block_orig.mlp.fc_1.sub_network_in_features,

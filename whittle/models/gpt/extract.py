@@ -89,11 +89,28 @@ def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
 
 
 def extract_attention(super_network_attention, sub_network_attention):
-
-    state_dict = extract_linear(super_network_attention.qkv)
-    sub_network_attention.qkv.load_state_dict(state_dict)
-    state_dict = extract_linear(super_network_attention.proj)
-    sub_network_attention.proj.load_state_dict(state_dict)
+    if super_network_attention.qkv_indices is not None:
+        sub_network_attention.qkv.weight.data = super_network_attention.qkv.weight.data[
+            super_network_attention.qkv_indices, :
+        ][:, 0 : sub_network_attention.sub_network_n_embd]
+        if sub_network_attention.qkv.bias is not None:
+            sub_network_attention.qkv.bias.data = super_network_attention.qkv.bias.data[
+                super_network_attention.qkv_indices
+            ]
+    else:
+        state_dict = extract_linear(super_network_attention.attn)
+        sub_network_attention.attn.load_state_dict(state_dict)
+    if super_network_attention.proj_indices is not None:
+        sub_network_attention.proj.weight.data = super_network_attention.proj.weight.data[
+            0 : sub_network_attention.sub_network_n_embd
+        ][:, super_network_attention.proj_indices]
+        if sub_network_attention.proj.bias is not None:
+            sub_network_attention.proj.bias.data = super_network_attention.proj.bias.data[
+                0 : sub_network_attention.sub_network_n_embd
+            ]
+    else:
+        state_dict = extract_linear(super_network_attention.proj)
+        sub_network_attention.proj.load_state_dict(state_dict)
 
 
 def extract_mlp(mlp, sub_mlp):

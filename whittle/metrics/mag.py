@@ -86,6 +86,6 @@ def compute_weight_magnitude_embedding(layer):
 
 def compute_weight_magnitude_attention(layer):
     mag = 0
-    mag = mag + compute_weight_magnitude_linear_layer(layer.attn)
+    mag = mag + compute_weight_magnitude_linear_layer(layer.qkv)
     mag += compute_weight_magnitude_linear_layer(layer.proj)
     return float(mag)

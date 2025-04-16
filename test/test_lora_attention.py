@@ -53,10 +53,10 @@ attention_configs = {
 def init_attention(config):
     attention = CausalSelfAttention(config, 2)
     torch.manual_seed(0)
-    attention.attn.linear.weight.data = torch.randn_like(
-        attention.attn.linear.weight.data
+    attention.qkv.linear.weight.data = torch.randn_like(
+        attention.qkv.linear.weight.data
     )
-    attention.attn.linear.bias.data = torch.randn_like(attention.attn.linear.bias.data)
+    attention.qkv.linear.bias.data = torch.randn_like(attention.qkv.linear.bias.data)
     attention.proj.linear.bias.data = torch.randn_like(attention.proj.linear.bias.data)
     attention.proj.linear.weight.data = torch.randn_like(
         attention.proj.linear.weight.data
@@ -67,8 +67,8 @@ def init_attention(config):
 def init_lit_attention(config):
     attention = LitCausalSelfAttention(config, 2)
     torch.manual_seed(0)
-    attention.attn.weight.data = torch.randn_like(attention.attn.weight.data)
-    attention.attn.bias.data = torch.randn_like(attention.attn.bias.data)
+    attention.qkv.weight.data = torch.randn_like(attention.qkv.weight.data)
+    attention.qkv.bias.data = torch.randn_like(attention.qkv.bias.data)
     attention.proj.bias.data = torch.randn_like(attention.proj.bias.data)
     attention.proj.weight.data = torch.randn_like(attention.proj.weight.data)
     return attention
@@ -77,16 +77,16 @@ def init_lit_attention(config):
 def init_lit_small_attention(config, base_attention, attention_super):
     attention = LitCausalSelfAttention(config, 2)
     torch.manual_seed(0)
-    slices = tuple(slice(0, s) for s in attention.attn.weight.data.size())[1]
+    slices = tuple(slice(0, s) for s in attention.qkv.weight.data.size())[1]
     qkv_indices = (
         attention_super.qkv_indices
         if attention_super.qkv_indices is not None
-        else slice(0, attention.attn.weight.data.size()[0])
+        else slice(0, attention.qkv.weight.data.size()[0])
     )
-    attention.attn.weight.data = base_attention.attn.weight.data[qkv_indices, :][
-        :, 0 : attention.attn.weight.data.size()[1]
+    attention.qkv.weight.data = base_attention.qkv.weight.data[qkv_indices, :][
+        :, 0 : attention.qkv.weight.data.size()[1]
     ]
-    attention.attn.bias.data = base_attention.attn.bias.data[qkv_indices]
+    attention.qkv.bias.data = base_attention.qkv.bias.data[qkv_indices]
     proj_indices = (
         attention_super.proj_indices
         if attention_super.proj_indices is not None
@@ -104,6 +104,11 @@ def init_lit_small_attention(config, base_attention, attention_super):
 @pytest.mark.parametrize("attention_config", attention_configs.keys())
 def test_attention(attention_config):
     config = attention_configs[attention_config]["config"]
+    if config.sliding_window_size is not None:
+        config.sliding_window_layer_stride = (
+            1 if (config.sliding_window_layer_placing is None or config.sliding_window_layer_placing == "all") else 2
+        )
+
     config.fix_head_size = attention_configs[attention_config]["fix_head_size"]
     if not config.fix_head_size:
         config.head_size = 32
@@ -112,8 +117,8 @@ def test_attention(attention_config):
 
     seq_len = config.max_seq_len
     cos, sin = build_rope_cache(seq_len, n_elem=config.rope_n_elem)
-    cos = cos[:seq_len]
-    sin = sin[:seq_len]
+    cos = cos[:seq_len].unsqueeze(0)
+    sin = sin[:seq_len].unsqueeze(0)
     input = torch.rand(8, seq_len, config.n_embd)
     mask = build_mask_cache(seq_len)
 
@@ -146,6 +151,8 @@ def test_attention(attention_config):
     cos, sin = build_rope_cache(
         seq_len, n_elem=int(config.rotary_percentage * sub_network_head_size)
     )
+    cos = cos[:seq_len].unsqueeze(0)
+    sin = sin[:seq_len].unsqueeze(0)
     out_small = attention(input[:, :, : config.n_embd // 2], mask=mask, cos=cos, sin=sin)
 
     # check shape of sub-network attention

@@ -9,7 +9,7 @@ from litgpt import Config
 from litgpt.model import KVCache, apply_rope, do_softcapping
 from litgpt.scripts.convert_hf_checkpoint import qkv_reassemble
 
-from whittle.modules import Linear
+from whittle.modules import LinearProj, LinearQKV
 
 
 class CausalSelfAttention(nn.Module):
@@ -19,10 +19,10 @@ class CausalSelfAttention(nn.Module):
         super().__init__()
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
-        self.qkv = Linear(config.n_embd, shape, bias=config.bias or config.attn_bias)
+        self.qkv = LinearQKV(config.n_embd, shape, bias=config.bias or config.attn_bias)
         # output projection
         # if `head_size` is explicitly specified in the config, `n_emd` might not be equal to `head_size * n_head`
-        self.proj = Linear(
+        self.proj = LinearProj(
             config.head_size * config.n_head, config.n_embd, bias=config.bias
         )
         # disabled by default
@@ -56,6 +56,94 @@ class CausalSelfAttention(nn.Module):
         )
         self.sub_attention_scaler = self.config.attention_scores_scalar
 
+    def get_qkv_indices(self):
+        head_size = self.config.head_size
+        n_head = self.config.n_head
+        n_query_groups = self.config.n_query_groups
+        sub_n_head = self.sub_network_n_head
+        sub_head_size = self.sub_network_head_size
+        sub_q_groups = self.sub_network_query_groups
+        sub_q_per_kv = self.sub_network_q_per_kv
+
+        heads_per_group = n_head // n_query_groups
+
+        # Count heads per section
+        if n_head == n_query_groups:
+            num_q = num_k = num_v = n_head
+        elif n_query_groups == 1:
+            num_q = n_head
+            num_k = num_v = 1
+        else:
+            num_q = n_head
+            num_k = num_v = n_query_groups
+
+        # Compute block start offsets
+        q_block_start = 0
+        k_block_start = num_q * head_size
+        v_block_start = k_block_start + num_k * head_size
+
+        q_parts, k_parts, v_parts = [], [], []
+
+        if n_head == n_query_groups:
+            for i in range(sub_n_head):
+                q_start = q_block_start + i * head_size
+                k_start = k_block_start + i * head_size
+                v_start = v_block_start + i * head_size
+                q_parts.append(torch.arange(q_start, q_start + sub_head_size))
+                k_parts.append(torch.arange(k_start, k_start + sub_head_size))
+                v_parts.append(torch.arange(v_start, v_start + sub_head_size))
+
+        elif n_query_groups == 1:
+            for i in range(sub_n_head):
+                q_start = q_block_start + i * head_size
+                q_parts.append(torch.arange(q_start, q_start + sub_head_size))
+
+            k_parts.append(torch.arange(k_block_start, k_block_start + sub_head_size))
+            v_parts.append(torch.arange(v_block_start, v_block_start + sub_head_size))
+
+        else:
+            for g in range(sub_q_groups):
+                for h in range(sub_q_per_kv):
+                    q_head_index = g * heads_per_group + h
+                    q_start = q_block_start + q_head_index * head_size
+                    q_parts.append(torch.arange(q_start, q_start + sub_head_size))
+
+                k_start = k_block_start + g * head_size
+                k_parts.append(torch.arange(k_start, k_start + sub_head_size))
+
+                v_start = v_block_start + g * head_size
+                v_parts.append(torch.arange(v_start, v_start + sub_head_size))
+
+        qkv = torch.cat(q_parts + k_parts + v_parts)
+        return qkv
+
+    def get_proj_indices(self):
+        head_size = self.config.head_size
+        n_head = self.config.n_head
+        n_query_groups = self.config.n_query_groups
+        sub_n_head = self.sub_network_n_head
+        sub_head_size = self.sub_network_head_size
+        sub_q_groups = self.sub_network_query_groups
+        sub_q_per_kv = self.sub_network_q_per_kv
+
+        heads_per_group = n_head // n_query_groups
+
+        if n_head == n_query_groups:
+            base = torch.arange(sub_n_head) * head_size
+            proj = torch.cat([
+                torch.arange(start, start + sub_head_size) for start in base
+            ])
+        else:
+            proj_parts = []
+            for g in range(sub_q_groups):
+                start = g * heads_per_group * head_size
+                for h in range(sub_q_per_kv):
+                    proj_start = start + h * head_size
+                    proj_parts.append(torch.arange(proj_start, proj_start + sub_head_size))
+            proj = torch.cat(proj_parts)
+
+        return proj
+    
     def set_sub_network(
         self,
         sub_network_n_embd: int,
@@ -106,12 +194,15 @@ class CausalSelfAttention(nn.Module):
             (q_per_kv + 2) * self.sub_network_head_size * self.sub_network_query_groups
         )
         self.sub_network_q_per_kv = int(q_per_kv)
-        self.qkv.set_sub_network(self.sub_network_n_embd, self.sub_network_qkv_shape)
+        self.qkv_indices = self.get_qkv_indices()
+        self.proj_indices = self.get_proj_indices()
+        self.qkv.set_sub_network(self.sub_network_n_embd, self.sub_network_qkv_shape, self.qkv_indices)
         self.proj.set_sub_network(
             self.sub_network_head_size
             * self.sub_network_query_groups
             * self.sub_network_q_per_kv,
             self.sub_network_n_embd,
+            self.proj_indices,
         )
         if self.config.attention_scores_scalar:
             self.sub_attention_scaler = self.sub_network_n_embd // self.sub_network_n_head
