@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from litgpt.model import KVCache
-from litgpt.utils import map_old_state_dict_weights
 from litgpt.scripts.convert_hf_checkpoint import qkv_reassemble
+from litgpt.utils import map_old_state_dict_weights
+
 from whittle.lora_model.config import LoRAConfig as Config
 from whittle.lora_model.lora_linear import LoRALinearProj
 from whittle.lora_model.lora_qkv_linear import LoRAQKVLinear
@@ -143,7 +144,9 @@ class CausalSelfAttention(BaseCausalSelfAttention):
         else:
             self.sub_attention_scaler = self.config.attention_scores_scalar
 
-    def _load_from_state_dict(self, state_dict: Dict, prefix: str, *args: Any, **kwargs: Any) -> None:
+    def _load_from_state_dict(
+        self, state_dict: dict, prefix: str, *args: Any, **kwargs: Any
+    ) -> None:
         """For compatibility with base and/or legacy checkpoints."""
         mapping = {
             "qkv.weight": "qkv.linear.weight",
@@ -157,6 +160,8 @@ class CausalSelfAttention(BaseCausalSelfAttention):
             legacy_key = f"{prefix}attn.linear.{attr}"
             current_key = f"{prefix}qkv.linear.{attr}"
             if legacy_key in state_dict:
-                state_dict[current_key] = qkv_reassemble(state_dict.pop(legacy_key), self.config)
+                state_dict[current_key] = qkv_reassemble(
+                    state_dict.pop(legacy_key), self.config
+                )
 
         super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)

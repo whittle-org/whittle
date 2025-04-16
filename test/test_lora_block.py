@@ -41,9 +41,7 @@ def test_block():
     block = Block(config, 0)
     input = torch.rand(8, 512, 64)
     mask = build_mask_cache(512)
-    block.attn.qkv.linear.weight.data = torch.ones_like(
-        block.attn.qkv.linear.weight.data
-    )
+    block.attn.qkv.linear.weight.data = torch.ones_like(block.attn.qkv.linear.weight.data)
     block.attn.qkv.linear.bias.data = torch.ones_like(block.attn.qkv.linear.bias.data)
     block.attn.proj.linear.bias.data = torch.ones_like(block.attn.proj.linear.bias.data)
     block.attn.proj.linear.weight.data = torch.ones_like(

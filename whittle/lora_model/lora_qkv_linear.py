@@ -201,14 +201,21 @@ class LoRAQKVLinear(LoRALayer):
         indices = torch.arange(len(candidate_indices), dtype=torch.long, device=device)
 
         if target_mod == "q":
-            mask = candidate_tensor < self.q_per_kv*self.head_size*self.n_query_groups
+            mask = candidate_tensor < self.q_per_kv * self.head_size * self.n_query_groups
         elif target_mod == "k":
-            mask = (candidate_tensor >= self.q_per_kv*self.head_size*self.n_query_groups) & (
-                candidate_tensor < (self.q_per_kv + 1) * self.head_size * self.n_query_groups
+            mask = (
+                candidate_tensor >= self.q_per_kv * self.head_size * self.n_query_groups
+            ) & (
+                candidate_tensor
+                < (self.q_per_kv + 1) * self.head_size * self.n_query_groups
             )
         elif target_mod == "v":
-            mask = (candidate_tensor >= (self.q_per_kv + 1) * self.head_size * self.n_query_groups) & (
-                candidate_tensor < (self.q_per_kv + 2) * self.head_size * self.n_query_groups
+            mask = (
+                candidate_tensor
+                >= (self.q_per_kv + 1) * self.head_size * self.n_query_groups
+            ) & (
+                candidate_tensor
+                < (self.q_per_kv + 2) * self.head_size * self.n_query_groups
             )
 
         selected_indices = candidate_tensor[mask]
@@ -363,7 +370,7 @@ class LoRAQKVLinear(LoRALayer):
                 0
             ),  # (4, 128) -> (1, 4, 128)
             self.lora_B,  # (256, 2) -> (256, 2, 1) -> splitted (inside conv1d)
-        ) # (1, 4, 128) @ (256, 2, 1) -> (1, 256, 128) -> (256, 128)
+        )  # (1, 4, 128) @ (256, 2, 1) -> (1, 256, 128) -> (256, 128)
         return self.zero_pad(
             [lora_w.squeeze(0).T * self.scaling for lora_w in lora.T]
         ).T  # (256, 128) after zero_pad (384, 128)

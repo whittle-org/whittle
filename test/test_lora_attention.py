@@ -53,9 +53,7 @@ attention_configs = {
 def init_attention(config):
     attention = CausalSelfAttention(config, 2)
     torch.manual_seed(0)
-    attention.qkv.linear.weight.data = torch.randn_like(
-        attention.qkv.linear.weight.data
-    )
+    attention.qkv.linear.weight.data = torch.randn_like(attention.qkv.linear.weight.data)
     attention.qkv.linear.bias.data = torch.randn_like(attention.qkv.linear.bias.data)
     attention.proj.linear.bias.data = torch.randn_like(attention.proj.linear.bias.data)
     attention.proj.linear.weight.data = torch.randn_like(
@@ -106,7 +104,12 @@ def test_attention(attention_config):
     config = attention_configs[attention_config]["config"]
     if config.sliding_window_size is not None:
         config.sliding_window_layer_stride = (
-            1 if (config.sliding_window_layer_placing is None or config.sliding_window_layer_placing == "all") else 2
+            1
+            if (
+                config.sliding_window_layer_placing is None
+                or config.sliding_window_layer_placing == "all"
+            )
+            else 2
         )
 
     config.fix_head_size = attention_configs[attention_config]["fix_head_size"]

@@ -102,7 +102,12 @@ def test_attention(attention_config):
     config = attention_configs[attention_config]["config"]
     if config.sliding_window_size is not None:
         config.sliding_window_layer_stride = (
-            1 if (config.sliding_window_layer_placing is None or config.sliding_window_layer_placing == "all") else 2
+            1
+            if (
+                config.sliding_window_layer_placing is None
+                or config.sliding_window_layer_placing == "all"
+            )
+            else 2
         )
     config.fix_head_size = attention_configs[attention_config]["fix_head_size"]
     if not config.fix_head_size:

@@ -69,13 +69,13 @@ class CausalSelfAttention(nn.Module):
 
         # Count heads per section
         if n_head == n_query_groups:
-            num_q = num_k = num_v = n_head
+            num_q = num_k = n_head
         elif n_query_groups == 1:
             num_q = n_head
-            num_k = num_v = 1
+            num_k = 1
         else:
             num_q = n_head
-            num_k = num_v = n_query_groups
+            num_k = n_query_groups
 
         # Compute block start offsets
         q_block_start = 0
@@ -130,20 +130,22 @@ class CausalSelfAttention(nn.Module):
 
         if n_head == n_query_groups:
             base = torch.arange(sub_n_head) * head_size
-            proj = torch.cat([
-                torch.arange(start, start + sub_head_size) for start in base
-            ])
+            proj = torch.cat(
+                [torch.arange(start, start + sub_head_size) for start in base]
+            )
         else:
             proj_parts = []
             for g in range(sub_q_groups):
                 start = g * heads_per_group * head_size
                 for h in range(sub_q_per_kv):
                     proj_start = start + h * head_size
-                    proj_parts.append(torch.arange(proj_start, proj_start + sub_head_size))
+                    proj_parts.append(
+                        torch.arange(proj_start, proj_start + sub_head_size)
+                    )
             proj = torch.cat(proj_parts)
 
         return proj
-    
+
     def set_sub_network(
         self,
         sub_network_n_embd: int,
@@ -196,7 +198,9 @@ class CausalSelfAttention(nn.Module):
         self.sub_network_q_per_kv = int(q_per_kv)
         self.qkv_indices = self.get_qkv_indices()
         self.proj_indices = self.get_proj_indices()
-        self.qkv.set_sub_network(self.sub_network_n_embd, self.sub_network_qkv_shape, self.qkv_indices)
+        self.qkv.set_sub_network(
+            self.sub_network_n_embd, self.sub_network_qkv_shape, self.qkv_indices
+        )
         self.proj.set_sub_network(
             self.sub_network_head_size
             * self.sub_network_query_groups
@@ -380,11 +384,18 @@ class CausalSelfAttention(nn.Module):
         dtype: torch.dtype | None = None,
         rope_n_elem: int | None = None,
     ) -> KVCache:
-        v_shape = (batch_size, self.sub_network_query_groups, max_seq_length, self.sub_network_head_size)
+        v_shape = (
+            batch_size,
+            self.sub_network_query_groups,
+            max_seq_length,
+            self.sub_network_head_size,
+        )
         rope_n_elem = int(self.sub_network_head_size * self.config.rotary_percentage)
         if rope_cache_length is None:
             if self.config.rotary_percentage != 1.0:
-                raise TypeError("Please pass the `rope_cache_length=gpt.cos.size(-1)` value")
+                raise TypeError(
+                    "Please pass the `rope_cache_length=gpt.cos.size(-1)` value"
+                )
             k_shape = v_shape
         else:
             k_shape = (

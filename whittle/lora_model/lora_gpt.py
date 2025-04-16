@@ -1,12 +1,14 @@
 from __future__ import annotations
+
 from functools import partial
 from typing import Any
 from typing_extensions import Self
 
 import torch
 import torch.nn as nn
-from litgpt.utils import map_old_state_dict_weights
 from litgpt.model import do_softcapping
+from litgpt.utils import map_old_state_dict_weights
+
 from whittle.lora_model.config import LoRAConfig as Config
 from whittle.lora_model.lora_block import LoRABlock as Block
 from whittle.lora_model.lora_embedding import LoRAEmbedding
@@ -81,7 +83,9 @@ class GPT(BaseModel):
             block = self.transformer.h[i]
 
             cos, sin = self.cos.to(idx.device), self.sin.to(idx.device)
-            cos, sin, mask, input_pos_maxp1_block = self.process_rope_cache(cos, sin, input_pos, input_pos_maxp1, T)
+            cos, sin, mask, input_pos_maxp1_block = self.process_rope_cache(
+                cos, sin, input_pos, input_pos_maxp1, T
+            )
             x = block(x, cos, sin, mask, input_pos, input_pos_maxp1_block)
 
         x = self.transformer.ln_f(x)

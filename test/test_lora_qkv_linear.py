@@ -6,7 +6,6 @@ import torch.nn as nn
 from litgpt import Config
 
 from whittle.lora_model.config import LoRAConfig
-from whittle.lora_model.lora_attention import CausalSelfAttention
 from whittle.lora_model.lora_qkv_linear import LoRAQKVLinear
 from whittle.models.gpt.blocks import CausalSelfAttention as CausalSelfAttentionWhittle
 
@@ -164,12 +163,20 @@ def test_qkv_linear_forward(qkv_config):
     inp = torch.rand(batch_size, seq_length, whittle_config.n_embd)
     qkv_out_whittle = whittle_attention.qkv(inp)
 
-    query_size = whittle_attention.sub_network_q_per_kv * whittle_attention.sub_network_head_size * whittle_attention.sub_network_query_groups
-    key_size = whittle_attention.sub_network_head_size * whittle_attention.sub_network_query_groups
-    value_size = whittle_attention.sub_network_head_size * whittle_attention.sub_network_query_groups
-    q, k, v = qkv_out_whittle.split(
-        (query_size, key_size, value_size), dim=-1
+    query_size = (
+        whittle_attention.sub_network_q_per_kv
+        * whittle_attention.sub_network_head_size
+        * whittle_attention.sub_network_query_groups
     )
+    key_size = (
+        whittle_attention.sub_network_head_size
+        * whittle_attention.sub_network_query_groups
+    )
+    value_size = (
+        whittle_attention.sub_network_head_size
+        * whittle_attention.sub_network_query_groups
+    )
+    q, k, v = qkv_out_whittle.split((query_size, key_size, value_size), dim=-1)
     nn.init.xavier_uniform_(qkv.lora_A)
     nn.init.xavier_uniform_(qkv.lora_B)
     after_A = torch.nn.functional.linear(
@@ -179,8 +186,8 @@ def test_qkv_linear_forward(qkv_config):
     lora = qkv.zero_pad([a.transpose(-2, -1) * qkv.scaling for a in after_B])
     q_lora, k_lora, v_lora = lora.split((query_size, key_size, value_size), dim=-1)
     qkv_out_lora = qkv_out_whittle + lora
-    q_lora_and_whittle, k_lora_and_whittle, v_lora_and_whittle = (
-        qkv_out_lora.split((query_size, key_size, value_size), dim=-1)
+    q_lora_and_whittle, k_lora_and_whittle, v_lora_and_whittle = qkv_out_lora.split(
+        (query_size, key_size, value_size), dim=-1
     )
     assert torch.allclose(q_lora_and_whittle - q_lora, q, atol=1e-6)
     assert torch.allclose(k_lora_and_whittle - k_lora, k, atol=1e-6)

@@ -131,7 +131,7 @@ class LoRALinear(LoRALayer):
             @ self.lora_B[: self.sub_network_out_features, :].transpose(0, 1)
         ) * self.scaling
         return pretrained + lora
-    
+
 
 class LoRALinearProj(LoRALayer):
     def __init__(

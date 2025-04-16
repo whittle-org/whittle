@@ -102,11 +102,11 @@ def test_gpt():
     for i, block in enumerate(lit_gpt_small.transformer.h):
         block_orig = gpt.transformer.h[i]
         if block_orig.attn.qkv_indices is not None:
-             block.attn.qkv.weight.data = block_orig.attn.qkv.weight.data[
+            block.attn.qkv.weight.data = block_orig.attn.qkv.weight.data[
                 block_orig.attn.qkv_indices,
                 : block_orig.attn.qkv.sub_network_in_features,
             ]
-             block.attn.qkv.bias.data = block_orig.attn.qkv.bias.data[
+            block.attn.qkv.bias.data = block_orig.attn.qkv.bias.data[
                 block_orig.attn.qkv_indices
             ]
         else:
