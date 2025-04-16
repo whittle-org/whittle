@@ -4,11 +4,11 @@ import os
 import pathlib
 from contextlib import redirect_stdout
 from io import StringIO
+from unittest import mock
 from unittest.mock import Mock
 
 import pytest
 import torch
-from litgpt.data import DataModule
 from litgpt.scripts.download import download_from_hub
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -25,43 +25,24 @@ def checkpoint_dir(tmp_path_factory):
     return pathlib.Path(checkpoint_dir) / "EleutherAI" / "pythia-14m"
 
 
-class MockDataModule(DataModule):
-    def __init__(self):
-        pass
-
-    def connect(self, tokenizer, batch_size, max_seq_length):
-        pass
-
-    def setup(self):
-        pass
-
-    def train_dataloader(self):
-        dataset = TensorDataset(
-            torch.randint(0, 1000, size=(128, 512)),
-            torch.randint(0, 1000, size=(128, 1)),
-        )
-        return DataLoader(dataset, batch_size=8)
-
-    def val_dataloader(self):
-        dataset = TensorDataset(
-            torch.randint(0, 1000, size=(128, 512)),
-            torch.randint(0, 1000, size=(128, 1)),
-        )
-        return DataLoader(dataset, batch_size=8)
-
-
+# Set CUDA_VISIBLE_DEVICES for FSDP hybrid-shard, if fewer GPUs are used than are available
+@mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0"})
 @pytest.mark.parametrize("pruning_strategy", methods)
 def test_checkpoints(tmp_path, checkpoint_dir, pruning_strategy, accelerator_device):
     out_dir = tmp_path / "out"
     # Dynamically adjust the number of sequences based on the device to prevent OOM issue on CPU
     num_sequences = 32 if accelerator_device == "cpu" else 128
+    max_seq_length = 512
     batch_size = 8
     nsamples = int(num_sequences / batch_size)
 
-    data_module = MockDataModule()
-    prune.get_dataloaders = Mock(
-        return_value=(data_module.train_dataloader(), data_module.val_dataloader())
+    dataset = TensorDataset(
+        torch.randint(0, 1000, size=(num_sequences, max_seq_length)),
+        torch.randint(0, 1000, size=(num_sequences, 1)),
     )
+
+    dataloader = DataLoader(dataset, batch_size=batch_size)
+    prune.get_dataloaders = Mock(return_value=(dataloader, dataloader))
 
     stdout = StringIO()
     with redirect_stdout(stdout):
@@ -69,7 +50,7 @@ def test_checkpoints(tmp_path, checkpoint_dir, pruning_strategy, accelerator_dev
             checkpoint_dir=checkpoint_dir,
             devices=1,
             out_dir=out_dir,
-            data=data_module,
+            data="test",
             prune=PruningArgs(
                 pruning_strategy=pruning_strategy,
                 n_samples=nsamples,
