@@ -1,3 +1,46 @@
+## 0.5.0 (2025-04-16)
+
+### Feat
+
+- add workflow finetune (#275)
+- lora finetuning (#265)
+- Add new distill losses (#266)
+- Checkpointing and convert to litgpt (#268)
+- add distillation workflow (#261)
+- litgpt-style CLI (#246)
+- remove duplicated lora QKV linear layer (#260)
+- adds pruning workflow (#241)
+- search results and evaluation workflow (#249)
+- add lora supernet (#245)
+- make deepspeed install optional (#248)
+- add pypi version to readme (#234)
+- add workflow for multi-objective search (#179)
+- addition of structural pruning methods (#192)
+
+### Fix
+
+- optimize lora_qkv_linear (#274)
+- link to distillation workflow in readme (#269)
+- off-by-one error in bin sampling (#267)
+- lora indexing (#259)
+- use `litgpt.data.Alpaca` instead of C4 in pruning workflow (#257)
+- pass dataloader in data loading function (#240)
+- gqa and mqa indexing (#244)
+- update contributor list (#250)
+- ruff linting rules (#253)
+- formatting (#252)
+- add link for search workflow to README (#232)
+- use random init for unit test (#227)
+- updating `ruff` config to respect `target-version` for linting (#224)
+- Reset the rope cache in reset_super_network (#220)
+- update doc for puning (#218)
+- renamed folder from sine_curves/ to sinc/ (#219)
+- Enable to extract the current active subnet without passing configs/dicts. (#213)
+
+### Refactor
+
+- Use Lightning instead of Deepspeed to measure flops (#281)
+
 ## 0.4.1 (2024-12-12)
 
 ### Fix
