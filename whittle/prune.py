@@ -11,7 +11,7 @@ from lightning.fabric.strategies import FSDPStrategy
 from litgpt import Tokenizer
 from litgpt.args import TrainArgs
 from litgpt.data import DataModule
-from litgpt.data.dolly import Alpaca
+from litgpt.data.alpaca import Alpaca
 from litgpt.model import Config
 from litgpt.pretrain import get_dataloaders
 from litgpt.utils import (
