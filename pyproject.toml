@@ -19,7 +19,7 @@ dependencies = [
     "pandas",
     "matplotlib",
     "typing-extensions",
-    "torch>=2",
+    "torch>=2.5.0,<2.6.0",
     "transformers>=4",
     "litgpt[all]==0.5.7",
     "syne-tune[moo]@ git+https://github.com/syne-tune/syne-tune.git@be5f694b57fc4d1f1c38966727717ed912602ce5",
