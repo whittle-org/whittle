@@ -52,7 +52,7 @@ def params_attention_layer(attention: CausalSelfAttention):
         num_query_groups = attention.sub_network_n_head
     qkv_dim = (q_per_kv + 2) * dhead * num_query_groups
     n_attention = dmodel * qkv_dim
-    if attention.attn.use_bias:
+    if attention.qkv.use_bias:
         n_attention += qkv_dim
     n_attention += dmodel * dhead * num_query_groups * q_per_kv
     if attention.proj.use_bias:

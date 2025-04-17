@@ -49,11 +49,11 @@ def test_gpt():
     gpt.transformer.ln_f.weight.data = torch.randn_like(gpt.transformer.ln_f.weight.data)
 
     for block in gpt.transformer.h:
-        block.attn.attn.linear.weight.data = torch.randn_like(
-            block.attn.attn.linear.weight.data
+        block.attn.qkv.linear.weight.data = torch.randn_like(
+            block.attn.qkv.linear.weight.data
         )
-        block.attn.attn.linear.bias.data = torch.randn_like(
-            block.attn.attn.linear.bias.data
+        block.attn.qkv.linear.bias.data = torch.randn_like(
+            block.attn.qkv.linear.bias.data
         )
         block.attn.proj.linear.bias.data = torch.randn_like(
             block.attn.proj.linear.bias.data
@@ -94,8 +94,8 @@ def test_gpt():
     lit_gpt.transformer.ln_f.weight.data = gpt.transformer.ln_f.weight.data
     for i, block in enumerate(lit_gpt.transformer.h):
         block_orig = gpt.transformer.h[i]
-        block.attn.attn.weight.data = block_orig.attn.attn.linear.weight.data
-        block.attn.attn.bias.data = block_orig.attn.attn.linear.bias.data
+        block.attn.qkv.weight.data = block_orig.attn.qkv.linear.weight.data
+        block.attn.qkv.bias.data = block_orig.attn.qkv.linear.bias.data
         block.attn.proj.bias.data = block_orig.attn.proj.linear.bias.data
         block.attn.proj.weight.data = block_orig.attn.proj.linear.weight.data
         block.mlp.fc_1.weight.data = block_orig.mlp.fc_1.linear.weight.data
@@ -140,21 +140,21 @@ def test_gpt():
     for i, block in enumerate(lit_gpt_small.transformer.h):
         block_orig = gpt.transformer.h[i]
         if block_orig.attn.qkv_indices is not None:
-            block.attn.attn.weight.data = block_orig.attn.attn.linear.weight.data[
+            block.attn.qkv.weight.data = block_orig.attn.qkv.linear.weight.data[
                 block_orig.attn.qkv_indices,
-                : block_orig.attn.attn.sub_network_in_features,
+                : block_orig.attn.qkv.sub_network_in_features,
             ]
-            block.attn.attn.bias.data = block_orig.attn.attn.linear.bias.data[
+            block.attn.qkv.bias.data = block_orig.attn.qkv.linear.bias.data[
                 block_orig.attn.qkv_indices
             ]
             print(torch.tensor(block_orig.attn.qkv_indices).shape)
         else:
-            block.attn.attn.weight.data = block_orig.attn.attn.linear.weight.data[
-                : block_orig.attn.attn.sub_network_out_features,
-                : block_orig.attn.attn.sub_network_in_features,
+            block.attn.qkv.weight.data = block_orig.attn.qkv.linear.weight.data[
+                : block_orig.attn.qkv.sub_network_out_features,
+                : block_orig.attn.qkv.sub_network_in_features,
             ]
-            block.attn.attn.bias.data = block_orig.attn.attn.linear.bias.data[
-                : block_orig.attn.attn.sub_network_out_features
+            block.attn.qkv.bias.data = block_orig.attn.qkv.linear.bias.data[
+                : block_orig.attn.qkv.sub_network_out_features
             ]
         if block_orig.attn.proj_indices is not None:
             block.attn.proj.weight.data = block_orig.attn.proj.linear.weight.data[

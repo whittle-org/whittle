@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
 from typing_extensions import Self
 
 import torch
 import torch.nn as nn
+from litgpt.model import do_softcapping
 from litgpt.utils import map_old_state_dict_weights
 
 from whittle.lora_model.config import LoRAConfig as Config
@@ -65,6 +67,7 @@ class GPT(BaseModel):
         self,
         idx: torch.Tensor,
         input_pos: torch.Tensor | None = None,
+        input_pos_maxp1: torch.Tensor | None = None,
         lm_head_chunk_size: int = 0,
     ) -> torch.Tensor | list[torch.Tensor]:
         T = idx.size(1)
@@ -80,20 +83,25 @@ class GPT(BaseModel):
             block = self.transformer.h[i]
 
             cos, sin = self.cos.to(idx.device), self.sin.to(idx.device)
-            cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
-            x = block(x, cos, sin, mask, input_pos)
+            cos, sin, mask, input_pos_maxp1_block = self.process_rope_cache(
+                cos, sin, input_pos, input_pos_maxp1, T
+            )
+            x = block(x, cos, sin, mask, input_pos, input_pos_maxp1_block)
 
         x = self.transformer.ln_f(x)
+        clamp_head = (
+            partial(do_softcapping, thresh=self.config.final_logit_softcapping)
+            if self.config.final_logit_softcapping is not None
+            else nn.Identity()
+        )
         if lm_head_chunk_size > 0:
             # chunk the lm head logits to reduce the peak memory used by autograd
-            return [self.lm_head(x_i) for x_i in x.split(lm_head_chunk_size, dim=1)]
-        x = self.lm_head(x)  # (b, t, vocab_size)
-        if self.config.final_logit_softcapping is not None:
-            x = (
-                torch.tanh(x / self.config.final_logit_softcapping)
-                * self.config.final_logit_softcapping
-            )
-        return x
+            return [
+                clamp_head(self.lm_head(x_i))
+                for x_i in x.split(lm_head_chunk_size, dim=1)
+            ]
+        else:
+            return clamp_head(self.lm_head(x))  # (B, T, padded_vocab_size)
         # return self.lm_head(x)  # (b, t, vocab_size)
 
     @classmethod

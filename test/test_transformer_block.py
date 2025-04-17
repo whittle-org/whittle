@@ -24,12 +24,13 @@ def test_block():
     config.rotary_percentage = 0.25
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
     cos, sin = build_rope_cache(config.max_seq_len, n_elem=config.rope_n_elem)
-
+    cos = cos[: config.max_seq_len].unsqueeze(0)
+    sin = sin[: config.max_seq_len].unsqueeze(0)
     block = Block(config, 0)
     input = torch.rand(8, 512, 64)
     mask = build_mask_cache(512)
-    block.attn.attn.weight.data = torch.randn_like(block.attn.attn.weight.data)
-    block.attn.attn.bias.data = torch.randn_like(block.attn.attn.bias.data)
+    block.attn.qkv.weight.data = torch.randn_like(block.attn.qkv.weight.data)
+    block.attn.qkv.bias.data = torch.randn_like(block.attn.qkv.bias.data)
     block.attn.proj.bias.data = torch.randn_like(block.attn.proj.bias.data)
     block.attn.proj.weight.data = torch.randn_like(block.attn.proj.weight.data)
     block.norm_1.weight.data = torch.randn_like(block.norm_1.weight.data)
@@ -56,8 +57,8 @@ def test_block():
     assert out_small.shape == (8, 512, 32)
 
     lit_block = LitBlock(config, 0)
-    lit_block.attn.attn.weight.data = block.attn.attn.weight.data
-    lit_block.attn.attn.bias.data = block.attn.attn.bias.data
+    lit_block.attn.qkv.weight.data = block.attn.qkv.weight.data
+    lit_block.attn.qkv.bias.data = block.attn.qkv.bias.data
     lit_block.attn.proj.bias.data = block.attn.proj.bias.data
     lit_block.attn.proj.weight.data = block.attn.proj.weight.data
     lit_block.mlp.fc_1.weight.data = block.mlp.fc_1.weight.data
@@ -79,8 +80,8 @@ def test_block():
     config.n_query_groups = 2
     config.intermediate_size = 32 * 4
     lit_block_small = LitBlock(config, 0)
-    lit_block_small.attn.attn.weight.data = block.attn.attn.weight.data
-    lit_block_small.attn.attn.bias.data = block.attn.attn.bias.data
+    lit_block_small.attn.qkv.weight.data = block.attn.qkv.weight.data
+    lit_block_small.attn.qkv.bias.data = block.attn.qkv.bias.data
     lit_block_small.attn.proj.bias.data = block.attn.proj.bias.data
     lit_block_small.attn.proj.weight.data = block.attn.proj.weight.data
     lit_block_small.mlp.fc_1.weight.data = block.mlp.fc_1.weight.data

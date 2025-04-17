@@ -90,11 +90,11 @@ def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
 
 def extract_attention(super_network_attention, sub_network_attention):
     if super_network_attention.qkv_indices is not None:
-        sub_network_attention.attn.weight.data = super_network_attention.attn.weight.data[
+        sub_network_attention.qkv.weight.data = super_network_attention.qkv.weight.data[
             super_network_attention.qkv_indices, :
         ][:, 0 : sub_network_attention.sub_network_n_embd]
-        if sub_network_attention.attn.bias is not None:
-            sub_network_attention.attn.bias.data = super_network_attention.attn.bias.data[
+        if sub_network_attention.qkv.bias is not None:
+            sub_network_attention.qkv.bias.data = super_network_attention.qkv.bias.data[
                 super_network_attention.qkv_indices
             ]
     else:
