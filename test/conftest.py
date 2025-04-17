@@ -63,3 +63,10 @@ def RunIf(thunder: bool | None = None, **kwargs):
         reason=f"Requires: [{' + '.join(reasons)}]",
         **marker_kwargs,
     )
+
+
+@pytest.fixture(params=["cpu", "cuda"])
+def accelerator_device(request):
+    if request.param == "cuda" and not torch.cuda.is_available():
+        pytest.skip("CUDA not available")
+    return request.param

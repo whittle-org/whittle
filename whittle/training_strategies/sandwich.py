@@ -43,7 +43,6 @@ class SandwichStrategy(BaseTrainingStrategy):
             config = self.sampler.sample()
             model.set_sub_network(**config)
             loss = self.compute_loss(model, inputs, outputs)
-
             loss *= scale_loss
             loss.backward() if self.fabric is None else self.fabric.backward(loss)
             model.reset_super_network()

@@ -30,20 +30,16 @@ class MagnitudePruner(Pruner):
     ) -> None:
         """
         Prunes a pre-trained model using magnitude-based structural pruning. For each
-        structural component (e.g head) we compute a score based on the sum of the magnitudes of
-        its weights.
+        structural component (e.g., head), we compute a score based on the sum of the
+        magnitudes of its weights.
 
         Args:
             model: The model to be pruned.
             prune_n: Number of weights to prune per group.
             prune_m: Total number of weights per group.
-            **kwargs: Additional arguments specific to Wanda and SparseGPT.
-
+            **kwargs: Unused arguments (for compatibility with other pruners).
         """
-
-        layers = [model.transformer.h]
-        for i in range(len(layers)):
-            layer = layers[i]
+        for layer in model.transformer.h:
             subset = self._find_layers(layer)
             for name in subset:
                 W = subset[name].weight.data

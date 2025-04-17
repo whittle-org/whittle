@@ -61,10 +61,10 @@ training_strategies_cls = {
 
 def get_search_space(config):
     return {
-        "embed_dim": lograndint(1, config.n_embd),
-        "num_heads": randint(1, config.n_head),
-        "mlp_ratio": randint(1, 4),
-        "depth": randint(1, config.n_layer),
+        "sub_network_n_embd": lograndint(1, config.n_embd),
+        "sub_network_intermediate_size": randint(1, config.n_embd),
+        "sub_network_num_heads": randint(1, config.n_head),
+        "sub_network_n_layers": randint(1, config.n_layer),
     }
 
 
@@ -95,6 +95,7 @@ def setup(
     tokenizer_dir: Path | None = None,
     logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
     seed: int = 42,
+    accelerator: str | None = None,
 ):
     """Pretrain a model.
 
@@ -167,7 +168,12 @@ def setup(
         log_interval=train.log_interval,
     )
 
-    if num_devices * num_nodes > 1:
+    # Default to CPU if accelerator not specified
+    if accelerator is None:
+        accelerator = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # Use FSDP only for multi-device CUDA setups
+    if num_devices * num_nodes > 1 and accelerator == "cuda":
         strategy = FSDPStrategy(
             auto_wrap_policy={Block},
             state_dict_type="full",
@@ -182,9 +188,11 @@ def setup(
         strategy=strategy,
         precision=precision,
         loggers=[logger],
+        accelerator=accelerator,
     )
 
-    if torch.cuda.is_available() and num_devices > 1:
+    # Skip NVLink check for CPU or single-device setups
+    if accelerator == "cuda" and num_devices > 1 and torch.cuda.is_available():
         check_nvlink_connectivity(fabric)
 
     fabric.launch()

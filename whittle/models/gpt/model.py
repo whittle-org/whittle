@@ -266,10 +266,10 @@ class GPT(nn.Module):
         Selects and sets the sub-network configuration based on the provided configuration.
         """
         self.set_sub_network(
-            config["embed_dim"],
-            int(config["mlp_ratio"] * config["embed_dim"]),
-            config["num_heads"],
-            config["depth"],
+            sub_network_n_embd=config["embed_dim"],
+            sub_network_intermediate_size=int(config["mlp_ratio"] * config["embed_dim"]),
+            sub_network_num_heads=config["num_heads"],
+            sub_network_n_layers=config["depth"],
             sub_network_head_size=config.get("head_size", None),
             sub_network_query_groups=config.get("n_query_groups", None),
         )

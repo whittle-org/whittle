@@ -27,7 +27,7 @@ from whittle.pruning.pruners.wanda import WandaPruner
         },
     ],
 )
-def test_model_pruning(model_info, mock_tokenizer):
+def test_model_pruning(model_info, mock_tokenizer, accelerator_device):
     torch.manual_seed(0)
     config = Config.from_name(
         model_info["config_name"],
@@ -42,7 +42,7 @@ def test_model_pruning(model_info, mock_tokenizer):
     config.tie_embeddings = False
     config.use_cache = True
 
-    model = GPT(config)
+    model = GPT(config).to(accelerator_device)
     pruner_wanda = WandaPruner()
     pruner_sparsegpt = SparseGPTPruner()
     pruner_magnitude = MagnitudePruner()
@@ -68,7 +68,7 @@ def test_model_pruning(model_info, mock_tokenizer):
         dataloader=dataloader,
         prune_n=2,
         prune_m=4,
-        dev="cpu",
+        device=accelerator_device,
         nsamples=32,
     )
 
@@ -77,7 +77,7 @@ def test_model_pruning(model_info, mock_tokenizer):
         dataloader=dataloader,
         prune_n=2,
         prune_m=4,
-        dev="cpu",
+        device=accelerator_device,
         nsamples=32,
     )
 

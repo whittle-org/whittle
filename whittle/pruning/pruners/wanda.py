@@ -41,7 +41,7 @@ class WandaPruner(Pruner):
             inps, outs, attention_mask, position_ids = self._prepare_calibration_input(
                 model=model,
                 dataloader=dataloader,
-                dev=kwargs.get("dev", "cuda"),
+                dev=kwargs.get("device", "cuda"),
                 nsamples=nsamples,
             )
 
