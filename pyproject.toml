@@ -71,7 +71,7 @@ dev = [
     "mkdocstrings[python]",
     "black",                # Allows mkdocstrings to do formatting...
 ]
-distributed = ["deepspeed", "triton==3.0.0"]
+distributed = ["triton==3.0.0"]
 all = ["whittle[dev]", "whittle[distributed]"]
 
 [tool.setuptools.packages.find]
