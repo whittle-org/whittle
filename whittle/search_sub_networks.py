@@ -9,7 +9,6 @@ from typing import Literal
 import lightning as L
 import torch
 from lightning.fabric.strategies import FSDPStrategy
-from lightning.fabric.strategies.deepspeed import _DEEPSPEED_AVAILABLE
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.data import Alpaca, DataModule, TinyStories
@@ -31,15 +30,12 @@ from syne_tune.config_space import lograndint, randint
 from torch.utils.data import DataLoader
 
 from whittle.args import ParamBinArgs, SearchArgs
-from whittle.metrics import compute_latency, compute_parameters
+from whittle.metrics import compute_flops, compute_latency, compute_parameters
 from whittle.models.gpt import GPT, Block
 from whittle.models.gpt.checkpoint import save_sub_network
 from whittle.sampling.param_bins import ParamBins, ParamsEstimator
 from whittle.search import multi_objective_search
 from whittle.search.baselines import Methods
-
-if _DEEPSPEED_AVAILABLE:
-    from whittle.metrics import compute_flops
 
 
 def setup(

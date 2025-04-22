@@ -3,16 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lightning.fabric.strategies.deepspeed import _DEEPSPEED_AVAILABLE
 from litgpt import Config
 
 from whittle.eval.utils import convert_and_evaluate
-from whittle.metrics import compute_latency, compute_parameters
+from whittle.metrics import compute_flops, compute_latency, compute_parameters
 from whittle.models.gpt import GPT
 from whittle.models.gpt.checkpoint import load_checkpoint
-
-if _DEEPSPEED_AVAILABLE:
-    from whittle.metrics import compute_flops
 
 
 def setup(
