@@ -1,3 +1,10 @@
+## 0.5.1 (2025-04-22)
+
+### Fix
+
+- update index in docs (#280)
+- use current pip version of syne-tune (#290)
+
 ## 0.5.0 (2025-04-16)
 
 ### Feat
