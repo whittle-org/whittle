@@ -208,6 +208,15 @@ class CausalSelfAttention(nn.Module):
             self.sub_network_n_embd,
             self.proj_indices,
         )
+        if self.config.norm_qk:
+            self.norm_q.set_sub_network(
+                self.sub_network_head_size
+                * self.sub_network_n_query_groups
+                * self.sub_network_q_per_kv
+            )
+            self.norm_k.set_sub_network(
+                self.sub_network_head_size * self.sub_network_query_groups
+            )
         if self.config.attention_scores_scalar:
             self.sub_attention_scaler = self.sub_network_n_embd // self.sub_network_n_head
         else:
@@ -227,6 +236,9 @@ class CausalSelfAttention(nn.Module):
         )
         self.qkv.reset_super_network()
         self.proj.reset_super_network()
+        if self.config.norm_qk:
+            self.norm_q.reset_super_network()
+            self.norm_k.reset_super_network()
         self.sub_attention_scaler = self.config.attention_scores_scalar
 
     def forward(

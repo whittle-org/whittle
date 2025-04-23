@@ -57,6 +57,9 @@ def params_attention_layer(attention: CausalSelfAttention):
     n_attention += dmodel * dhead * num_query_groups * q_per_kv
     if attention.proj.use_bias:
         n_attention += dmodel
+    if attention.config.norm_qk:
+        n_attention += dhead * num_query_groups
+        n_attention += dhead * num_query_groups * q_per_kv
 
     return n_attention
 

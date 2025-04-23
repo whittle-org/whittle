@@ -88,4 +88,7 @@ def compute_weight_magnitude_attention(layer):
     mag = 0
     mag = mag + compute_weight_magnitude_linear_layer(layer.qkv)
     mag += compute_weight_magnitude_linear_layer(layer.proj)
+    if layer.config.norm_qk:
+        mag += compute_weight_magnitude_layer_norm(layer.norm_q)
+        mag += compute_weight_magnitude_layer_norm(layer.norm_k)
     return float(mag)

@@ -111,6 +111,9 @@ def extract_attention(super_network_attention, sub_network_attention):
     else:
         state_dict = extract_linear(super_network_attention.proj)
         sub_network_attention.proj.load_state_dict(state_dict)
+    if super_network_attention.config.norm_qk:
+        extract_norm(super_network_attention.norm_q, sub_network_attention.norm_q)
+        extract_norm(super_network_attention.norm_k, sub_network_attention.norm_k)
 
 
 def extract_mlp(mlp, sub_mlp):
