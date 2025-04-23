@@ -194,7 +194,7 @@ def test_convert_to_litgpt(
         sub_network_dict = {
             "embed_dim": 128,
             "depth": 6,
-            "num_heads": 8,
+            "num_heads": 6,
             "mlp_ratio": 1.5,
             "n_query_groups": 3,
         }
