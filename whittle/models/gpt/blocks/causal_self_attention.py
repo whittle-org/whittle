@@ -162,6 +162,7 @@ class CausalSelfAttention(nn.Module):
             sub_network_query_groups: Number of query groups for grouped-query attention (GQA).
             sub_network_head_size: Size of each attention head in the sub-network.
         """
+
         self.sub_network_n_embd = (
             sub_network_n_embd if sub_network_n_embd else self.config.n_embd
         )
@@ -196,6 +197,10 @@ class CausalSelfAttention(nn.Module):
             (q_per_kv + 2) * self.sub_network_head_size * self.sub_network_query_groups
         )
         self.sub_network_q_per_kv = int(q_per_kv)
+        if self.sub_network_n_head != self.sub_network_query_groups:
+            assert self.sub_network_n_head % self.sub_network_query_groups == 0, (
+                f"Number of heads {self.sub_network_n_head} must be divisible by number of query groups {self.sub_network_query_groups} for GQA"
+            )
         self.qkv_indices = self.get_qkv_indices()
         self.proj_indices = self.get_proj_indices()
         self.qkv.set_sub_network(
