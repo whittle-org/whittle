@@ -23,7 +23,7 @@ def random_init_weights(gpt):
     gpt.transformer.ln_f.weight.data = torch.randn_like(gpt.transformer.ln_f.weight.data)
 
     for block in gpt.transformer.h:
-        block.attn.attn.weight.data = torch.randn_like(block.attn.attn.weight.data)
+        block.attn.qkv.weight.data = torch.randn_like(block.attn.qkv.weight.data)
         block.attn.proj.weight.data = torch.randn_like(block.attn.proj.weight.data)
         block.mlp.fc_1.weight.data = torch.randn_like(block.mlp.fc_1.weight.data)
         block.mlp.fc_2.weight.data = torch.randn_like(block.mlp.fc_2.weight.data)
@@ -194,7 +194,7 @@ def test_convert_to_litgpt(
         sub_network_dict = {
             "embed_dim": 128,
             "depth": 6,
-            "num_heads": 8,
+            "num_heads": 6,
             "mlp_ratio": 1.5,
             "n_query_groups": 3,
         }

@@ -86,28 +86,9 @@ def compute_weight_magnitude_embedding(layer):
 
 def compute_weight_magnitude_attention(layer):
     mag = 0
-    if hasattr(layer, "qkv_indices"):
-        mag = mag + torch.sum(
-            torch.abs(
-                layer.attn.weight.data[layer.qkv_indices, :][
-                    :, 0 : layer.sub_network_n_embd
-                ]
-            )
-        )
-        if layer.attn.bias is not None:
-            mag = mag + torch.sum(torch.abs(layer.attn.weight.data[layer.qkv_indices]))
-    else:
-        mag = mag + compute_weight_magnitude_linear_layer(layer.attn)
-    if hasattr(layer, "proj_indices"):
-        mag += torch.sum(
-            torch.abs(
-                layer.proj.weight.data[0 : layer.sub_network_n_embd][
-                    :, layer.proj_indices
-                ]
-            )
-        )
-        if layer.proj.bias is not None:
-            mag += torch.sum(layer.proj.bias[: layer.sub_network_n_embd])
-    else:
-        mag += compute_weight_magnitude_linear_layer(layer.proj)
+    mag = mag + compute_weight_magnitude_linear_layer(layer.qkv)
+    mag += compute_weight_magnitude_linear_layer(layer.proj)
+    if layer.config.norm_qk:
+        mag += compute_weight_magnitude_layer_norm(layer.norm_q)
+        mag += compute_weight_magnitude_layer_norm(layer.norm_k)
     return float(mag)
