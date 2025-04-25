@@ -70,8 +70,8 @@ class SparseGPTPruner(Pruner):
                     outs[j] = layer(
                         inps[j],
                         mask=attention_mask,
-                        cos=model.cos,
-                        sin=model.sin,
+                        cos=model.cos.unsqueeze(0),
+                        sin=model.sin.unsqueeze(0),
                         input_pos=position_ids,
                     )[0]
 
@@ -94,8 +94,8 @@ class SparseGPTPruner(Pruner):
                 outs[j] = layer(
                     inps[j],
                     mask=attention_mask,
-                    cos=model.cos,
-                    sin=model.sin,
+                    cos=model.cos.unsqueeze(0),
+                    sin=model.sin.unsqueeze(0),
                     input_pos=position_ids,
                 )[0]
 

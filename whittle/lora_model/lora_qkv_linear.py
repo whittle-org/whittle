@@ -195,19 +195,28 @@ class LoRAQKVLinear(LoRALayer):
                 [], dtype=torch.long, device=device
             )
 
-        group_index = qkv_group_size - (2 if target_mod in {"q", "k"} else 1)
-
         candidate_tensor = torch.tensor(
             candidate_indices, dtype=torch.long, device=device
         )
         indices = torch.arange(len(candidate_indices), dtype=torch.long, device=device)
 
-        mod_tensor = (indices // self.sub_network_head_size) % qkv_group_size
-
         if target_mod == "q":
-            mask = mod_tensor < group_index
-        else:
-            mask = mod_tensor == group_index
+            mask = candidate_tensor < self.q_per_kv * self.head_size * self.n_query_groups
+        elif target_mod == "k":
+            mask = (
+                candidate_tensor >= self.q_per_kv * self.head_size * self.n_query_groups
+            ) & (
+                candidate_tensor
+                < (self.q_per_kv + 1) * self.head_size * self.n_query_groups
+            )
+        elif target_mod == "v":
+            mask = (
+                candidate_tensor
+                >= (self.q_per_kv + 1) * self.head_size * self.n_query_groups
+            ) & (
+                candidate_tensor
+                < (self.q_per_kv + 2) * self.head_size * self.n_query_groups
+            )
 
         selected_indices = candidate_tensor[mask]
         selected_targets = indices[mask]
@@ -273,27 +282,6 @@ class LoRAQKVLinear(LoRALayer):
         ________________________________________
         | query         | key       | value    |
         ----------------------------------------
-        For Llama2's GQA support, Q, K, and V weights are interleaved, so that weights for grouped
-        queries are adjacent to their associated key and value weights.
-        For example, suppose we have n_head = 12 with 3 query groups.
-        Then along the embedding dimension the interleaved weights would look like
-
-        [Q, Q, Q, Q, K, V, Q, Q, Q, Q, K, V, Q, Q, Q, Q, K, V],
-
-        where each Q, K, and V has size head_size.
-
-        In this case, the previously-described weight update applies separately to each
-        individual block, so the update will take the form
-
-        [[ΔW,ΔW,ΔW, ..., 0,0,0, ..., ΔW,ΔW,ΔW, ΔW,ΔW,ΔW, ..., 0,0,0, ..., ΔW,ΔW,ΔW, ...],
-         [.............................................................................],
-         [ΔW,ΔW,ΔW, ..., 0,0,0, ..., ΔW,ΔW,ΔW, ΔW,ΔW,ΔW, ..., 0,0,0, ..., ΔW,ΔW,ΔW, ...]]
-             ↑              ↑            ↑        ↑             ↑            ↑
-        ________________________________________________________________________________
-        | q block 1 | k block 1  | v block 1 | q block 2 |  k block 2 |  v block 2 | ...
-        --------------------------------------------------------------------------------
-        Note that in the above diagram, the size of each q block will equal q_per_kv
-        times the size of each k and v block.
 
         Args:
             x: tensor with weights update that will be padded with zeros if necessary
@@ -335,7 +323,7 @@ class LoRAQKVLinear(LoRALayer):
 
         Lora in litgpt is applied separately to keys, queries and values. Because of sub-network selection,
         we need flexible indexing to select parts of the lora_B matrix that correspond to active queries, keys and values.
-        Since QKV are interleaved (i.e. QQKV QQKV ... QQKV), we need to select them in `_set_lora_ind`, and then call `_split_lora_B`
+        Wwe need to select them in `_set_lora_ind`, and then call `_split_lora_B`
         to get the corresponding parts of the weight matrix. Then, we apply each part of the weight matrix to the
         corresponding input's part and concatenate the result.
 
