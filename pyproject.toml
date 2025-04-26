@@ -22,7 +22,7 @@ dependencies = [
     "torch>=2.5.0,<2.6.0",
     "transformers>=4",
     "litgpt[all]==0.5.7",
-    "syne-tune[aws]",
+    "syne-tune[moo]",
     "torchvision>=0.18",
     "boto3==1.34.147",
     "botocore==1.34.147",
