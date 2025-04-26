@@ -170,8 +170,6 @@ def main(
     checkpoint_path = checkpoint_dir / "lit_model.pth"
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
         model = GPT(config)
-        # If the GPT model needs max_seq_length explicitly set after init
-        # model.max_seq_length = effective_max_seq_length
 
     model = fabric.setup(model)
 
@@ -198,7 +196,6 @@ def main(
 
     fabric.log_dict({"sparsity_ratio": sparsity_ratio, "pruning_time": pruning_time})
 
-    # Save model weights (existing code)
     save_path = out_dir / "lit_model.pth"
     fabric.save(save_path, {"model": model})
     fabric.print(f"Saved model weights to {save_path}")
