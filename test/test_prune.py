@@ -31,7 +31,7 @@ def checkpoint_dir(tmp_path_factory):
 def test_checkpoints(tmp_path, checkpoint_dir, pruning_strategy, accelerator_device):
     out_dir = tmp_path / "out"
     # Dynamically adjust the number of sequences based on the device to prevent OOM issue on CPU
-    num_sequences = 32 if accelerator_device == "cpu" else 128
+    num_sequences = 16 if accelerator_device == "cpu" else 128
     max_seq_length = 512
     batch_size = 8
     nsamples = int(num_sequences / batch_size)

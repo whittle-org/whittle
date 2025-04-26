@@ -10,7 +10,7 @@ from typing import Literal
 import lightning as L
 import torch
 from lightning.fabric.strategies import FSDPStrategy
-from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
+from lightning.fabric.utilities.throughput import ThroughputMonitor
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import name_to_config
@@ -42,6 +42,7 @@ from syne_tune.config_space import lograndint, randint
 from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
+from whittle.metrics.flops import compute_flops
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.sampling.random_sampler import RandomSampler
@@ -247,20 +248,21 @@ def fit(
         val_loss = "n/a"
 
     throughput = ThroughputMonitor(fabric, window_size=5)
+    batch_size = train.micro_batch_size
+    sequence_length = model.max_seq_length
 
-    with torch.device("meta"):
-        meta_model = GPT(model.config)
-        x = torch.randint(0, 1, (train.micro_batch_size, meta_model.max_seq_length))
+    def loss_fn(output: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        return chunked_cross_entropy(output, targets, chunk_size=0)
 
-        def model_fwd():
-            return meta_model(x)  # noqa: F821
-
-        def model_loss(y):
-            return chunked_cross_entropy(y, x, chunk_size=0)  # noqa: F821
-
-        measured_flops = measure_flops(meta_model, model_fwd, model_loss)
-        fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
-        del meta_model, x
+    measured_flops = compute_flops(
+        model,
+        batch_size=batch_size,
+        sequence_length=sequence_length,
+        device=fabric.device.type,  # Use fabric's device (cpu or cuda)
+        loss_fn=loss_fn,
+        verbose=True,
+    )
+    fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
 
     max_tokens_per_device = train.max_tokens // fabric.world_size
     tokens_per_iter = train.micro_batch_size * model.max_seq_length

@@ -12,7 +12,7 @@ from typing import Literal
 import lightning as L
 import torch
 from lightning.fabric.strategies import FSDPStrategy
-from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
+from lightning.fabric.utilities.throughput import ThroughputMonitor
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.data import DataModule
 from litgpt.generate.base import generate
@@ -40,6 +40,7 @@ from torch.utils.data import ConcatDataset, DataLoader
 from torchmetrics import RunningMean
 
 from whittle.data.llamamini import LLaMaMini
+from whittle.metrics import compute_flops
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.pretrain_super_network import get_search_space, training_strategies_cls
@@ -322,19 +323,17 @@ def fit(
 
     throughput = ThroughputMonitor(fabric, window_size=5)
 
-    with torch.device("meta"):
-        meta_model = GPT(model.config)
-        x = torch.randint(0, 1, (train.micro_batch_size, meta_model.max_seq_length))
+    def model_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        return chunked_cross_entropy(logits, targets, chunk_size=0)
 
-        def model_fwd():
-            return meta_model(x)  # noqa: F821
-
-        def model_loss(y):
-            return chunked_cross_entropy(y, x, chunk_size=0)  # noqa: F821
-
-        measured_flops = measure_flops(meta_model, model_fwd, model_loss)
-        fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
-        del meta_model, x
+    measured_flops = compute_flops(
+        model=model,
+        batch_size=train.micro_batch_size,
+        sequence_length=int(model.max_seq_length),  # Ensure max_seq_length is an integer
+        loss_fn=model_loss,
+        device=fabric.device.type,  # Use fabric's device (cpu or cuda)
+    )
+    fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
 
     log_iter_interval = train.log_interval * train.gradient_accumulation_iters(devices)
     initial_iter = state["iter_num"]
