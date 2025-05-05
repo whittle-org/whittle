@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
 import torch
+from jsonargparse import CLI
 from litgpt import Config
 from litgpt.utils import copy_config_files, lazy_load, save_config
 
@@ -50,6 +52,8 @@ def setup(
 
     if out_dir is None:
         out_dir = sub_network_dir
+    else:
+        os.makedirs(out_dir, exist_ok=True)
 
     ckp = lazy_load(sub_network_dir / "lit_model.pth")
 
@@ -114,3 +118,7 @@ def setup(
         )
         torch.save(save_data, out_dir / "lit_model.pth")
         save_config(sub_network.config, out_dir)
+
+
+if __name__ == "__main__":
+    CLI(setup)
