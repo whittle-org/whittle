@@ -9,7 +9,7 @@ The input arguments for super-network pre-training workflow follow the original 
 During training, only random sub-networks are updated at each step, which encourages the super-network to become more prunable and resilient, making it easier to later extract strong-performing sub-models.
 
 ```bash
-python whittle/pretrain_super_network.py EleutherAI/pythia-14m --data TinyStories  --data.train_data_path ./data --tokenizer_dir ~/checkpoints/EleutherAI/pythia-14m/ --out_dir pretrained_super_net --train.save_interval 5 --train.max_tokens 1000000000
+python whittle/pretrain_super_network.py EleutherAI/pythia-14m --data TinyStories  --data.data_path ./data --tokenizer_dir ~/checkpoints/EleutherAI/pythia-14m/ --out_dir pretrained_super_net --train.save_interval 5 --train.max_tokens 1000000000
 ```
 
 ## Search for Sub-Networks using Multi-objective Search
