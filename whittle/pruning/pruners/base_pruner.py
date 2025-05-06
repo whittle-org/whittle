@@ -107,6 +107,7 @@ class Pruner:
             model.config.use_cache = False
         layers = model.transformer.h
         dtype = next(iter(model.parameters())).dtype
+        device = torch.device(dev)  # Ensure device is a torch.device object
         inps = torch.zeros(
             (
                 nsamples,
@@ -115,27 +116,44 @@ class Pruner:
                 model.config.n_embd,
             ),
             dtype=dtype,
-            device=dev,
+            device=device,
         )
         inps.requires_grad = False
         cache = {"i": 0, "attention_mask": None, "position_ids": None}
 
         layers[0] = Catcher(layers[0], inps, cache)
+
+        # Process up to nsamples batches
+        batch_count = 0
         for batch in dataloader:
+            if batch_count >= nsamples:
+                break
+
             try:
-                with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
+                if dev == "cuda":
+                    with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
+                        with torch.no_grad():
+                            torch.cuda.empty_cache()
+                            if isinstance(batch, (tuple, list)):
+                                inputs = batch[0]
+                            elif isinstance(batch, dict):
+                                inputs = batch["input_ids"]
+                            model(inputs.to(device))
+                else:
                     with torch.no_grad():
-                        torch.cuda.empty_cache()
                         if isinstance(batch, (tuple, list)):
                             inputs = batch[0]
                         elif isinstance(batch, dict):
                             inputs = batch["input_ids"]
-                        model(inputs.to(dev))
+                        model(inputs.to(device))
             except ValueError:
                 pass
+
+            batch_count += 1
+
         layers[0] = layers[0].module
 
-        outs = torch.zeros_like(inps)
+        outs = torch.zeros_like(inps).to(device)  # Ensure outs is on the correct device
         attention_mask = cache["attention_mask"]
         position_ids = cache["position_ids"]
 

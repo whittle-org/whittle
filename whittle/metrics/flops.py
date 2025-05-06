@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import torch
 from lightning.fabric.utilities.throughput import measure_flops
 
@@ -10,6 +12,7 @@ def compute_flops(
     model: GPT,
     batch_size: int = 1,
     sequence_length: int = 512,
+    loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] | None = None,
     device: str = "cpu",
     previous_device: str | None = None,
     verbose: bool = False,
@@ -25,6 +28,7 @@ def compute_flops(
         model: The GPT model to profile.
         batch_size: The batch size for the input tensor.
         sequence_length: The sequence length for the input tensor.
+        loss_fn: Optional loss function that takes model output and target tensors.
         device: The device on which to run the FLOPs calculation ("cpu", "cuda", etc.).
         previous_device: Optional device to move the model back to after profiling.
         verbose: If True, prints debug information about profiling.
@@ -55,11 +59,23 @@ def compute_flops(
         0, model.config.padded_vocab_size, (batch_size, sequence_length), device=device
     )
 
-    def forward_fn():
+    def forward_fn() -> torch.Tensor:
         return model(input_tensor)
 
+    model_loss: Callable[[torch.Tensor], torch.Tensor] | None = None
+    if loss_fn is not None:
+        dummy_targets = torch.randint(
+            0,
+            model.config.padded_vocab_size,
+            (batch_size, sequence_length),
+            device=device,
+        )
+
+        def model_loss(y: torch.Tensor) -> torch.Tensor:
+            return loss_fn(y, dummy_targets)
+
     try:
-        flops = measure_flops(model, forward_fn)
+        flops = measure_flops(model=model, forward_fn=forward_fn, loss_fn=model_loss)
     except Exception as e:
         raise RuntimeError(f"Failed to compute FLOPs: {e}")
 
