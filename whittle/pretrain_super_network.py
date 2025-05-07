@@ -249,7 +249,7 @@ def fit(
     throughput = ThroughputMonitor(fabric, window_size=5)
 
     with torch.device("meta"):
-        meta_model = GPT(model.config)
+        meta_model = GPT(model.config).to("meta")
         x = torch.randint(0, 1, (train.micro_batch_size, meta_model.max_seq_length)).to(
             "meta"
         )
