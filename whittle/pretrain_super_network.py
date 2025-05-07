@@ -509,14 +509,19 @@ def main(
     # Save final checkpoint
     save_checkpoint(fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth")
 
-    total_tokens = state["iter_num"] * train.micro_batch_size * model.max_seq_length * fabric.world_size
+    total_tokens = (
+        state["iter_num"]
+        * train.micro_batch_size
+        * model.max_seq_length
+        * fabric.world_size
+    )
 
     # Print formatted output
     separator = "-" * 40
     fabric.print(separator)
     fabric.print("| Performance")
     fabric.print(f"| - Total tokens  : {total_tokens:,}")
-    fabric.print(f"| - Training Time : {(time.perf_counter()-train_time):.2f} s")
+    fabric.print(f"| - Training Time : {(time.perf_counter() - train_time):.2f} s")
     fabric.print(f"| - Tok/sec       : {total_tokens / train_time:.2f} tok/s")
     fabric.print("| " + "-" * 40)
 
@@ -525,6 +530,7 @@ def main(
         memory_used = torch.cuda.max_memory_allocated() / 1e9
         fabric.print("| Memory Usage")
         fabric.print(f"| - Memory Used   : {memory_used:.2f} GB")
+
 
 if __name__ == "__main__":
     from jsonargparse import CLI
