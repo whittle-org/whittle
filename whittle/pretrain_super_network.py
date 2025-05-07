@@ -250,7 +250,9 @@ def fit(
 
     with torch.device("meta"):
         meta_model = GPT(model.config)
-        x = torch.randint(0, 1, (train.micro_batch_size, meta_model.max_seq_length))
+        x = torch.randint(0, 1, (train.micro_batch_size, meta_model.max_seq_length)).to(
+            "meta"
+        )
 
         def model_fwd():
             return meta_model(x)  # noqa: F821
@@ -261,8 +263,6 @@ def fit(
         measured_flops = measure_flops(meta_model, model_fwd, model_loss)
         fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
         del meta_model, x
-
-    fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
 
     max_tokens_per_device = train.max_tokens // fabric.world_size
     tokens_per_iter = train.micro_batch_size * model.max_seq_length
