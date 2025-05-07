@@ -39,7 +39,7 @@ After pre-training, we can search for high-performing sub-networks within a chec
 
 ```bash
 python whittle/search_sub_networks.py pretrained_super_net/final/ \
-    --data TextFiles \
+    --data TinyStories \
     --data.data_path ./data \
     --search.iterations 10 \
     --out_dir sub_networks/
