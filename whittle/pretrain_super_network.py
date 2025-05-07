@@ -76,7 +76,7 @@ def setup(
     model_name: str,
     model_config: Config | None = None,
     out_dir: Path = Path("../examples/gpt/out/pretrain"),
-    precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = "None",
+    precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
     initial_checkpoint_dir: Path | None = None,
     resume: bool | Literal["auto"] | Path = False,
     data: DataModule | None = None,
