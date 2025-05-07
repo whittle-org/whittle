@@ -74,6 +74,7 @@ def setup(
     logger_name: Literal["wandb", "tensorboard", "csv"] = "csv",
     seed: int = 1337,
     access_token: str | None = None,
+    accelerator: str | None = None,
 ) -> None:
     """Finetune a model using super-network training strategies.
 
@@ -95,6 +96,7 @@ def setup(
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
         access_token: Optional API token to access models with restrictions.
+        accelerator: The accelerator to use for training. Possible choices: "cuda", "cpu".
     """
     checkpoint_dir = auto_download_checkpoint(
         model_name=checkpoint_dir, access_token=access_token
@@ -107,6 +109,9 @@ def setup(
     check_valid_checkpoint_dir(checkpoint_dir)
     config = Config.from_file(checkpoint_dir / "model_config.yaml")
     config.fix_head_size = True
+
+    if accelerator is None:
+        accelerator = "cuda" if torch.cuda.is_available() else "cpu"
 
     precision = precision or get_default_supported_precision(training=True)
     logger = choose_logger(
@@ -121,7 +126,10 @@ def setup(
         f"Training strategy is {training_strategy}. Should be in {list(training_strategies_cls)}"
     )
 
-    if num_devices * num_nodes > 1:
+    # Use simple strategy for CPU or single-device setups
+    if accelerator == "cpu" or num_devices * num_nodes <= 1:
+        strategy = "auto"
+    else:
         strategy = FSDPStrategy(
             auto_wrap_policy={Block},
             activation_checkpointing_policy={Block},
@@ -129,8 +137,6 @@ def setup(
             limit_all_gathers=True,
             cpu_offload=False,
         )
-    else:
-        strategy = "auto"
 
     fabric = L.Fabric(
         devices=num_devices,
@@ -138,9 +144,11 @@ def setup(
         strategy=strategy,
         precision=precision,
         loggers=logger,
+        accelerator=accelerator,
     )
 
-    if torch.cuda.is_available() and num_devices > 1:
+    # Only check NVLink for CUDA and multi-device setups
+    if accelerator == "cuda" and num_devices > 1 and torch.cuda.is_available():
         check_nvlink_connectivity(fabric)
 
     fabric.launch(
@@ -239,12 +247,9 @@ def main(
         data,
         strategy,
     )
-    time.perf_counter() - train_time
+    train_duration = time.perf_counter() - train_time
 
-    fabric.print(f"Training time: {(time.perf_counter() - train_time):.2f}s")
-    if fabric.device.type == "cuda":
-        fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
-
+    fabric.print(f"Training time: {train_duration:.2f}s")
     if fabric.device.type == "cuda":
         fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
 
@@ -318,7 +323,7 @@ def fit(
 
     throughput = ThroughputMonitor(fabric, window_size=5)
 
-    with torch.device("meta"):
+    with torch.device("cpu"):
         meta_model = GPT(model.config)
         x = torch.randint(0, 1, (train.micro_batch_size, meta_model.max_seq_length))
 
@@ -362,7 +367,8 @@ def fit(
         batch = next(train_iterator)
         if train_iterator.epoch >= train.epochs:
             break
-        input_ids, targets = batch["input_ids"], batch["labels"]
+        input_ids = batch["input_ids"].to(fabric.device)
+        targets = batch["labels"].to(fabric.device)
 
         is_accumulating = (
             state["iter_num"] % train.gradient_accumulation_iters(devices) != 0
@@ -483,11 +489,12 @@ def validate(
     if verbose:
         fabric.print("Validating ...")
     model.eval()
-    losses = torch.zeros(min(len(val_dataloader), eval.max_iters))
+    losses = torch.zeros(min(len(val_dataloader), eval.max_iters), device=fabric.device)
     for k, batch in enumerate(val_dataloader):
         if k >= eval.max_iters:
             break
-        input_ids, targets = batch["input_ids"], batch["labels"]
+        input_ids = batch["input_ids"].to(fabric.device)
+        targets = batch["labels"].to(fabric.device)
         logits = model(input_ids)
         losses[k] = chunked_cross_entropy(
             logits[..., :-1, :], targets[..., 1:], chunk_size=0
