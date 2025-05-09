@@ -14,6 +14,25 @@ class SimpleSearchSpace:
         return config
 
 
+class LoraSearchSpace(SimpleSearchSpace):
+    def __init__(self, gpt_model_specification):
+        self.config_space = {
+            "n_embd": lograndint(32, gpt_model_specification.n_embd),
+            "n_layers": randint(1, gpt_model_specification.n_layer),
+            "heads": randint(1, gpt_model_specification.n_head),
+            "intermediate_size": randint(1, gpt_model_specification.intermediate_size),
+        }
+
+    @staticmethod
+    def cast(config):
+        return {
+            "sub_network_n_embd": config["n_embd"],
+            "sub_network_intermediate_size": config["intermediate_size"],
+            "sub_network_num_heads": config["heads"],
+            "sub_network_n_layers": config["n_layers"],
+        }
+
+
 class SmallSearchSpace(SimpleSearchSpace):
     def __init__(self, gpt_model_specification):
         self.config_space = {
@@ -118,6 +137,7 @@ class LlamaJoint(SimpleSearchSpace):
 
 
 search_spaces = {
+    "lora": LoraSearchSpace,
     "small": SmallSearchSpace,
     "medium": MediumSearchSpace,
     "hw_gpt_bench": HWGPTBench,
