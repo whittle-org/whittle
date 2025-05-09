@@ -192,7 +192,6 @@ def setup(
         data: Data-related arguments. If not provided, the default is ``litgpt.data.Alpaca``.
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
         train_strategy: The training strategy to use. Possible choices: "sandwich", "standard".
-        search_space_type: The search space to use. Possible choices: "small", "medium", "hw_gpt_bench", "llama_joint".
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
         optimizer: An optimizer name (such as "AdamW") or config.
         logger_name: The name of the logger to send metrics to.
