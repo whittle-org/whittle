@@ -21,7 +21,7 @@ from whittle import pretrain_super_network
 MODEL_NAME = "EleutherAI/pythia-14m"
 
 
-@mock.patch("litgpt.pretrain.save_hyperparameters")
+@mock.patch("whittle.pretrain_super_network.save_hyperparameters")
 @pytest.mark.parametrize("strategy", ["standard", "random", "sandwich"])
 def test_training_strategies(
     save_hyperparameters_mock, strategy, tmp_path, accelerator_device
@@ -61,7 +61,7 @@ def test_training_strategies(
 # If we were to use `save_hyperparameters()`, we would have to patch `sys.argv` or otherwise
 # the CLI would capture pytest args, but unfortunately patching would mess with subprocess
 # launching, so we need to mock `save_hyperparameters()`
-@mock.patch("litgpt.pretrain.save_hyperparameters")
+@mock.patch("whittle.pretrain_super_network.save_hyperparameters")
 def test_pretrain(save_hyperparameters_mock, tmp_path, accelerator_device):
     model_config = Config(
         block_size=2, n_layer=2, n_embd=8, n_head=4, padded_vocab_size=8
@@ -122,7 +122,7 @@ def test_pretrain(save_hyperparameters_mock, tmp_path, accelerator_device):
 @mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0,1"})
 @mock.patch("litgpt.pretrain.L.Fabric.load_raw")
 # See comment in `test_pretrain` why we need to mock `save_hyperparameters()`
-@mock.patch("litgpt.pretrain.save_hyperparameters")
+@mock.patch("whittle.pretrain_super_network.save_hyperparameters")
 def test_initial_checkpoint_dir(_, load_mock, tmp_path):
     model_config = Config(
         block_size=2, n_layer=2, n_embd=8, n_head=4, padded_vocab_size=8
