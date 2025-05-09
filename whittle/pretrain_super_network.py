@@ -20,7 +20,6 @@ from litgpt.pretrain import (
     get_dataloaders,
     get_lr,
     initialize_weights,
-    save_checkpoint,
     validate,
     validate_args,
 )
@@ -30,6 +29,7 @@ from litgpt.utils import (
     check_nvlink_connectivity,
     choose_logger,
     chunked_cross_entropy,
+    copy_config_files,
     extend_checkpoint_dir,
     find_resume_path,
     get_default_supported_precision,
@@ -37,6 +37,8 @@ from litgpt.utils import (
     instantiate_torch_optimizer,
     num_parameters,
     parse_devices,
+    save_config,
+    save_hyperparameters,
 )
 from syne_tune.config_space import lograndint, randint
 from torch.utils.data import DataLoader
@@ -218,6 +220,18 @@ def setup(
         optimizer,
         training_strategy,
     )
+
+
+def save_checkpoint(fabric, state, tokenizer_dir, checkpoint_file):
+    model = state["model"]
+    checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+    fabric.print(f"Saving checkpoint to {str(checkpoint_file)!r}")
+    fabric.save(checkpoint_file, state)
+    if fabric.global_rank == 0:
+        save_hyperparameters(setup, checkpoint_file.parent)
+        if tokenizer_dir is not None:
+            copy_config_files(tokenizer_dir, checkpoint_file.parent)
+        save_config(model.config, checkpoint_file.parent)
 
 
 def fit(
