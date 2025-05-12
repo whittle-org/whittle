@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import torch
 from litgpt import Config
 
 from whittle.eval.utils import convert_and_evaluate
@@ -66,6 +67,9 @@ def setup(
             model, batch_size=latency_batch_size, previous_device=device
         )
     metrics_path.write_text(json.dumps(metrics, indent=2))
+
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # downstream task evaluation
     model.to(device)
