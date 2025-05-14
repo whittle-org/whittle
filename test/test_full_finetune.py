@@ -36,7 +36,11 @@ class MockDataset(Dataset):
         input_ids = self.data[idx]
         # Shift labels by one and append a token (use 0 as a placeholder)
         labels = torch.cat([input_ids[1:], torch.tensor([0], dtype=input_ids.dtype)])
-        return {"input_ids": input_ids, "labels": labels}
+        token_counts = {
+            "raw": 2,
+            "raw_plus_prompt_template": 3,
+        }
+        return {"input_ids": input_ids, "labels": labels, "token_counts": token_counts}
 
 
 @pytest.fixture(scope="module")
