@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import torch
 from lightning.fabric.utilities.throughput import measure_flops
+from lightning.fabric.wrappers import _FabricModule
 
 from whittle.models.gpt import GPT
 
@@ -60,7 +61,10 @@ def compute_flops(
     )
 
     def forward_fn() -> torch.Tensor:
-        return model(input_tensor)
+        if isinstance(model, _FabricModule):
+            return model.module(input_tensor)
+        else:
+            return model(input_tensor)
 
     model_loss: Callable[[torch.Tensor], torch.Tensor] | None = None
     if loss_fn is not None:
