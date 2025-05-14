@@ -104,7 +104,13 @@ def setup(
         model_name=checkpoint_dir, access_token=access_token
     )
     pprint(locals())
-    data = LLaMaMini() if data is None else data
+
+    def init_LLaMaMini() -> LLaMaMini:
+        return (
+            LLaMaMini() if access_token is None else LLaMaMini(access_token=access_token)
+        )
+
+    data = init_LLaMaMini() if data is None else data
     num_devices = parse_devices(devices)
     out_dir = init_out_dir(out_dir)
 
