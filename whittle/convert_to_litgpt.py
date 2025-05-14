@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -50,6 +51,9 @@ def setup(
 
     if out_dir is None:
         out_dir = sub_network_dir
+
+    if not os.path.exists(out_dir):
+        out_dir.mkdir(parents=True, exist_ok=True)
 
     ckp = lazy_load(sub_network_dir / "lit_model.pth")
 
@@ -114,3 +118,11 @@ def setup(
         )
         torch.save(save_data, out_dir / "lit_model.pth")
         save_config(sub_network.config, out_dir)
+
+    print(f"Converted sub-network saved to {out_dir}")
+
+
+if __name__ == "__main__":
+    from jsonargparse import CLI
+
+    CLI(setup)
