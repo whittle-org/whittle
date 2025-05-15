@@ -159,7 +159,6 @@ def setup(
         max_seq_length=None,
     ),
     train_strategy: str = "sandwich",
-    search_space_type: str = "hw_gpt_bench",
     eval: EvalArgs = EvalArgs(interval=10, max_new_tokens=100, max_iters=100),
     optimizer: str | dict = "AdamW",
     logger_name: Literal["wandb", "tensorboard", "csv"] = "wandb",
@@ -193,7 +192,6 @@ def setup(
         data: Data-related arguments. If not provided, the default is ``litgpt.data.Alpaca``.
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
         train_strategy: The training strategy to use. Possible choices: "sandwich", "standard".
-        search_space_type: The search space to use. Possible choices: "small", "medium", "hw_gpt_bench", "llama_joint".
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
         optimizer: An optimizer name (such as "AdamW") or config.
         logger_name: The name of the logger to send metrics to.
@@ -246,11 +244,11 @@ def setup(
     n_trials = sampler.n_trials
     # Create a timestamp with nanosecond precision
     time_string = now.strftime("%Y%m%d_%H%M%S")
-    search_space = search_spaces[search_space_type](config)
+    search_space = search_spaces["lora"](config)
     out_dir = Path(
-        f"{config.name}-{train_strategy}-{search_space_type}-{sampling_strategy}-{data_str}/finetune/lora/"
+        f"{config.name}-{train_strategy}-lora-{sampling_strategy}-{data_str}/finetune/lora/"
     )
-    id = f"{train_strategy}-{search_space_type}-{sampling_strategy}-{time_string}-{data_str}-lora"
+    id = f"{train_strategy}-lora-{sampling_strategy}-{time_string}-{data_str}-lora"
     precision = precision or get_default_supported_precision(training=True)
     logger = choose_logger(
         logger_name,
@@ -261,7 +259,7 @@ def setup(
         resume=bool(resume),
         config=dict(
             train_strategy=train_strategy,
-            search_space_type=search_space_type,
+            search_space_type="lora",
             sampling_strategy=sampling_strategy,
             data=data_str,
             lora_r=lora_r,
