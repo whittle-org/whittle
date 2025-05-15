@@ -11,15 +11,15 @@ All the commands in the following sections assume that they are executed from th
 
 ## Pre-Training Super-Networks
 
-In this example, we pre-train a Whittle super-network using a lightweight version of [Pythia-14M](https://huggingface.co/EleutherAI/pythia-14m) on the [TinyStories](https://arxiv.org/abs/2305.07759) dataset.
+In this example, we pre-train a Whittle super-network based on a lightweight version of [Pythia-14M](https://huggingface.co/EleutherAI/pythia-14m) on the [TinyStories](https://arxiv.org/abs/2305.07759) dataset.
 The input arguments for the super-network pre-training workflow follow the original [pretrain](https://github.com/Lightning-AI/litgpt/blob/main/tutorials/pretrain.md) workflow of [LitGPT](https://github.com/Lightning-AI/litgpt).
 
 There are a few different strategies for training the super-networks.
-- The *standard strategy* is to update the entire super-network at each step.
+- The *standard strategy* is to update the weights of entire super-network at each step.
 - The *random strategy* updates only random sub-networks at each step, which encourages the super-network to become more prunable and resilient, making it easier to later extract strong-performing sub-models.
-- Finally, the *sandwich strategy*, as proposed by Cai et al. [1], updates the largest super-network, followed by a few randomly sampled sub-networks, and then the smallest sub-network. This strategy is used by default if none are specified explicitly.
+- Finally, the *sandwich strategy*, as proposed by Cai et al. [1], updates the largest super-network, followed by a few randomly sampled sub-networks, and then the smallest sub-network. This strategy is used by **default** if none are specified explicitly.
 
-Before you run the command to pre-train a super-network, ensure that you have downloaded the tokenizer for the model
+Before you run the command to pre-train a super-network, ensure that you have [downloaded the tokenizer](https://github.com/Lightning-AI/litgpt/blob/main/tutorials/download_model_weights.md#downloading-tokenizers-only) for the model
 ```bash
 python whittle/pretrain_super_network.py EleutherAI/pythia-14m \
     --data TinyStories \
@@ -48,8 +48,8 @@ python whittle/search_sub_networks.py pretrained_super_net/final/ \
 ## Evaluating Sub-Networks
 
 The following workflow allows you to evaluate checkpoints of a sub-network using the [Language Model Evaluation Harness](https://github.com/EleutherAI/lm-evaluation-harness/tree/main).
-
-It runs standard validation to measure metrics like accuracy, loss, and resource usage, helping you choose the best sub-network for your application.
+Have a look [here](https://github.com/EleutherAI/lm-evaluation-harness/tree/main/lm_eval/tasks#tasks) for a list of all available tasks.
+The workflow runs standard validation to measure metrics like accuracy, loss, and resource usage, helping you choose the best sub-network for your application.
 
 ```bash
 python whittle/evaluate_network.py sub_networks/sub_network_0/ \
