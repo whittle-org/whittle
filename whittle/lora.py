@@ -214,7 +214,9 @@ def setup(
     if data_str == "alpaca":
         data = Alpaca()
     elif data_str == "llamamini":
-        data = LLaMaMini()
+        data = (
+            LLaMaMini() if access_token is None else LLaMaMini(access_token=access_token)
+        )
     else:
         data = None
     devices = parse_devices(devices)
