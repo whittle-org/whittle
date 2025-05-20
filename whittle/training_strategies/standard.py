@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from torch.profiler import ProfilerActivity, profile, record_function
+
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 
 
@@ -22,7 +24,17 @@ class StandardStrategy(BaseTrainingStrategy):
         super().__init__(**kwargs)
 
     def __call__(self, model, inputs, outputs, scale_loss=1, **kwargs):
-        loss = self.compute_loss(model, inputs, outputs)
-        loss *= scale_loss
-        loss.backward() if self.fabric is None else self.fabric.backward(loss)
+        with profile(
+            activities=[ProfilerActivity.CUDA, ProfilerActivity.CPU], record_shapes=True
+        ) as prof:
+            with record_function("Standard::compute_loss"):
+                loss = self.compute_loss(model, inputs, outputs)
+
+            loss *= scale_loss
+
+            with record_function("Standard::backward"):
+                loss.backward() if self.fabric is None else self.fabric.backward(loss)
+
+        prof.export_chrome_trace("trace.json")
+
         return loss.item()

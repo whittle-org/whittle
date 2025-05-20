@@ -94,11 +94,12 @@ def setup(
     optimizer: str | dict = "AdamW",
     devices: int | str = "auto",
     num_nodes: int = 1,
-    training_strategy: str = "sandwich",
+    training_strategy: str = "random",
     tokenizer_dir: Path | None = None,
     logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
     seed: int = 42,
     accelerator: str | None = None,
+    compile_model: bool = True,
 ):
     """Pretrain a model.
 
@@ -219,6 +220,7 @@ def setup(
         eval,
         optimizer,
         training_strategy,
+        compile_model=compile_model,
     )
 
 
@@ -331,6 +333,8 @@ def fit(
             loss = training_strategy(model, input_ids, targets, scale_loss=scale_loss)
         #            fabric.backward(loss / train.gradient_accumulation_iters(devices))
 
+        print("Train strategy", training_strategy)
+
         running_loss.update(loss)
 
         if not is_accumulating:
@@ -390,6 +394,8 @@ def fit(
             metrics.update(throughput_metrics)
             fabric.log_dict(metrics, step=state["iter_num"] - 1)
 
+        exit(0)
+
         if (
             val_dataloader is not None
             and not is_accumulating
@@ -446,6 +452,7 @@ def main(
     eval: EvalArgs,
     optimizer: str | dict,
     training_strategy: str,
+    compile_model: bool = True,
 ) -> None:
     validate_args(train, eval, initial_checkpoint_dir, resume)
 
@@ -468,7 +475,8 @@ def main(
     fabric.print(f"Time to instantiate model: {time.perf_counter() - t0:.02f} seconds.")
     fabric.print(f"Total parameters: {num_parameters(model):,}")
 
-    model = torch.compile(model)
+    if compile_model:
+        model = torch.compile(model)
     model = fabric.setup(model)
 
     extra_kwargs = {"fused": fabric.device.type == "cuda"}
