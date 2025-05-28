@@ -52,7 +52,7 @@ class ATS(BaseTrainingStrategy):
                 loss.backward() if self.fabric is None else self.fabric.backward(loss)
                 model.reset_super_network()
 
-                total_loss += loss.item()
+                total_loss += loss
         else:
             y_hat = model(inputs)
             if self.kd_loss is not None:
@@ -61,6 +61,6 @@ class ATS(BaseTrainingStrategy):
                 loss = self.loss_function(y_hat, outputs)
             loss *= scale_loss
             loss.backward() if self.fabric is None else self.fabric.backward(loss)
-            total_loss = loss.item()
+            total_loss = loss
         self.current_step += 1
-        return total_loss
+        return total_loss.item()
