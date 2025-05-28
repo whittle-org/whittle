@@ -299,7 +299,7 @@ def fit(
     eval: EvalArgs,
     data: DataModule,
     training_strategy: BaseTrainingStrategy,
-) -> dict:
+) -> dict[str, float]:
     model = state["model"]
     optimizer = state["optimizer"]
     scheduler = state["scheduler"]
