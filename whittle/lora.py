@@ -469,7 +469,7 @@ def fit(
     downstream_dataset: str,
     downstream_test_iters: int,
     resume: bool,
-) -> dict:
+) -> dict[str, float]:
     model = state["model"]
     optimizer = state["optimizer"]
     scheduler = state["scheduler"]
