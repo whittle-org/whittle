@@ -33,6 +33,7 @@ from litgpt.utils import (
     choose_logger,
     chunked_cross_entropy,
     copy_config_files,
+    create_finetuning_performance_report,
     get_default_supported_precision,
     init_out_dir,
     instantiate_bnb_optimizer,
@@ -41,6 +42,7 @@ from litgpt.utils import (
     num_parameters,
     parse_devices,
     save_hyperparameters,
+    select_sft_generate_example,
 )
 from torch.utils.data import ConcatDataset, DataLoader
 from torchmetrics import RunningMean
@@ -393,7 +395,7 @@ def main(
         if resume:
             fabric.load(resume, state)
     train_time = time.perf_counter()
-    fit(
+    token_counts = fit(
         fabric,
         state,
         model,
@@ -412,9 +414,11 @@ def main(
         downstream_test_iters,
         resume,
     )
-    fabric.print(f"Training time: {(time.perf_counter() - train_time):.2f}s")
-    if fabric.device.type == "cuda":
-        fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
+    training_time = time.perf_counter() - train_time
+    output = create_finetuning_performance_report(
+        training_time, token_counts, fabric.device.type
+    )
+    fabric.print(output)
 
     # Final evaluation
     if eval.final_validation:
@@ -465,7 +469,7 @@ def fit(
     downstream_dataset: str,
     downstream_test_iters: int,
     resume: bool,
-) -> None:
+) -> dict[str, float]:
     model = state["model"]
     optimizer = state["optimizer"]
     scheduler = state["scheduler"]
@@ -525,6 +529,16 @@ def fit(
     total_lengths = 0
     time.perf_counter()
 
+    token_counts = {
+        "raw_tokens": torch.tensor(0, device=fabric.device, dtype=torch.long),
+        "raw_tokens_plus_prompt_template": torch.tensor(
+            0, device=fabric.device, dtype=torch.long
+        ),
+        "raw_tokens_plus_prompt_template_and_padding": torch.tensor(
+            0, device=fabric.device, dtype=torch.long
+        ),
+    }
+
     while state["step_count"] < max_steps and train_iterator.epoch < train.epochs:
         state["iter_num"] += 1
         iter_t0 = time.perf_counter()
@@ -557,6 +571,12 @@ def fit(
             scheduler.step()
             state["step_count"] += 1
 
+        token_counts["raw_tokens"] += batch["token_counts"]["raw"].sum().item()
+        token_counts["raw_tokens_plus_prompt_template"] += (
+            batch["token_counts"]["raw_plus_prompt_template"].sum().item()
+        )
+        token_counts["raw_tokens_plus_prompt_template_and_padding"] += input_ids.numel()
+
         total_lengths += input_ids.numel()
         if state["iter_num"] % train.log_interval == 0:
             loss = (
@@ -569,15 +589,9 @@ def fit(
                 "step": state["step_count"],
                 "epoch": train_iterator.epoch,
                 "iter_time": t1 - iter_t0,
-                "tokens": state["iter_num"]
-                * train.micro_batch_size
-                * model.config.block_size,
-                "total_tokens": (
-                    state["iter_num"]
-                    * train.micro_batch_size
-                    * model.config.block_size
-                    * fabric.world_size
-                ),
+                "tokens": token_counts["raw_tokens_plus_prompt_template"],
+                "total_tokens": token_counts["raw_tokens_plus_prompt_template"]
+                * fabric.world_size,
                 "learning_rate": scheduler.get_last_lr()[0],
             }
             if isinstance(val_loss_largest, torch.Tensor):
@@ -645,6 +659,13 @@ def fit(
                 save_hyperparameters(setup, checkpoint_file.parent)
                 save_prompt_style(data.prompt_style, checkpoint_file.parent)
 
+    total_token_counts = {}
+    for key in token_counts:
+        total = fabric.all_reduce(token_counts[key], reduce_op="sum")
+        total_token_counts[key] = total.item()
+
+    return total_token_counts
+
 
 # FSDP has issues with `inference_mode`
 @torch.no_grad()
@@ -685,9 +706,7 @@ def test_downstream(
 def generate_example(
     fabric: L.Fabric, model: GPT, tokenizer: Tokenizer, eval: EvalArgs, data: DataModule
 ):
-    instruction = (
-        "Recommend a movie for me to watch during the weekend and explain the reason."
-    )
+    instruction = select_sft_generate_example(eval, data)
     fabric.print(instruction)
     prompt = data.prompt_style.apply(instruction)
     encoded = tokenizer.encode(prompt, device=fabric.device)
