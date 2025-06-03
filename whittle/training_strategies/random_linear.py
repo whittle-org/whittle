@@ -54,11 +54,11 @@ class RandomLinearStrategy(BaseTrainingStrategy):
                 loss.backward() if self.fabric is None else self.fabric.backward(loss)
                 model.reset_super_network()
 
-                total_loss += loss.item()
+                total_loss += loss
         else:
             loss = self.compute_loss(model, inputs, outputs)
             loss *= scale_loss
             loss.backward() if self.fabric is None else self.fabric.backward(loss)
-            total_loss = loss.item()
+            total_loss = loss
         self.current_step += 1
-        return total_loss
+        return total_loss.item()
