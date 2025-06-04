@@ -360,6 +360,10 @@ def main(
             fabric.print("Initializing params grid....")
             strategy.sampler.initialize_grid(model)
             fabric.print("Grid Size", len(strategy.sampler.grid))
+        elif "stratified_random" in sampling_strategy:
+            fabric.print("Initializing param bins...")
+            strategy.sampler.initialize_param_bins(model)  # type: ignore
+
     model.name_or_path = checkpoint_dir
     mark_only_lora_as_trainable(model)
 
