@@ -143,13 +143,13 @@ class RandomSampler(BaseSampler):
 
         return self.search_space.cast(config) if self.cast_search_space else config
 
-    def get_parameters(self, model: GPT, config) -> float:
+    def get_parameters(self, model: GPT, config: dict[str, Any]) -> float:
         """
         Counts the number of parameters in the model for the given configuration
 
         Args:
-            model       : GPT model
-            config      : Configuration of sub-network of the model
+            model: GPT model
+            config: Configuration of sub-network of the model
 
         Returns:
             The number of parameters of the activated sub-network
