@@ -17,8 +17,7 @@ def get_sampler(sampler_type, search_space, seed, num_configs, n_trials, **kwarg
         return StratifiedRandomSampler(
             search_space=search_space,
             seed=seed,
-            n_trials=n_trials,
-            num_configs=num_configs,
+            max_tries=n_trials,
             **kwargs,
         )
     elif sampler_type == Samplers.GRID_PARAMS:

@@ -1,13 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any
 
 from whittle.args import ParamBinArgs
-from whittle.metrics.parameters import (
-    compute_parameters,
-)
-from whittle.models.gpt import GPT
 from whittle.sampling.param_bins import ParamBins
 from whittle.sampling.random_sampler import RandomSampler
 
@@ -27,25 +22,27 @@ class StratifiedRandomSampler(RandomSampler):
     def __init__(
         self,
         search_space: dict[str, Any] | Any,
-        params_estimator: Callable,
         seed: int | None = None,
         param_bins: ParamBinArgs | None = None,
         max_tries: int = 10000,
         cast_search_space: bool = True,
     ):
-        param_bins = param_bins if param_bins is not None else ParamBinArgs()
+        self.param_bins_args = param_bins if param_bins is not None else ParamBinArgs()
         super().__init__(search_space, seed=seed, cast_search_space=cast_search_space)
+
+        self.param_bins = None
+        self.max_tries = max_tries
+
+    def initialize_param_bins(self, model):
         self.param_bins = ParamBins(
             self.get_smallest_sub_network(),
             self.get_largest_sub_network(),
-            params_estimator,
-            num_bins=param_bins.num_bins,
-            log_bins=param_bins.log_bins,
-            start_bin_size=param_bins.start_bin_size,
-            empty_bin_tolerance=param_bins.empty_bin_tolerance,
+            params_func=lambda config: self.get_parameters(model, config),
+            num_bins=self.param_bins_args.num_bins,
+            log_bins=self.param_bins_args.log_bins,
+            start_bin_size=self.param_bins_args.start_bin_size,
+            empty_bin_tolerance=self.param_bins_args.empty_bin_tolerance,
         )
-
-        self.max_tries = max_tries
 
     def sample(self) -> dict[str, Any]:
         """
@@ -54,6 +51,9 @@ class StratifiedRandomSampler(RandomSampler):
         Returns:
             The smallest sub-network configuration.
         """
+        assert self.param_bins is not None, (
+            "StratifiedRandomSampler.param_bins must be initialized first."
+        )
         tries = 0
         while True:
             config = super().sample()
@@ -105,12 +105,13 @@ class FixedParamGridSampler(RandomSampler):
     def initialize_grid(self, model):
         sampler = StratifiedRandomSampler(
             self.search_space,
-            params_estimator=lambda config: self.get_parameters(model, config),
             seed=self.seed,
             param_bins=self.args,
             max_tries=self.n_trials,
             cast_search_space=self.cast_search_space,
         )
+
+        sampler.initialize_param_bins(model)
 
         # add smallest/largest sub-networks, update param bins from outside
         self.grid.append(sampler.get_smallest_sub_network())
@@ -127,16 +128,6 @@ class FixedParamGridSampler(RandomSampler):
         self.grid_params = [self.get_parameters(model, config) for config in self.grid]
         self.grid = [config for _, config in sorted(zip(self.grid_params, self.grid))]
         self.grid_params.sort()
-
-    def get_parameters(self, model: GPT, config):
-        if self.cast_search_space:
-            model.set_sub_network(**config)
-        else:
-            model.select_sub_network(config)
-
-        params = compute_parameters(model)
-        model.reset_super_network()
-        return params
 
     def sample(self):
         return self.rng.choice(self.grid)

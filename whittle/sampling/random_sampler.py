@@ -6,6 +6,8 @@ from typing import Any
 import numpy as np
 from syne_tune.config_space import Categorical, Domain
 
+from whittle.metrics.parameters import compute_parameters
+from whittle.models.gpt import GPT
 from whittle.search.search_spaces import SimpleSearchSpace
 
 
@@ -140,3 +142,23 @@ class RandomSampler(BaseSampler):
                     config[k] = (v.lower + v.upper) // 2
 
         return self.search_space.cast(config) if self.cast_search_space else config
+
+    def get_parameters(self, model: GPT, config) -> float:
+        """
+        Counts the number of parameters in the model for the given configuration
+
+        Args:
+            model       : GPT model
+            config      : Configuration of sub-network of the model
+
+        Returns:
+            The number of parameters of the activated sub-network
+        """
+        if self.cast_search_space:
+            model.set_sub_network(**config)
+        else:
+            model.select_sub_network(config)
+
+        params = compute_parameters(model)
+        model.reset_super_network()
+        return params
