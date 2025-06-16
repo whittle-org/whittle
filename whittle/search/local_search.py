@@ -69,7 +69,7 @@ class LocalSearch(SingleObjectiveBaseSearcher):
         )
         self.random_state = np.random.RandomState(self.random_seed)
 
-    def _sample_random_neighbour(self, start_point):
+    def _sample_random_neighbour(self, start_point) -> dict | None:
         # get actual hyperparameters from the search space
         config = deepcopy(start_point)
         hypers = []
@@ -84,6 +84,7 @@ class LocalSearch(SingleObjectiveBaseSearcher):
             if new_value != start_point[hp_name]:
                 config[hp_name] = new_value
                 return config
+        return None
 
     def is_efficient(self, costs):
         is_efficient = np.ones(costs.shape[0], dtype=bool)
