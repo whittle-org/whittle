@@ -7,8 +7,7 @@ from typing import Any
 
 import numpy as np
 from syne_tune.config_space import Domain
-from syne_tune.optimizer.schedulers import LegacyFIFOScheduler
-from syne_tune.optimizer.schedulers.searchers.searcher_base import StochasticSearcher
+from syne_tune.optimizer.schedulers.searchers.single_objective_searcher import SingleObjectiveBaseSearcher
 
 logger = logging.getLogger(__name__)
 
@@ -25,51 +24,7 @@ class PopulationElement:
     result: dict
 
 
-class LS(LegacyFIFOScheduler):
-    """
-    Local Search Scheduler for hyperparameter optimization.
-
-    This scheduler uses a local search strategy to explore the configuration space.
-    It extends the FIFOScheduler and integrates with the LocalSearch searcher.
-
-    Args:
-        config_space: Configuration space for the evaluation function.
-        metric: List of metrics to optimize.
-        mode: Optimization mode, either "min" or "max". Defaults to "min".
-        start_point: Starting point for the search. Defaults to None.
-        random_seed: Random seed for reproducibility. Defaults to None.
-        points_to_evaluate: Initial points to evaluate. Defaults to None.
-        **kwargs: Additional arguments for the FIFOScheduler.
-    """
-
-    def __init__(
-        self,
-        config_space: dict[str, Any],
-        metric: list[str],
-        mode: list[str] | str = "min",
-        start_point: dict[str, Any] | None = None,
-        random_seed: int | None = None,
-        points_to_evaluate: list[dict] | None = None,
-        **kwargs: Any,
-    ):
-        super().__init__(
-            config_space=config_space,
-            metric=metric,
-            mode=mode,
-            searcher=LocalSearch(
-                config_space=config_space,
-                metric=metric,
-                start_point=start_point,
-                mode=mode,
-                random_seed=random_seed,
-                points_to_evaluate=points_to_evaluate,
-            ),
-            random_seed=random_seed,
-            **kwargs,
-        )
-
-
-class LocalSearch(StochasticSearcher):
+class LocalSearch(SingleObjectiveBaseSearcher):
     """
     Local Search algorithm for hyperparameter optimization.
 
@@ -78,21 +33,17 @@ class LocalSearch(StochasticSearcher):
 
     Args:
         config_space: Configuration space for the evaluation function.
-        metric: List of metrics to optimize.
         points_to_evaluate: Initial points to evaluate. Defaults to None.
         start_point: Starting point for the search. Defaults to None.
-        mode: Optimization mode, either "min" or "max". Defaults to "min".
-        **kwargs: Additional arguments for the StochasticSearcher.
+        random_seed: Seed for the random number generator.
     """
 
     def __init__(
         self,
         config_space: dict[str, Any],
-        metric: list[str] | str,
         points_to_evaluate: list[dict] | None = None,
         start_point: dict | None = None,
-        mode: list[str] | str = "min",
-        **kwargs: Any,
+        random_seed: int | None = None,
     ):
         if start_point is None:
             self.start_point = {
@@ -111,21 +62,10 @@ class LocalSearch(StochasticSearcher):
 
         super().__init__(
             config_space,
-            metric,
-            mode=mode,
             points_to_evaluate=points_to_evaluate,
-            **kwargs,
+            random_seed=random_seed,
         )
-        if isinstance(self._mode, list):
-            self._metric_op: dict[str, Any] = {
-                metric: 1 if mode == "min" else -1
-                for metric, mode in zip(metric, self._mode)
-            }
-        else:
-            if self._mode == "min":
-                self._metric_op = dict(zip(self._metric, [1.0] * len(self._metric)))
-            elif self._mode == "max":
-                self._metric_op = dict(zip(self._metric, [-1.0] * len(self._metric)))
+        self.random_state = np.random.RandomState(self.random_seed)
 
     def _sample_random_neighbour(self, start_point):
         # get actual hyperparameters from the search space
@@ -165,8 +105,9 @@ class LocalSearch(StochasticSearcher):
     def dominates(self, incumbent, neighbour):
         return np.all(neighbour <= incumbent) * np.any(neighbour < incumbent)
 
-    def get_config(self, **kwargs) -> dict | None:
-        config = self._next_initial_config()
+    def suggest(self, **kwargs) -> dict | None:
+        config = self._next_points_to_evaluate()
+
         if config is not None:
             return config
 
@@ -178,12 +119,6 @@ class LocalSearch(StochasticSearcher):
             config = self._sample_random_neighbour(element.config)
 
         return config
-
-    def _metric_dict(self, reported_results: dict) -> dict:
-        return {
-            metric: reported_results[metric] * self._metric_op[metric]
-            for metric in self._metric
-        }
 
     def _update(self, trial_id: int, config: dict[str, Any], result: dict[str, Any]):
         # assume that the new point is in the Pareto Front
@@ -208,16 +143,3 @@ class LocalSearch(StochasticSearcher):
         for i, keep in enumerate(is_efficient):
             if keep:
                 self._pareto_front.append(pareto_front[i])
-
-    def configure_scheduler(self, scheduler):
-        from syne_tune.optimizer.schedulers.scheduler_searcher import (
-            TrialSchedulerWithSearcher,
-        )
-
-        assert isinstance(scheduler, TrialSchedulerWithSearcher), (
-            "This searcher requires TrialSchedulerWithSearcher scheduler"
-        )
-        super().configure_scheduler(scheduler)
-
-    def clone_from_state(self, state: dict[str, Any]):
-        raise NotImplementedError
