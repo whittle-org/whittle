@@ -7,7 +7,9 @@ from typing import Any
 
 import numpy as np
 from syne_tune.config_space import Domain
-from syne_tune.optimizer.schedulers.searchers.single_objective_searcher import SingleObjectiveBaseSearcher
+from syne_tune.optimizer.schedulers.searchers.single_objective_searcher import (
+    SingleObjectiveBaseSearcher,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -82,16 +84,6 @@ class LocalSearch(SingleObjectiveBaseSearcher):
             if new_value != start_point[hp_name]:
                 config[hp_name] = new_value
                 return config
-
-        # mutation_name = np.random.choice(list(self._mutations.keys()))
-        #
-        # config = self._mutations[mutation_name](start_point)
-
-        # sample mutation
-        # name = np.random.choice(hypers)
-        # mutation = self._mutations[name]
-
-        # return mutation(config)
 
     def is_efficient(self, costs):
         is_efficient = np.ones(costs.shape[0], dtype=bool)

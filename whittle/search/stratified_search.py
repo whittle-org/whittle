@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Optional, List, Dict
+from typing import Any
 
+from syne_tune.optimizer.schedulers.searchers.searcher import BaseSearcher
 
 from whittle.sampling.param_bins import ParamBins
 
-from syne_tune.optimizer.schedulers.searchers.searcher import BaseSearcher
 
 class StratifiedRandomSearcher(BaseSearcher):
     """
@@ -19,8 +19,8 @@ class StratifiedRandomSearcher(BaseSearcher):
         config_space: dict[str, Any],
         param_bins: ParamBins,
         sample_patience: int = 10000,
-        points_to_evaluate: Optional[List[Dict[str, Any]]] = None,
-        random_seed: int = None,
+        points_to_evaluate: list[dict[str, Any]] | None = None,
+        random_seed: int | None = None,
     ):
         """
         Args:
@@ -56,8 +56,9 @@ class StratifiedRandomSearcher(BaseSearcher):
             return config
         i = 0
         while True:
-            config =  {
-                k: v.sample() if hasattr(v, "sample") else v for k, v in self.config_space.items()
+            config = {
+                k: v.sample() if hasattr(v, "sample") else v
+                for k, v in self.config_space.items()
             }
 
             # find a bin for the config, if not found, continue sampling
