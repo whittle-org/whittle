@@ -13,7 +13,7 @@ from typing_extensions import Self
 import torch
 import torch.nn as nn
 from litgpt import Config
-from litgpt.model import batched_index_select, build_rope_cache
+from litgpt.model import batched_index_select, build_rope_cache, do_softcapping
 
 from whittle.models.gpt.blocks import Block
 from whittle.modules.embedding import Embedding
@@ -143,12 +143,8 @@ class GPT(nn.Module):
             elif num_params_present == 4:
                 # These parameters should always be used together so that we don't interfere with standard rope
                 extra_config = {
-                    "original_max_seq_len": self.config.rope_adjustments[
-                        "original_max_seq_len"
-                    ],
-                    "factor": self.config.rope_adjustments["factor"],
-                    "low_freq_factor": self.config.rope_adjustments["low_freq_factor"],
-                    "high_freq_factor": self.config.rope_adjustments["high_freq_factor"],
+                    name: self.config.rope_adjustments[name]
+                    for name in adjusted_params_required
                 }
             else:
                 # Some but not all parameters are specified; raise an error
@@ -266,10 +262,10 @@ class GPT(nn.Module):
         Selects and sets the sub-network configuration based on the provided configuration.
         """
         self.set_sub_network(
-            config["embed_dim"],
-            int(config["mlp_ratio"] * config["embed_dim"]),
-            config["num_heads"],
-            config["depth"],
+            sub_network_n_embd=config["embed_dim"],
+            sub_network_intermediate_size=int(config["mlp_ratio"] * config["embed_dim"]),
+            sub_network_num_heads=config["num_heads"],
+            sub_network_n_layers=config["depth"],
             sub_network_head_size=config.get("head_size", None),
             sub_network_query_groups=config.get("n_query_groups", None),
         )
@@ -298,26 +294,52 @@ class GPT(nn.Module):
         if rebuild_rope:
             self.reset_parameters()
 
-    def process_rope_cache(self, cos, sin, input_pos, T):
+    def process_rope_cache(self, cos, sin, input_pos, input_pos_maxp1, T):
         if input_pos is not None:  # use the kv cache
+            if input_pos.dim() > 2:
+                # otherwise, things go wrong in `apply_rope`
+                raise ValueError(
+                    f"input_pos must have 1 or 2 dimensions, input_pos.shape = {input_pos.shape}"
+                )
+            if input_pos.shape[-1] != T:
+                raise ValueError(
+                    f"input_pos.shape[-1] = {input_pos.shape[-1]} != {T} = idx.shape[1], must be the same"
+                )
             cos = batched_index_select(cos, 0, input_pos)
             sin = batched_index_select(sin, 0, input_pos)
+            if input_pos.dim() == 1:
+                cos = cos.unsqueeze(0)
+                sin = sin.unsqueeze(0)
             if self.mask_cache is None:
                 raise TypeError("You need to call `gpt.set_kv_cache()`")
             mask = batched_index_select(self.mask_cache, 2, input_pos)
             if mask.dim() > 4:
                 # the mask cache has a batch dim of 1 in addition to the one
                 # we get if input_pos has a batch dimension
-                mask = mask.squeeze(1)
+                mask = mask.view(*(mask.shape[0:1] + mask.shape[2:]))
+            if input_pos_maxp1 is not None:
+                # Shorten final dimension so it just covers all `input_pos` entries
+                if input_pos_maxp1 > self.max_seq_length:
+                    raise ValueError(
+                        f"Positions in 'input_pos' must be in [0,{self.max_seq_length})"
+                    )
+                mask = mask[..., :input_pos_maxp1]
         else:
-            cos = cos[:T]
-            sin = sin[:T]
-            mask = None
-        return cos, sin, mask
+            # unsqueeze to have a batch dimension
+            cos = cos[:T].unsqueeze(0)
+            sin = sin[:T].unsqueeze(0)
+            # `cos`, `sin` have shape (1, T, config.rope_n_elem)
+            mask = None  # defaults to causal mask
+            input_pos_maxp1 = None
+        return cos, sin, mask, input_pos_maxp1
 
     def forward(
-        self, idx: torch.Tensor, input_pos: torch.Tensor | None = None
-    ) -> torch.Tensor:
+        self,
+        idx: torch.Tensor,
+        input_pos: torch.Tensor | None = None,
+        input_pos_maxp1: torch.Tensor | None = None,
+        lm_head_chunk_size: int = 0,
+    ) -> torch.Tensor | list[torch.Tensor]:
         T = idx.size(1)
         if self.max_seq_length < T:
             raise ValueError(
@@ -330,18 +352,25 @@ class GPT(nn.Module):
         for i in range(self.sub_network_n_layers):
             block = self.transformer.h[i]
 
-            cos, sin = self.cos.to(idx.device), self.sin.to(idx.device)
-            cos, sin, mask = self.process_rope_cache(cos, sin, input_pos, T)
-
-            x = block(x, cos, sin, mask, input_pos)
-        x = self.transformer.ln_f(x)
-        x = self.lm_head(x)  # (b, t, vocab_size)
-        if self.config.final_logit_softcapping is not None:
-            x = (
-                torch.tanh(x / self.config.final_logit_softcapping)
-                * self.config.final_logit_softcapping
+            cos, sin, mask, input_pos_maxp1_block = self.process_rope_cache(
+                self.cos, self.sin, input_pos, input_pos_maxp1, T
             )
-        return x
+
+            x = block(x, cos, sin, mask, input_pos, input_pos_maxp1_block)
+        x = self.transformer.ln_f(x)
+        clamp_head = (
+            partial(do_softcapping, thresh=self.config.final_logit_softcapping)
+            if self.config.final_logit_softcapping is not None
+            else nn.Identity()
+        )
+        if lm_head_chunk_size > 0:
+            # chunk the lm head logits to reduce the peak memory used by autograd
+            return [
+                clamp_head(self.lm_head(x_i))
+                for x_i in x.split(lm_head_chunk_size, dim=1)
+            ]
+        else:
+            return clamp_head(self.lm_head(x))  # (B, T, padded_vocab_size)
 
     @classmethod
     def from_name(cls, name: str, **kwargs: Any) -> Self:

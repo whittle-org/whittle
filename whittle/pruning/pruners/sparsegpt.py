@@ -30,16 +30,17 @@ class SparseGPTPruner(Pruner):
             model: The model to be pruned.
             prune_n: Number of weights to prune per group.
             prune_m: Total number of weights per group.
-            kwargs: Additional arguments (e.g., 'nsamples',sparsity_ratio ,dev,dataloader).
+            kwargs: Additional arguments (e.g., 'nsamples', sparsity_ratio, device, dataloader).
         """
 
         nsamples = kwargs.get("nsamples", 32)
         sparsity_ratio = kwargs.get("sparsity_ratio", None)
+        device = kwargs.get("device", torch.device("cuda"))  # Default to cuda device
 
         inps, outs, attention_mask, position_ids = self._prepare_calibration_input(
             model=model,
             dataloader=kwargs.get("dataloader"),
-            dev=kwargs.get("dev", "cuda"),
+            dev=device,
             nsamples=nsamples,
         )
 
@@ -69,8 +70,8 @@ class SparseGPTPruner(Pruner):
                     outs[j] = layer(
                         inps[j],
                         mask=attention_mask,
-                        cos=model.cos,
-                        sin=model.sin,
+                        cos=model.cos.unsqueeze(0),
+                        sin=model.sin.unsqueeze(0),
                         input_pos=position_ids,
                     )[0]
 
@@ -93,12 +94,14 @@ class SparseGPTPruner(Pruner):
                 outs[j] = layer(
                     inps[j],
                     mask=attention_mask,
-                    cos=model.cos,
-                    sin=model.sin,
+                    cos=model.cos.unsqueeze(0),
+                    sin=model.sin.unsqueeze(0),
                     input_pos=position_ids,
                 )[0]
 
             layers[i] = layer
-            torch.cuda.empty_cache()
+
+            if device == "cuda" and torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
             inps, outs = outs, inps

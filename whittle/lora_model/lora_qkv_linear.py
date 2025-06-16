@@ -184,6 +184,45 @@ class LoRAQKVLinear(LoRALayer):
 
         return self._v_target
 
+    def _get_lora_indices(
+        self, candidate_indices, qkv_group_size, enable_flag, target_mod, device
+    ):
+        # target_mod=q corresponds to indices [0, q_per_kv), [q_per_kv + 2, 2 * q_per_kv + 2)...
+        # target_mod=k corresponds to indices q_per_kv, 2 * q_per_kv + 1, ...
+        # target_mod=v corresponds to indices q_per_kv + 1, 2 * q_per_kv + 2, 3 * q_per_kv + 4...
+        if not enable_flag:
+            return torch.tensor([], dtype=torch.long, device=device), torch.tensor(
+                [], dtype=torch.long, device=device
+            )
+
+        candidate_tensor = torch.tensor(
+            candidate_indices, dtype=torch.long, device=device
+        )
+        indices = torch.arange(len(candidate_indices), dtype=torch.long, device=device)
+
+        if target_mod == "q":
+            mask = candidate_tensor < self.q_per_kv * self.head_size * self.n_query_groups
+        elif target_mod == "k":
+            mask = (
+                candidate_tensor >= self.q_per_kv * self.head_size * self.n_query_groups
+            ) & (
+                candidate_tensor
+                < (self.q_per_kv + 1) * self.head_size * self.n_query_groups
+            )
+        elif target_mod == "v":
+            mask = (
+                candidate_tensor
+                >= (self.q_per_kv + 1) * self.head_size * self.n_query_groups
+            ) & (
+                candidate_tensor
+                < (self.q_per_kv + 2) * self.head_size * self.n_query_groups
+            )
+
+        selected_indices = candidate_tensor[mask]
+        selected_targets = indices[mask]
+
+        return selected_indices, selected_targets
+
     def _set_lora_ind(self) -> None:
         """Set the indices for LoRA."""
         enable_q, enable_k, enable_v = self.enable_lora
@@ -194,40 +233,18 @@ class LoRAQKVLinear(LoRALayer):
             else self.qkv_indices
         )
 
-        q_ind: list[int] = []
-        k_ind: list[int] = []
-        v_ind: list[int] = []
-        q_target: list[int] = []
-        k_target: list[int] = []
-        v_target: list[int] = []
-        if enable_q:
-            q_indices: list[tuple[int, int]] = [
-                (x, i)
-                for i, x in enumerate(candidate_indices)
-                if (i // self.sub_network_head_size) % qkv_group_size < qkv_group_size - 2
-            ]
-            q_ind, q_target = zip(*q_indices)  # type: ignore[assignment]
-        if enable_k:
-            k_indices: list[tuple[int, int]] = [
-                (x, i)
-                for i, x in enumerate(candidate_indices)
-                if (i // self.sub_network_head_size) % qkv_group_size
-                == qkv_group_size - 2
-            ]
-            k_ind, k_target = zip(*k_indices)  # type: ignore[assignment]
-        if enable_v:
-            v_indices: list[tuple[int, int]] = [
-                (x, i)
-                for i, x in enumerate(candidate_indices)
-                if (i // self.sub_network_head_size) % qkv_group_size
-                == qkv_group_size - 1
-            ]
-            v_ind, v_target = zip(*v_indices)  # type: ignore[assignment]
+        # Get indices and targets for q, k, v
+        q_ind, q_target = self._get_lora_indices(
+            candidate_indices, qkv_group_size, enable_q, "q", self.linear.weight.device
+        )
+        k_ind, k_target = self._get_lora_indices(
+            candidate_indices, qkv_group_size, enable_k, "k", self.linear.weight.device
+        )
+        v_ind, v_target = self._get_lora_indices(
+            candidate_indices, qkv_group_size, enable_v, "v", self.linear.weight.device
+        )
 
-        # *_ind indices are the same as self.qkv_indices, only splitted into 3 parts (for q, k and v)
-        # *_target indices serve for populating the resulting tensor -> since we do not index in super-network
-        # anymore, we need indices relative to the sub-network tensor (e.g. for out_features == 16)
-        # and sub-network out_features == 3, if qkv_indices are [0, 14, 15], our target indices will be [0, 1, 2]
+        # Define the mapping for buffer creation
         all_indices = [
             (q_ind, "_q_ind"),
             (k_ind, "_k_ind"),
@@ -237,9 +254,8 @@ class LoRAQKVLinear(LoRALayer):
             (v_target, "_v_target"),
         ]
 
-        # lazy creation of a buffer with LoRA indices to overcome the limitation when FSDP with meta device is used
-        for index_value, index_name in all_indices:
-            index_tensor = torch.tensor(index_value, device=self.linear.weight.device)
+        # Efficient buffer creation for LoRA indices
+        for index_tensor, index_name in all_indices:
             if not hasattr(self, index_name):
                 self.register_buffer(index_name, index_tensor, persistent=False)
             else:
@@ -266,27 +282,6 @@ class LoRAQKVLinear(LoRALayer):
         ________________________________________
         | query         | key       | value    |
         ----------------------------------------
-        For Llama2's GQA support, Q, K, and V weights are interleaved, so that weights for grouped
-        queries are adjacent to their associated key and value weights.
-        For example, suppose we have n_head = 12 with 3 query groups.
-        Then along the embedding dimension the interleaved weights would look like
-
-        [Q, Q, Q, Q, K, V, Q, Q, Q, Q, K, V, Q, Q, Q, Q, K, V],
-
-        where each Q, K, and V has size head_size.
-
-        In this case, the previously-described weight update applies separately to each
-        individual block, so the update will take the form
-
-        [[ΔW,ΔW,ΔW, ..., 0,0,0, ..., ΔW,ΔW,ΔW, ΔW,ΔW,ΔW, ..., 0,0,0, ..., ΔW,ΔW,ΔW, ...],
-         [.............................................................................],
-         [ΔW,ΔW,ΔW, ..., 0,0,0, ..., ΔW,ΔW,ΔW, ΔW,ΔW,ΔW, ..., 0,0,0, ..., ΔW,ΔW,ΔW, ...]]
-             ↑              ↑            ↑        ↑             ↑            ↑
-        ________________________________________________________________________________
-        | q block 1 | k block 1  | v block 1 | q block 2 |  k block 2 |  v block 2 | ...
-        --------------------------------------------------------------------------------
-        Note that in the above diagram, the size of each q block will equal q_per_kv
-        times the size of each k and v block.
 
         Args:
             x: tensor with weights update that will be padded with zeros if necessary
@@ -328,7 +323,7 @@ class LoRAQKVLinear(LoRALayer):
 
         Lora in litgpt is applied separately to keys, queries and values. Because of sub-network selection,
         we need flexible indexing to select parts of the lora_B matrix that correspond to active queries, keys and values.
-        Since QKV are interleaved (i.e. QQKV QQKV ... QQKV), we need to select them in `_set_lora_ind`, and then call `_split_lora_B`
+        Wwe need to select them in `_set_lora_ind`, and then call `_split_lora_B`
         to get the corresponding parts of the weight matrix. Then, we apply each part of the weight matrix to the
         corresponding input's part and concatenate the result.
 
@@ -350,15 +345,19 @@ class LoRAQKVLinear(LoRALayer):
         # ⚬ C_output': embeddings size for each LoRA layer (not equal in size)
         # ⚬ r: rank of all LoRA layers (equal in size)
 
+        # Split input tensor along the specified dimension
         input_splitted = input.chunk(sum(self.enable_lora), dim=1)  # N * (B, C // N, T)
-        # (256, 2) -> (256, 2, 1) -> split to (q, 2, 1), (k, 2, 1), (v, 2, 1)
-        # (k + v + q = 256, k = v, q = self.q_per_kv * k)
 
-        active_inds = [self.q_ind, self.k_ind, self.v_ind]
-        active_inds = [ind for ind in active_inds if len(ind) > 0]
+        # Filter out empty indices and get corresponding weights
+        active_inds = filter(
+            lambda ind: len(ind) > 0, [self.q_ind, self.k_ind, self.v_ind]
+        )
 
-        weight_splitted = [weight[ind].data.unsqueeze(-1) for ind in active_inds]
-        return [F.conv1d(a, b) for a, b in zip(input_splitted, weight_splitted)]
+        # Use indexing directly without `.data` and unsqueeze in the same operation
+        weight_splitted = [weight[ind].unsqueeze(-1) for ind in active_inds]
+
+        # Perform convolution in a single pass with a list comprehension
+        return [F.conv1d(inp, w) for inp, w in zip(input_splitted, weight_splitted)]
 
     def get_lora_AB(self) -> torch.Tensor:
         """Return merged lora_A and lora_B matrices with the same shape as the pretrained weights."""

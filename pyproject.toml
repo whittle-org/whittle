@@ -1,6 +1,6 @@
 [project]
 name = "whittle"
-version = "0.4.1"
+version = "0.5.1"
 description = "Two-stage neural architecture search for large language models"
 # alphabetic order
 authors = [
@@ -19,10 +19,10 @@ dependencies = [
     "pandas",
     "matplotlib",
     "typing-extensions",
-    "torch>=2",
+    "torch>=2.5.0,<2.6.0",
     "transformers>=4",
-    "litgpt[all]==0.5.0",
-    "syne-tune[moo]@ git+https://github.com/syne-tune/syne-tune.git@be5f694b57fc4d1f1c38966727717ed912602ce5",
+    "litgpt[all]==0.5.7",
+    "syne-tune[moo]",
     "torchvision>=0.18",
     "boto3==1.34.147",
     "botocore==1.34.147",
@@ -71,7 +71,9 @@ dev = [
     "mkdocstrings[python]",
     "black",                # Allows mkdocstrings to do formatting...
 ]
-distributed = ["deepspeed", "triton==3.0.0"]
+
+distributed = ["triton"]
+
 all = ["whittle[dev]", "whittle[distributed]"]
 
 [tool.setuptools.packages.find]
@@ -84,7 +86,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.4.1"
+version = "0.5.1"
 update_changelog_on_bump = true
 version_files = ["pyproject.toml:version", "whittle/__version__.py"]
 changelog_start_rev = "0.1.3"

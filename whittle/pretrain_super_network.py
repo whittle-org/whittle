@@ -10,7 +10,7 @@ from typing import Literal
 import lightning as L
 import torch
 from lightning.fabric.strategies import FSDPStrategy
-from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
+from lightning.fabric.utilities.throughput import ThroughputMonitor
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import name_to_config
@@ -20,7 +20,6 @@ from litgpt.pretrain import (
     get_dataloaders,
     get_lr,
     initialize_weights,
-    save_checkpoint,
     validate,
     validate_args,
 )
@@ -30,6 +29,7 @@ from litgpt.utils import (
     check_nvlink_connectivity,
     choose_logger,
     chunked_cross_entropy,
+    copy_config_files,
     extend_checkpoint_dir,
     find_resume_path,
     get_default_supported_precision,
@@ -37,11 +37,14 @@ from litgpt.utils import (
     instantiate_torch_optimizer,
     num_parameters,
     parse_devices,
+    save_config,
+    save_hyperparameters,
 )
 from syne_tune.config_space import lograndint, randint
 from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
+from whittle.metrics.flops import compute_flops
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.sampling.random_sampler import RandomSampler
@@ -61,10 +64,10 @@ training_strategies_cls = {
 
 def get_search_space(config):
     return {
-        "embed_dim": lograndint(1, config.n_embd),
-        "num_heads": randint(1, config.n_head),
-        "mlp_ratio": randint(1, 4),
-        "depth": randint(1, config.n_layer),
+        "sub_network_n_embd": lograndint(1, config.n_embd),
+        "sub_network_intermediate_size": randint(1, config.n_embd),
+        "sub_network_num_heads": randint(1, config.n_head),
+        "sub_network_n_layers": randint(1, config.n_layer),
     }
 
 
@@ -95,6 +98,7 @@ def setup(
     tokenizer_dir: Path | None = None,
     logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
     seed: int = 42,
+    accelerator: str | None = None,
 ):
     """Pretrain a model.
 
@@ -167,7 +171,12 @@ def setup(
         log_interval=train.log_interval,
     )
 
-    if num_devices * num_nodes > 1:
+    # Default to CPU if accelerator not specified
+    if accelerator is None:
+        accelerator = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # Use FSDP only for multi-device CUDA setups
+    if num_devices * num_nodes > 1 and accelerator == "cuda":
         strategy = FSDPStrategy(
             auto_wrap_policy={Block},
             state_dict_type="full",
@@ -182,9 +191,11 @@ def setup(
         strategy=strategy,
         precision=precision,
         loggers=[logger],
+        accelerator=accelerator,
     )
 
-    if torch.cuda.is_available() and num_devices > 1:
+    # Skip NVLink check for CPU or single-device setups
+    if accelerator == "cuda" and num_devices > 1 and torch.cuda.is_available():
         check_nvlink_connectivity(fabric)
 
     fabric.launch()
@@ -209,6 +220,18 @@ def setup(
         optimizer,
         training_strategy,
     )
+
+
+def save_checkpoint(fabric, state, tokenizer_dir, checkpoint_file):
+    model = state["model"]
+    checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+    fabric.print(f"Saving checkpoint to {str(checkpoint_file)!r}")
+    fabric.save(checkpoint_file, state)
+    if fabric.global_rank == 0:
+        save_hyperparameters(setup, checkpoint_file.parent)
+        if tokenizer_dir is not None:
+            copy_config_files(tokenizer_dir, checkpoint_file.parent)
+        save_config(model.config, checkpoint_file.parent)
 
 
 def fit(
@@ -239,20 +262,21 @@ def fit(
         val_loss = "n/a"
 
     throughput = ThroughputMonitor(fabric, window_size=5)
+    batch_size = train.micro_batch_size
+    sequence_length = model.max_seq_length
 
-    with torch.device("meta"):
-        meta_model = GPT(model.config)
-        x = torch.randint(0, 1, (train.micro_batch_size, meta_model.max_seq_length))
+    def loss_fn(output: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        return chunked_cross_entropy(output, targets, chunk_size=0)
 
-        def model_fwd():
-            return meta_model(x)  # noqa: F821
-
-        def model_loss(y):
-            return chunked_cross_entropy(y, x, chunk_size=0)  # noqa: F821
-
-        measured_flops = measure_flops(meta_model, model_fwd, model_loss)
-        fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
-        del meta_model, x
+    measured_flops = compute_flops(
+        model,
+        batch_size=batch_size,
+        sequence_length=sequence_length,
+        device=fabric.device.type,  # Use fabric's device (cpu or cuda)
+        loss_fn=loss_fn,
+        verbose=True,
+    )
+    fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
 
     max_tokens_per_device = train.max_tokens // fabric.world_size
     tokens_per_iter = train.micro_batch_size * model.max_seq_length
@@ -444,7 +468,9 @@ def main(
     fabric.print(f"Time to instantiate model: {time.perf_counter() - t0:.02f} seconds.")
     fabric.print(f"Total parameters: {num_parameters(model):,}")
 
-    model = torch.compile(model)
+    if training_strategy == "standard":
+        model = torch.compile(model)
+
     model = fabric.setup(model)
 
     extra_kwargs = {"fused": fabric.device.type == "cuda"}
@@ -499,9 +525,27 @@ def main(
     # Save final checkpoint
     save_checkpoint(fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth")
 
+    total_tokens = (
+        state["iter_num"]
+        * train.micro_batch_size
+        * model.max_seq_length
+        * fabric.world_size
+    )
+
+    # Print formatted output
+    separator = "-" * 40
+    fabric.print(separator)
+    fabric.print("| Performance")
+    fabric.print(f"| - Total tokens  : {total_tokens:,}")
+    fabric.print(f"| - Training Time : {(time.perf_counter() - train_time):.2f} s")
+    fabric.print(f"| - Tok/sec       : {total_tokens / train_time:.2f} tok/s")
+    fabric.print("| " + "-" * 40)
+
     fabric.print(f"Training time: {(time.perf_counter() - train_time):.2f}s")
     if fabric.device.type == "cuda":
-        fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
+        memory_used = torch.cuda.max_memory_allocated() / 1e9
+        fabric.print("| Memory Usage")
+        fabric.print(f"| - Memory Used   : {memory_used:.2f} GB")
 
 
 if __name__ == "__main__":

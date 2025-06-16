@@ -34,5 +34,5 @@ class RandomStrategy(BaseTrainingStrategy):
             loss.backward() if self.fabric is None else self.fabric.backward(loss)
             model.reset_super_network()
 
-            total_loss += loss.item()
-        return total_loss
+            total_loss += loss
+        return total_loss.item()

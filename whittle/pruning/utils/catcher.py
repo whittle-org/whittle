@@ -27,6 +27,7 @@ class Catcher(nn.Module):
         sin: torch.Tensor,
         mask: torch.Tensor,
         input_pos: torch.Tensor,
+        input_pos_maxp1: torch.Tensor | None = None,  # Added to match Block's signature
     ) -> None:
         """
         Forward pass that captures the input data.
@@ -37,6 +38,7 @@ class Catcher(nn.Module):
             sin: Rotary embeddings.
             mask: Attention mask tensor.
             input_pos: Position IDs.
+            input_pos_maxp1: Maximum position ID for masking (optional).
         """
         self.inps[self.cache["i"]] = inp
         self.cache["i"] += 1

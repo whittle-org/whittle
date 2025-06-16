@@ -9,7 +9,6 @@ from typing import Literal
 import lightning as L
 import torch
 from lightning.fabric.strategies import FSDPStrategy
-from lightning.fabric.strategies.deepspeed import _DEEPSPEED_AVAILABLE
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.data import Alpaca, DataModule, TinyStories
@@ -27,19 +26,16 @@ from litgpt.utils import (
     load_checkpoint,
     parse_devices,
 )
+from syne_tune.config_space import lograndint, randint
 from torch.utils.data import DataLoader
 
 from whittle.args import ParamBinArgs, SearchArgs
-from whittle.metrics import compute_latency, compute_parameters
+from whittle.metrics import compute_flops, compute_latency, compute_parameters
 from whittle.models.gpt import GPT, Block
 from whittle.models.gpt.checkpoint import save_sub_network
-from whittle.pretrain_super_network import get_search_space
 from whittle.sampling.param_bins import ParamBins, ParamsEstimator
 from whittle.search import multi_objective_search
 from whittle.search.baselines import Methods
-
-if _DEEPSPEED_AVAILABLE:
-    from whittle.metrics import compute_flops
 
 
 def setup(
@@ -287,7 +283,12 @@ def main(
     longest_seq_length = len(val_dataloader.dataset)
     model.max_seq_length = min(longest_seq_length, train.max_seq_length or int("inf"))
 
-    search_space = get_search_space(config)
+    search_space = {
+        "embed_dim": lograndint(1, config.n_embd),
+        "num_heads": randint(1, config.n_head),
+        "mlp_ratio": randint(1, 4),
+        "depth": randint(1, config.n_layer),
+    }
 
     fabric.print("Start multi-objective search")
 
