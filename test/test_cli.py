@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sys
 from functools import wraps
 from unittest.mock import patch
@@ -14,6 +15,8 @@ from whittle.evaluate_network import setup as evaluate_fn
 from whittle.pretrain_super_network import setup as pretrain_fn
 from whittle.prune import setup as prune_fn
 from whittle.search_sub_networks import setup as search_fn
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 def create_mock_fn(original_fn):
