@@ -84,7 +84,7 @@ class CausalSelfAttention(nn.Module):
 
         q_parts, k_parts, v_parts = [], [], []
 
-        if n_head == n_query_groups:
+        if sub_n_head == sub_q_groups:
             for i in range(sub_n_head):
                 q_start = q_block_start + i * head_size
                 k_start = k_block_start + i * head_size
@@ -93,7 +93,7 @@ class CausalSelfAttention(nn.Module):
                 k_parts.append(torch.arange(k_start, k_start + sub_head_size))
                 v_parts.append(torch.arange(v_start, v_start + sub_head_size))
 
-        elif n_query_groups == 1:
+        elif sub_q_groups == 1:
             for i in range(sub_n_head):
                 q_start = q_block_start + i * head_size
                 q_parts.append(torch.arange(q_start, q_start + sub_head_size))
@@ -116,35 +116,6 @@ class CausalSelfAttention(nn.Module):
 
         qkv = torch.cat(q_parts + k_parts + v_parts)
         return qkv
-
-    def get_proj_indices(self):
-        head_size = self.config.head_size
-        n_head = self.config.n_head
-        n_query_groups = self.config.n_query_groups
-        sub_n_head = self.sub_network_n_head
-        sub_head_size = self.sub_network_head_size
-        sub_q_groups = self.sub_network_query_groups
-        sub_q_per_kv = self.sub_network_q_per_kv
-
-        heads_per_group = n_head // n_query_groups
-
-        if n_head == n_query_groups:
-            base = torch.arange(sub_n_head) * head_size
-            proj = torch.cat(
-                [torch.arange(start, start + sub_head_size) for start in base]
-            )
-        else:
-            proj_parts = []
-            for g in range(sub_q_groups):
-                start = g * heads_per_group * head_size
-                for h in range(sub_q_per_kv):
-                    proj_start = start + h * head_size
-                    proj_parts.append(
-                        torch.arange(proj_start, proj_start + sub_head_size)
-                    )
-            proj = torch.cat(proj_parts)
-
-        return proj
 
     def set_sub_network(
         self,
@@ -189,7 +160,7 @@ class CausalSelfAttention(nn.Module):
                 if sub_network_query_groups
                 else self.config.n_query_groups
             )
-            q_per_kv = self.sub_network_n_head // self.config.n_query_groups
+            q_per_kv = self.sub_network_n_head // self.sub_network_query_groups
         elif self.config.n_head == self.config.n_query_groups:
             q_per_kv = 1
             self.sub_network_query_groups = self.sub_network_n_head
@@ -202,7 +173,11 @@ class CausalSelfAttention(nn.Module):
                 f"Number of heads {self.sub_network_n_head} must be divisible by number of query groups {self.sub_network_query_groups} for GQA"
             )
         self.qkv_indices = self.get_qkv_indices()
-        self.proj_indices = self.get_proj_indices()
+        self.proj_indices = self.qkv_indices[
+            : torch.searchsorted(
+                self.qkv_indices, sub_network_n_head * self.config.head_size, right=False
+            )
+        ]
         self.qkv.set_sub_network(
             self.sub_network_n_embd, self.sub_network_qkv_shape, self.qkv_indices
         )
@@ -437,3 +412,72 @@ class CausalSelfAttention(nn.Module):
                 )
 
         super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
+
+
+if __name__ == "__main__":
+
+    def check_shapes(n_query_groups, n_head, subnet_query_groups, subnet_n_head):
+        config = Config()
+        config.n_query_groups = n_query_groups
+        config.n_head = n_head
+        config.head_size = 10
+        config.n_embd = 16
+
+        config.n_layer = 1
+        config.attention_scores_scalar = 1
+        config.rotary_percentage = 0.25
+        config.max_seq_len = 8
+        config.bias = True
+        config.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        config.dtype = torch.float32
+        attention = CausalSelfAttention(config, 0)
+
+        def forward_pass(attention):
+            B, T = 32, 100
+            input = torch.rand(B, T, config.n_embd)
+            h = int(config.head_size * config.rotary_percentage)
+            cos = torch.rand(1, T, h)
+            sin = torch.rand(1, T, h)
+            attention(input, cos, sin)
+
+        print("supernet:")
+        forward_pass(attention)
+        attention.set_sub_network(
+            sub_network_n_embd=config.n_embd,
+            sub_network_n_head=subnet_n_head,
+            sub_network_query_groups=subnet_query_groups,
+            sub_network_head_size=6,
+        )
+        print("subnet:")
+        forward_pass(attention)
+
+    supernet_attn_configs = {
+        # "mha": (8, 8),  # (num groups, num_query_heads)
+        "gqa": (4, 16),
+        # "mqa": (1, 8),
+    }
+
+    subnet_attn_configs = {
+        "mha": (1, 4),  # (num groups, num_query_heads)
+        # "gqa": (4, 2),
+        # "mqa": (1, 4),
+    }
+
+    print("\nShape is (batch, num_heads, sequence_length, head_embed_dim)\n")
+
+    def format_config(conf):
+        return (
+            f"({conf[0]} groups, {conf[1]} heads, {conf[1] / conf[0]} query heads/group)"
+        )
+
+    for supernet_attn, supernet_config in supernet_attn_configs.items():
+        for subnet_attn, subnet_config in subnet_attn_configs.items():
+            try:
+                print(
+                    f"{supernet_attn} {format_config(supernet_config)} -> {subnet_attn} {format_config(subnet_config)}"
+                )
+                check_shapes(*supernet_config, *subnet_config)
+            except Exception as e:
+                print("Failed!")
+                print(e)
+            print()
