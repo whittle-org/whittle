@@ -13,7 +13,7 @@ authors = [
 ]
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.9,<3.13"
+requires-python = ">=3.10,<3.13"
 # TODO: Some of these might be able to be moved to optional dependancies
 dependencies = [
     "pandas",
@@ -22,7 +22,7 @@ dependencies = [
     "torch>=2.5.0,<2.6.0",
     "transformers>=4",
     "litgpt[all]==0.5.7",
-    "syne-tune[extra]",
+    "syne-tune[extra]>=0.14.1",
     "torchvision>=0.18",
     "boto3==1.34.147",
     "botocore==1.34.147",
@@ -39,9 +39,9 @@ classifiers = [
     "Operating System :: Unix",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 
 [project.urls]
