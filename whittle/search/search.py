@@ -6,9 +6,8 @@ from typing import Any
 
 import numpy as np
 from lightning.fabric.loggers import Logger
-from tqdm import tqdm
-
 from syne_tune.optimizer.schedulers.ask_tell_scheduler import AskTellScheduler
+from tqdm import tqdm
 
 from whittle.sampling.param_bins import ParamBins
 from whittle.search.baselines import MethodArguments, methods
