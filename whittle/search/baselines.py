@@ -6,14 +6,21 @@ from syne_tune.config_space import Categorical, Domain
 from syne_tune.optimizer.baselines import (
     RandomSearch,
 )
-from syne_tune.optimizer.schedulers.multiobjective.multi_objective_regularized_evolution import MultiObjectiveRegularizedEvolution
-from syne_tune.optimizer.schedulers.multiobjective.expected_hyper_volume_improvement import \
-    ExpectedHyperVolumeImprovement
+from syne_tune.optimizer.schedulers.multiobjective.expected_hyper_volume_improvement import (
+    ExpectedHyperVolumeImprovement,
+)
 from syne_tune.optimizer.schedulers.multiobjective.linear_scalarizer import (
     LinearScalarizedScheduler,
 )
-from syne_tune.optimizer.schedulers.single_fidelity_scheduler import SingleFidelityScheduler
-from syne_tune.optimizer.schedulers.searchers.conformal.conformal_quantile_regression_searcher import ConformalQuantileRegression
+from syne_tune.optimizer.schedulers.multiobjective.multi_objective_regularized_evolution import (
+    MultiObjectiveRegularizedEvolution,
+)
+from syne_tune.optimizer.schedulers.searchers.conformal.conformal_quantile_regression_searcher import (
+    ConformalQuantileRegression,
+)
+from syne_tune.optimizer.schedulers.single_fidelity_scheduler import (
+    SingleFidelityScheduler,
+)
 
 from whittle.sampling.param_bins import ParamBins
 from whittle.search.local_search import LocalSearch
@@ -98,62 +105,68 @@ methods = {
     Methods.RS: lambda method_arguments: RandomSearch(
         config_space=method_arguments.config_space,
         metrics=method_arguments.metrics,
-        do_minimize=method_arguments.mode[0]=='min',
+        do_minimize=method_arguments.mode[0] == "min",
         random_seed=method_arguments.random_seed,
         points_to_evaluate=initial_design(method_arguments.config_space),
     ),
     Methods.SRS: lambda method_arguments: SingleFidelityScheduler(
         config_space=method_arguments.config_space,
         metrics=method_arguments.metrics,
-        do_minimize=method_arguments.mode == 'min',
-        searcher=StratifiedRandomSearcher(config_space=method_arguments.config_space,
-                                        random_seed=method_arguments.random_seed,
-                                        param_bins=method_arguments.param_bins,
-                                        points_to_evaluate=initial_design(method_arguments.config_space)
-                                        ),
+        do_minimize=method_arguments.mode == "min",
+        searcher=StratifiedRandomSearcher(
+            config_space=method_arguments.config_space,
+            random_seed=method_arguments.random_seed,
+            param_bins=method_arguments.param_bins,
+            points_to_evaluate=initial_design(method_arguments.config_space),
+        ),
         random_seed=method_arguments.random_seed,
         searcher_kwargs=None,
     ),
     Methods.LS: lambda method_arguments: SingleFidelityScheduler(
         config_space=method_arguments.config_space,
         metrics=method_arguments.metrics,
-        do_minimize=method_arguments.mode == 'min',
-        searcher=LocalSearch(config_space=method_arguments.config_space,
-                                                random_seed=method_arguments.random_seed,
-                                                points_to_evaluate=initial_design(method_arguments.config_space)
-                                                ),
+        do_minimize=method_arguments.mode == "min",
+        searcher=LocalSearch(
+            config_space=method_arguments.config_space,
+            random_seed=method_arguments.random_seed,
+            points_to_evaluate=initial_design(method_arguments.config_space),
+        ),
         random_seed=method_arguments.random_seed,
         searcher_kwargs=None,
     ),
     Methods.LSBO: lambda method_arguments: LinearScalarizedScheduler(
         config_space=method_arguments.config_space,
         metrics=method_arguments.metrics,
-        do_minimize=method_arguments.mode[0] == 'min',
+        do_minimize=method_arguments.mode[0] == "min",
         random_seed=method_arguments.random_seed,
-        searcher=ConformalQuantileRegression(config_space=method_arguments.config_space,
-                                             random_seed=method_arguments.random_seed,
-                                             points_to_evaluate=initial_design(method_arguments.config_space)),
+        searcher=ConformalQuantileRegression(
+            config_space=method_arguments.config_space,
+            random_seed=method_arguments.random_seed,
+            points_to_evaluate=initial_design(method_arguments.config_space),
+        ),
     ),
     Methods.EHVI: lambda method_arguments: SingleFidelityScheduler(
         config_space=method_arguments.config_space,
         metrics=method_arguments.metrics,
-        do_minimize=method_arguments.mode == 'min',
-        searcher=ExpectedHyperVolumeImprovement(config_space=method_arguments.config_space,
-                                                random_seed=method_arguments.random_seed,
-                                                points_to_evaluate=initial_design(method_arguments.config_space)
-                                                ),
+        do_minimize=method_arguments.mode == "min",
+        searcher=ExpectedHyperVolumeImprovement(
+            config_space=method_arguments.config_space,
+            random_seed=method_arguments.random_seed,
+            points_to_evaluate=initial_design(method_arguments.config_space),
+        ),
         random_seed=method_arguments.random_seed,
         searcher_kwargs=None,
     ),
     Methods.MOREA: lambda method_arguments: SingleFidelityScheduler(
         config_space=method_arguments.config_space,
         metrics=method_arguments.metrics,
-        do_minimize=method_arguments.mode == 'min',
-        searcher=MultiObjectiveRegularizedEvolution(config_space=method_arguments.config_space,
-                                                random_seed=method_arguments.random_seed,
-                                                points_to_evaluate=initial_design(method_arguments.config_space)
-                                                ),
+        do_minimize=method_arguments.mode == "min",
+        searcher=MultiObjectiveRegularizedEvolution(
+            config_space=method_arguments.config_space,
+            random_seed=method_arguments.random_seed,
+            points_to_evaluate=initial_design(method_arguments.config_space),
+        ),
         random_seed=method_arguments.random_seed,
         searcher_kwargs=None,
-    )
+    ),
 }
