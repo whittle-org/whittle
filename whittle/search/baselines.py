@@ -4,18 +4,27 @@ from dataclasses import dataclass
 
 from syne_tune.config_space import Categorical, Domain
 from syne_tune.optimizer.baselines import (
-    MOREA,
-    NSGA2,
-    MORandomScalarizationBayesOpt,
     RandomSearch,
+)
+from syne_tune.optimizer.schedulers.multiobjective.expected_hyper_volume_improvement import (
+    ExpectedHyperVolumeImprovement,
 )
 from syne_tune.optimizer.schedulers.multiobjective.linear_scalarizer import (
     LinearScalarizedScheduler,
 )
+from syne_tune.optimizer.schedulers.multiobjective.multi_objective_regularized_evolution import (
+    MultiObjectiveRegularizedEvolution,
+)
+from syne_tune.optimizer.schedulers.searchers.conformal.conformal_quantile_regression_searcher import (
+    ConformalQuantileRegression,
+)
+from syne_tune.optimizer.schedulers.single_fidelity_scheduler import (
+    SingleFidelityScheduler,
+)
 
 from whittle.sampling.param_bins import ParamBins
-from whittle.search.local_search import LS
-from whittle.search.stratified_search import StratifiedRandomSearch
+from whittle.search.local_search import LocalSearch
+from whittle.search.stratified_search import StratifiedRandomSearcher
 
 
 def get_random(config_space):
@@ -84,11 +93,9 @@ def initial_design(config_space):
 
 class Methods:
     RS = "random_search"
-    MOREA = "morea"
     LS = "local_search"
-    NSGA2 = "nsga2"
     LSBO = "lsbo"
-    RSBO = "rsbo"
+    MOREA = "morea"
     EHVI = "ehvi"
     MOASHA = "moasha"
     SRS = "stratified_random_search"
@@ -97,76 +104,69 @@ class Methods:
 methods = {
     Methods.RS: lambda method_arguments: RandomSearch(
         config_space=method_arguments.config_space,
-        metric=method_arguments.metrics[0],
-        mode=method_arguments.mode[0],
+        metrics=method_arguments.metrics,
+        do_minimize=method_arguments.mode[0] == "min",
         random_seed=method_arguments.random_seed,
         points_to_evaluate=initial_design(method_arguments.config_space),
     ),
-    Methods.SRS: lambda method_arguments: StratifiedRandomSearch(
+    Methods.SRS: lambda method_arguments: SingleFidelityScheduler(
         config_space=method_arguments.config_space,
-        metric=method_arguments.metrics[0],
-        mode=method_arguments.mode[0],
+        metrics=method_arguments.metrics,
+        do_minimize=method_arguments.mode == "min",
+        searcher=StratifiedRandomSearcher(
+            config_space=method_arguments.config_space,
+            random_seed=method_arguments.random_seed,
+            param_bins=method_arguments.param_bins,
+            points_to_evaluate=initial_design(method_arguments.config_space),
+        ),
         random_seed=method_arguments.random_seed,
-        points_to_evaluate=initial_design(method_arguments.config_space),
-        param_bins=method_arguments.param_bins,
+        searcher_kwargs=None,
     ),
-    Methods.MOREA: lambda method_arguments: MOREA(
+    Methods.LS: lambda method_arguments: SingleFidelityScheduler(
         config_space=method_arguments.config_space,
-        metric=method_arguments.metrics,
-        mode=method_arguments.mode,
+        metrics=method_arguments.metrics,
+        do_minimize=method_arguments.mode == "min",
+        searcher=LocalSearch(
+            config_space=method_arguments.config_space,
+            random_seed=method_arguments.random_seed,
+            points_to_evaluate=initial_design(method_arguments.config_space),
+        ),
         random_seed=method_arguments.random_seed,
-        sample_size=5,
-        population_size=10,
-        points_to_evaluate=initial_design(method_arguments.config_space),
-    ),
-    Methods.LS: lambda method_arguments: LS(
-        config_space=method_arguments.config_space,
-        metric=method_arguments.metrics,
-        mode=method_arguments.mode,
-        random_seed=method_arguments.random_seed,
-        start_point=None,
-        points_to_evaluate=initial_design(method_arguments.config_space),
-    ),
-    Methods.NSGA2: lambda method_arguments: NSGA2(
-        config_space=method_arguments.config_space,
-        metric=method_arguments.metrics,
-        mode=method_arguments.mode,
-        random_seed=method_arguments.random_seed,
-        population_size=10,
-        points_to_evaluate=initial_design(method_arguments.config_space),
+        searcher_kwargs=None,
     ),
     Methods.LSBO: lambda method_arguments: LinearScalarizedScheduler(
         config_space=method_arguments.config_space,
-        metric=method_arguments.metrics,
-        mode=method_arguments.mode,
+        metrics=method_arguments.metrics,
+        do_minimize=method_arguments.mode[0] == "min",
         random_seed=method_arguments.random_seed,
-        searcher="bayesopt",
-        points_to_evaluate=initial_design(method_arguments.config_space),
+        searcher=ConformalQuantileRegression(
+            config_space=method_arguments.config_space,
+            random_seed=method_arguments.random_seed,
+            points_to_evaluate=initial_design(method_arguments.config_space),
+        ),
     ),
-    Methods.RSBO: lambda method_arguments: MORandomScalarizationBayesOpt(
+    Methods.EHVI: lambda method_arguments: SingleFidelityScheduler(
         config_space=method_arguments.config_space,
-        metric=method_arguments.metrics,
-        mode=method_arguments.mode,
+        metrics=method_arguments.metrics,
+        do_minimize=method_arguments.mode == "min",
+        searcher=ExpectedHyperVolumeImprovement(
+            config_space=method_arguments.config_space,
+            random_seed=method_arguments.random_seed,
+            points_to_evaluate=initial_design(method_arguments.config_space),
+        ),
         random_seed=method_arguments.random_seed,
-        points_to_evaluate=initial_design(method_arguments.config_space),
+        searcher_kwargs=None,
     ),
-    # Methods.MOASHA: lambda method_arguments: MOASHA(
-    #     config_space=method_arguments.config_space,
-    #     metrics=method_arguments.metrics,
-    #     mode=method_arguments.mode,
-    #     time_attr="epoch",
-    #     max_t=method_arguments.config_space["num_train_epochs"],
-    #     grace_period=1,
-    #     reduction_factor=3,
-    #     brackets=1,
-    # random_seed=method_arguments.random_seed,
-    # points_to_evaluate=initial_design(method_arguments.config_space),
-    # ),
-    # Methods.EHVI: lambda method_arguments: EHVI(
-    #     config_space=method_arguments.config_space,
-    #     metric=method_arguments.metrics,
-    #     mode=method_arguments.mode,
-    #     random_seed=method_arguments.random_seed,
-    #     points_to_evaluate=initial_design(method_arguments.config_space),
-    # ),
+    Methods.MOREA: lambda method_arguments: SingleFidelityScheduler(
+        config_space=method_arguments.config_space,
+        metrics=method_arguments.metrics,
+        do_minimize=method_arguments.mode == "min",
+        searcher=MultiObjectiveRegularizedEvolution(
+            config_space=method_arguments.config_space,
+            random_seed=method_arguments.random_seed,
+            points_to_evaluate=initial_design(method_arguments.config_space),
+        ),
+        random_seed=method_arguments.random_seed,
+        searcher_kwargs=None,
+    ),
 }
