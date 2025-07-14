@@ -5,16 +5,16 @@ import pprint
 import time
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import lightning as L
 import torch
-from lightning.fabric.strategies import FSDPStrategy
+from lightning.fabric.strategies import DDPStrategy, FSDPStrategy
 from lightning.fabric.utilities.throughput import ThroughputMonitor
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import name_to_config
-from litgpt.data import DataModule, TinyLlama
+from litgpt.data import DataModule, TinyLlama, TinyStories
 from litgpt.model import Config
 from litgpt.pretrain import (
     get_dataloaders,
@@ -54,6 +54,8 @@ from whittle.training_strategies import (
     StandardStrategy,
 )
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
+
+torch.set_float32_matmul_precision("medium") # trade-off precision for performance
 
 training_strategies_cls = {
     "sandwich": SandwichStrategy,
@@ -99,6 +101,7 @@ def setup(
     logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
     seed: int = 42,
     accelerator: str | None = None,
+    parallel_strategy: Literal["fsdp", "ddp", "auto"] = "fsdp",
 ):
     """Pretrain a model.
 
@@ -125,6 +128,8 @@ def setup(
             module require this.
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
+        parallel_strategy: The parallelization strategy to use. Options are "fsdp" (Fully Sharded Data Parallel),
+            "ddp" (Distributed Data Parallel), or "auto" (automatically choose based on setup).
     """
     if model_name == "list":
         available_models = "\n".join(sorted(name_to_config))
@@ -175,13 +180,20 @@ def setup(
     if accelerator is None:
         accelerator = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # Use FSDP only for multi-device CUDA setups
+    # Set up parallel strategy
     if num_devices * num_nodes > 1 and accelerator == "cuda":
-        strategy = FSDPStrategy(
-            auto_wrap_policy={Block},
-            state_dict_type="full",
-            sharding_strategy="HYBRID_SHARD",
-        )
+        if parallel_strategy == "fsdp":
+            strategy = FSDPStrategy(
+                auto_wrap_policy={Block},
+                activation_checkpointing_policy={Block},
+                state_dict_type="full",
+                sharding_strategy="HYBRID_SHARD",
+                use_orig_params=True,
+                limit_all_gathers=True,
+                sync_module_states=True,
+            )
+        elif parallel_strategy == "ddp":
+            strategy = DDPStrategy(find_unused_parameters=True)
     else:
         strategy = "auto"
 
@@ -268,15 +280,19 @@ def fit(
     def loss_fn(output: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         return chunked_cross_entropy(output, targets, chunk_size=0)
 
-    measured_flops = compute_flops(
-        model,
-        batch_size=batch_size,
-        sequence_length=sequence_length,
-        device=fabric.device.type,  # Use fabric's device (cpu or cuda)
-        loss_fn=loss_fn,
-        verbose=True,
-    )
-    fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
+    if torch.cuda.device_count() > 1:
+        fabric.print("[FLOPs] Skipping FLOPs computation on multi-GPU setup.")
+        measured_flops = -1.0
+    else:
+        measured_flops = compute_flops(
+            model,
+            batch_size=batch_size,
+            sequence_length=sequence_length,
+            device=fabric.device.type,
+            loss_fn=loss_fn,
+            verbose=True,
+        )
+        fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
 
     max_tokens_per_device = train.max_tokens // fabric.world_size
     tokens_per_iter = train.micro_batch_size * model.max_seq_length

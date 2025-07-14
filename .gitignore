@@ -138,3 +138,6 @@ Session.vim
 *~
 # Auto-generated tag files
 tags
+
+pretrained_super_net/
+wandb/
