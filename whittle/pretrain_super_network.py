@@ -5,7 +5,7 @@ import pprint
 import time
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import lightning as L
 import torch
@@ -14,7 +14,7 @@ from lightning.fabric.utilities.throughput import ThroughputMonitor
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import name_to_config
-from litgpt.data import DataModule, TinyLlama, TinyStories
+from litgpt.data import DataModule, TinyLlama
 from litgpt.model import Config
 from litgpt.pretrain import (
     get_dataloaders,
@@ -55,7 +55,7 @@ from whittle.training_strategies import (
 )
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
 
-torch.set_float32_matmul_precision("medium") # trade-off precision for performance
+torch.set_float32_matmul_precision("medium")  # trade-off precision for performance
 
 training_strategies_cls = {
     "sandwich": SandwichStrategy,
@@ -185,12 +185,8 @@ def setup(
         if parallel_strategy == "fsdp":
             strategy = FSDPStrategy(
                 auto_wrap_policy={Block},
-                activation_checkpointing_policy={Block},
                 state_dict_type="full",
                 sharding_strategy="HYBRID_SHARD",
-                use_orig_params=True,
-                limit_all_gathers=True,
-                sync_module_states=True,
             )
         elif parallel_strategy == "ddp":
             strategy = DDPStrategy(find_unused_parameters=True)
