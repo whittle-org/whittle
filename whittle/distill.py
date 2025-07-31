@@ -13,7 +13,7 @@ import torch
 import torch._dynamo
 from jsonargparse import CLI
 from lightning.fabric.strategies import FSDPStrategy
-from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
+from lightning.fabric.utilities.throughput import ThroughputMonitor
 from litgpt import Config, Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.data import DataModule, TinyStories
@@ -27,7 +27,6 @@ from litgpt.utils import (
     capture_hparams,
     check_nvlink_connectivity,
     choose_logger,
-    chunked_cross_entropy,
     copy_config_files,
     get_default_supported_precision,
     init_out_dir,
@@ -42,6 +41,7 @@ from torchmetrics.aggregation import RunningMean
 
 from whittle.args import DistillArgs
 from whittle.loss.kd_loss import DistillLoss
+from whittle.metrics.flops import compute_flops
 from whittle.metrics.parameters import compute_parameters
 from whittle.models.gpt.blocks import Block
 from whittle.models.gpt.extract import extract_current_sub_network
@@ -55,7 +55,7 @@ torch._dynamo.config.suppress_errors = True
 def setup(
     out_dir: Path = Path("out/distill"),
     precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
-    initial_checkpoint_dir: Path | None = None,
+    teacher_checkpoint_dir: Path | None = None,
     student_dir: Path | None = None,
     data: DataModule | None = None,
     train: TrainArgs = TrainArgs(
@@ -71,31 +71,31 @@ def setup(
     ),
     distill: DistillArgs = DistillArgs(
         method="logits",
-        temperature=5,
-        alpha=0.6,
-        beta=0.4,
+        temperature=10,
+        alpha=0.3,
+        beta=0.7,
         loss="forward_kld",
+        weight_scheme="other",
     ),
-    eval: EvalArgs = EvalArgs(interval=1000, max_iters=100, initial_validation=True),
+    eval: EvalArgs = EvalArgs(interval=50, max_iters=100, initial_validation=True),
     optimizer: str | dict = "AdamW",
     devices: int | str = "auto",
     num_nodes: int = 1,
     tokenizer_dir: Path | None = None,
     logger_name: Literal["wandb", "tensorboard", "csv"] = "csv",
     seed: int = 42,
-    min_ratio: float = 0.3,
-    max_ratio: float = 0.7,
+    min_ratio: float = 0.6,
+    max_ratio: float = 0.61,
+    teacher_logits_dir: Path | None = None,
+    use_saved_logits: bool = False,
 ):
     """Train a (random) subnet of the teacher model using knowledge distillation.
 
     Arguments:
-        out_dir: Directory in which to save checkpoints and logs. If running in a Lightning Studio Job, look for it in
-            /teamspace/jobs/<job-name>/share.
-        precision: The precision to use for finetuning. Determines a compatible precision setting by default.
-        initial_checkpoint_dir: Path to a checkpoint directory to initialize the teacher model from.
+        out_dir: Directory in which to save checkpoints and logs.
+        precision: The precision to use for finetuning.
+        teacher_checkpoint_dir: Path to a checkpoint directory to initialize the teacher model from.
         student_dir: Optional path to a directory to initialize the student model from.
-            Checks for student model config and checkpoint.
-            If not provided, the student model will be initialized as a random subnetwork of the teacher model.
         data: Data-related arguments. If not provided, the default is ``litgpt.data.TinyStories``.
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
         distill: Distillation-related arguments. See ``whittle.args.DistillArgs`` for details.
@@ -103,19 +103,23 @@ def setup(
         optimizer: An optimizer name (such as "AdamW") or config.
         devices: How many devices/GPUs to use. Uses all GPUs by default.
         num_nodes: How many nodes the code is being run on.
-        tokenizer_dir: Optional path to the tokenizer dir that was used for preprocessing the dataset. Only some data
-            modules require this.
+        tokenizer_dir: Optional path to the tokenizer dir that was used for preprocessing the dataset.
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
         min_ratio: Minimum allowed ratio (student_params / teacher_params).
         max_ratio: Maximum allowed ratio (student_params / teacher_params).
+        teacher_logits_dir: Directory containing pre-computed teacher logits. Required if use_saved_logits=True.
+        use_saved_logits: Whether to use pre-computed teacher logits from files or compute them online.
     """
-    if initial_checkpoint_dir is not None:
-        print(f"Loading teacher model config from {initial_checkpoint_dir}")
-        config = Config.from_file(initial_checkpoint_dir / "model_config.yaml")
-        config.fix_head_size = True
+    if teacher_checkpoint_dir is not None:
+        print(f"Loading teacher model config from {teacher_checkpoint_dir}")
+        teacher_config = Config.from_file(teacher_checkpoint_dir / "model_config.yaml")
+        teacher_config.fix_head_size = True
     else:
-        raise ValueError("initial_checkpoint_dir is required")
+        raise ValueError("teacher_checkpoint_dir is required")
+
+    if use_saved_logits and teacher_logits_dir is None:
+        raise ValueError("teacher_logits_dir is required when use_saved_logits=True")
 
     if student_dir:
         print(f"Loading student model config from {student_dir}")
@@ -138,7 +142,7 @@ def setup(
     logger = choose_logger(
         logger_name,
         out_dir,
-        name=f"distill-{config.name}",
+        name=f"distill-{teacher_config.name}",
         log_interval=train.log_interval,
     )
 
@@ -172,9 +176,9 @@ def setup(
 
     main(
         fabric,
-        initial_checkpoint_dir,
+        teacher_checkpoint_dir,
         num_devices,
-        config,
+        teacher_config,
         student_config,
         data,
         out_dir,
@@ -189,12 +193,14 @@ def setup(
         min_ratio,
         max_ratio,
         logger_name,
+        teacher_logits_dir,
+        use_saved_logits,
     )
 
 
 def main(
     fabric: L.Fabric,
-    initial_checkpoint_dir: Path,
+    teacher_checkpoint_dir: Path,
     devices: int,
     teacher_config: Config,
     student_config: Config | None = None,
@@ -211,6 +217,8 @@ def main(
     min_ratio: float = 0.3,
     max_ratio: float = 0.7,
     logger_name: Literal["wandb", "tensorboard", "csv"] = "csv",
+    teacher_logits_dir: Path | None = None,
+    use_saved_logits: bool = False,
 ):
     if fabric.global_rank == 0 and out_dir is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -231,26 +239,41 @@ def main(
         train_dataloader, val_dataloader
     )
 
-    with fabric.init_module(empty_init=(fabric.world_size > 1)):
-        teacher = GPT(teacher_config)
+    # Load teacher model only if not using saved logits for training
+    teacher = None
+    if not use_saved_logits:
+        with fabric.init_module(empty_init=(fabric.world_size > 1)):
+            teacher = GPT(teacher_config)
 
-    checkpoint = os.path.join(initial_checkpoint_dir, "lit_model.pth")
-    teacher = fabric.setup(teacher)
-    load_checkpoint(fabric, teacher, checkpoint, strict=False)
+        checkpoint = os.path.join(teacher_checkpoint_dir, "lit_model.pth")
+        teacher = fabric.setup(teacher)
+        load_checkpoint(fabric, teacher, checkpoint, strict=False)
 
-    teacher.eval()
-    teacher_val_loss = validate(fabric, teacher, val_dataloader, max_iters=eval.max_iters)
-    teacher_val_loss = teacher_val_loss.item()
-    teacher_val_ppl = math.exp(teacher_val_loss)
+        assert teacher is not None
+        teacher.eval()
+        teacher_val_loss = validate(
+            fabric, teacher, val_dataloader, max_iters=eval.max_iters
+        )
+        teacher_val_loss = teacher_val_loss.item()
+        teacher_val_ppl = math.exp(teacher_val_loss)
 
-    fabric.print(f"Teacher model loaded from {initial_checkpoint_dir} (not compiled)")
-    fabric.print(f"Teacher model has {compute_parameters(teacher):,} parameters")
-    fabric.print(
-        f"Teacher model validation loss: {teacher_val_loss:.3f}, validation PPL: {teacher_val_ppl:.3f}"
-    )
-    fabric.log_dict(
-        {"teacher_val_loss": teacher_val_loss, "teacher_val_ppl": teacher_val_ppl}
-    )
+        fabric.print(f"Teacher model loaded from {teacher_checkpoint_dir} (not compiled)")
+        fabric.print(f"Teacher model has {compute_parameters(teacher):,} parameters")
+        fabric.print(
+            f"Teacher model validation loss: {teacher_val_loss:.3f}, validation PPL: {teacher_val_ppl:.3f}"
+        )
+        fabric.log_dict(
+            {"teacher_val_loss": teacher_val_loss, "teacher_val_ppl": teacher_val_ppl}
+        )
+    else:
+        fabric.print(f"Using pre-computed teacher logits from {teacher_logits_dir}")
+
+    # Initialize saved logits loader if needed
+    logits_loader = None
+    if use_saved_logits:
+        assert teacher_logits_dir is not None
+        logits_loader = SavedLogitsLoader(teacher_logits_dir, fabric.device)
+        fabric.print(f"Loaded saved logits with {logits_loader.num_batches} batches")
 
     if fabric.global_rank == 0 and out_dir is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -270,19 +293,59 @@ def main(
             random_config = sampler.sample()
             fabric.print(f"Random subnetwork config: {random_config}")
             subnetwork = {
-                "embed_dim": random_config["embed_dim"],
-                "mlp_ratio": random_config["mlp_ratio"],
-                "num_heads": teacher_config.n_head,  # keep the same number of heads as teacher
-                "depth": random_config["depth"],
+                "embed_dim": random_config["sub_network_n_embd"],
+                "mlp_ratio": random_config["sub_network_intermediate_size"]
+                / random_config["sub_network_n_embd"],
+                "num_heads": random_config["sub_network_num_heads"],
+                "depth": random_config["sub_network_n_layers"],
             }
-            teacher.select_sub_network(subnetwork)
-            student = extract_current_sub_network(teacher)
 
-            param_count = compute_parameters(student)
-            teacher.reset_super_network()
-            ratio = param_count / compute_parameters(teacher)
-            if min_ratio <= ratio <= max_ratio:
-                valid = True
+            # When no student checkpoint is provided, we need to create a teacher model to extract the subnetwork
+            try:
+                if teacher is None:
+                    # When using saved logits, create teacher on CPU to avoid GPU OOM
+                    if use_saved_logits:
+                        with torch.device("meta"):
+                            temp_teacher = GPT(teacher_config)
+                        checkpoint_data = torch.load(
+                            os.path.join(teacher_checkpoint_dir, "lit_model.pth"),
+                            map_location="cpu",
+                            weights_only=True,
+                        )
+                        # Create a CPU version for subnet extraction
+                        with torch.device("cpu"):
+                            temp_teacher_cpu = GPT(teacher_config)
+                        temp_teacher_cpu.load_state_dict(checkpoint_data, strict=False)
+                        temp_teacher = temp_teacher_cpu
+                    else:
+                        with fabric.init_module(empty_init=(fabric.world_size > 1)):
+                            temp_teacher = GPT(teacher_config)
+                        checkpoint = os.path.join(teacher_checkpoint_dir, "lit_model.pth")
+                        temp_teacher = fabric.setup(temp_teacher)
+                        load_checkpoint(fabric, temp_teacher, checkpoint, strict=False)
+                else:
+                    temp_teacher = teacher
+
+                temp_teacher.select_sub_network(subnetwork)
+                student = extract_current_sub_network(temp_teacher)
+
+                param_count = compute_parameters(student)
+                temp_teacher.reset_super_network()
+                ratio = param_count / compute_parameters(temp_teacher)
+                if min_ratio <= ratio <= max_ratio:
+                    valid = True
+                    # Clean up CPU teacher if we created one
+                    if use_saved_logits and teacher is None:
+                        del temp_teacher
+                        torch.cuda.empty_cache()
+
+            except Exception as e:
+                fabric.print(f"Error during subnet extraction: {e}")
+                fabric.print("Retrying with different random config...")
+                continue
+    else:
+        with fabric.init_module(empty_init=(fabric.world_size > 1)):
+            student = GPT(student_config)
 
     student = fabric.setup_module(student, move_to_device=True)
 
@@ -299,11 +362,8 @@ def main(
             fabric.print(f"Error compiling student model: {e}")
             fabric.print("Continuing with uncompiled student model")
 
-    # Use fused optimizer only if not compiling student to avoid dtype/device mismatches.
-    if use_compile_student:
-        extra_kwargs = {}
-    else:
-        extra_kwargs = {"fused": fabric.device.type == "cuda"}
+    # Fused optimizer causes dtype mismatch issues, so we disable it
+    extra_kwargs = {"fused": False}
 
     optimizer = instantiate_torch_optimizer(
         optimizer, student.parameters(), **extra_kwargs
@@ -312,9 +372,19 @@ def main(
 
     param_count = compute_parameters(student)
     fabric.print(f"Student model has {param_count:,} parameters")
-    fabric.print(
-        f"Model parameter reduction: {param_count / compute_parameters(teacher):.2%}"
-    )
+
+    if teacher is not None:
+        fabric.print(
+            f"Model parameter reduction: {param_count / compute_parameters(teacher):.2%}"
+        )
+        reduction_ratio = param_count / compute_parameters(teacher)
+    else:
+        # Estimate teacher parameters from config for logging
+        with torch.device("meta"):
+            temp_teacher = GPT(teacher_config)
+            teacher_params = compute_parameters(temp_teacher)
+        reduction_ratio = param_count / teacher_params
+        fabric.print(f"Model parameter reduction: {reduction_ratio:.2%}")
 
     exp_config = {
         "seed": seed,
@@ -322,11 +392,19 @@ def main(
         "mlp_ratio": student.config.intermediate_size / student.config.n_embd,
         "depth": student.config.n_layer,
         "parameter_count": param_count,
-        "reduction_ratio": param_count / compute_parameters(teacher),
+        "reduction_ratio": reduction_ratio,
+        "use_saved_logits": use_saved_logits,
     }
 
     if logger_name in ("tensorboard", "wandb"):
         fabric.logger.log_hyperparams(exp_config)
+
+    train_dataloader, val_dataloader = get_dataloaders(
+        fabric, dataset, tokenizer, train, teacher_config.block_size
+    )
+    train_dataloader, val_dataloader = fabric.setup_dataloaders(
+        train_dataloader, val_dataloader
+    )
 
     state = {
         "teacher": teacher,
@@ -357,16 +435,17 @@ def main(
         train,
         eval,
         distill,
+        logits_loader,
+        use_saved_logits,
     )
 
     save_checkpoint(
         fabric,
         student_state,
         tokenizer_dir,
-        out_dir / "final" / "lit_model.pth" if out_dir else None,
+        out_dir / "distill" / "lit_model.pth" if out_dir else None,
     )
 
-    # Track experiment results
     total_tokens = (
         state["iter_num"]
         * train.micro_batch_size
@@ -374,7 +453,6 @@ def main(
         * fabric.world_size
     )
 
-    # Print formatted output
     separator = "-" * 40
     fabric.print(separator)
     fabric.print("| Performance")
@@ -390,6 +468,117 @@ def main(
     fabric.print(separator)
 
 
+class SavedLogitsLoader:
+    """Utility class to load pre-computed teacher logits from saved files."""
+
+    def __init__(self, logits_dir: Path, device: torch.device):
+        self.logits_dir = Path(logits_dir)
+        self.device = device
+
+        # Find all logits files
+        self.logits_files = sorted((self.logits_dir / "logits").glob("logits_batch_*.pt"))
+        self.indices_files = sorted(
+            (self.logits_dir / "indices").glob("indices_batch_*.pt")
+        )
+
+        self.num_batches = len(self.logits_files)
+        self.current_batch = 0
+        self.current_sample = 0
+        self.epoch = 0  # Track how many times we've cycled through all batches
+
+        if self.num_batches > 0:
+            first_batch = torch.load(self.logits_files[0], map_location="cpu")
+            self.top_k = first_batch.get("top_k", None)
+            self.vocab_size = (
+                first_batch["logits"].shape[-1] if self.top_k is None else None
+            )
+            self.batch_size = first_batch["logits"].shape[0]
+            self.seq_len = first_batch["logits"].shape[1]
+
+        self._current_logits = None
+        self._current_indices = None
+        self._current_input_ids = None
+        self._load_batch(0)
+
+    def _load_batch(self, batch_idx: int):
+        """Load a specific batch of logits to CPU first."""
+        if batch_idx >= self.num_batches:
+            return
+
+        # Load to CPU first to avoid OOM
+        logits_data = torch.load(self.logits_files[batch_idx], map_location="cpu")
+        self._current_logits = logits_data["logits"]
+        self._current_input_ids = logits_data["input_ids"]
+
+        if self.top_k and batch_idx < len(self.indices_files):
+            indices_data = torch.load(self.indices_files[batch_idx], map_location="cpu")
+            self._current_indices = indices_data["indices"]
+        else:
+            self._current_indices = None
+
+        self.current_batch = batch_idx
+        self.current_sample = 0
+
+    def reset_to_beginning(self):
+        """Reset to the beginning of the saved logits for another epoch."""
+        self.epoch += 1
+        self._load_batch(0)
+
+    def get_logits_for_input(self, input_ids: torch.Tensor) -> torch.Tensor:
+        """Get teacher logits for given input_ids. Cycles through data if needed."""
+        batch_size, seq_len = input_ids.shape
+
+        # Check if we need to load next batch
+        if (
+            self._current_logits is None
+            or self.current_sample + batch_size > self._current_logits.shape[0]
+        ):
+            if self.current_batch + 1 < self.num_batches:
+                self._load_batch(self.current_batch + 1)
+            else:
+                # We've reached the end, cycle back to the beginning
+                self.reset_to_beginning()
+
+        # Extract logits for current batch
+        start_idx = self.current_sample
+        end_idx = start_idx + batch_size
+
+        if self.top_k:
+            if self._current_indices is None:
+                raise ValueError("Top-k indices are missing for the current batch.")
+
+            # Reconstruct full logits from top-k
+            top_k_logits = self._current_logits[start_idx:end_idx].to(self.device)
+            top_k_indices = self._current_indices[start_idx:end_idx].to(self.device)
+
+            # Create full logits tensor with very negative values for non-top-k
+            full_logits = torch.full(
+                (batch_size, seq_len, 50304),  # GPT-2 vocab size
+                fill_value=-1e9,
+                device=self.device,
+                dtype=top_k_logits.dtype,
+            )
+
+            # Fill in top-k values
+            batch_indices = (
+                torch.arange(batch_size, device=self.device).unsqueeze(1).unsqueeze(2)
+            )
+            seq_indices = (
+                torch.arange(seq_len, device=self.device).unsqueeze(0).unsqueeze(2)
+            )
+
+            full_logits[batch_indices, seq_indices, top_k_indices] = top_k_logits
+            teacher_logits = full_logits
+        else:
+            if self._current_logits is None:
+                raise ValueError("Logits are missing for the current batch.")
+
+            teacher_logits = self._current_logits[start_idx:end_idx].to(self.device)
+
+        self.current_sample = end_idx
+        return teacher_logits
+
+
 def fit(
     fabric: L.Fabric,
     devices: int,
@@ -401,18 +590,22 @@ def fit(
     train: TrainArgs,
     eval: EvalArgs,
     distill: DistillArgs,
+    logits_loader: SavedLogitsLoader | None = None,
+    use_saved_logits: bool = False,
 ) -> dict[str, Any]:
     teacher = state["teacher"]
     student = state["model"]
     optimizer = state["optimizer"]
 
-    teacher.eval()
+    if teacher is not None:
+        teacher.eval()
 
     distill_loss = DistillLoss(
         alpha=distill.alpha,
         beta=distill.beta,
         temperature=distill.temperature,
         loss=distill.loss,
+        weight_scheme=distill.weight_scheme,
     )
 
     if eval.initial_validation:
@@ -425,19 +618,14 @@ def fit(
 
     throughput = ThroughputMonitor(fabric, window_size=5)
 
-    with torch.device("meta"):
-        meta_model = GPT(student.config)
-        x = torch.randint(0, 1, (train.micro_batch_size, meta_model.max_seq_length))
-
-        def model_fwd():
-            return meta_model(x)  # noqa: F821
-
-        def model_loss(y):
-            return chunked_cross_entropy(y, x, chunk_size=0)  # noqa: F821
-
-        measured_flops = measure_flops(meta_model, model_fwd, model_loss)
-        fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
-        del meta_model, x
+    measured_flops = compute_flops(
+        student,
+        batch_size=train.micro_batch_size,
+        sequence_length=student.max_seq_length,
+        device=fabric.device.type,
+        verbose=True,
+    )
+    fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
 
     max_tokens_per_device = train.max_tokens // fabric.world_size
     tokens_per_iter = train.micro_batch_size * student.max_seq_length
@@ -479,11 +667,20 @@ def fit(
             state["iter_num"] % train.gradient_accumulation_iters(devices) != 0
         )
         with fabric.no_backward_sync(student, enabled=is_accumulating):
-            teacher.eval()
-            with torch.inference_mode():  # no grads for teacher
-                teacher_logits = teacher(input_ids)
+            # Get teacher logits
+            if use_saved_logits and logits_loader is not None:
+                teacher_logits = logits_loader.get_logits_for_input(input_ids)
+                # Log epoch information when cycling through saved logits
+                if state["iter_num"] % log_iter_interval == 0 and logits_loader.epoch > 0:
+                    fabric.print(
+                        f"Using saved logits epoch {logits_loader.epoch + 1}, batch {logits_loader.current_batch + 1}/{logits_loader.num_batches}"
+                    )
+            else:
+                teacher.eval()
+                with torch.inference_mode():
+                    teacher_logits = teacher(input_ids)
+                teacher_logits = teacher_logits.clone()
 
-            teacher_logits = teacher_logits.clone()
             logits = student(input_ids)
             logits_reshaped = logits.view(-1, logits.size(-1))
             targets_reshaped = targets.view(-1)
@@ -590,18 +787,18 @@ def fit(
 
     if eval.final_validation:
         val_loss = validate(fabric, student, val_dataloader, max_iters=eval.max_iters)
-        val_loss_value = val_loss.item()
-        ppl = math.exp(val_loss_value)
+        val_loss = val_loss.item()
+        ppl = math.exp(val_loss)
+
         metrics = {
-            "val_loss": val_loss_value,
+            "val_loss": val_loss,
             "val_ppl": ppl,
             "params": compute_parameters(student),
         }
 
         fabric.log_dict(metrics, step=state["iter_num"])
-        fabric.print(
-            f"Final evaluation | val loss: {val_loss_value:.3f} | val ppl: {ppl:.3f}"
-        )
+        fabric.print(f"Final evaluation | val loss: {val_loss:.3f} | val ppl: {ppl:.3f}")
+
     return metrics
 
 
