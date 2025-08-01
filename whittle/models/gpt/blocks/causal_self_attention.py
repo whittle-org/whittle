@@ -294,6 +294,11 @@ class CausalSelfAttention(nn.Module):
         q = q.transpose(1, 2)  # (B, nh_q, T, hs)
         k = k.transpose(1, 2)  # (B, nh_k, T, hs)
         v = v.transpose(1, 2)  # (B, nh_v, T, hs)
+
+        def shape(x):
+            return tuple(x.size())
+
+        print(f"q: {shape(q)}, k: {shape(k)}, v: {shape(v)}")
         rope_n_elem = int(self.sub_network_head_size * self.config.rotary_percentage)
         # apply rope to the first `rope_n_elem` elements of the query and key tensors
         q_roped = apply_rope(q[..., :rope_n_elem], cos, sin)
@@ -437,3 +442,72 @@ class CausalSelfAttention(nn.Module):
                 )
 
         super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
+
+
+if __name__ == "__main__":
+
+    def check_shapes(n_query_groups, n_head, subnet_query_groups, subnet_n_head):
+        config = Config()
+        config.n_query_groups = n_query_groups
+        config.n_head = n_head
+        config.head_size = 10
+        config.n_embd = 16
+
+        config.n_layer = 1
+        config.attention_scores_scalar = 1
+        config.rotary_percentage = 0.25
+        config.max_seq_len = 8
+        config.bias = True
+        config.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        config.dtype = torch.float32
+        attention = CausalSelfAttention(config, 0)
+
+        def forward_pass(attention):
+            B, T = 32, 100
+            input = torch.rand(B, T, config.n_embd)
+            h = int(config.head_size * config.rotary_percentage)
+            cos = torch.rand(1, T, h)
+            sin = torch.rand(1, T, h)
+            attention(input, cos, sin)
+
+        print("supernet:")
+        forward_pass(attention)
+        attention.set_sub_network(
+            sub_network_n_embd=config.n_embd,
+            sub_network_n_head=subnet_n_head,
+            sub_network_query_groups=subnet_query_groups,
+            sub_network_head_size=config.head_size,
+        )
+        print("subnet:")
+        forward_pass(attention)
+
+    supernet_attn_configs = {
+        "mha": (8, 8),  # (num groups, num_query_heads)
+        "gqa": (4, 16),
+        "mqa": (1, 8),
+    }
+
+    subnet_attn_configs = {
+        "mha": (4, 4),  # (num groups, num_query_heads)
+        "gqa": (4, 2),
+        "mqa": (1, 4),
+    }
+
+    print("\nShape is (batch, num_heads, sequence_length, head_embed_dim)\n")
+
+    def format_config(conf):
+        return (
+            f"({conf[0]} groups, {conf[1]} heads, {conf[1] / conf[0]} query heads/group)"
+        )
+
+    for supernet_attn, supernet_config in supernet_attn_configs.items():
+        for subnet_attn, subnet_config in subnet_attn_configs.items():
+            try:
+                print(
+                    f"{supernet_attn} {format_config(supernet_config)} -> {subnet_attn} {format_config(subnet_config)}"
+                )
+                check_shapes(*supernet_config, *subnet_config)
+            except Exception as e:
+                print("Failed!")
+                print(e)
+            print()

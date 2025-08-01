@@ -415,3 +415,67 @@ def build_mask_cache(
 ) -> torch.Tensor:
     ones = torch.ones((max_seq_length, max_seq_length), device=device, dtype=torch.bool)
     return torch.tril(ones).unsqueeze(0).unsqueeze(0)
+
+
+if __name__ == "__main__":
+
+    def check_shapes(n_query_groups, n_head, subnet_query_groups, subnet_n_head):
+        config = Config.from_name(
+            "gemma-2-9b",
+            block_size=6,
+            sliding_window_size=3,
+            n_layer=1,
+            n_embd=32,
+            intermediate_size=86,
+            n_head=n_head,
+            n_query_groups=n_query_groups,
+            head_size=32,
+        )
+        config.fix_head_size = True
+        model = GPT(config)
+        x = torch.tensor([[9856, 23, 491, 1536, 304, 1234]], dtype=torch.int32)
+
+        print("supernet:")
+        model(x)
+
+        model.set_sub_network(
+            sub_network_intermediate_size=32,
+            sub_network_n_layers=1,
+            sub_network_n_embd=config.n_embd,
+            sub_network_num_heads=subnet_n_head,
+            sub_network_query_groups=subnet_query_groups,
+            sub_network_head_size=config.head_size,
+        )
+        print("subnet:")
+        model(x)
+
+    supernet_attn_configs = {
+        "mha": (8, 8),  # (num groups, num_query_heads)
+        "gqa": (4, 16),
+        "mqa": (1, 8),
+    }
+
+    subnet_attn_configs = {
+        "mha": (4, 4),  # (num groups, num_query_heads)
+        "gqa": (2, 4),
+        "mqa": (1, 4),
+    }
+
+    print("\nShape is (batch, num_heads, sequence_length, head_embed_dim)\n")
+
+    def format_config(conf):
+        return (
+            f"({conf[0]} groups, {conf[1]} heads, {conf[1] / conf[0]} query heads/group)"
+        )
+
+    for supernet_attn, supernet_config in supernet_attn_configs.items():
+        for subnet_attn, subnet_config in subnet_attn_configs.items():
+            try:
+                print(
+                    f"{supernet_attn} {format_config(supernet_config)} -> {subnet_attn} {format_config(subnet_config)}"
+                )
+                check_shapes(*supernet_config, *subnet_config)
+            except Exception as e:
+                print("Failed!")
+                print(e)
+            print()
