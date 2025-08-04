@@ -9,6 +9,7 @@ from litgpt import Config
 from litgpt.model import KVCache, apply_rope, do_softcapping
 from litgpt.scripts.convert_hf_checkpoint import qkv_reassemble
 
+from whittle.exceptions import IllegalSubNetworkError
 from whittle.modules import LinearProj, LinearQKV
 
 
@@ -56,35 +57,95 @@ class CausalSelfAttention(nn.Module):
         )
         self.sub_attention_scaler = self.config.attention_scores_scalar
 
+    def _verify_subnet_is_legal(
+        self,
+        subnet_n_embed: int,
+        subnet_n_head: int,
+        subnet_n_query_groups: int,
+        subnet_head_size: int,
+    ):
+        n_embd = self.config.n_embd
+        head_size = self.config.head_size
+        n_head = self.config.n_head
+        n_query_groups = self.config.n_query_groups
+        heads_per_group = n_head // n_query_groups
+
+        subnet_heads_per_group = subnet_n_head // subnet_n_query_groups
+
+        if subnet_n_embed > n_embd:
+            raise IllegalSubNetworkError(
+                f"Subnet embedding dimension ({subnet_n_embed}) must be less than "
+                f"super-network embedding dimension ({self.config.n_embd})"
+            )
+
+        if subnet_n_head > n_head:
+            raise IllegalSubNetworkError(
+                f"Subnet number of heads ({subnet_n_head}) must be less than "
+                f"super-network number of heads ({n_head})"
+            )
+
+        if subnet_head_size > head_size:
+            raise IllegalSubNetworkError(
+                f"Subnet head size ({subnet_head_size}) must be less than "
+                f"super-network head size ({head_size})"
+            )
+
+        if subnet_n_query_groups > n_query_groups:
+            raise IllegalSubNetworkError(
+                f"Subnet number of query groups ({subnet_n_query_groups}) must be less than "
+                f"super-network number of query groups ({n_query_groups})"
+            )
+
+        if subnet_heads_per_group > heads_per_group:
+            raise IllegalSubNetworkError(
+                f"Subnet heads per group ({subnet_heads_per_group}) must be less than "
+                f"super-network heads per group ({heads_per_group})"
+            )
+
+        if subnet_n_head % subnet_n_query_groups != 0:
+            raise IllegalSubNetworkError(
+                f"Subnet number of heads ({subnet_n_head}) must be divisible by "
+                f"subnet number of query groups ({subnet_n_query_groups}) for GQA"
+            )
+
     def get_qkv_indices(self):
         head_size = self.config.head_size
         n_head = self.config.n_head
         n_query_groups = self.config.n_query_groups
+
         sub_n_head = self.sub_network_n_head
         sub_head_size = self.sub_network_head_size
         sub_q_groups = self.sub_network_query_groups
         sub_q_per_kv = self.sub_network_q_per_kv
+        sub_heads_per_group = sub_n_head // sub_q_groups
 
-        heads_per_group = n_head // n_query_groups
+        # Get the attention type of the supernet:
+        # multi-head, multi query, or grouped query attention
+        attn_type = self._get_attention_type(n_query_groups, n_head)
 
-        # Count heads per section
-        if n_head == n_query_groups:
-            num_q = num_k = n_head
-        elif n_query_groups == 1:
-            num_q = n_head
+        # Count the number of key heads
+        if attn_type == "mha":
+            num_k = n_head
+        elif attn_type == "mqa":
             num_k = 1
-        else:
-            num_q = n_head
+        elif attn_type == "gqa":
             num_k = n_query_groups
+        else:
+            raise IllegalSubNetworkError(
+                f"Unsupported attention type: {attn_type}. "
+                "Only multi-head, multi-query, and grouped-query attention are supported."
+            )
 
         # Compute block start offsets
         q_block_start = 0
-        k_block_start = num_q * head_size
+        k_block_start = n_head * head_size
         v_block_start = k_block_start + num_k * head_size
 
         q_parts, k_parts, v_parts = [], [], []
 
-        if n_head == n_query_groups:
+        # The q, k and v parts are sliced out according to the attention type
+        # of the sub-network
+        if sub_n_head == sub_q_groups:  # multi-head attention
             for i in range(sub_n_head):
                 q_start = q_block_start + i * head_size
                 k_start = k_block_start + i * head_size
@@ -93,7 +154,7 @@ class CausalSelfAttention(nn.Module):
                 k_parts.append(torch.arange(k_start, k_start + sub_head_size))
                 v_parts.append(torch.arange(v_start, v_start + sub_head_size))
 
-        elif n_query_groups == 1:
+        elif sub_q_groups == 1:  # multi-query attention
             for i in range(sub_n_head):
                 q_start = q_block_start + i * head_size
                 q_parts.append(torch.arange(q_start, q_start + sub_head_size))
@@ -101,10 +162,10 @@ class CausalSelfAttention(nn.Module):
             k_parts.append(torch.arange(k_block_start, k_block_start + sub_head_size))
             v_parts.append(torch.arange(v_block_start, v_block_start + sub_head_size))
 
-        else:
+        else:  # grouped query attention
             for g in range(sub_q_groups):
                 for h in range(sub_q_per_kv):
-                    q_head_index = g * heads_per_group + h
+                    q_head_index = g * sub_heads_per_group + h
                     q_start = q_block_start + q_head_index * head_size
                     q_parts.append(torch.arange(q_start, q_start + sub_head_size))
 
@@ -117,34 +178,37 @@ class CausalSelfAttention(nn.Module):
         qkv = torch.cat(q_parts + k_parts + v_parts)
         return qkv
 
-    def get_proj_indices(self):
-        head_size = self.config.head_size
-        n_head = self.config.n_head
-        n_query_groups = self.config.n_query_groups
-        sub_n_head = self.sub_network_n_head
-        sub_head_size = self.sub_network_head_size
-        sub_q_groups = self.sub_network_query_groups
-        sub_q_per_kv = self.sub_network_q_per_kv
+    def _update_sub_network(
+        self,
+        sub_network_n_embd: int,
+        sub_network_n_head: int,
+        sub_network_query_groups: int,
+        sub_network_head_size: int,
+    ) -> None:
+        """Updates the sub-network configuration."""
 
-        heads_per_group = n_head // n_query_groups
+        self._verify_subnet_is_legal(
+            sub_network_n_embd,
+            sub_network_n_head,
+            sub_network_query_groups,
+            sub_network_head_size,
+        )
 
-        if n_head == n_query_groups:
-            base = torch.arange(sub_n_head) * head_size
-            proj = torch.cat(
-                [torch.arange(start, start + sub_head_size) for start in base]
-            )
-        else:
-            proj_parts = []
-            for g in range(sub_q_groups):
-                start = g * heads_per_group * head_size
-                for h in range(sub_q_per_kv):
-                    proj_start = start + h * head_size
-                    proj_parts.append(
-                        torch.arange(proj_start, proj_start + sub_head_size)
-                    )
-            proj = torch.cat(proj_parts)
+        self.sub_network_n_embd = sub_network_n_embd
+        self.sub_network_n_head = sub_network_n_head
+        self.sub_network_query_groups = sub_network_query_groups
+        self.sub_network_head_size = sub_network_head_size
+        self.sub_network_q_per_kv = sub_network_n_head // sub_network_query_groups
 
-        return proj
+    def _get_attention_type(self, num_query_groups: int, num_head: int) -> str:
+        is_mha = num_head == num_query_groups
+        is_mqa = num_query_groups == 1 and num_head > 1
+
+        if is_mha:
+            return "mha"
+        if is_mqa:
+            return "mqa"
+        return "gqa"
 
     def set_sub_network(
         self,
@@ -163,48 +227,56 @@ class CausalSelfAttention(nn.Module):
             sub_network_head_size: Size of each attention head in the sub-network.
         """
 
-        self.sub_network_n_embd = (
-            sub_network_n_embd if sub_network_n_embd else self.config.n_embd
+        def get_val(value: int | None, default: int) -> int:
+            return value if value else default
+
+        sub_network_n_embd = get_val(sub_network_n_embd, self.config.n_embd)
+        sub_network_n_head = get_val(sub_network_n_head, self.config.n_head)
+        sub_network_query_groups = get_val(
+            sub_network_query_groups, self.config.n_query_groups
         )
-        self.sub_network_n_head = (
-            sub_network_n_head if sub_network_n_head else self.config.n_head
+        sub_network_head_size = get_val(sub_network_head_size, self.config.head_size)
+
+        subnet_attn_type = self._get_attention_type(
+            sub_network_query_groups, sub_network_n_head
         )
-        self.sub_network_query_groups = (
-            sub_network_query_groups
-            if sub_network_query_groups
-            else self.config.n_query_groups
+
+        self._update_sub_network(
+            sub_network_n_embd,
+            sub_network_n_head,
+            sub_network_query_groups,
+            sub_network_head_size,
         )
-        self.sub_network_head_size = (
-            sub_network_head_size if sub_network_head_size else self.config.head_size
-        )
-        if self.config.n_query_groups == 1:
-            q_per_kv = self.sub_network_n_head
-            self.sub_network_query_groups = 1
-        elif (
-            self.config.n_head != self.config.n_query_groups
-            and self.config.n_query_groups != 1
-        ):
-            self.sub_network_query_groups = (
-                sub_network_query_groups
-                if sub_network_query_groups
-                else self.config.n_query_groups
-            )
-            q_per_kv = self.sub_network_n_head // self.config.n_query_groups
-        elif self.config.n_head == self.config.n_query_groups:
+
+        if subnet_attn_type == "mha":
             q_per_kv = 1
-            self.sub_network_query_groups = self.sub_network_n_head
+        elif subnet_attn_type == "mqa":
+            q_per_kv = sub_network_n_head
+        elif subnet_attn_type == "gqa":
+            q_per_kv = sub_network_n_head // sub_network_query_groups
+
         self.sub_network_qkv_shape = (
             (q_per_kv + 2) * self.sub_network_head_size * self.sub_network_query_groups
         )
         self.sub_network_q_per_kv = int(q_per_kv)
-        if self.sub_network_n_head != self.sub_network_query_groups:
-            assert self.sub_network_n_head % self.sub_network_query_groups == 0, (
-                f"Number of heads {self.sub_network_n_head} must be divisible by number of query groups {self.sub_network_query_groups} for GQA"
-            )
+
+        # Get indices of the query, key, and value projections
         self.qkv_indices = self.get_qkv_indices()
-        self.proj_indices = self.get_proj_indices()
+        self.proj_indices = self.qkv_indices[
+            : torch.searchsorted(
+                self.qkv_indices, sub_network_n_head * self.config.head_size, right=False
+            )
+        ]
+
+        # Set the sub-network dimensions for the linear transformations
         self.qkv.set_sub_network(
-            self.sub_network_n_embd, self.sub_network_qkv_shape, self.qkv_indices
+            self.sub_network_n_embd,
+            self.sub_network_qkv_shape,
+            qkv_indices=self.qkv_indices,
+            sub_network_n_head=self.sub_network_n_head,
+            sub_network_query_groups=self.sub_network_query_groups,
+            sub_network_head_size=self.sub_network_head_size,
+            sub_network_q_per_kv=self.q_per_kv,
         )
         self.proj.set_sub_network(
             self.sub_network_head_size
@@ -213,6 +285,8 @@ class CausalSelfAttention(nn.Module):
             self.sub_network_n_embd,
             self.proj_indices,
         )
+
+        # If normalization is enabled, set the sub-network dimensions for the normalization layers
         if self.config.norm_qk:
             self.norm_q.set_sub_network(
                 self.sub_network_head_size
@@ -222,6 +296,8 @@ class CausalSelfAttention(nn.Module):
             self.norm_k.set_sub_network(
                 self.sub_network_head_size * self.sub_network_query_groups
             )
+
+        # If attention scores scalar is enabled, update the sub-attention scaler
         if self.config.attention_scores_scalar:
             self.sub_attention_scaler = self.sub_network_n_embd // self.sub_network_n_head
         else:
