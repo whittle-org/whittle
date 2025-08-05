@@ -164,12 +164,7 @@ def test_attention(attention_config):
     # check that our custom model produces the same output as LitGPT
     assert torch.all(out_lit_large == out_large)
     config.n_embd = attention.sub_network_n_embd
-    if config.n_query_groups == config.n_head:
-        config.n_head = attention.sub_network_n_head
-    else:
-        config.n_head = (
-            attention.sub_network_n_head // config.n_query_groups
-        ) * attention.sub_network_query_groups
+    config.n_head = attention.sub_network_n_head
     config.n_query_groups = attention.sub_network_query_groups
     config.head_size = attention.sub_network_head_size
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
