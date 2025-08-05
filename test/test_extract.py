@@ -36,6 +36,8 @@ def test_extract_sub_network_mha() -> None:
         sub_network_intermediate_size=sub_network_config.intermediate_size,
         sub_network_num_heads=sub_network_config.n_head,
         sub_network_n_layers=sub_network_config.n_layer,
+        sub_network_query_groups=sub_network_config.n_query_groups,
+        sub_network_head_size=sub_network_config.head_size,
     )
 
     # instantiate a new model

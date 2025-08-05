@@ -82,7 +82,7 @@ def test_gpt():
     out_small = gpt(input)
     assert out_small.shape == (1, 64, 128)
     config.n_embd = 32
-    config.n_head = 2
+    config.n_head = 4
     config.n_query_groups = 2
     config.intermediate_size = 32 * 4
     config.n_layer = 1
