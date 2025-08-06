@@ -88,6 +88,7 @@ def setup(
     max_ratio: float = 0.61,
     teacher_logits_dir: Path | None = None,
     use_saved_logits: bool = False,
+    random_init_student: bool = False,
 ):
     """Train a (random) subnet of the teacher model using knowledge distillation.
 
@@ -110,6 +111,7 @@ def setup(
         max_ratio: Maximum allowed ratio (student_params / teacher_params).
         teacher_logits_dir: Directory containing pre-computed teacher logits. Required if use_saved_logits=True.
         use_saved_logits: Whether to use pre-computed teacher logits from files or compute them online.
+        random_init_student: If True, the student sub-network will be randomly initialized instead of inheriting weights from the teacher.
     """
     if teacher_checkpoint_dir is not None:
         print(f"Loading teacher model config from {teacher_checkpoint_dir}")
@@ -195,6 +197,7 @@ def setup(
         logger_name,
         teacher_logits_dir,
         use_saved_logits,
+        random_init_student,
     )
 
 
@@ -219,6 +222,7 @@ def main(
     logger_name: Literal["wandb", "tensorboard", "csv"] = "csv",
     teacher_logits_dir: Path | None = None,
     use_saved_logits: bool = False,
+    random_init_student: bool = False,
 ):
     if fabric.global_rank == 0 and out_dir is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -328,6 +332,12 @@ def main(
 
                 temp_teacher.select_sub_network(subnetwork)
                 student = extract_current_sub_network(temp_teacher)
+
+                if random_init_student:
+                    fabric.print("Randomly initializing student weights.")
+                    student_config = student.config
+                    with fabric.init_module(empty_init=(fabric.world_size > 1)):
+                        student = GPT(student_config)
 
                 param_count = compute_parameters(student)
                 temp_teacher.reset_super_network()
