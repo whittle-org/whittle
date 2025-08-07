@@ -66,28 +66,37 @@ def test_training_strategies(
     dataloader = DataLoader(dataset)
     full_finetune.get_dataloaders = Mock(return_value=(dataloader, dataloader))
 
-    full_finetune.setup(
-        MODEL_NAME,
-        devices=1,
-        optimizer="RMSprop",
-        training_strategy=strategy,
-        out_dir=tmp_path,
-        train=TrainArgs(
-            global_batch_size=2,
-            epochs=5,  # Required by validate_args
-            save_interval=1,
-            micro_batch_size=1,
-            max_steps=4,  # Set to ensure termination
-        ),
-        eval=EvalArgs(
-            interval=1,
-            max_new_tokens=10,  # Required by validate_args
-            max_iters=1,
-            final_validation=False,
-        ),
-        precision="32-true",  # Full precision for CPU compatibility
-        accelerator=accelerator_device,
-    )
+    fixed_config = {
+        "sub_network_n_embd": 4,
+        "sub_network_intermediate_size": 93,
+        "sub_network_num_heads": 4,
+        "sub_network_n_layers": 2,
+    }
+    with mock.patch(
+        "whittle.sampling.random_sampler.RandomSampler.sample", return_value=fixed_config
+    ):
+        full_finetune.setup(
+            MODEL_NAME,
+            devices=1,
+            optimizer="RMSprop",
+            training_strategy=strategy,
+            out_dir=tmp_path,
+            train=TrainArgs(
+                global_batch_size=2,
+                epochs=5,  # Required by validate_args
+                save_interval=1,
+                micro_batch_size=1,
+                max_steps=4,  # Set to ensure termination
+            ),
+            eval=EvalArgs(
+                interval=1,
+                max_new_tokens=10,  # Required by validate_args
+                max_iters=1,
+                final_validation=False,
+            ),
+            precision="32-true",  # Full precision for CPU compatibility
+            accelerator=accelerator_device,
+        )
 
 
 # Set CUDA_VISIBLE_DEVICES for FSDP hybrid-shard, if fewer GPUs are used than are available
