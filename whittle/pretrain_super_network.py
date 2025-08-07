@@ -45,6 +45,7 @@ from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
 from whittle.metrics.flops import compute_flops
+from whittle.metrics.profiler import DistributedGPUProfiler, create_profiler
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.sampling.random_sampler import RandomSampler
@@ -102,6 +103,8 @@ def setup(
     seed: int = 42,
     accelerator: str | None = None,
     parallel_strategy: Literal["fsdp", "ddp", "auto"] = "fsdp",
+    enable_profiling: bool = False,
+    profiling_output_dir: Path | None = None,
 ):
     """Pretrain a model.
 
@@ -121,7 +124,7 @@ def setup(
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
         optimizer: An optimizer name (such as "AdamW") or config.
-        training_strategy:
+        training_strategy: Training strategy to use ("sandwich", "random", "standard").
         devices: How many devices/GPUs to use. Uses all GPUs by default.
         num_nodes: How many nodes the code is being run on.
         tokenizer_dir: Optional path to the tokenizer dir that was used for preprocessing the dataset. Only some data
@@ -130,6 +133,8 @@ def setup(
         seed: The random seed to use for reproducibility.
         parallel_strategy: The parallelization strategy to use. Options are "fsdp" (Fully Sharded Data Parallel),
             "ddp" (Distributed Data Parallel), or "auto" (automatically choose based on setup).
+        enable_profiling: Whether to enable GPU/performance profiling. Defaults to False.
+        profiling_output_dir: Directory to save profiling results. Defaults to out_dir/profiling.
     """
     if model_name == "list":
         available_models = "\n".join(sorted(name_to_config))
@@ -178,9 +183,16 @@ def setup(
 
     # Default to CPU if accelerator not specified
     if accelerator is None:
-        accelerator = "cuda" if torch.cuda.is_available() else "cpu"
+        if torch.cuda.is_available():
+            try:
+                torch.cuda.device_count()
+                accelerator = "cuda"
+            except Exception as e:
+                logger.warning(f"CUDA detection failed: {e}")
+                accelerator = "cpu"
+        else:
+            accelerator = "cpu"
 
-    # Set up parallel strategy
     if num_devices * num_nodes > 1 and accelerator == "cuda":
         if parallel_strategy == "fsdp":
             strategy = FSDPStrategy(
@@ -190,6 +202,9 @@ def setup(
             )
         elif parallel_strategy == "ddp":
             strategy = DDPStrategy(find_unused_parameters=True)
+        else:
+            strategy = "auto"
+
     else:
         strategy = "auto"
 
@@ -202,9 +217,12 @@ def setup(
         accelerator=accelerator,
     )
 
-    # Skip NVLink check for CPU or single-device setups
-    if accelerator == "cuda" and num_devices > 1 and torch.cuda.is_available():
-        check_nvlink_connectivity(fabric)
+    if accelerator == "cuda" and num_devices > 1:
+        try:
+            if torch.cuda.is_available():
+                check_nvlink_connectivity(fabric)
+        except Exception as e:
+            fabric.print(f"Warning: NVLink check failed: {e}")
 
     fabric.launch()
 
@@ -227,6 +245,9 @@ def setup(
         eval,
         optimizer,
         training_strategy,
+        parallel_strategy,
+        enable_profiling,
+        profiling_output_dir,
     )
 
 
@@ -253,7 +274,8 @@ def fit(
     train: TrainArgs,
     eval: EvalArgs,
     training_strategy: BaseTrainingStrategy,
-) -> None:
+    profiler: DistributedGPUProfiler | None = None,
+) -> Path | None:
     model = state["model"]
     optimizer = state["optimizer"]
 
@@ -300,10 +322,21 @@ def fit(
     running_loss = RunningMean(
         window=train.gradient_accumulation_iters(devices), sync_on_compute=False
     ).to(fabric.device)
-    fabric.barrier()
-    total_t0 = time.perf_counter()
 
+    fabric.barrier()
+    if fabric.global_rank == 0:
+        fabric.print("[Training] All ranks synchronized, starting training")
+
+    if profiler is not None:
+        profiler.start_profiling()
+        if fabric.global_rank == 0:
+            fabric.print("[Profiler] Started profiling with global synchronization")
+
+    total_t0 = time.perf_counter()
     warmup_iters = train.warmup_iters(devices, max_iters, train_dataloader)
+
+    # Expected tokens per batch for validation
+    expected_tokens_per_batch = train.micro_batch_size * model.max_seq_length
 
     for train_data in train_iterator:
         if state["iter_num"] >= max_iters:
@@ -341,7 +374,22 @@ def fit(
 
         with fabric.no_backward_sync(model, enabled=is_accumulating):
             loss = training_strategy(model, input_ids, targets, scale_loss=scale_loss)
-        #            fabric.backward(loss / train.gradient_accumulation_iters(devices))
+
+        if profiler is not None:
+            actual_batch_size = input_ids.size(0)
+            actual_sequence_length = input_ids.size(1)
+            actual_tokens_in_batch = actual_batch_size * actual_sequence_length
+
+            if actual_tokens_in_batch != expected_tokens_per_batch:
+                if (
+                    fabric.global_rank == 0 and state["iter_num"] <= 10
+                ):  # Log first few mismatches
+                    fabric.print(
+                        f"[Training] Token count mismatch at iter {state['iter_num']}: "
+                        f"expected {expected_tokens_per_batch}, got {actual_tokens_in_batch}"
+                    )
+
+            profiler.update_tokens(expected_tokens_per_batch)
 
         running_loss.update(loss)
 
@@ -352,9 +400,7 @@ def fit(
             state["step_count"] += 1
 
         if state["iter_num"] % log_iter_interval == 0:
-            loss = (
-                running_loss.compute().item()
-            )  # expensive device-to-host synchronization
+            loss = running_loss.compute().item()
             t1 = time.perf_counter()
             throughput.update(
                 time=(t1 - total_t0),
@@ -365,6 +411,10 @@ def fit(
                     state["iter_num"] * train.micro_batch_size * model.max_seq_length
                 ),
             )
+
+            local_tokens_processed = state["iter_num"] * expected_tokens_per_batch
+            global_tokens_processed = local_tokens_processed * fabric.world_size
+
             metrics = {
                 "loss": loss,
                 "iter": state["iter_num"],
@@ -376,26 +426,44 @@ def fit(
                     / (state["iter_num"] - initial_iter)
                     * (max_iters - state["iter_num"])
                 ),
-                "tokens": state["iter_num"]
-                * train.micro_batch_size
-                * model.max_seq_length,
-                "total_tokens": (
-                    state["iter_num"]
-                    * train.micro_batch_size
-                    * model.max_seq_length
-                    * fabric.world_size
-                ),
+                "local_tokens": local_tokens_processed,
+                "global_tokens": global_tokens_processed,
                 "learning_rate": lr,
             }
+
+            profiler_info = ""
+            if profiler is not None:
+                try:
+                    local_tps = profiler.get_current_local_tps()
+                    estimated_global_tps = local_tps * fabric.world_size
+
+                    # Add profiler metrics to logged metrics
+                    metrics["profiler_local_tps"] = local_tps
+                    metrics["profiler_estimated_global_tps"] = estimated_global_tps
+                    metrics["profiler_local_tokens"] = profiler.local_tokens_processed
+                    metrics["profiler_local_batches"] = profiler.local_batches_processed
+                    metrics["profiler_token_mismatches"] = profiler.token_count_mismatches
+
+                    profiler_info = (
+                        f" | Local TPS: {local_tps:.0f} "
+                        f"| Est. Global TPS: {estimated_global_tps:.0f} "
+                        f"| Mismatches: {profiler.token_count_mismatches}"
+                    )
+
+                except Exception as e:
+                    if fabric.global_rank == 0:
+                        fabric.print(f"[Profiler] Error calculating metrics: {e}")
+
             if isinstance(val_loss, float):
                 val_loss = f"{val_loss:.3f}"
+
             fabric.print(
-                f"Epoch {metrics['epoch'] + 1} | iter {metrics['iter']} step {metrics['step']} |"
-                f" loss train: {metrics['loss']:.3f},"
-                f" val: {val_loss} |"
-                f" iter time: {metrics['iter_time'] * 1000:.2f} ms"
-                f"{' (step)' if not is_accumulating else ''}"
-                f" remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
+                f"Epoch {metrics['epoch'] + 1} | iter {metrics['iter']} step {metrics['step']} | "
+                f"loss train: {metrics['loss']:.3f}, val: {val_loss} | "
+                f"iter time: {metrics['iter_time'] * 1000:.2f} ms"
+                f"{' (step)' if not is_accumulating else ''} | "
+                f"remaining time: {timedelta(seconds=int(metrics['remaining_time']))!s}"
+                f"{profiler_info}"
             )
 
             throughput_metrics = throughput.compute()
@@ -432,7 +500,16 @@ def fit(
                 out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth",
             )
 
-    # Final validation
+    profiling_output_file = None
+    if profiler is not None:
+        try:
+            profiling_output_file = profiler.stop_profiling()
+            if profiling_output_file and fabric.global_rank == 0:
+                fabric.print(f"[Profiler] Results saved to: {profiling_output_file}")
+        except Exception as e:
+            if fabric.global_rank == 0:
+                fabric.print(f"[Profiler] Error stopping profiler: {e}")
+
     if eval.final_validation:
         model.reset_super_network()
         val_loss = validate(fabric, model, val_dataloader, max_iters=eval.max_iters)
@@ -441,6 +518,8 @@ def fit(
         fabric.print(
             f"Final evaluation | val loss: {val_loss.item():.3f} | val ppl: {math.exp(val_loss):.3f}"
         )
+
+    return profiling_output_file
 
 
 def main(
@@ -458,13 +537,16 @@ def main(
     eval: EvalArgs,
     optimizer: str | dict,
     training_strategy: str,
+    parallel_strategy: str,
+    enable_profiling: bool = False,
+    profiling_output_dir: Path | None = None,
 ) -> None:
     validate_args(train, eval, initial_checkpoint_dir, resume)
 
     if fabric.global_rank == 0:
         out_dir.mkdir(parents=True, exist_ok=True)
 
-    fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
+    fabric.seed_everything(seed)  # same seed for every process to init model
 
     t0 = time.perf_counter()
     with fabric.init_module(empty_init=True):
@@ -520,8 +602,48 @@ def main(
         fabric.print(f"Resuming training from {resume}")
         fabric.load(resume, state)
 
+    profiler = None
+    if enable_profiling:
+        try:
+            profiler = create_profiler(
+                fabric=fabric,
+                model_name=config.name,
+                parallel_strategy=parallel_strategy,
+                train_args=train,
+                model=model,
+                output_dir=profiling_output_dir or out_dir / "profiling",
+            )
+
+            if profiler:
+                if fabric.global_rank == 0:
+                    fabric.print("[Profiler] Successfully initialized profiler")
+                    fabric.print(
+                        f"[Profiler] Hardware: {profiler.num_nodes} nodes, {profiler.num_gpus_total} GPUs total, {profiler.gpus_per_node} GPUs/node"
+                    )
+                    fabric.print(f"[Profiler] Strategy: {parallel_strategy}")
+                    fabric.print(
+                        f"[Profiler] Expected tokens per batch: {profiler.expected_tokens_per_batch}"
+                    )
+
+                if profiler.world_size != fabric.world_size:
+                    if fabric.global_rank == 0:
+                        fabric.print(
+                            f"[Profiler] Warning: Profiler world_size ({profiler.world_size}) != "
+                            f"Fabric world_size ({fabric.world_size})"
+                        )
+            else:
+                if fabric.global_rank == 0:
+                    fabric.print(
+                        "[Profiler] Warning: Profiler initialization returned None"
+                    )
+
+        except Exception as e:
+            if fabric.global_rank == 0:
+                fabric.print(f"[Profiler] Error initializing profiler: {e}")
+            profiler = None
+
     train_time = time.perf_counter()
-    fit(
+    profiling_output_file = fit(
         fabric,
         devices,
         state,
@@ -532,32 +654,50 @@ def main(
         train,
         eval,
         strategy,
+        profiler,
     )
 
-    # Save final checkpoint
     save_checkpoint(fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth")
 
-    total_tokens = (
-        state["iter_num"]
-        * train.micro_batch_size
-        * model.max_seq_length
-        * fabric.world_size
+    expected_tokens_per_batch = train.micro_batch_size * model.max_seq_length
+    local_total_tokens = state["iter_num"] * expected_tokens_per_batch
+    global_total_tokens = local_total_tokens * fabric.world_size
+    final_train_time = time.perf_counter() - train_time
+
+    separator = "-" * 70
+    fabric.print(separator)
+    fabric.print("| Training Completed - Performance Summary")
+    fabric.print("| " + "-" * 66)
+    fabric.print(f"| Model: {config.name}")
+    fabric.print(f"| Parallel Strategy: {parallel_strategy}")
+    fabric.print(
+        f"| Hardware: {fabric.world_size} GPUs across {getattr(profiler, 'num_nodes', 'unknown')} nodes"
+    )
+    if profiler and hasattr(profiler, "gpus_per_node"):
+        fabric.print(f"| GPUs per node: {profiler.gpus_per_node}")
+    fabric.print(f"| Local tokens processed (this rank): {local_total_tokens:,}")
+    fabric.print(f"| Global tokens processed (all ranks): {global_total_tokens:,}")
+    fabric.print(
+        f"| Training time: {final_train_time:.2f} seconds ({final_train_time / 60:.2f} minutes)"
+    )
+    fabric.print(
+        f"| Local throughput: {local_total_tokens / final_train_time:.2f} tokens/sec"
+    )
+    fabric.print(
+        f"| Estimated global throughput: {global_total_tokens / final_train_time:.2f} tokens/sec"
     )
 
-    # Print formatted output
-    separator = "-" * 40
-    fabric.print(separator)
-    fabric.print("| Performance")
-    fabric.print(f"| - Total tokens  : {total_tokens:,}")
-    fabric.print(f"| - Training Time : {(time.perf_counter() - train_time):.2f} s")
-    fabric.print(f"| - Tok/sec       : {total_tokens / train_time:.2f} tok/s")
-    fabric.print("| " + "-" * 40)
+    if profiler and profiling_output_file:
+        fabric.print(f"| Detailed profiling results: {profiling_output_file}")
 
-    fabric.print(f"Training time: {(time.perf_counter() - train_time):.2f}s")
     if fabric.device.type == "cuda":
-        memory_used = torch.cuda.max_memory_allocated() / 1e9
-        fabric.print("| Memory Usage")
-        fabric.print(f"| - Memory Used   : {memory_used:.2f} GB")
+        try:
+            memory_used = torch.cuda.max_memory_allocated() / 1e9
+            fabric.print(f"| Peak GPU memory usage (this rank): {memory_used:.2f} GB")
+        except Exception as e:
+            fabric.print(f"| Memory usage: Could not determine ({e})")
+
+    fabric.print(separator)
 
 
 if __name__ == "__main__":
