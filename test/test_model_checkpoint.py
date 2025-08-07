@@ -101,7 +101,7 @@ def test_checkpoints(tmp_path, checkpoint_dir, copy_config_files, save_checkpoin
     ckp = lazy_load(checkpoint_dir / "lit_model.pth")
     model.load_state_dict(ckp)
 
-    sub_network_dict = {"embed_dim": 8, "mlp_ratio": 2, "num_heads": 2, "depth": 2}
+    sub_network_dict = {"embed_dim": 8, "mlp_ratio": 2, "num_heads": 4, "depth": 2}
 
     for set_subnet_before_call in [True, False]:
         out_dir = (
@@ -187,7 +187,7 @@ def test_convert_to_litgpt(
     model.load_state_dict(ckp)
 
     if "pythia" in model_dir:
-        sub_network_dict = {"embed_dim": 8, "mlp_ratio": 2, "num_heads": 2, "depth": 2}
+        sub_network_dict = {"embed_dim": 8, "mlp_ratio": 2, "num_heads": 4, "depth": 2}
     elif "gemma" in model_dir:
         sub_network_dict = {"embed_dim": 8, "mlp_ratio": 2, "num_heads": 4, "depth": 3}
     elif "MicroLlama" in model_dir:

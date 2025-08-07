@@ -59,7 +59,7 @@ def test_block():
     block.set_sub_network(
         sub_network_n_embd=32,
         sub_network_intermediate_size=32 * 4,
-        sub_network_num_heads=8,
+        sub_network_num_heads=4,
         sub_network_query_groups=config.n_query_groups // 2,
         sub_network_head_size=32 // 4,
     )
