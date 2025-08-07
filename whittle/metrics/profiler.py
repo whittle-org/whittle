@@ -16,6 +16,9 @@ import lightning as L
 import psutil
 import pynvml
 import torch
+from litgpt.args import TrainArgs
+
+from whittle.models.gpt.model import GPT
 
 
 class DistributedGPUProfiler:
@@ -24,16 +27,16 @@ class DistributedGPUProfiler:
         fabric: L.Fabric,
         model_name: str,
         parallel_strategy: str,
-        train_args,
-        model,
+        train_args: TrainArgs,
+        model: GPT,
         output_dir: Path,
         monitoring_interval: float = 1.0,
     ):
         self.fabric = fabric
         self.model_name = model_name
         self.parallel_strategy = parallel_strategy
-        self.train_args = train_args
-        self.model = model
+        self.train_args: TrainArgs = train_args
+        self.model: GPT = model
         self.output_dir = Path(output_dir)
         self.monitoring_interval = monitoring_interval
 
@@ -509,8 +512,8 @@ def create_profiler(
     fabric: L.Fabric,
     model_name: str,
     parallel_strategy: str,
-    train_args,
-    model,
+    train_args: TrainArgs,
+    model: GPT,
     output_dir: Path,
     monitoring_interval: float = 1.0,
 ) -> DistributedGPUProfiler | None:
