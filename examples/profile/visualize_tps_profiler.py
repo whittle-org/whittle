@@ -176,126 +176,12 @@ class GPUUtilizationAnalyzer:
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)
 
-        # Create multiple plots
-        self._plot_tokens_per_second_comparison(output_dir)
+        # Create the two main plots
         self._plot_gpu_utilization_comparison(output_dir)
-        self._plot_scaling_efficiency(output_dir)
-        self._plot_detailed_metrics_heatmap(output_dir)
+        self._plot_comprehensive_metrics(output_dir)
 
         # Create summary table
         self._create_summary_table(output_dir)
-
-    def _plot_tokens_per_second_comparison(self, output_dir: str = None):
-        """Plot tokens per second comparison across configurations."""
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
-        fig.suptitle(
-            "Tokens Per Second Performance Analysis",
-            fontsize=16,
-            fontweight="bold",
-            y=0.98,
-        )
-
-        # Prepare data
-        configs = []
-        avg_tps = []
-        total_tps = []
-        std_tps = []
-
-        for config_key, data in self.aggregated_data.items():
-            # Create readable config label
-            num_nodes = data["config"]["num_nodes"]
-            num_gpus = data["config"]["num_gpus_total"]
-            config_label = f"{num_nodes}/{num_gpus}"
-
-            configs.append(config_label)
-            avg_tps.append(data["avg_tokens_per_second"])
-            total_tps.append(data["total_global_tps"])
-            std_tps.append(data["std_tokens_per_second"])
-
-        # Sort by total GPUs for better visualization
-        sorted_data = sorted(
-            zip(configs, avg_tps, total_tps, std_tps),
-            key=lambda x: int(x[0].split("/")[1]),
-        )
-        configs, avg_tps, total_tps, std_tps = zip(*sorted_data)
-
-        x_pos = np.arange(len(configs))
-
-        # Plot 1: Average TPS per GPU
-        bars1 = ax1.bar(
-            x_pos,
-            avg_tps,
-            BAR_WIDTH,
-            yerr=std_tps,
-            capsize=4,
-            color=COLORS["primary_blue"],
-            edgecolor=COLORS["dark_blue"],
-            linewidth=1.2,
-            alpha=0.8,
-            error_kw={"elinewidth": 1.5, "capthick": 1.5},
-        )
-
-        ax1.set_xlabel("Configuration (Nodes/GPUs)", fontweight="bold")
-        ax1.set_ylabel("Average Tokens/Second per GPU", fontweight="bold")
-        ax1.set_title("Average Tokens per Second per GPU", fontweight="bold", pad=20)
-        ax1.set_xticks(x_pos)
-        ax1.set_xticklabels(configs, rotation=0, ha="center")
-        ax1.grid(axis="y", alpha=0.3, linestyle="-", linewidth=0.5)
-
-        # Add value labels on bars
-        for bar, val, std in zip(bars1, avg_tps, std_tps):
-            height = bar.get_height()
-            ax1.text(
-                bar.get_x() + bar.get_width() / 2.0,
-                height + std + height * 0.02,
-                f"{val:.0f}",
-                ha="center",
-                va="bottom",
-                fontweight="bold",
-                fontsize=9,
-            )
-
-        # Plot 2: Total Global TPS
-        bars2 = ax2.bar(
-            x_pos,
-            total_tps,
-            BAR_WIDTH,
-            color=COLORS["secondary_blue"],
-            edgecolor=COLORS["dark_blue"],
-            linewidth=1.2,
-            alpha=0.8,
-        )
-
-        ax2.set_xlabel("Configuration (Nodes/GPUs)", fontweight="bold")
-        ax2.set_ylabel("Total Global Tokens/Second", fontweight="bold")
-        ax2.set_title("Total Global Throughput", fontweight="bold", pad=20)
-        ax2.set_xticks(x_pos)
-        ax2.set_xticklabels(configs, rotation=0, ha="center")
-        ax2.grid(axis="y", alpha=0.3, linestyle="-", linewidth=0.5)
-
-        # Add value labels on bars
-        for bar, val in zip(bars2, total_tps):
-            height = bar.get_height()
-            ax2.text(
-                bar.get_x() + bar.get_width() / 2.0,
-                height + height * 0.02,
-                f"{val:.0f}",
-                ha="center",
-                va="bottom",
-                fontweight="bold",
-                fontsize=9,
-            )
-
-        plt.tight_layout()
-
-        if output_dir:
-            plt.savefig(
-                f"{output_dir}/tokens_per_second_comparison.png",
-                dpi=300,
-                bbox_inches="tight",
-                facecolor="white",
-            )
-        plt.show()
 
     def _plot_gpu_utilization_comparison(self, output_dir: str = None):
         """Plot GPU utilization comparison."""
@@ -367,93 +253,101 @@ class GPUUtilizationAnalyzer:
             )
         plt.show()
 
-    def _plot_scaling_efficiency(self, output_dir: str = None):
-        """Plot scaling efficiency analysis."""
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+    def _plot_comprehensive_metrics(self, output_dir: str = None):
+        """Create comprehensive metrics plot with 4 subplots."""
+        fig = plt.figure(figsize=(20, 14))
         fig.suptitle(
-            "Scaling Efficiency Analysis", fontsize=16, fontweight="bold", y=0.98
+            "Comprehensive Performance Metrics Analysis",
+            fontsize=20,
+            fontweight="bold",
+            y=0.98,
         )
 
-        # Prepare data sorted by GPU count
-        data_points = []
+        # Prepare common data
+        configs = []
+        avg_tps = []
+        total_tps = []
+        std_tps = []
+        gpus = []
+        nodes = []
+
         for config_key, data in self.aggregated_data.items():
-            num_gpus = data["config"]["num_gpus_total"]
             num_nodes = data["config"]["num_nodes"]
-            total_tps = data["total_global_tps"]
-            avg_tps = data["avg_tokens_per_second"]
+            num_gpus = data["config"]["num_gpus_total"]
+            config_label = f"{num_nodes}/{num_gpus}"
 
-            data_points.append((num_gpus, num_nodes, total_tps, avg_tps, config_key))
+            configs.append(config_label)
+            avg_tps.append(data["avg_tokens_per_second"])
+            total_tps.append(data["total_global_tps"])
+            std_tps.append(data["std_tokens_per_second"])
+            gpus.append(num_gpus)
+            nodes.append(num_nodes)
 
-        data_points.sort(key=lambda x: x[0])  # Sort by GPU count
-
-        if not data_points:
-            print("No data points available for scaling analysis")
-            return
-
-        gpus = [dp[0] for dp in data_points]
-        nodes = [dp[1] for dp in data_points]
-        total_tps = [dp[2] for dp in data_points]
-        avg_tps = [dp[3] for dp in data_points]
-
-        # Plot 1: Total throughput scaling
-        ax1.plot(
-            gpus,
-            total_tps,
-            "o-",
-            linewidth=3,
-            markersize=8,
-            color=COLORS["primary_blue"],
-            markerfacecolor=COLORS["secondary_blue"],
-            markeredgecolor=COLORS["dark_blue"],
-            markeredgewidth=2,
-            label="Actual",
+        # Sort by total GPUs for consistency
+        sorted_data = sorted(
+            zip(configs, avg_tps, total_tps, std_tps, gpus, nodes),
+            key=lambda x: x[4],  # Sort by GPU count
         )
+        configs, avg_tps, total_tps, std_tps, gpus, nodes = zip(*sorted_data)
 
-        if len(data_points) > 1:
-            # Calculate ideal linear scaling from the first point
-            base_tps_per_gpu = total_tps[0] / gpus[0]
-            ideal_scaling = [gpu * base_tps_per_gpu for gpu in gpus]
-            ax1.plot(
-                gpus,
-                ideal_scaling,
-                "--",
-                linewidth=2,
-                alpha=0.7,
-                color=COLORS["accent_coral"],
-                label="Ideal Linear",
-            )
+        x_pos = np.arange(len(configs))
 
-        ax1.set_xlabel("Number of GPUs", fontweight="bold")
-        ax1.set_ylabel("Total Throughput (tokens/sec)", fontweight="bold")
-        ax1.set_title("Throughput Scaling vs GPU Count", fontweight="bold", pad=20)
-        ax1.legend(frameon=True, fancybox=True, shadow=True)
-        ax1.grid(True, alpha=0.3, linestyle="-", linewidth=0.5)
-
-        # Plot 2: Per-GPU efficiency
-        x_pos = np.arange(len(gpus))
-
-        bars = ax2.bar(
+        # Subplot 1: Average Tokens per Second per GPU
+        ax1 = plt.subplot(2, 2, 1)
+        bars1 = ax1.bar(
             x_pos,
             avg_tps,
             BAR_WIDTH,
-            color=COLORS["accent_coral"],
-            alpha=0.8,
+            yerr=std_tps,
+            capsize=4,
+            color=COLORS["primary_blue"],
             edgecolor=COLORS["dark_blue"],
             linewidth=1.2,
+            alpha=0.8,
+            error_kw={"elinewidth": 1.5, "capthick": 1.5},
         )
 
-        ax2.set_xlabel("Configuration", fontweight="bold")
-        ax2.set_ylabel("Tokens/Second per GPU", fontweight="bold")
-        ax2.set_title("Per-GPU Efficiency", fontweight="bold", pad=20)
+        ax1.set_xlabel("Configuration (Nodes/GPUs)", fontweight="bold")
+        ax1.set_ylabel("Average Tokens/Second per GPU", fontweight="bold")
+        ax1.set_title("Average Tokens per Second per GPU", fontweight="bold", pad=15)
+        ax1.set_xticks(x_pos)
+        ax1.set_xticklabels(configs, rotation=0, ha="center")
+        ax1.grid(axis="y", alpha=0.3, linestyle="-", linewidth=0.5)
 
-        # Create labels for x-axis
-        config_labels = [f"{n}N/{g}G" for g, n in zip(gpus, nodes)]
+        # Add value labels on bars
+        for bar, val, std in zip(bars1, avg_tps, std_tps):
+            height = bar.get_height()
+            ax1.text(
+                bar.get_x() + bar.get_width() / 2.0,
+                height + std + height * 0.02,
+                f"{val:.0f}",
+                ha="center",
+                va="bottom",
+                fontweight="bold",
+                fontsize=9,
+            )
+
+        # Subplot 2: Total Global Throughput
+        ax2 = plt.subplot(2, 2, 2)
+        bars2 = ax2.bar(
+            x_pos,
+            total_tps,
+            BAR_WIDTH,
+            color=COLORS["secondary_blue"],
+            edgecolor=COLORS["dark_blue"],
+            linewidth=1.2,
+            alpha=0.8,
+        )
+
+        ax2.set_xlabel("Configuration (Nodes/GPUs)", fontweight="bold")
+        ax2.set_ylabel("Total Global Tokens/Second", fontweight="bold")
+        ax2.set_title("Total Global Throughput", fontweight="bold", pad=15)
         ax2.set_xticks(x_pos)
-        ax2.set_xticklabels(config_labels, rotation=0, ha="center")
+        ax2.set_xticklabels(configs, rotation=0, ha="center")
         ax2.grid(axis="y", alpha=0.3, linestyle="-", linewidth=0.5)
 
         # Add value labels on bars
-        for bar, val in zip(bars, avg_tps):
+        for bar, val in zip(bars2, total_tps):
             height = bar.get_height()
             ax2.text(
                 bar.get_x() + bar.get_width() / 2.0,
@@ -465,97 +359,107 @@ class GPUUtilizationAnalyzer:
                 fontsize=9,
             )
 
-        plt.tight_layout()
+        # Subplot 3: Throughput Scaling vs GPU Count
+        ax3 = plt.subplot(2, 2, 3)
+        ax3.plot(
+            gpus,
+            total_tps,
+            "o-",
+            linewidth=3,
+            markersize=10,
+            color=COLORS["primary_blue"],
+            markerfacecolor=COLORS["secondary_blue"],
+            markeredgecolor=COLORS["dark_blue"],
+            markeredgewidth=2,
+            label="Actual",
+        )
 
-        if output_dir:
-            plt.savefig(
-                f"{output_dir}/scaling_efficiency.png",
-                dpi=300,
-                bbox_inches="tight",
-                facecolor="white",
+        if len(gpus) > 1:
+            # Calculate ideal linear scaling from the first point
+            base_tps_per_gpu = total_tps[0] / gpus[0]
+            ideal_scaling = [gpu * base_tps_per_gpu for gpu in gpus]
+            ax3.plot(
+                gpus,
+                ideal_scaling,
+                "--",
+                linewidth=3,
+                alpha=0.8,
+                color=COLORS["accent_coral"],
+                label="Ideal Linear",
+                markersize=8,
+                marker="s",
             )
-        plt.show()
 
-    def _plot_detailed_metrics_heatmap(self, output_dir: str = None):
-        """Create a heatmap showing various metrics across configurations."""
+        ax3.set_xlabel("Number of GPUs", fontweight="bold")
+        ax3.set_ylabel("Total Throughput (tokens/sec)", fontweight="bold")
+        ax3.set_title("Throughput Scaling vs GPU Count", fontweight="bold", pad=15)
+        ax3.legend(frameon=True, fancybox=True, shadow=True, fontsize=11)
+        ax3.grid(True, alpha=0.3, linestyle="-", linewidth=0.5)
+
+        # Add value labels on points
+        for gpu, tps in zip(gpus, total_tps):
+            ax3.annotate(
+                f"{tps:.0f}",
+                (gpu, tps),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontweight="bold",
+                fontsize=9,
+            )
+
+        # Subplot 4: Raw Metrics Values Heatmap
+        ax4 = plt.subplot(2, 2, 4)
+
         # Prepare data for heatmap
-        configs = []
         metrics_data = {
-            "Avg TPS": [],
+            "Avg TPS": list(avg_tps),
             "GPU Util (%)": [],
             "Mem Util (%)": [],
-            "Total TPS": [],
+            "Total TPS": [
+                tps / 1000 for tps in total_tps
+            ],  # Scale for better visualization
             "Peak Mem (GB)": [],
         }
 
-        for config_key, data in self.aggregated_data.items():
-            num_nodes = data["config"]["num_nodes"]
-            num_gpus = data["config"]["num_gpus_total"]
-            config_label = f"{num_nodes}N/{num_gpus}G"
+        # Get additional metrics for heatmap
+        for config in configs:
+            # Find matching config in aggregated data
+            for config_key, data in self.aggregated_data.items():
+                num_nodes = data["config"]["num_nodes"]
+                num_gpus = data["config"]["num_gpus_total"]
+                if f"{num_nodes}/{num_gpus}" == config:
+                    metrics_data["GPU Util (%)"].append(data["avg_gpu_utilization"])
+                    metrics_data["Mem Util (%)"].append(data["avg_memory_utilization"])
+                    metrics_data["Peak Mem (GB)"].append(data["total_peak_memory"])
+                    break
 
-            configs.append(config_label)
-            metrics_data["Avg TPS"].append(data["avg_tokens_per_second"])
-            metrics_data["GPU Util (%)"].append(data["avg_gpu_utilization"])
-            metrics_data["Mem Util (%)"].append(data["avg_memory_utilization"])
-            metrics_data["Total TPS"].append(
-                data["total_global_tps"] / 1000
-            )  # Scale down for better visualization
-            metrics_data["Peak Mem (GB)"].append(data["total_peak_memory"])
+        # Create DataFrame for heatmap
+        df_heatmap = pd.DataFrame(metrics_data, index=configs)
 
-        # Create DataFrame and normalize data for heatmap
-        df = pd.DataFrame(metrics_data, index=configs)
-
-        # Normalize each column to 0-1 scale for better heatmap visualization
-        df_normalized = df.copy()
-        for col in df.columns:
-            df_normalized[col] = (df[col] - df[col].min()) / (
-                df[col].max() - df[col].min()
-            )
-
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
-        fig.suptitle(
-            "Performance Metrics Analysis", fontsize=16, fontweight="bold", y=0.98
-        )
-
-        # Plot normalized heatmap
+        # Create heatmap with raw values and annotations
         sns.heatmap(
-            df_normalized.T,
-            annot=False,
-            cmap="Blues",
-            ax=ax1,
-            cbar_kws={"label": "Normalized Value (0-1)"},
-            linewidths=0.5,
-            linecolor="white",
-        )
-        ax1.set_title("Normalized Metrics Heatmap", fontweight="bold", pad=20)
-        ax1.set_xlabel("Configuration", fontweight="bold")
-        ax1.set_ylabel("Metrics", fontweight="bold")
-
-        # Plot raw values heatmap with annotations
-        df_display = df.copy()
-        df_display["Total TPS"] = (
-            df_display["Total TPS"] * 1000
-        )  # Convert back for display
-
-        sns.heatmap(
-            df_display.T,
+            df_heatmap.T,
             annot=True,
             fmt=".0f",
             cmap="RdYlBu_r",
-            ax=ax2,
-            linewidths=0.5,
+            ax=ax4,
+            linewidths=1,
             linecolor="white",
             annot_kws={"size": 9, "weight": "bold"},
+            cbar_kws={"shrink": 0.8},
         )
-        ax2.set_title("Raw Metrics Values", fontweight="bold", pad=20)
-        ax2.set_xlabel("Configuration", fontweight="bold")
-        ax2.set_ylabel("Metrics", fontweight="bold")
+
+        ax4.set_title("Raw Metrics Values Heatmap", fontweight="bold", pad=15)
+        ax4.set_xlabel("Configuration", fontweight="bold")
+        ax4.set_ylabel("Metrics", fontweight="bold")
 
         plt.tight_layout()
+        plt.subplots_adjust(top=0.93)
 
         if output_dir:
             plt.savefig(
-                f"{output_dir}/metrics_heatmap.png",
+                f"{output_dir}/comprehensive_report.png",
                 dpi=300,
                 bbox_inches="tight",
                 facecolor="white",
