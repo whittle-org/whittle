@@ -86,7 +86,6 @@ def test_checkpoints(tmp_path, checkpoint_dir, copy_config_files, save_checkpoin
             "sub_network_num_heads": 2,
             "sub_network_n_layers": 2,
         }
-
         fixed_config_syne_tune = {
             "embed_dim": 4,
             "num_heads": 4,

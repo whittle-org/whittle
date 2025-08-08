@@ -72,8 +72,23 @@ def test_training_strategies(
         "sub_network_num_heads": 4,
         "sub_network_n_layers": 2,
     }
-    with mock.patch(
-        "whittle.sampling.random_sampler.RandomSampler.sample", return_value=fixed_config
+
+    smallest_config = {
+        "sub_network_n_embd": 4,
+        "sub_network_intermediate_size": 5,
+        "sub_network_num_heads": 4,
+        "sub_network_n_layers": 1,
+    }
+
+    with (
+        mock.patch(
+            "whittle.sampling.random_sampler.RandomSampler.sample",
+            return_value=fixed_config,
+        ),
+        mock.patch(
+            "whittle.sampling.random_sampler.RandomSampler.get_smallest_sub_network",
+            return_value=smallest_config,
+        ),
     ):
         full_finetune.setup(
             MODEL_NAME,
@@ -116,26 +131,45 @@ def test_full_finetune(save_hyper_mock, tmp_path, accelerator_device, ensure_che
     out_dir = tmp_path / "out"
     stdout = StringIO()
     with redirect_stdout(stdout):
-        full_finetune.setup(
-            MODEL_NAME,
-            devices=1,
-            out_dir=out_dir,
-            train=TrainArgs(
-                global_batch_size=2,
-                epochs=5,  # Required by validate_args
-                save_interval=1,
-                micro_batch_size=1,
-                max_steps=4,  # Set to ensure termination
-            ),
-            eval=EvalArgs(
-                interval=1,
-                max_new_tokens=10,  # Required by validate_args
-                max_iters=1,
-                final_validation=False,
-            ),
-            precision="32-true",  # Full precision for CPU compatibility
-            accelerator=accelerator_device,
-        )
+        fixed_config = {
+            "sub_network_n_embd": 4,
+            "sub_network_intermediate_size": 93,
+            "sub_network_num_heads": 4,
+            "sub_network_n_layers": 2,
+        }
+
+        min_config = {
+            "sub_network_n_embd": 4,
+            "sub_network_intermediate_size": 4,
+            "sub_network_num_heads": 4,
+            "sub_network_n_layers": 1,
+        }
+
+        _rs_str = "whittle.sampling.random_sampler.RandomSampler"
+        with (
+            mock.patch(f"{_rs_str}.sample", return_value=fixed_config),
+            mock.patch(f"{_rs_str}.get_smallest_sub_network", return_value=min_config),
+        ):
+            full_finetune.setup(
+                MODEL_NAME,
+                devices=1,
+                out_dir=out_dir,
+                train=TrainArgs(
+                    global_batch_size=2,
+                    epochs=5,  # Required by validate_args
+                    save_interval=1,
+                    micro_batch_size=1,
+                    max_steps=4,  # Set to ensure termination
+                ),
+                eval=EvalArgs(
+                    interval=1,
+                    max_new_tokens=10,  # Required by validate_args
+                    max_iters=1,
+                    final_validation=False,
+                ),
+                precision="32-true",  # Full precision for CPU compatibility
+                accelerator=accelerator_device,
+            )
 
     # tmp_path is not the same across all ranks, run assert only on rank 0
     out_dir_contents = set(os.listdir(out_dir))
