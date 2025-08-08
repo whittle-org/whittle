@@ -183,3 +183,143 @@ def test_attention(attention_config):
     )
     # check that our sub-networks the same output as equally sized LitGPT attention layer
     assert torch.all(out_lit_small == out_small)
+
+
+QKV_INDICES_TEST_CONFIGS = {
+    "gqa_to_gqa": [
+        (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 8, 2, 2),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]  # queries
+            + [24, 25, 26, 27]  # keys
+            + [
+                30,
+                31,
+                32,
+                33,
+            ]  # values
+        ),
+    ],
+    "gqa_to_gqa_slice_head": [
+        (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 8, 2, 1),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 2, 4, 6, 8, 10, 12, 14]  # queries
+            + [24, 26]  # keys
+            + [30, 32]  # values
+        ),
+    ],
+    "gqa_to_mqa": [
+        (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 4, 1, 2),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 1, 2, 3, 4, 5, 6, 7]  # queries
+            + [24, 25]  # keys
+            + [30, 31]  # values
+        ),
+    ],
+    "gqa_to_mqa_fewer_than_max_heads": [
+        (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 1, 2),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 1, 2, 3, 4, 5]  # queries
+            + [24, 25]  # keys
+            + [30, 31]  # values
+        ),
+    ],
+    "gqa_to_mqa_slice_head_fewer_than_max_heads": [
+        (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 1, 1),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 2, 4]  # queries
+            + [24]  # keys
+            + [30]  # values
+        ),
+    ],
+    "gqa_to_mha": [
+        (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 2, 2, 2),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 1, 2, 3]  # queries
+            + [24, 25, 26, 27]  # keys
+            + [
+                30,
+                31,
+                32,
+                33,
+            ]  # values
+        ),
+    ],
+    "gqa_to_mha_slice_head": [
+        (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 2, 2, 1),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 2]  # queries
+            + [24, 26]  # keys
+            + [30, 32]  # values
+        ),
+    ],
+    "mha_to_mha": [
+        (64, 4, 4, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 3, 2),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 1, 2, 3, 4, 5]  # queries
+            + [8, 9, 10, 11, 12, 13]  # keys
+            + [16, 17, 18, 19, 20, 21]  # values
+        ),
+    ],
+    "mha_to_mha_slice_head": [
+        (64, 4, 4, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 3, 1),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 2, 4]  # queries
+            + [8, 10, 12]  # keys
+            + [16, 18, 20]  # values
+        ),
+    ],
+    "mqa_to_mqa": [
+        (64, 4, 1, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 1, 2),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 1, 2, 3, 4, 5]  # queries
+            + [8, 9]  # keys
+            + [10, 11]  # values
+        ),
+    ],
+    "mqa_to_mqa_slice_head": [
+        (64, 4, 1, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 1, 1),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [
+                0,
+                2,
+                4,
+            ]  # queries
+            + [8]  # keys
+            + [10]  # values
+        ),
+    ],
+}
+
+
+@pytest.mark.parametrize("config_key", QKV_INDICES_TEST_CONFIGS.keys())
+def test_qkv_indices(config_key):
+    supernet_config, subnet_config, correct_indices = QKV_INDICES_TEST_CONFIGS[config_key]
+    n_embd, n_head, n_query_groups, head_size = supernet_config
+    config = Config(
+        n_embd=n_embd, n_head=n_head, n_query_groups=n_query_groups, head_size=head_size
+    )
+    attn = CausalSelfAttention(config, 2)
+
+    attn.set_sub_network(*subnet_config)
+
+    qkv_indices = attn.qkv_indices
+    assert qkv_indices is not None
+
+    _, sub_n_head, sub_n_query_groups, sub_head_size = subnet_config
+    assert qkv_indices.shape == (
+        (sub_n_head + 2 * sub_n_query_groups) * sub_head_size,
+    )  # (n heads + 2*num_groups)*head_size
+
+    correct_indices = torch.tensor(correct_indices)
+    assert torch.all(qkv_indices == correct_indices)
