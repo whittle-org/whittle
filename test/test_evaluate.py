@@ -56,14 +56,14 @@ def setup_checkpoint_dir(checkpoint_dir, sub_network_dir, checkpoint_mode):
         )
 
     elif checkpoint_mode == "whittle-sub-network":
-        sub_network_config = {
+        sub_network_conf = {
             "embed_dim": 2,
             "mlp_ratio": 1.5,
             "num_heads": 1,
             "depth": 1,
         }
         torch.save(
-            {"sub_network_config": sub_network_config, "parent_dir": checkpoint_dir},
+            {"sub_network_config": sub_network_conf, "parent_dir": checkpoint_dir},
             sub_network_dir / "lit_model.pth",
         )
 
