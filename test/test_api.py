@@ -366,6 +366,7 @@ class Test_WhittleLM:
         )
         gpt = copy_subnetwork_weights(gpt_14m, gpt)
         gpt.max_seq_length = config_14m.block_size
+        gpt.config.rope_n_elem = config_14m.rope_n_elem
         convert_and_evaluate(
             model=gpt,
             out_dir=out_dir,
