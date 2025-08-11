@@ -314,13 +314,13 @@ class Test_WhittleLM:
             device=str(device),
             dtype=torch.float32,
             limit=10,
-            tasks="piqa",
+            tasks="boolq",
             batch_size=1,  # Test for non-positive integer
         )
         with open(str(out_dir / "results.json")) as f:
             results = json.load(f)
-        acc_api = results["results"]["piqa"]["acc_norm,none"]
-        stderr_api = results["results"]["piqa"]["acc_stderr,none"]
+        acc_api = results["results"]["boolq"]["acc,none"]
+        stderr_api = results["results"]["boolq"]["acc_stderr,none"]
 
         module.convert_and_evaluate(
             checkpoint_dir,
@@ -328,14 +328,14 @@ class Test_WhittleLM:
             device=str(device),
             dtype=torch.float32,
             limit=10,
-            tasks="piqa",
+            tasks="boolq",
             force_conversion=True,
             batch_size=1,  # Test for non-positive integer
         )
         with open(str(out_dir / "results.json")) as f:
             results = json.load(f)
-        acc_lit = results["results"]["piqa"]["acc_norm,none"]
-        stderr_lit = results["results"]["piqa"]["acc_stderr,none"]
+        acc_lit = results["results"]["boolq"]["acc,none"]
+        stderr_lit = results["results"]["boolq"]["acc_stderr,none"]
         assert acc_api == acc_lit
         assert stderr_api == stderr_lit
 
@@ -372,13 +372,13 @@ class Test_WhittleLM:
             device=str(device),
             dtype=torch.float32,
             limit=10,
-            tasks="piqa",
+            tasks="boolq",
             batch_size=1,  # Test for non-positive integer
         )
         with open(str(out_dir / "results.json")) as f:
             results = json.load(f)
-        acc_api = results["results"]["piqa"]["acc_norm,none"]
-        stderr_api = results["results"]["piqa"]["acc_stderr,none"]
+        acc_api = results["results"]["boolq"]["acc,none"]
+        stderr_api = results["results"]["boolq"]["acc_stderr,none"]
 
         module.convert_and_evaluate(
             checkpoint_dir_14m,
@@ -386,13 +386,13 @@ class Test_WhittleLM:
             device=str(device),
             dtype=torch.float32,
             limit=10,
-            tasks="piqa",
+            tasks="boolq",
             force_conversion=True,
             batch_size=1,  # Test for non-positive integer
         )
         with open(str(out_dir / "results.json")) as f:
             results = json.load(f)
-        acc_lit = results["results"]["piqa"]["acc_norm,none"]
-        stderr_lit = results["results"]["piqa"]["acc_stderr,none"]
+        acc_lit = results["results"]["boolq"]["acc,none"]
+        stderr_lit = results["results"]["boolq"]["acc_stderr,none"]
         assert acc_api == acc_lit
         assert stderr_api == stderr_lit
