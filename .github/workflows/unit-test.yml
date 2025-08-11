@@ -27,8 +27,8 @@ jobs:
           enable-cache: true
           prune-cache: false
           cache-dependency-glob: "**/pyproject.toml"  
-      - name: Show installed Python packages
-        run: pip freeze
       - name: Run pytest
         run: uv run --all-extras sh -c "pip freeze && pytest -vvv"
+      - name: Show installed Python packages in uv
+        run: uv run --all-extras pip freeze
 
