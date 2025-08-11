@@ -314,13 +314,13 @@ class Test_WhittleLM:
             device=str(device),
             dtype=torch.float32,
             limit=10,
-            tasks="logiqa",
+            tasks="piqa",
             batch_size=1,  # Test for non-positive integer
         )
         with open(str(out_dir / "results.json")) as f:
             results = json.load(f)
-        acc_api = results["results"]["logiqa"]["acc,none"]
-        stderr_api = results["results"]["logiqa"]["acc_stderr,none"]
+        acc_api = results["results"]["piqa"]["acc_norm,none"]
+        stderr_api = results["results"]["piqa"]["acc_stderr,none"]
 
         module.convert_and_evaluate(
             checkpoint_dir,
