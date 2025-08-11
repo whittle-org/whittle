@@ -346,10 +346,11 @@ class Test_WhittleLM:
         config.fix_head_size = True
         config.model_type = "gpt"
         config.tie_embeddings = False
+        config_14m = Config.from_file(str(checkpoint_dir_14m / "model_config.yaml"))
+        config.rope_n_elem = config_14m.rope_n_elem
         gpt = GPT(config).to(device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
         gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
-        config_14m = Config.from_file(str(checkpoint_dir_14m / "model_config.yaml"))
         config_14m.fix_head_size = True
         config_14m.model_type = "gpt"
         config_14m.tie_embeddings = False
@@ -366,7 +367,6 @@ class Test_WhittleLM:
         )
         gpt = copy_subnetwork_weights(gpt_14m, gpt)
         gpt.max_seq_length = config_14m.block_size
-        gpt.config.rope_n_elem = config_14m.rope_n_elem
         convert_and_evaluate(
             model=gpt,
             out_dir=out_dir,
