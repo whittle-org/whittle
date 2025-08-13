@@ -45,7 +45,7 @@ from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
 from whittle.metrics.flops import compute_flops
-from whittle.metrics.profiler import DistributedGPUProfiler, create_profiler
+from whittle.metrics.profiler import DistributedGPUProfiler
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.sampling.random_sampler import RandomSampler
@@ -55,8 +55,6 @@ from whittle.training_strategies import (
     StandardStrategy,
 )
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
-
-torch.set_float32_matmul_precision("medium")  # trade-off precision for performance
 
 training_strategies_cls = {
     "sandwich": SandwichStrategy,
@@ -604,6 +602,8 @@ def main(
 
     profiler = None
     if enable_profiling:
+        from whittle.metrics.profiler import create_profiler
+
         try:
             profiler = create_profiler(
                 fabric=fabric,

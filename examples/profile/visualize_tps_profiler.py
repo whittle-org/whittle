@@ -55,7 +55,7 @@ COLORS = {
     "error_red": "#DC3545",
 }
 
-BAR_WIDTH = 0.2
+BAR_WIDTH = 0.8
 
 
 class GPUUtilizationAnalyzer:
