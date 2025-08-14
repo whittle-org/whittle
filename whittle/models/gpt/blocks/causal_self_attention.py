@@ -27,19 +27,18 @@ class CausalSelfAttention(nn.Module):
         )
         # disabled by default
         self.kv_cache: KVCache | None = None
-        self.apply_sliding_window_attention = (
-            config.sliding_window_size is not None
-            and block_idx % config.sliding_window_layer_stride == 0
-        )
+        self.apply_sliding_window_attention = False
+        if config.sliding_window_size is not None and config.sliding_window_indices is not None:
+            self.apply_sliding_window_attention = config.sliding_window_indices[block_idx]
         self.config = config
         self.block_idx = block_idx
         if config.norm_qk:
-            self.norm_q = config.norm_class(
-                config.head_size * config.n_head, eps=config.norm_eps
+            norm_q_size = config.n_head * config.head_size if config.norm_qk_type == "olmo2" else config.head_size
+            norm_k_size = (
+                config.n_query_groups * config.head_size if config.norm_qk_type == "olmo2" else config.head_size
             )
-            self.norm_k = config.norm_class(
-                config.head_size * config.n_query_groups, eps=config.norm_eps
-            )
+            self.norm_q = config.norm_class(norm_q_size, eps=config.norm_eps)
+            self.norm_k = config.norm_class(norm_k_size, eps=config.norm_eps)
         else:
             self.norm_q = self.norm_k = None
         # Set current sub-network to super-network

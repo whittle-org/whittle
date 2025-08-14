@@ -50,10 +50,9 @@ class CausalSelfAttention(BaseCausalSelfAttention):
         self.kv_cache: KVCache | None = None
 
         self.config = config
-        self.apply_sliding_window_attention = (
-            config.sliding_window_size is not None
-            and block_idx % config.sliding_window_layer_stride == 0
-        )
+        self.apply_sliding_window_attention = False
+        if config.sliding_window_size is not None and config.sliding_window_indices is not None:
+            self.apply_sliding_window_attention = config.sliding_window_indices[block_idx]
 
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
