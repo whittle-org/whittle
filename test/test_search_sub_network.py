@@ -3,7 +3,9 @@ from __future__ import annotations
 import os
 import pathlib
 from contextlib import redirect_stdout
+from datetime import datetime
 from io import StringIO
+from unittest import mock
 from unittest.mock import Mock
 
 import pytest
@@ -13,6 +15,7 @@ from litgpt.args import EvalArgs
 from litgpt.config import Config
 from litgpt.scripts.download import download_from_hub
 from litgpt.utils import lazy_load
+from syne_tune.backend.trial_status import Trial
 from torch.utils.data import DataLoader
 
 from whittle import search_sub_networks
@@ -30,7 +33,7 @@ def test_objective():
     dataloader = DataLoader(dataset)
     model = GPT(model_config)
 
-    sub_network_config = {"embed_dim": 2, "mlp_ratio": 1, "num_heads": 1, "depth": 1}
+    sub_network_config = {"embed_dim": 2, "mlp_ratio": 1, "num_heads": 2, "depth": 1}
     x, y = search_sub_networks._objective(
         config=sub_network_config,
         fabric=Fabric(devices=1),
@@ -77,16 +80,44 @@ def test_checkpoints(tmp_path, checkpoint_dir, copy_config_files, save_checkpoin
     out_dir = tmp_path / "out"
     stdout = StringIO()
     with redirect_stdout(stdout):
-        search_sub_networks.setup(
-            checkpoint_dir,
-            devices=1,
-            out_dir=out_dir,
-            search=SearchArgs(iterations=3),
-            eval=EvalArgs(interval=1, max_iters=1, final_validation=False),
-            save_checkpoints=save_checkpoints,
-            copy_config_files=copy_config_files,
-            verbose=False,
+        fixed_config = {
+            "sub_network_n_embd": 4,
+            "sub_network_intermediate_size": 93,
+            "sub_network_num_heads": 2,
+            "sub_network_n_layers": 2,
+        }
+        fixed_config_syne_tune = {
+            "embed_dim": 4,
+            "num_heads": 4,
+            "mlp_ratio": 4,
+            "depth": 6,
+        }
+        fixed_trial = Trial(
+            trial_id=1,
+            config=fixed_config_syne_tune,
+            creation_time=datetime.now(),
         )
+
+        with (
+            mock.patch(
+                "whittle.sampling.random_sampler.RandomSampler.sample",
+                return_value=fixed_config,
+            ),
+            mock.patch(
+                "whittle.search.ask_tell_scheduler.AskTellScheduler.ask",
+                return_value=fixed_trial,
+            ),
+        ):
+            search_sub_networks.setup(
+                checkpoint_dir,
+                devices=1,
+                out_dir=out_dir,
+                search=SearchArgs(iterations=3),
+                eval=EvalArgs(interval=1, max_iters=1, final_validation=False),
+                save_checkpoints=save_checkpoints,
+                copy_config_files=copy_config_files,
+                verbose=False,
+            )
 
     out_dir_contents = set(os.listdir(out_dir))
 
