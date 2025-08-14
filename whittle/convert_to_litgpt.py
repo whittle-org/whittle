@@ -73,8 +73,7 @@ def setup(
         # re-save the model if the required format is state_dict instead of {'model': state_dict}
         elif no_model_key:
             ckp = torch.load(
-                model_path, 
-                weights_only=False
+                model_path, weights_only=False
             )  # this time not lazy loading because we're re-saving the weights
             torch.save(ckp["model"], out_dir / "lit_model.pth")
 

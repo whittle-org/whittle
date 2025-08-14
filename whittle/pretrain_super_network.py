@@ -219,7 +219,7 @@ def setup(
         eval,
         optimizer,
         training_strategy,
-        num_nodes
+        num_nodes,
     )
 
 

@@ -149,7 +149,10 @@ class GPT(nn.Module):
             elif "factor" in self.config.rope_adjustments:
                 # linear RoPE
                 adjusted_params_required = ["factor"]
-                extra_config = {name: self.config.rope_adjustments[name] for name in adjusted_params_required}
+                extra_config = {
+                    name: self.config.rope_adjustments[name]
+                    for name in adjusted_params_required
+                }
             else:
                 # Some but not all parameters are specified; raise an error
                 missing_params = [

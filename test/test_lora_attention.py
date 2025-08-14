@@ -19,7 +19,7 @@ attention_configs = {
             n_query_groups=16,
             head_size=64,
             sliding_window_size=256,
-            sliding_window_indices=[1 if i % 2 == 0 else 0 for i in range(1)]
+            sliding_window_indices=[1 if i % 2 == 0 else 0 for i in range(1)],
         ),
         "fix_head_size": True,
     },
