@@ -3,16 +3,17 @@ from __future__ import annotations
 import math
 import pprint
 import time
+from dataclasses import asdict
 from datetime import timedelta
 from pathlib import Path
 from typing import Literal
-from dataclasses import asdict
+
 import lightning as L
 import torch
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
 from litgpt import Tokenizer
-from litgpt.args import EvalArgs, TrainArgs, LogArgs
+from litgpt.args import EvalArgs, LogArgs, TrainArgs
 from litgpt.config import name_to_config
 from litgpt.data import DataModule, TinyLlama
 from litgpt.model import Config
@@ -44,7 +45,6 @@ from syne_tune.config_space import lograndint, randint
 from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
-from whittle.metrics.flops import compute_flops
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.sampling.random_sampler import RandomSampler
@@ -273,9 +273,11 @@ def fit(
             "meta"
         )
 
-        model_fwd = lambda: meta_model(x)  # noqa: F821
+        def model_fwd():
+            return meta_model(x)  # noqa: F821
 
-        model_loss = lambda y: chunked_cross_entropy(y, x, chunk_size=0)  # noqa: F821
+        def model_loss(y):
+            return chunked_cross_entropy(y, x, chunk_size=0)  # noqa: F821
 
         measured_flops = measure_flops(meta_model, model_fwd, model_loss)
         del meta_model, x
