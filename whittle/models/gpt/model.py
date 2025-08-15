@@ -146,6 +146,13 @@ class GPT(nn.Module):
                     name: self.config.rope_adjustments[name]
                     for name in adjusted_params_required
                 }
+            elif "factor" in self.config.rope_adjustments:
+                # linear RoPE
+                adjusted_params_required = ["factor"]
+                extra_config = {
+                    name: self.config.rope_adjustments[name]
+                    for name in adjusted_params_required
+                }
             else:
                 # Some but not all parameters are specified; raise an error
                 missing_params = [
@@ -165,6 +172,7 @@ class GPT(nn.Module):
             condense_ratio=self.config.rope_condense_ratio,
             base=self.config.rope_base,
             extra_config=extra_config,
+            rope_local_base_freq=self.config.rope_local_base_freq,
         )
 
     def set_sub_network(

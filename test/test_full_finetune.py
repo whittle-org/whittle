@@ -14,6 +14,7 @@ import pytest
 import torch
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import Config
+from litgpt.data.alpaca import Alpaca
 from litgpt.utils import auto_download_checkpoint, check_valid_checkpoint_dir
 from torch.utils.data import DataLoader, Dataset
 
@@ -72,6 +73,7 @@ def test_training_strategies(
         optimizer="RMSprop",
         training_strategy=strategy,
         out_dir=tmp_path,
+        data=Alpaca(),
         train=TrainArgs(
             global_batch_size=2,
             epochs=5,  # Required by validate_args
@@ -111,6 +113,7 @@ def test_full_finetune(save_hyper_mock, tmp_path, accelerator_device, ensure_che
             MODEL_NAME,
             devices=1,
             out_dir=out_dir,
+            data=Alpaca(),
             train=TrainArgs(
                 global_batch_size=2,
                 epochs=5,  # Required by validate_args
