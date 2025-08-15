@@ -219,6 +219,7 @@ def setup(
         eval,
         optimizer,
         training_strategy,
+        num_nodes,
     )
 
 
@@ -245,6 +246,7 @@ def fit(
     train: TrainArgs,
     eval: EvalArgs,
     training_strategy: BaseTrainingStrategy,
+    num_nodes: int = 1,
 ) -> None:
     model = state["model"]
     optimizer = state["optimizer"]
@@ -291,7 +293,7 @@ def fit(
     fabric.barrier()
     total_t0 = time.perf_counter()
 
-    warmup_iters = train.warmup_iters(devices, max_iters, train_dataloader)
+    warmup_iters = train.warmup_iters(devices, num_nodes, max_iters, train_dataloader)
 
     for train_data in train_iterator:
         if state["iter_num"] >= max_iters:
@@ -446,6 +448,7 @@ def main(
     eval: EvalArgs,
     optimizer: str | dict,
     training_strategy: str,
+    num_nodes: int = 1,
 ) -> None:
     validate_args(train, eval, initial_checkpoint_dir, resume)
 
@@ -520,6 +523,7 @@ def main(
         train,
         eval,
         strategy,
+        num_nodes=num_nodes,
     )
 
     # Save final checkpoint
