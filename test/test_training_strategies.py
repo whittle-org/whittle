@@ -35,7 +35,7 @@ sampler_mlp = RandomSampler(
 loss_function = torch.nn.functional.mse_loss
 search_space_gpt = {
     "sub_network_n_embd": randint(1, 32),
-    "sub_network_num_heads": choice([2, 4]),
+    "sub_network_num_heads": choice([4]),
     "sub_network_intermediate_size": randint(1, 64),
     "sub_network_n_layers": randint(1, 2),
 }

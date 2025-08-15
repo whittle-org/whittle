@@ -34,24 +34,43 @@ def test_training_strategies(
     dataloader = DataLoader(dataset)
     pretrain_super_network.get_dataloaders = Mock(return_value=(dataloader, dataloader))
 
-    pretrain_super_network.setup(
-        model_name=MODEL_NAME,
-        devices=1,
-        optimizer="RMSprop",
-        training_strategy=strategy,
-        model_config=model_config,
-        out_dir=tmp_path,
-        train=TrainArgs(
-            global_batch_size=2,
-            max_tokens=16,
-            save_interval=1,
-            micro_batch_size=1,
-            max_norm=1.0,
-        ),
-        eval=EvalArgs(interval=1, max_iters=1, final_validation=False),
-        precision="32-true",  # Full precision for CPU compatibility
-        accelerator=accelerator_device,
-    )
+    fixed_config = {
+        "sub_network_n_embd": 4,
+        "sub_network_intermediate_size": 93,
+        "sub_network_num_heads": 2,
+        "sub_network_n_layers": 2,
+    }
+
+    min_config = {
+        "sub_network_n_embd": 4,
+        "sub_network_intermediate_size": 4,
+        "sub_network_num_heads": 2,
+        "sub_network_n_layers": 1,
+    }
+
+    _rs_str = "whittle.sampling.random_sampler.RandomSampler"
+    with (
+        mock.patch(f"{_rs_str}.sample", return_value=fixed_config),
+        mock.patch(f"{_rs_str}.get_smallest_sub_network", return_value=min_config),
+    ):
+        pretrain_super_network.setup(
+            model_name=MODEL_NAME,
+            devices=1,
+            optimizer="RMSprop",
+            training_strategy=strategy,
+            model_config=model_config,
+            out_dir=tmp_path,
+            train=TrainArgs(
+                global_batch_size=2,
+                max_tokens=16,
+                save_interval=1,
+                micro_batch_size=1,
+                max_norm=1.0,
+            ),
+            eval=EvalArgs(interval=1, max_iters=1, final_validation=False),
+            precision="32-true",  # Full precision for CPU compatibility
+            accelerator=accelerator_device,
+        )
 
     save_hyperparameters_mock.assert_called()
 
@@ -74,22 +93,41 @@ def test_pretrain(save_hyperparameters_mock, tmp_path, accelerator_device):
     out_dir = tmp_path / "out"
     stdout = StringIO()
     with redirect_stdout(stdout):
-        pretrain_super_network.setup(
-            model_name=MODEL_NAME,
-            devices=1,
-            model_config=model_config,
-            out_dir=out_dir,
-            train=TrainArgs(
-                global_batch_size=2,
-                max_tokens=16,
-                save_interval=1,
-                micro_batch_size=1,
-                max_norm=1.0,
-            ),
-            eval=EvalArgs(interval=1, max_iters=1, final_validation=False),
-            precision="32-true",
-            accelerator=accelerator_device,
-        )
+        fixed_config = {
+            "sub_network_n_embd": 4,
+            "sub_network_intermediate_size": 93,
+            "sub_network_num_heads": 4,
+            "sub_network_n_layers": 2,
+        }
+
+        min_config = {
+            "sub_network_n_embd": 4,
+            "sub_network_intermediate_size": 4,
+            "sub_network_num_heads": 4,
+            "sub_network_n_layers": 1,
+        }
+
+        _rs_str = "whittle.sampling.random_sampler.RandomSampler"
+        with (
+            mock.patch(f"{_rs_str}.sample", return_value=fixed_config),
+            mock.patch(f"{_rs_str}.get_smallest_sub_network", return_value=min_config),
+        ):
+            pretrain_super_network.setup(
+                model_name=MODEL_NAME,
+                devices=1,
+                model_config=model_config,
+                out_dir=out_dir,
+                train=TrainArgs(
+                    global_batch_size=2,
+                    max_tokens=16,
+                    save_interval=1,
+                    micro_batch_size=1,
+                    max_norm=1.0,
+                ),
+                eval=EvalArgs(interval=1, max_iters=1, final_validation=False),
+                precision="32-true",
+                accelerator=accelerator_device,
+            )
 
     # tmp_path is not the same across all ranks, run assert only on rank 0
     out_dir_contents = set(os.listdir(out_dir))
