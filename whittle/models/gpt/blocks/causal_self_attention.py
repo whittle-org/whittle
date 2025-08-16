@@ -125,7 +125,6 @@ class CausalSelfAttention(nn.Module):
         sub_head_size = self.sub_network_head_size
         sub_q_groups = self.sub_network_query_groups
         sub_q_per_kv = self.sub_network_q_per_kv
-        sub_heads_per_group = sub_n_head // sub_q_groups
 
         # Get the attention type of the supernet:
         # multi-head, multi query, or grouped query attention
@@ -154,36 +153,63 @@ class CausalSelfAttention(nn.Module):
         # The q, k and v parts are sliced out according to the attention type
         # of the sub-network
         if sub_n_head == sub_q_groups:  # multi-head attention
-            for i in range(sub_n_head):
-                q_start = q_block_start + i * head_size
-                k_start = k_block_start + i * head_size
-                v_start = v_block_start + i * head_size
-                q_parts.append(torch.arange(q_start, q_start + sub_head_size))
-                k_parts.append(torch.arange(k_start, k_start + sub_head_size))
-                v_parts.append(torch.arange(v_start, v_start + sub_head_size))
+            head_offsets = (
+                torch.arange(sub_n_head)[:, None] * head_size
+            )  # (sub_n_head, 1)
+            q_head_indices = torch.arange(sub_head_size)  # (sub_head_size,)
+            q_parts = (
+                q_block_start + head_offsets + q_head_indices
+            )  # (sub_n_head, sub_head_size)
+            k_parts = (
+                k_block_start + head_offsets + q_head_indices
+            )  # (sub_n_head, sub_head_size)
+            v_parts = (
+                v_block_start + head_offsets + q_head_indices
+            )  # (sub_n_head, sub_head_size)
 
         elif sub_q_groups == 1:  # multi-query attention
-            for i in range(sub_n_head):
-                q_start = q_block_start + i * head_size
-                q_parts.append(torch.arange(q_start, q_start + sub_head_size))
+            head_offsets = (
+                torch.arange(sub_n_head)[:, None] * head_size
+            )  # (sub_n_head, 1)
+            q_head_indices = torch.arange(sub_head_size)  # (sub_head_size, )
+            kv_head_indices = torch.arange(sub_head_size)[None, :]  # (1, sub_head_size)
 
-            k_parts.append(torch.arange(k_block_start, k_block_start + sub_head_size))
-            v_parts.append(torch.arange(v_block_start, v_block_start + sub_head_size))
+            q_parts = (
+                q_block_start + head_offsets + q_head_indices
+            )  # (sub_n_head, sub_head_size)
+            k_parts = k_block_start + kv_head_indices  # (1, sub_head_size)
+            v_parts = v_block_start + kv_head_indices  # (1, sub_head_size)
 
         else:  # grouped query attention
-            for g in range(sub_q_groups):
-                for h in range(sub_q_per_kv):
-                    q_head_index = g * sub_heads_per_group + h
-                    q_start = q_block_start + q_head_index * head_size
-                    q_parts.append(torch.arange(q_start, q_start + sub_head_size))
+            supernet_q_per_kv = n_head // n_query_groups
+            sub_q_group_offsets = (
+                torch.arange(sub_q_groups)[:, None] * supernet_q_per_kv * head_size
+            )  # (sub_q_groups, 1)
+            sub_q_per_kv_offsets = (
+                torch.arange(sub_q_per_kv) * head_size
+            )  # (sub_q_per_kv,)
+            q_offsets = (sub_q_group_offsets + sub_q_per_kv_offsets).view(
+                -1, 1
+            )  # (sub_q_groups * sub_q_per_kv, 1)
+            q_parts = (q_offsets + torch.arange(sub_head_size)).view(
+                -1
+            )  # (sub_q_groups * sub_q_per_kv,)
 
-                k_start = k_block_start + g * head_size
-                k_parts.append(torch.arange(k_start, k_start + sub_head_size))
+            kv_head_offsets = (
+                torch.arange(sub_q_groups)[:, None] * head_size
+            )  # (sub_q_groups, 1)
+            kv_head_indices = torch.arange(sub_head_size)  # (sub_head_size, )
+            k_parts = (
+                k_block_start + kv_head_offsets + kv_head_indices
+            )  # (sub_q_groups, sub_head_size)
+            v_parts = (
+                v_block_start + kv_head_offsets + kv_head_indices
+            )  # (sub_q_groups, sub_head_size)
 
-                v_start = v_block_start + g * head_size
-                v_parts.append(torch.arange(v_start, v_start + sub_head_size))
+            k_parts = k_parts.view(-1)  # (sub_q_groups * sub_head_size,)
+            v_parts = v_parts.view(-1)  # (sub_q_groups * sub_head_size,)
 
-        qkv = torch.cat(q_parts + k_parts + v_parts)
+        qkv = torch.cat((q_parts, k_parts, v_parts), dim=0).view(-1)
         return qkv
 
     def _update_sub_network(
@@ -272,7 +298,7 @@ class CausalSelfAttention(nn.Module):
         self.qkv_indices = self.get_qkv_indices()
         self.proj_indices = self.qkv_indices[
             : torch.searchsorted(
-                self.qkv_indices, sub_network_n_head * self.config.head_size, right=False
+                self.qkv_indices, self.config.n_head * self.config.head_size, right=False
             )
         ]
 
