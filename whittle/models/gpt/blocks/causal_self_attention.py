@@ -125,7 +125,7 @@ class CausalSelfAttention(nn.Module):
         sub_head_size = self.sub_network_head_size
         sub_q_groups = self.sub_network_query_groups
         sub_q_per_kv = self.sub_network_q_per_kv
-        sub_heads_per_group = sub_n_head // sub_q_groups
+        heads_per_group = n_head // n_query_groups
 
         # Get the attention type of the supernet:
         # multi-head, multi query, or grouped query attention
@@ -173,7 +173,7 @@ class CausalSelfAttention(nn.Module):
         else:  # grouped query attention
             for g in range(sub_q_groups):
                 for h in range(sub_q_per_kv):
-                    q_head_index = g * sub_heads_per_group + h
+                    q_head_index = g * heads_per_group + h
                     q_start = q_block_start + q_head_index * head_size
                     q_parts.append(torch.arange(q_start, q_start + sub_head_size))
 
@@ -272,7 +272,7 @@ class CausalSelfAttention(nn.Module):
         self.qkv_indices = self.get_qkv_indices()
         self.proj_indices = self.qkv_indices[
             : torch.searchsorted(
-                self.qkv_indices, sub_network_n_head * self.config.head_size, right=False
+                self.qkv_indices, self.config.n_head * self.config.head_size, right=False
             )
         ]
 
