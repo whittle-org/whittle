@@ -192,6 +192,15 @@ QKV_INDICES_TEST_CONFIGS = {
             ]  # values
         ),
     ],
+    "gqa_to_gqa_2": [
+        (64, 16, 4, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 6, 3, 1),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 2, 8, 10, 16, 18]  # queries
+            + [32, 34, 36]  # keys
+            + [40, 42, 44]  # values
+        ),
+    ],
     "gqa_to_gqa_slice_head": [
         (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
         (64, 8, 2, 1),  # subnet    n_embd, n_head, query_groups, head_size
