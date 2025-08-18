@@ -33,19 +33,31 @@ class Embedding(torch.nn.Embedding):
 
         # the embedding dimensionality of the current sub-network
         self.sub_network_embedding_dim: int | None = embedding_dim
+        self.sampled_embd_dim_indices: list[int] | None = None
 
-    def set_sub_network(self, sub_network_embedding_dim: int):
+    def set_sub_network(
+        self,
+        sub_network_embedding_dim: int,
+        sampled_embd_dim_indices: list[int] | None = None,
+    ):
         """Set the embedding dimensionality of the current sub-network."""
         self.sub_network_embedding_dim = sub_network_embedding_dim
+        self.sampled_embd_dim_indices = sampled_embd_dim_indices
 
     def reset_super_network(self):
         """Reset the embedding dimensionality of the current sub-network to the super-network dimensionality"""
         self.sub_network_embedding_dim = self.embedding_dim
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        weight = (
+            self.weight[:, self.sampled_embd_dim_indices]
+            if self.sampled_embd_dim_indices is not None
+            else self.weight[:, : self.sub_network_embedding_dim]
+        )
+
         return F.embedding(
             x,
-            self.weight[:, : self.sub_network_embedding_dim],
+            weight,
             self.padding_idx,
             self.max_norm,
             self.norm_type,

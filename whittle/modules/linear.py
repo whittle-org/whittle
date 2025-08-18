@@ -22,13 +22,21 @@ class Linear(nn.Linear):
         self.sub_network_in_features = in_features
         self.sub_network_out_features = out_features
         self.use_bias = bias
+        self.sampled_in_indices: list[int] | None = None
+        self.sampled_out_indices: list[int] | None = None
 
     def set_sub_network(
-        self, sub_network_in_features: int, sub_network_out_features: int
+        self,
+        sub_network_in_features: int,
+        sub_network_out_features: int,
+        sampled_in_indices: list[int] | None = None,
+        sampled_out_indices: list[int] | None = None,
     ):
         """Set the linear transformation dimensions of the current sub-network."""
         self.sub_network_in_features = sub_network_in_features
         self.sub_network_out_features = sub_network_out_features
+        self.sampled_in_indices = sampled_in_indices
+        self.sampled_out_indices = sampled_out_indices
 
     def reset_super_network(self):
         """Reset the linear transformation dimensions of the current sub-network to the super-network dimensionality."""
@@ -36,21 +44,21 @@ class Linear(nn.Linear):
         self.sub_network_out_features = self.out_features
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if self.use_bias:
-            return F.linear(
-                x,
-                self.weight[
-                    : self.sub_network_out_features, : self.sub_network_in_features
-                ],
-                self.bias[: self.sub_network_out_features],
-            )
-        else:
-            return F.linear(
-                x,
-                self.weight[
-                    : self.sub_network_out_features, : self.sub_network_in_features
-                ],
-            )
+        out_idx = (
+            self.sampled_out_indices
+            if self.sampled_out_indices is not None
+            else slice(0, self.sub_network_out_features)
+        )
+        in_idx = (
+            self.sampled_in_indices
+            if self.sampled_in_indices is not None
+            else slice(0, self.sub_network_in_features)
+        )
+
+        W = self.weight[out_idx][:, in_idx]
+        b = self.bias[out_idx] if self.use_bias else None
+
+        return F.linear(x, W, b)
 
 
 class LinearQKV(nn.Linear):
