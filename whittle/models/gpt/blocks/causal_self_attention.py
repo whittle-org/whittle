@@ -10,7 +10,7 @@ from litgpt.model import KVCache, apply_rope, do_softcapping
 from litgpt.scripts.convert_hf_checkpoint import qkv_reassemble
 
 from whittle.exceptions import IllegalSubNetworkError
-from whittle.modules import LinearProj, LinearQKV
+from whittle.modules import Linear
 
 
 class CausalSelfAttention(nn.Module):
@@ -20,10 +20,10 @@ class CausalSelfAttention(nn.Module):
         super().__init__()
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
-        self.qkv = LinearQKV(config.n_embd, shape, bias=config.bias or config.attn_bias)
+        self.qkv = Linear(config.n_embd, shape, bias=config.bias or config.attn_bias)
         # output projection
         # if `head_size` is explicitly specified in the config, `n_emd` might not be equal to `head_size * n_head`
-        self.proj = LinearProj(
+        self.proj = Linear(
             config.head_size * config.n_head, config.n_embd, bias=config.bias
         )
         # disabled by default
@@ -116,7 +116,7 @@ class CausalSelfAttention(nn.Module):
                 f"subnet number of query groups ({subnet_n_query_groups}) for GQA"
             )
 
-    def get_qkv_indices(self):
+    def get_qkv_indices(self, *args):  # TODO: FIX
         head_size = self.config.head_size
         n_head = self.config.n_head
         n_query_groups = self.config.n_query_groups
@@ -254,6 +254,10 @@ class CausalSelfAttention(nn.Module):
         sub_network_n_head: int,
         sub_network_query_groups: int,
         sub_network_head_size: int,
+        sampled_head_indices: list[int] | None = None,
+        sampled_embd_indices: list[int] | None = None,
+        sampled_head_size_indices: list[int] | None = None,
+        sampled_query_groups_indices: list[int] | None = None,
     ):
         """
         Sets the CausalSelfAttention block to the specified sub-network dimensionality.
@@ -299,7 +303,11 @@ class CausalSelfAttention(nn.Module):
         self.sub_network_q_per_kv = int(q_per_kv)
 
         # Get indices of the query, key, and value projections
-        self.qkv_indices = self.get_qkv_indices()
+        self.qkv_indices = self.get_qkv_indices(
+            sampled_head_indices,
+            sampled_query_groups_indices,
+            sampled_head_size_indices,
+        )
         self.proj_indices = self.qkv_indices[
             : torch.searchsorted(
                 self.qkv_indices, self.config.n_head * self.config.head_size, right=False
@@ -310,18 +318,16 @@ class CausalSelfAttention(nn.Module):
         self.qkv.set_sub_network(
             self.sub_network_n_embd,
             self.sub_network_qkv_shape,
-            qkv_indices=self.qkv_indices,
-            sub_network_n_head=self.sub_network_n_head,
-            sub_network_query_groups=self.sub_network_query_groups,
-            sub_network_head_size=self.sub_network_head_size,
-            sub_network_q_per_kv=self.q_per_kv,
+            sampled_in_indices=sampled_embd_indices,
+            sampled_out_indices=self.qkv_indices,
         )
         self.proj.set_sub_network(
             self.sub_network_head_size
             * self.sub_network_query_groups
             * self.sub_network_q_per_kv,
             self.sub_network_n_embd,
-            self.proj_indices,
+            sampled_in_indices=self.proj_indices,
+            sampled_out_indices=sampled_embd_indices,
         )
 
         # If normalization is enabled, set the sub-network dimensions for the normalization layers
