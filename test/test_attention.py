@@ -241,7 +241,7 @@ QKV_INDICES_TEST_CONFIGS = {
         (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
         (64, 2, 2, 2),  # subnet    n_embd, n_head, query_groups, head_size
         (
-            [0, 1, 2, 3]  # queries
+            [0, 1, 8, 9]  # queries
             + [24, 25, 26, 27]  # keys
             + [
                 30,
@@ -255,7 +255,7 @@ QKV_INDICES_TEST_CONFIGS = {
         (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
         (64, 2, 2, 1),  # subnet    n_embd, n_head, query_groups, head_size
         (
-            [0, 2]  # queries
+            [0, 8]  # queries
             + [24, 26]  # keys
             + [30, 32]  # values
         ),

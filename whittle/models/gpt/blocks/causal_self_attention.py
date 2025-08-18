@@ -120,6 +120,7 @@ class CausalSelfAttention(nn.Module):
         head_size = self.config.head_size
         n_head = self.config.n_head
         n_query_groups = self.config.n_query_groups
+        supernet_q_per_kv = n_head // n_query_groups
 
         sub_n_head = self.sub_network_n_head
         sub_head_size = self.sub_network_head_size
@@ -153,18 +154,22 @@ class CausalSelfAttention(nn.Module):
         # The q, k and v parts are sliced out according to the attention type
         # of the sub-network
         if sub_n_head == sub_q_groups:  # multi-head attention
-            head_offsets = (
+            query_head_offsets = (
+                torch.arange(sub_n_head)[:, None] * supernet_q_per_kv * head_size
+            )  # (sub_n_head, 1)
+            kv_head_offsets = (
                 torch.arange(sub_n_head)[:, None] * head_size
             )  # (sub_n_head, 1)
+
             q_head_indices = torch.arange(sub_head_size)  # (sub_head_size,)
             q_parts = (
-                q_block_start + head_offsets + q_head_indices
+                q_block_start + query_head_offsets + q_head_indices
             )  # (sub_n_head, sub_head_size)
             k_parts = (
-                k_block_start + head_offsets + q_head_indices
+                k_block_start + kv_head_offsets + q_head_indices
             )  # (sub_n_head, sub_head_size)
             v_parts = (
-                v_block_start + head_offsets + q_head_indices
+                v_block_start + kv_head_offsets + q_head_indices
             )  # (sub_n_head, sub_head_size)
 
         elif sub_q_groups == 1:  # multi-query attention
@@ -181,7 +186,6 @@ class CausalSelfAttention(nn.Module):
             v_parts = v_block_start + kv_head_indices  # (1, sub_head_size)
 
         else:  # grouped query attention
-            supernet_q_per_kv = n_head // n_query_groups
             sub_q_group_offsets = (
                 torch.arange(sub_q_groups)[:, None] * supernet_q_per_kv * head_size
             )  # (sub_q_groups, 1)
