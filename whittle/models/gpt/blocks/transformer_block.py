@@ -71,6 +71,11 @@ class Block(litgpt.model.Block):
         sub_network_num_heads: int,
         sub_network_query_groups: int,
         sub_network_head_size: int,
+        sampled_intermediate_indices: list[int] | None = None,
+        sampled_head_indices: list[int] | None = None,
+        sampled_query_group_indices: list[int] | None = None,
+        sampled_head_size_indices: list[int] | None = None,
+        sampled_embd_indices: list[int] | None = None,
     ) -> None:
         """
         Set the Block to the specified sub-network dimensionality.
@@ -85,26 +90,37 @@ class Block(litgpt.model.Block):
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
-        self.norm_1.set_sub_network(self.sub_network_n_embd)
+        self.norm_1.set_sub_network(self.sub_network_n_embd, sampled_embd_indices)
         self.attn.set_sub_network(
             self.sub_network_n_embd,
             self.sub_network_num_heads,
             sub_network_query_groups,
             sub_network_head_size,
+            sampled_head_indices,
+            sampled_embd_indices,
+            sampled_head_size_indices,
+            sampled_query_group_indices,
         )
         if isinstance(self.post_attention_norm, LayerNorm) or isinstance(
             self.post_attention_norm, RMSNorm
         ):
-            self.post_attention_norm.set_sub_network(self.sub_network_n_embd)
+            self.post_attention_norm.set_sub_network(
+                self.sub_network_n_embd, sampled_embd_indices
+            )
         if not self.config.shared_attention_norm and self.norm_2 is not None:
-            self.norm_2.set_sub_network(self.sub_network_n_embd)
+            self.norm_2.set_sub_network(self.sub_network_n_embd, sampled_embd_indices)
         self.mlp.set_sub_network(
-            self.sub_network_n_embd, self.sub_network_intermediate_size
+            self.sub_network_n_embd,
+            self.sub_network_intermediate_size,
+            sampled_intermediate_indices,
+            sampled_embd_indices,
         )
         if isinstance(self.post_mlp_norm, LayerNorm) or isinstance(
             self.post_mlp_norm, RMSNorm
         ):
-            self.post_mlp_norm.set_sub_network(self.sub_network_n_embd)
+            self.post_mlp_norm.set_sub_network(
+                self.sub_network_n_embd, sampled_embd_indices
+            )
 
     def reset_super_network(self):
         """
