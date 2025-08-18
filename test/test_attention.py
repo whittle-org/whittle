@@ -192,6 +192,15 @@ QKV_INDICES_TEST_CONFIGS = {
             ]  # values
         ),
     ],
+    "gqa_to_gqa_slice_head": [
+        (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 8, 2, 1),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 2, 4, 6, 8, 10, 12, 14]  # queries
+            + [24, 26]  # keys
+            + [30, 32]  # values
+        ),
+    ],
     "gqa_to_gqa_2": [
         (64, 16, 4, 2),  # supernet  n_embd, n_head, query_groups, head_size
         (64, 6, 3, 1),  # subnet    n_embd, n_head, query_groups, head_size
@@ -201,11 +210,39 @@ QKV_INDICES_TEST_CONFIGS = {
             + [40, 42, 44]  # values
         ),
     ],
-    "gqa_to_gqa_slice_head": [
+    "gqa_to_gqa_3": [
         (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
-        (64, 8, 2, 1),  # subnet    n_embd, n_head, query_groups, head_size
+        (64, 6, 2, 2),  # subnet    n_embd, n_head, query_groups, head_size
         (
-            [0, 2, 4, 6, 8, 10, 12, 14]  # queries
+            [0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13]  # queries
+            + [24, 25, 26, 27]  # keys
+            + [
+                30,
+                31,
+                32,
+                33,
+            ]  # values
+        ),
+    ],
+    "gqa_to_gqa_4": [
+        (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 4, 2, 2),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 1, 2, 3, 8, 9, 10, 11]  # queries
+            + [24, 25, 26, 27]  # keys
+            + [
+                30,
+                31,
+                32,
+                33,
+            ]  # values
+        ),
+    ],
+    "gqa_to_gqa_4_slice_head": [
+        (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 4, 2, 1),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 2, 8, 10]  # queries
             + [24, 26]  # keys
             + [30, 32]  # values
         ),
@@ -241,7 +278,7 @@ QKV_INDICES_TEST_CONFIGS = {
         (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
         (64, 2, 2, 2),  # subnet    n_embd, n_head, query_groups, head_size
         (
-            [0, 1, 2, 3]  # queries
+            [0, 1, 8, 9]  # queries
             + [24, 25, 26, 27]  # keys
             + [
                 30,
@@ -255,7 +292,7 @@ QKV_INDICES_TEST_CONFIGS = {
         (64, 12, 3, 2),  # supernet  n_embd, n_head, query_groups, head_size
         (64, 2, 2, 1),  # subnet    n_embd, n_head, query_groups, head_size
         (
-            [0, 2]  # queries
+            [0, 8]  # queries
             + [24, 26]  # keys
             + [30, 32]  # values
         ),
@@ -291,11 +328,7 @@ QKV_INDICES_TEST_CONFIGS = {
         (64, 4, 1, 2),  # supernet  n_embd, n_head, query_groups, head_size
         (64, 3, 1, 1),  # subnet    n_embd, n_head, query_groups, head_size
         (
-            [
-                0,
-                2,
-                4,
-            ]  # queries
+            [0, 2, 4]  # queries
             + [8]  # keys
             + [10]  # values
         ),
