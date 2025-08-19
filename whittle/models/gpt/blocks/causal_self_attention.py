@@ -228,28 +228,44 @@ class CausalSelfAttention(nn.Module):
             v_parts = v_block_start + kv_group_offset + head_size_indices[None, :]   # (1, sub_head_size)
 
         else:  # grouped query attention
+            if sampled_query_groups_indices is None:
+                query_group_indices = torch.arange(sub_q_groups)
+            else:
+                query_group_indices = torch.tensor(sampled_query_groups_indices)
+
             sub_q_group_offsets = (
-                torch.arange(sub_q_groups)[:, None] * supernet_q_per_kv * head_size
+                query_group_indices[:, None] * supernet_q_per_kv * head_size
             )  # (sub_q_groups, 1)
+
+            if sampled_head_indices is None:
+                per_kv_head_indices = torch.arange(sub_q_per_kv)
+            else:
+                per_kv_head_indices = torch.tensor(sampled_head_indices)
+
             sub_q_per_kv_offsets = (
-                torch.arange(sub_q_per_kv) * head_size
+                per_kv_head_indices * head_size
             )  # (sub_q_per_kv,)
             q_offsets = (sub_q_group_offsets + sub_q_per_kv_offsets).view(
                 -1, 1
             )  # (sub_q_groups * sub_q_per_kv, 1)
-            q_parts = (q_offsets + torch.arange(sub_head_size)).view(
+
+            if sampled_head_size_indices is None:
+                head_size_indices = torch.arange(sub_head_size)
+            else:
+                head_size_indices = torch.tensor(sampled_head_size_indices)
+
+            q_parts = (q_offsets + head_size_indices).view(
                 -1
             )  # (sub_q_groups * sub_q_per_kv,)
 
             kv_head_offsets = (
-                torch.arange(sub_q_groups)[:, None] * head_size
+                query_group_indices[:, None] * head_size
             )  # (sub_q_groups, 1)
-            kv_head_indices = torch.arange(sub_head_size)  # (sub_head_size, )
             k_parts = (
-                k_block_start + kv_head_offsets + kv_head_indices
+                k_block_start + kv_head_offsets + head_size_indices
             )  # (sub_q_groups, sub_head_size)
             v_parts = (
-                v_block_start + kv_head_offsets + kv_head_indices
+                v_block_start + kv_head_offsets + head_size_indices
             )  # (sub_q_groups, sub_head_size)
 
             k_parts = k_parts.view(-1)  # (sub_q_groups * sub_head_size,)
