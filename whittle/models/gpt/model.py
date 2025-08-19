@@ -58,7 +58,12 @@ class GPT(nn.Module):
         self.config.is_encoder_decoder = False
         self.main_input_name = "input_pos"
         self._supports_cache_class = True
-
+        self.sampled_intermediate_indices = None
+        self.sampled_head_indices = None
+        self.sampled_query_group_indices = None
+        self.sampled_head_size_indices = None
+        self.sampled_layer_indices = None
+        self.sampled_embd_indices = None
         # self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
 
     @property
@@ -175,6 +180,31 @@ class GPT(nn.Module):
             rope_local_base_freq=self.config.rope_local_base_freq,
         )
 
+    def set_block_config(self, block, i):
+        def is_none_or_list_of_ints(obj):
+            if obj is None:
+                return True
+            return isinstance(obj, list) and all(isinstance(x, int) for x in obj)
+
+        def get_val(val, _type):
+            if _type == int:
+                return val if isinstance(val, int) else val[i]
+            elif _type == list:
+                return val if is_none_or_list_of_ints(val) else val[i]
+
+        block.set_sub_network(
+            self.sub_network_n_embd,
+            get_val(self.sub_network_intermediate_size, int),
+            get_val(self.sub_network_num_heads, int),
+            get_val(self.sub_network_query_groups, int),
+            get_val(self.sub_network_head_size, int),
+            get_val(self.sampled_intermediate_indices, list),
+            get_val(self.sampled_head_indices, list),
+            get_val(self.sampled_query_group_indices, list),
+            get_val(self.sampled_head_size_indices, list),
+            self.sampled_embd_indices,
+        )
+
     def set_sub_network(
         self,
         sub_network_n_embd: int,
@@ -183,6 +213,13 @@ class GPT(nn.Module):
         sub_network_n_layers: int,
         sub_network_query_groups: int | None = None,
         sub_network_head_size: int | None = None,
+        sampled_intermediate_indices: list[int] | list[list] = None,
+        sampled_head_indices: list[int] | list[list] = None,
+        sampled_query_group_indices: list[int] | list[list] = None,
+        sampled_head_size_indices: list[int] | list[list] = None,
+        sampled_layer_indices: list[int] | None = None,
+        sampled_embd_indices: list[int] | None = None,
+        sub_network_n_blocks: int | None = None,
     ) -> None:
         """
         Sets the GPT model to the specified sub-network dimensionality.
@@ -200,8 +237,21 @@ class GPT(nn.Module):
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
         self.sub_network_n_layers = sub_network_n_layers
-        self.transformer.wte.set_sub_network(self.sub_network_n_embd)
-        self.transformer.ln_f.set_sub_network(self.sub_network_n_embd)
+        self.sampled_intermediate_indices = sampled_intermediate_indices
+        self.sampled_head_indices = sampled_head_indices
+        self.sampled_query_group_indices = sampled_query_group_indices
+        self.sampled_head_size_indices = sampled_head_size_indices
+        self.sampled_layer_indices = sampled_layer_indices
+        self.sampled_embd_indices = sampled_embd_indices
+        self.sub_network_n_blocks = sub_network_n_blocks
+
+        self.transformer.wte.set_sub_network(
+            self.sub_network_n_embd, sampled_embd_indices
+        )
+        self.transformer.ln_f.set_sub_network(
+            self.sub_network_n_embd, sampled_embd_indices
+        )
+
         self.sub_network_query_groups = (
             sub_network_query_groups
             if sub_network_query_groups is not None
@@ -220,21 +270,24 @@ class GPT(nn.Module):
                 self.sub_network_head_size = (
                     self.sub_network_n_embd // self.sub_network_num_heads
                 )
-        for i in range(self.sub_network_n_layers):
-            block = self.transformer.h[i]
-            block.set_sub_network(
-                self.sub_network_n_embd,
-                self.sub_network_intermediate_size,
-                self.sub_network_num_heads,
-                self.sub_network_query_groups,
-                self.sub_network_head_size,
-            )
+
+        if sampled_layer_indices is not None:
+            for i, j in enumerate(sampled_layer_indices):
+                block = self.transformer.h[j]
+                self.set_block_config(block, i)
+        else:
+            for i in range(self.sub_network_n_layers):
+                block = self.transformer.h[i]
+                self.set_block_config(block, i)
+
         # these change inside causal_self_attention
         if self.sub_network_n_layers > 0:
             self.sub_network_query_groups = block.attn.sub_network_query_groups
 
         self.lm_head.set_sub_network(
-            self.sub_network_n_embd, self.config.padded_vocab_size
+            self.sub_network_n_embd,
+            self.config.padded_vocab_size,
+            sampled_embd_indices,
         )
 
         # change the rope cache to match n_elem induced by subnet head size
