@@ -156,7 +156,7 @@ class CausalSelfAttention(nn.Module):
 
         q_parts, k_parts, v_parts = [], [], []
 
-        query_group_indices = torch.arange(sub_n_head) if sampled_query_groups_indices is None else torch.tensor(sampled_query_groups_indices)
+        query_group_indices = torch.arange(sub_q_groups) if sampled_query_groups_indices is None else torch.tensor(sampled_query_groups_indices)
         head_size_indices = torch.arange(sub_head_size) if sampled_head_size_indices is None else torch.tensor(sampled_head_size_indices)
 
         # The q, k and v parts are sliced out according to the attention type
