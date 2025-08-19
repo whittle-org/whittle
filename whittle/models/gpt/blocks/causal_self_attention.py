@@ -197,17 +197,35 @@ class CausalSelfAttention(nn.Module):
             )  # (sub_n_head, sub_head_size)
 
         elif sub_q_groups == 1:  # multi-query attention
-            head_offsets = (
-                torch.arange(sub_n_head)[:, None] * head_size
-            )  # (sub_n_head, 1)
-            q_head_indices = torch.arange(sub_head_size)  # (sub_head_size, )
-            kv_head_indices = torch.arange(sub_head_size)[None, :]  # (1, sub_head_size)
+            if sampled_query_groups_indices is None:
+                query_group_idx = 0
+            else:
+                if len(sampled_query_groups_indices) > 1:
+                    raise IllegalSubNetworkError(
+                        f"len(sampled_query_groups_indices) ({len(sampled_query_groups_indices)}) "
+                        f"cannot be greater than 1 for an attention block when the target "
+                        f"subnetwork is a multi query attention (MQA)"
+                    )
+                query_group_idx = sampled_query_groups_indices[0]
+
+            query_group_offset = query_group_idx * supernet_q_per_kv * head_size
+            kv_group_offset = query_group_idx * head_size
+
+            if sampled_head_indices is None:
+                query_head_indices = torch.arange(sub_n_head) * head_size
+            else:
+                query_head_indices = torch.tensor(sampled_head_indices) * head_size
+
+            if sampled_head_size_indices is None:
+                head_size_indices = torch.arange(sub_head_size)
+            else:
+                head_size_indices = torch.tensor(sampled_head_size_indices)
 
             q_parts = (
-                q_block_start + head_offsets + q_head_indices
+                q_block_start + query_group_offset + query_head_indices[:, None] + head_size_indices[None, :]
             )  # (sub_n_head, sub_head_size)
-            k_parts = k_block_start + kv_head_indices  # (1, sub_head_size)
-            v_parts = v_block_start + kv_head_indices  # (1, sub_head_size)
+            k_parts = k_block_start + kv_group_offset + head_size_indices[None, :]   # (1, sub_head_size)
+            v_parts = v_block_start + kv_group_offset + head_size_indices[None, :]   # (1, sub_head_size)
 
         else:  # grouped query attention
             sub_q_group_offsets = (
