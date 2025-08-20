@@ -10,6 +10,7 @@ from functools import partial
 from typing import Any
 from typing_extensions import Self
 
+import math
 import torch
 import torch.nn as nn
 from litgpt import Config
@@ -64,6 +65,8 @@ class GPT(nn.Module):
         self.sampled_head_size_indices = None
         self.sampled_layer_indices = None
         self.sampled_embd_indices = None
+        self.cos_list = None
+        self.sin_list = None
         # self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
 
     @property
@@ -290,15 +293,30 @@ class GPT(nn.Module):
             sampled_embd_indices,
         )
 
-        # change the rope cache to match n_elem induced by subnet head size
-        self.sub_network_rope_n_elem = int(
-            self.config.rotary_percentage * self.sub_network_head_size
+        self.sub_network_rope_n_elem = (
+            math.ceil(self.config.rotary_percentage * self.sub_network_head_size)
+            if isinstance(self.sub_network_head_size, int)
+            else [
+                math.ceil(self.config.rotary_percentage * head_size)
+                for head_size in self.sub_network_head_size
+            ]
         )
-        self.cos, self.sin = self.rope_cache(
-            seq_len=self._max_seq_length,
-            n_elem=self.sub_network_rope_n_elem,
-            device=self.cos.device,
-        )
+
+        if isinstance(self.sub_network_rope_n_elem, int):
+            self.cos, self.sin = self.rope_cache(
+                seq_len=self._max_seq_length,
+                n_elem=self.sub_network_rope_n_elem,
+                device=self.cos.device,
+            )
+        else:
+            self.cos_list = [None for _ in range(self.sub_network_n_layers)]
+            self.sin_list = [None for _ in range(self.sub_network_n_layers)]
+            for i, n_elem in enumerate(self.sub_network_rope_n_elem):
+                self.cos_list[i], self.sin_list[i] = self.rope_cache(
+                    seq_len=self._max_seq_length,
+                    n_elem=n_elem,
+                    device=self.cos.device,
+                )
 
     def select_sub_network(self, config: dict[str, Any]) -> None:
         """
@@ -332,6 +350,8 @@ class GPT(nn.Module):
             block = self.transformer.h[i]
             block.reset_super_network()
         self.lm_head.reset_super_network()
+        self.cos_list = None
+        self.sin_list = None
 
         # rebuild the rope cache
         if rebuild_rope:
@@ -376,6 +396,19 @@ class GPT(nn.Module):
             input_pos_maxp1 = None
         return cos, sin, mask, input_pos_maxp1
 
+    def process_blocks(self, x, idx, input_pos, j, i, input_pos_maxp1, T):
+        block = self.transformer.h[j]
+        cos, sin, mask, input_pos_maxp1_block = self.process_rope_cache(
+            self.cos, self.sin, input_pos, input_pos_maxp1, T
+        )
+
+        if isinstance(self.cos_list, list):
+            cos, sin = self.cos_list[i].to(idx.device), self.sin_list[i].to(idx.device)
+
+        x = block(x, cos, sin, mask, input_pos, input_pos_maxp1_block)
+
+        return x
+
     def forward(
         self,
         idx: torch.Tensor,
@@ -392,14 +425,15 @@ class GPT(nn.Module):
         x = self.transformer.wte(idx)  # token embeddings of shape (b, t, n_embd)
         if self.config.scale_embeddings:
             x = x * torch.tensor(self.sub_network_n_embd**0.5, dtype=x.dtype)
-        for i in range(self.sub_network_n_layers):
-            block = self.transformer.h[i]
 
-            cos, sin, mask, input_pos_maxp1_block = self.process_rope_cache(
-                self.cos, self.sin, input_pos, input_pos_maxp1, T
-            )
+        if self.sampled_layer_indices is not None:
+            for i, j in enumerate(self.sampled_layer_indices):
+                x = self.process_blocks(x, idx, input_pos, j, i, input_pos_maxp1, T)
 
-            x = block(x, cos, sin, mask, input_pos, input_pos_maxp1_block)
+        else:
+            for i in range(self.sub_network_n_layers):
+                x = self.process_blocks(x, idx, input_pos, i, i, input_pos_maxp1, T)
+
         x = self.transformer.ln_f(x)
         clamp_head = (
             partial(do_softcapping, thresh=self.config.final_logit_softcapping)
