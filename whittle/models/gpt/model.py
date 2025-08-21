@@ -21,6 +21,7 @@ from whittle.modules.embedding import Embedding
 from whittle.modules.layernorm import LayerNorm
 from whittle.modules.linear import Linear
 from whittle.modules.rmsnorm import RMSNorm
+from whittle.exceptions import IllegalSubNetworkError
 
 
 class GPT(nn.Module):
@@ -208,6 +209,191 @@ class GPT(nn.Module):
             sampled_embd_indices=self.sampled_embd_indices,
         )
 
+    def _verify_config(
+        self,
+        super_n_dim: int,
+        sub_n_dim: int,
+        sampled_dim_indices: list[int] | list[list[int]] | None,
+        n_layers: int,
+    ):
+        if sampled_dim_indices is None:
+            if sub_n_dim > super_n_dim:
+                raise IllegalSubNetworkError(
+                    "Dimension of subnet cannot be greater than the supernet's."
+                )
+            return
+        elif isinstance(sampled_dim_indices, list):
+            if len(sampled_dim_indices) == 0:
+                raise IllegalSubNetworkError("List of indices cannot be empty!")
+            if isinstance(sampled_dim_indices[0], list):  # list of lists
+                if len(sampled_dim_indices) != n_layers:
+                    raise IllegalSubNetworkError(
+                        f"The number of lists of indices {len(sampled_dim_indices)} must"
+                        " match the number of layers in the subnet ({n_layers})!"
+                    )
+                for list_of_indices in sampled_dim_indices:
+                    if len(list_of_indices) != sub_n_dim:
+                        raise IllegalSubNetworkError(
+                            f"Number of indices in {list_of_indices} does not match the"
+                            " dimensions of the subnet."
+                        )
+            elif isinstance(sampled_dim_indices[0], int):
+                if len(sampled_dim_indices) != sub_n_dim:
+                    raise IllegalSubNetworkError(
+                        f"Number of indices in {sampled_dim_indices} does not match the"
+                        " dimensions of the subnet."
+                    )
+        else:
+            raise IllegalSubNetworkError(
+                f"f{sampled_dim_indices} is not a valid value for the list of indices."
+            )
+
+    def _infer_sub_network_sizes_from_indices(
+        self,
+        sub_network_n_embd: int = None,
+        sub_network_intermediate_size: int = None,
+        sub_network_num_heads: int = None,
+        sub_network_n_layers: int = None,
+        sub_network_query_groups: int = None,
+        sub_network_head_size: int = None,
+        sampled_intermediate_indices: list[int] | list[list] = None,
+        sampled_head_indices: list[int] | list[list] = None,
+        sampled_query_group_indices: list[int] | list[list] = None,
+        sampled_head_size_indices: list[int] | list[list] = None,
+        sampled_layer_indices: list[int] | None = None,
+        sampled_embd_indices: list[int] | None = None,
+    ):
+
+        def infer_size(indices):
+            if isinstance(indices[0], list):
+                return len(indices[0])
+            else:
+                return len(indices)
+
+        if sub_network_n_embd is None and sampled_embd_indices is not None:
+            sub_network_n_embd = infer_size(sampled_embd_indices)
+
+        if (
+            sub_network_intermediate_size is None
+            and sampled_intermediate_indices is not None
+        ):
+            sub_network_intermediate_size = infer_size(sampled_intermediate_indices)
+
+        if sub_network_query_groups is None and sampled_query_group_indices is not None:
+            sub_network_query_groups = infer_size(sampled_query_group_indices)
+
+        if sub_network_head_size is None and sampled_head_size_indices is not None:
+            sub_network_head_size = infer_size(sampled_head_size_indices)
+
+        if sub_network_n_layers is None and sampled_layer_indices is not None:
+            sub_network_n_layers = infer_size(sampled_layer_indices)
+
+        if sub_network_num_heads is None and sampled_head_indices is not None:
+            if sub_network_query_groups is not None:
+                sub_network_num_heads = (
+                    len(sampled_head_indices) * sub_network_query_groups
+                )
+            else:
+                sub_network_num_heads = (
+                    len(sampled_head_indices) * self.config.n_query_groups
+                )
+        if sub_network_n_embd is None:
+            sub_network_n_embd = self.config.n_embd
+
+        if sub_network_intermediate_size is None:
+            sub_network_intermediate_size = self.config.intermediate_size
+
+        if sub_network_num_heads is None:
+            sub_network_num_heads = self.config.n_head
+
+        if sub_network_n_layers is None:
+            sub_network_n_layers = self.config.n_layer
+
+        if sub_network_query_groups is None:
+            sub_network_query_groups = self.config.n_query_groups
+
+        if sub_network_head_size is None:
+            sub_network_head_size = self.config.head_size
+
+        return {
+            "sub_network_n_embd": sub_network_n_embd,
+            "sub_network_intermediate_size": sub_network_intermediate_size,
+            "sub_network_num_heads": sub_network_num_heads,
+            "sub_network_n_layers": sub_network_n_layers,
+            "sub_network_query_groups": sub_network_query_groups,
+            "sub_network_head_size": sub_network_head_size,
+        }
+
+    def _verify_sub_network(
+        self,
+        sub_network_n_embd: int | None = None,
+        sub_network_intermediate_size: int | None = None,
+        sub_network_num_heads: int | None = None,
+        sub_network_n_layers: int | None = None,
+        sub_network_query_groups: int | None = None,
+        sub_network_head_size: int | None = None,
+        sampled_intermediate_indices: list[int] | list[list] = None,
+        sampled_head_indices: list[int] | list[list] = None,
+        sampled_query_group_indices: list[int] | list[list] = None,
+        sampled_head_size_indices: list[int] | list[list] = None,
+        sampled_layer_indices: list[int] | None = None,
+        sampled_embd_indices: list[int] | None = None,
+    ):
+        if sampled_layer_indices is not None:
+            if len(sampled_layer_indices) != sub_network_n_layers:
+                raise IllegalSubNetworkError(
+                    f"Number of layer indices ({len(sampled_layer_indices)}) do not "
+                    f"match sub_network_n_layers ({sub_network_n_layers})"
+                )
+            elif max(sampled_layer_indices) >= self.config.n_layer:
+                raise IllegalSubNetworkError(
+                    f"The layer indices ({sampled_layer_indices}) must not be greater "
+                    f"than the number of layers in the supernet ({self.config.n_layer})"
+                )
+
+        self._verify_config(
+            self.config.n_embd,
+            sub_network_n_embd,
+            sampled_embd_indices,
+            sub_network_n_layers,
+        )
+        self._verify_config(
+            self.config.n_query_groups,
+            (
+                sub_network_query_groups
+                if sub_network_query_groups is not None
+                else self.config.n_query_groups
+            ),
+            sampled_query_group_indices,
+            sub_network_n_layers,
+        )
+        self._verify_config(
+            self.config.n_head,
+            (
+                sub_network_num_heads
+                if sub_network_num_heads is not None
+                else self.config.n_head
+            ),
+            sampled_head_indices,
+            sub_network_n_layers,
+        )
+        self._verify_config(
+            self.config.head_size,
+            (
+                sub_network_head_size
+                if sub_network_head_size is not None
+                else self.config.head_size
+            ),
+            sampled_head_size_indices,
+            sub_network_n_layers,
+        )
+        self._verify_config(
+            self.config.intermediate_size,
+            sub_network_intermediate_size,
+            sampled_intermediate_indices,
+            sub_network_n_layers,
+        )
+
     def set_sub_network(
         self,
         sub_network_n_embd: int,
@@ -235,10 +421,37 @@ class GPT(nn.Module):
             sub_network_query_groups: Number of query groups in the sub-network. Defaults to None.
             sub_network_head_size: Size of each attention head in the sub-network. Defaults to None.
         """
-        self.sub_network_n_embd = sub_network_n_embd
-        self.sub_network_intermediate_size = sub_network_intermediate_size
-        self.sub_network_num_heads = sub_network_num_heads
-        self.sub_network_n_layers = sub_network_n_layers
+        self.reset_super_network()
+        sub_network_sizes = self._infer_sub_network_sizes_from_indices(
+            sub_network_n_embd=sub_network_n_embd,
+            sub_network_intermediate_size=sub_network_intermediate_size,
+            sub_network_num_heads=sub_network_num_heads,
+            sub_network_n_layers=sub_network_n_layers,
+            sub_network_query_groups=sub_network_query_groups,
+            sub_network_head_size=sub_network_head_size,
+            sampled_intermediate_indices=sampled_intermediate_indices,
+            sampled_head_indices=sampled_head_indices,
+            sampled_query_group_indices=sampled_query_group_indices,
+            sampled_head_size_indices=sampled_head_size_indices,
+            sampled_layer_indices=sampled_layer_indices,
+            sampled_embd_indices=sampled_embd_indices,
+        )
+        self._verify_sub_network(
+            **sub_network_sizes,
+            sampled_intermediate_indices=sampled_intermediate_indices,
+            sampled_head_indices=sampled_head_indices,
+            sampled_query_group_indices=sampled_query_group_indices,
+            sampled_head_size_indices=sampled_head_size_indices,
+            sampled_layer_indices=sampled_layer_indices,
+            sampled_embd_indices=sampled_embd_indices,
+        )
+
+        self.sub_network_n_embd = sub_network_sizes["sub_network_n_embd"]
+        self.sub_network_intermediate_size = sub_network_sizes[
+            "sub_network_intermediate_size"
+        ]
+        self.sub_network_num_heads = sub_network_sizes["sub_network_num_heads"]
+        self.sub_network_n_layers = sub_network_sizes["sub_network_n_layers"]
         self.sampled_intermediate_indices = sampled_intermediate_indices
         self.sampled_head_indices = sampled_head_indices
         self.sampled_query_group_indices = sampled_query_group_indices
@@ -254,19 +467,19 @@ class GPT(nn.Module):
         )
 
         self.sub_network_query_groups = (
-            sub_network_query_groups
-            if sub_network_query_groups is not None
+            sub_network_sizes["sub_network_query_groups"]
+            if sub_network_sizes["sub_network_query_groups"] is not None
             else self.config.n_query_groups
         )
 
-        if self.config.fix_head_size:
-            if sub_network_head_size is None:
+        if self.config.fix_head_size: # TODO: Deprecate. Not used (always set to True)
+            if sub_network_sizes["sub_network_head_size"] is None:
                 self.sub_network_head_size = self.config.head_size
             else:
-                self.sub_network_head_size = sub_network_head_size
+                self.sub_network_head_size = sub_network_sizes["sub_network_head_size"]
         else:
-            if sub_network_head_size is not None:
-                self.sub_network_head_size = sub_network_head_size
+            if sub_network_sizes["sub_network_head_size"] is not None:
+                self.sub_network_head_size = sub_network_sizes["sub_network_head_size"]
             else:
                 self.sub_network_head_size = (
                     self.sub_network_n_embd // self.sub_network_num_heads

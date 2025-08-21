@@ -71,6 +71,10 @@ class CausalSelfAttention(nn.Module):
         subnet_n_head: int,
         subnet_n_query_groups: int,
         subnet_head_size: int,
+        sampled_head_indices: list[int] | None = None,
+        sampled_embd_indices: list[int] | None = None,
+        sampled_head_size_indices: list[int] | None = None,
+        sampled_query_groups_indices: list[int] | None = None,
     ):
         n_embd = self.config.n_embd
         head_size = self.config.head_size
@@ -115,6 +119,19 @@ class CausalSelfAttention(nn.Module):
                 f"Subnet number of heads ({subnet_n_head}) must be divisible by "
                 f"subnet number of query groups ({subnet_n_query_groups}) for GQA"
             )
+
+        def verify_indices(indices: list[int] | None, max_val: int, property: str):
+            if indices is None:
+                return
+            elif max(indices) >= max_val:
+                raise IllegalSubNetworkError(
+                    f"Sampled index cannot be greater than {max_val} for {property}"
+                )
+
+        verify_indices(sampled_head_indices, heads_per_group, "sampled_head_indices")
+        verify_indices(sampled_embd_indices, n_embd, "sampled_embd_indices")
+        verify_indices(sampled_head_size_indices, head_size, "sampled_head_size_indices")
+        verify_indices(sampled_query_groups_indices, n_query_groups, "sampled_query_groups_indices")
 
     def get_qkv_indices(
             self,
@@ -242,14 +259,22 @@ class CausalSelfAttention(nn.Module):
         sub_network_n_head: int,
         sub_network_query_groups: int,
         sub_network_head_size: int,
+        sampled_head_indices: list[int] | None = None,
+        sampled_embd_indices: list[int] | None = None,
+        sampled_head_size_indices: list[int] | None = None,
+        sampled_query_groups_indices: list[int] | None = None,
     ) -> None:
         """Updates the sub-network configuration."""
 
         self._verify_subnet_is_legal(
-            sub_network_n_embd,
-            sub_network_n_head,
-            sub_network_query_groups,
-            sub_network_head_size,
+            subnet_n_embed=sub_network_n_embd,
+            subnet_n_head=sub_network_n_head,
+            subnet_n_query_groups=sub_network_query_groups,
+            subnet_head_size=sub_network_head_size,
+            sampled_head_indices=sampled_head_indices,
+            sampled_embd_indices=sampled_embd_indices,
+            sampled_head_size_indices=sampled_head_size_indices,
+            sampled_query_groups_indices=sampled_query_groups_indices,
         )
 
         self.sub_network_n_embd = sub_network_n_embd
@@ -304,10 +329,14 @@ class CausalSelfAttention(nn.Module):
         )
 
         self._update_sub_network(
-            sub_network_n_embd,
-            sub_network_n_head,
-            sub_network_query_groups,
-            sub_network_head_size,
+            sub_network_n_embd=sub_network_n_embd,
+            sub_network_n_head=sub_network_n_head,
+            sub_network_query_groups=sub_network_query_groups,
+            sub_network_head_size=sub_network_head_size,
+            sampled_head_indices=sampled_head_indices,
+            sampled_embd_indices=sampled_embd_indices,
+            sampled_head_size_indices=sampled_head_size_indices,
+            sampled_query_groups_indices=sampled_query_groups_indices,
         )
 
         if subnet_attn_type == "mha":
