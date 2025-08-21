@@ -350,6 +350,12 @@ class GPT(nn.Module):
             block = self.transformer.h[i]
             block.reset_super_network()
         self.lm_head.reset_super_network()
+        self.sampled_intermediate_indices = None
+        self.sampled_head_indices = None
+        self.sampled_query_group_indices = None
+        self.sampled_head_size_indices = None
+        self.sampled_layer_indices = None
+        self.sampled_embd_indices = None
         self.cos_list = None
         self.sin_list = None
 

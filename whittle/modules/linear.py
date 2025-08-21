@@ -42,6 +42,8 @@ class Linear(nn.Linear):
         """Reset the linear transformation dimensions of the current sub-network to the super-network dimensionality."""
         self.sub_network_in_features = self.in_features
         self.sub_network_out_features = self.out_features
+        self.sampled_in_indices = None
+        self.sampled_out_indices = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out_idx = (

@@ -47,6 +47,7 @@ class Embedding(torch.nn.Embedding):
     def reset_super_network(self):
         """Reset the embedding dimensionality of the current sub-network to the super-network dimensionality"""
         self.sub_network_embedding_dim = self.embedding_dim
+        self.sampled_embd_dim_indices = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         weight = (

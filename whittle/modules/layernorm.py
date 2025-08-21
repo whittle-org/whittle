@@ -25,6 +25,7 @@ class LayerNorm(torch.nn.LayerNorm):
     def reset_super_network(self):
         """Reset the input dimensionality of the current sub-network to the super-network dimensionality."""
         self.sub_network_in_features = self.in_features
+        self.sampled_ln_indices = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.sampled_ln_indices is None:
