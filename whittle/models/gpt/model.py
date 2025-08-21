@@ -196,16 +196,16 @@ class GPT(nn.Module):
                 return val if is_none_or_list_of_ints(val) else val[i]
 
         block.set_sub_network(
-            self.sub_network_n_embd,
-            get_val(self.sub_network_intermediate_size, int),
-            get_val(self.sub_network_num_heads, int),
-            get_val(self.sub_network_query_groups, int),
-            get_val(self.sub_network_head_size, int),
-            get_val(self.sampled_intermediate_indices, list),
-            get_val(self.sampled_head_indices, list),
-            get_val(self.sampled_query_group_indices, list),
-            get_val(self.sampled_head_size_indices, list),
-            self.sampled_embd_indices,
+            sub_network_n_embd=self.sub_network_n_embd,
+            sub_network_intermediate_size=get_val(self.sub_network_intermediate_size, int),
+            sub_network_num_heads=get_val(self.sub_network_num_heads, int),
+            sub_network_query_groups=get_val(self.sub_network_query_groups, int),
+            sub_network_head_size=get_val(self.sub_network_head_size, int),
+            sampled_intermediate_indices=get_val(self.sampled_intermediate_indices, list),
+            sampled_head_indices=get_val(self.sampled_head_indices, list),
+            sampled_query_group_indices=get_val(self.sampled_query_group_indices, list),
+            sampled_head_size_indices=get_val(self.sampled_head_size_indices, list),
+            sampled_embd_indices=self.sampled_embd_indices,
         )
 
     def set_sub_network(
@@ -222,7 +222,6 @@ class GPT(nn.Module):
         sampled_head_size_indices: list[int] | list[list] = None,
         sampled_layer_indices: list[int] | None = None,
         sampled_embd_indices: list[int] | None = None,
-        sub_network_n_blocks: int | None = None,
     ) -> None:
         """
         Sets the GPT model to the specified sub-network dimensionality.
@@ -246,7 +245,6 @@ class GPT(nn.Module):
         self.sampled_head_size_indices = sampled_head_size_indices
         self.sampled_layer_indices = sampled_layer_indices
         self.sampled_embd_indices = sampled_embd_indices
-        self.sub_network_n_blocks = sub_network_n_blocks
 
         self.transformer.wte.set_sub_network(
             self.sub_network_n_embd, sampled_embd_indices

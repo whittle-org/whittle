@@ -121,7 +121,7 @@ class CausalSelfAttention(nn.Module):
             sampled_head_indices,
             sampled_query_groups_indices,
             sampled_head_size_indices,
-        ):  # TODO: FIX
+        ):
         head_size = self.config.head_size
         n_head = self.config.n_head
         n_query_groups = self.config.n_query_groups
