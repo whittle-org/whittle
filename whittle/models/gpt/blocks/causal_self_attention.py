@@ -434,7 +434,7 @@ class CausalSelfAttention(nn.Module):
         q = q.transpose(1, 2)  # (B, nh_q, T, hs)
         k = k.transpose(1, 2)  # (B, nh_k, T, hs)
         v = v.transpose(1, 2)  # (B, nh_v, T, hs)
-        rope_n_elem = int(self.sub_network_head_size * self.config.rotary_percentage)
+        rope_n_elem = math.ceil(self.sub_network_head_size * self.config.rotary_percentage)
         # apply rope to the first `rope_n_elem` elements of the query and key tensors
         q_roped = apply_rope(q[..., :rope_n_elem], cos, sin)
         k_roped = apply_rope(k[..., :rope_n_elem], cos, sin)
