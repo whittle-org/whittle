@@ -359,31 +359,19 @@ class GPT(nn.Module):
         )
         self._verify_config(
             self.config.n_query_groups,
-            (
-                sub_network_query_groups
-                if sub_network_query_groups is not None
-                else self.config.n_query_groups
-            ),
+            sub_network_query_groups,
             sampled_query_group_indices,
             sub_network_n_layers,
         )
         self._verify_config(
             self.config.n_head,
-            (
-                sub_network_num_heads
-                if sub_network_num_heads is not None
-                else self.config.n_head
-            ),
+            sub_network_num_heads,
             sampled_head_indices,
             sub_network_n_layers,
         )
         self._verify_config(
             self.config.head_size,
-            (
-                sub_network_head_size
-                if sub_network_head_size is not None
-                else self.config.head_size
-            ),
+            sub_network_head_size,
             sampled_head_size_indices,
             sub_network_n_layers,
         )
