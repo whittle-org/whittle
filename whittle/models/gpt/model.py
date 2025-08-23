@@ -217,7 +217,7 @@ class GPT(nn.Module):
         n_layers: int,
     ):
         if sampled_dim_indices is None:
-            if isinstance(sub_n_dim, list):
+            if isinstance(sub_n_dim, list) or isinstance(sub_n_dim, tuple):
                 for dim in sub_n_dim:
                     if dim > super_n_dim:
                         raise IllegalSubNetworkError(
@@ -240,7 +240,10 @@ class GPT(nn.Module):
                         " match the number of layers in the subnet ({n_layers})!"
                     )
                 for i, list_of_indices in enumerate(sampled_dim_indices):
-                    sub_dim = sub_n_dim if isinstance(sub_n_dim, int) else sub_n_dim[i]
+                    if isinstance(sub_n_dim, int):
+                        sub_dim = sub_n_dim
+                    else:
+                        sub_dim = sub_n_dim[i]
                     if len(list_of_indices) != sub_dim:
                         raise IllegalSubNetworkError(
                             f"Number of indices in {list_of_indices} does not match the"
@@ -289,7 +292,12 @@ class GPT(nn.Module):
             sub_network_intermediate_size = infer_size(sampled_intermediate_indices)
 
         if sub_network_query_groups is None and sampled_query_group_indices is not None:
-            sub_network_query_groups = infer_size(sampled_query_group_indices)
+            if isinstance(sampled_query_group_indices[0], list):
+                sub_network_query_groups = []
+                for indices in sampled_query_group_indices:
+                    sub_network_query_groups.append(len(indices))
+            else:
+                sub_network_query_groups = len(sampled_query_group_indices)
 
         if sub_network_head_size is None and sampled_head_size_indices is not None:
             sub_network_head_size = infer_size(sampled_head_size_indices)
@@ -319,11 +327,11 @@ class GPT(nn.Module):
             sub_network_n_layers = self.config.n_layer
 
         if sub_network_query_groups is None:
-            if self.config.n_query_groups == self.config.n_head and sub_network_num_heads is not None:
-                sub_network_query_groups = sub_network_num_heads
-            else:
-                sub_network_query_groups = self.config.n_query_groups
-
+          #sub_network_query_groups = sub_network_num_heads
+          if (self.config.n_query_groups == self.config.n_head) and (sub_network_num_heads is not None):
+            sub_network_query_groups = sub_network_num_heads
+          else:
+            sub_network_query_groups = self.config.n_query_groups
         if sub_network_head_size is None:
             sub_network_head_size = self.config.head_size
 
