@@ -217,10 +217,18 @@ class GPT(nn.Module):
         n_layers: int,
     ):
         if sampled_dim_indices is None:
-            if sub_n_dim > super_n_dim:
-                raise IllegalSubNetworkError(
-                    "Dimension of subnet cannot be greater than the supernet's."
-                )
+            if isinstance(sub_n_dim, list):
+                for dim in sub_n_dim:
+                    if dim > super_n_dim:
+                        raise IllegalSubNetworkError(
+                            "Dimension of subnet cannot be greater than the supernet's."
+                        )
+
+            else:
+                if sub_n_dim > super_n_dim:
+                    raise IllegalSubNetworkError(
+                        "Dimension of subnet cannot be greater than the supernet's."
+                    )
             return
         elif isinstance(sampled_dim_indices, list):
             if len(sampled_dim_indices) == 0:
@@ -231,8 +239,9 @@ class GPT(nn.Module):
                         f"The number of lists of indices {len(sampled_dim_indices)} must"
                         " match the number of layers in the subnet ({n_layers})!"
                     )
-                for list_of_indices in sampled_dim_indices:
-                    if len(list_of_indices) != sub_n_dim:
+                for i, list_of_indices in enumerate(sampled_dim_indices):
+                    sub_dim = sub_n_dim if isinstance(sub_n_dim, int) else sub_n_dim[i]
+                    if len(list_of_indices) != sub_dim:
                         raise IllegalSubNetworkError(
                             f"Number of indices in {list_of_indices} does not match the"
                             " dimensions of the subnet."
@@ -310,7 +319,10 @@ class GPT(nn.Module):
             sub_network_n_layers = self.config.n_layer
 
         if sub_network_query_groups is None:
-            sub_network_query_groups = self.config.n_query_groups
+            if self.config.n_query_groups == self.config.n_head and sub_network_num_heads is not None:
+                sub_network_query_groups = sub_network_num_heads
+            else:
+                sub_network_query_groups = self.config.n_query_groups
 
         if sub_network_head_size is None:
             sub_network_head_size = self.config.head_size
@@ -607,9 +619,14 @@ class GPT(nn.Module):
             self.cos, self.sin, input_pos, input_pos_maxp1, T
         )
 
+
         if isinstance(self.cos_list, list):
             cos, sin = self.cos_list[i].to(idx.device), self.sin_list[i].to(idx.device)
-
+        else:
+            cos, sin = self.cos.to(idx.device), self.sin.to(idx.device)
+        cos, sin, mask, input_pos_maxp1_block = self.process_rope_cache(
+            cos, sin, input_pos, input_pos_maxp1, T
+        )
         x = block(x, cos, sin, mask, input_pos, input_pos_maxp1_block)
 
         return x
