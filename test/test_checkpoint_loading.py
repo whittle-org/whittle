@@ -25,7 +25,9 @@ def test_checkpoint_loading(checkpoint_dir):
     input_ids = torch.randint(0, config.vocab_size, (1, config.block_size))  # .cuda()
 
     model = LitGPT(config)  # .cuda()
-    model.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
+    model.load_state_dict(
+        torch.load(str(checkpoint_dir / "lit_model.pth"), weights_only=True)
+    )
     # test output
     model.eval()
     output_lit = model(input_ids)

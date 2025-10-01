@@ -59,7 +59,7 @@ def setup_checkpoint_dir(checkpoint_dir, sub_network_dir, checkpoint_mode):
         sub_network_config = {
             "embed_dim": 2,
             "mlp_ratio": 1.5,
-            "num_heads": 1,
+            "num_heads": 4,
             "depth": 1,
         }
         torch.save(

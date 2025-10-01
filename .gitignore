@@ -141,3 +141,7 @@ tags
 
 pretrained_super_net/
 wandb/
+results/
+*.sh
+plots/
+outputs/

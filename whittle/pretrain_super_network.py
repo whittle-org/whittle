@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import pprint
 import time
+from dataclasses import asdict
 from datetime import timedelta
 from pathlib import Path
 from typing import Literal
@@ -10,9 +11,9 @@ from typing import Literal
 import lightning as L
 import torch
 from lightning.fabric.strategies import DDPStrategy, FSDPStrategy
-from lightning.fabric.utilities.throughput import ThroughputMonitor
+from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
 from litgpt import Tokenizer
-from litgpt.args import EvalArgs, TrainArgs
+from litgpt.args import EvalArgs, LogArgs, TrainArgs
 from litgpt.config import name_to_config
 from litgpt.data import DataModule, TinyLlama
 from litgpt.model import Config
@@ -44,7 +45,6 @@ from syne_tune.config_space import lograndint, randint
 from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
-from whittle.metrics.flops import compute_flops
 from whittle.metrics.profiler import DistributedGPUProfiler
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
@@ -92,12 +92,13 @@ def setup(
         tie_embeddings=False,
     ),
     eval: EvalArgs = EvalArgs(interval=1000, max_iters=100),
+    log: LogArgs = LogArgs(),
     optimizer: str | dict = "AdamW",
     devices: int | str = "auto",
     num_nodes: int = 1,
     training_strategy: str = "sandwich",
     tokenizer_dir: Path | None = None,
-    logger_name: Literal["wandb", "tensorboard", "csv"] = "tensorboard",
+    logger_name: Literal["wandb", "tensorboard", "csv", "mlflow"] = "tensorboard",
     seed: int = 42,
     accelerator: str | None = None,
     parallel_strategy: Literal["fsdp", "ddp", "auto"] = "fsdp",
@@ -177,6 +178,7 @@ def setup(
         name=f"pretrain-{config.name}",
         resume=bool(resume),
         log_interval=train.log_interval,
+        log_args=asdict(log),
     )
 
     # Default to CPU if accelerator not specified
@@ -225,27 +227,28 @@ def setup(
     fabric.launch()
 
     fabric.print(pprint.pformat(hparams))
-    if logger_name in ("tensorboard", "wandb"):
+    if logger_name in ("tensorboard", "wandb", "mlflow"):
         fabric.logger.log_hyperparams(hparams)
 
     main(
-        fabric,
-        num_devices,
-        seed,
-        initial_checkpoint_dir,
-        resume,
-        config,
-        data,
-        out_dir,
-        tokenizer_dir,
-        tokenizer,
-        train,
-        eval,
-        optimizer,
-        training_strategy,
-        parallel_strategy,
-        enable_profiling,
-        profiling_output_dir,
+        fabric=fabric,
+        devices=num_devices,
+        seed=seed,
+        initial_checkpoint_dir=initial_checkpoint_dir,
+        resume=resume,
+        config=config,
+        data=data,
+        out_dir=out_dir,
+        tokenizer_dir=tokenizer_dir,
+        tokenizer=tokenizer,
+        train=train,
+        eval=eval,
+        optimizer=optimizer,
+        training_strategy=training_strategy,
+        parallel_strategy=parallel_strategy,
+        num_nodes=num_nodes,
+        enable_profiling=enable_profiling,
+        profiling_output_dir=profiling_output_dir,
     )
 
 
@@ -272,6 +275,7 @@ def fit(
     train: TrainArgs,
     eval: EvalArgs,
     training_strategy: BaseTrainingStrategy,
+    num_nodes: int = 1,
     profiler: DistributedGPUProfiler | None = None,
 ) -> Path | None:
     model = state["model"]
@@ -290,35 +294,35 @@ def fit(
         val_loss = "n/a"
 
     throughput = ThroughputMonitor(fabric, window_size=5)
-    batch_size = train.micro_batch_size
-    sequence_length = model.max_seq_length
+    with torch.device("meta"):
+        meta_model = GPT(model.config).to("meta")
 
-    def loss_fn(output: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        return chunked_cross_entropy(output, targets, chunk_size=0)
-
-    if torch.cuda.device_count() > 1:
-        fabric.print("[FLOPs] Skipping FLOPs computation on multi-GPU setup.")
-        measured_flops = -1.0
-    else:
-        measured_flops = compute_flops(
-            model,
-            batch_size=batch_size,
-            sequence_length=sequence_length,
-            device=fabric.device.type,
-            loss_fn=loss_fn,
-            verbose=True,
+        x = torch.randint(0, 1, (train.micro_batch_size, meta_model.max_seq_length)).to(
+            "meta"
         )
-        fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
+
+        def model_fwd():
+            return meta_model(x)  # noqa: F821
+
+        def model_loss(y):
+            return chunked_cross_entropy(y, x, chunk_size=0)  # noqa: F821
+
+        measured_flops = measure_flops(meta_model, model_fwd, model_loss)
+        del meta_model, x
+    fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
 
     max_tokens_per_device = train.max_tokens // fabric.world_size
     tokens_per_iter = train.micro_batch_size * model.max_seq_length
     max_iters = max_tokens_per_device // tokens_per_iter
-    log_iter_interval = train.log_interval * train.gradient_accumulation_iters(devices)
+    log_iter_interval = train.log_interval * train.gradient_accumulation_iters(
+        devices, num_nodes
+    )
     initial_iter = state["iter_num"]
     train_iterator = CycleIterator(train_dataloader)
 
     running_loss = RunningMean(
-        window=train.gradient_accumulation_iters(devices), sync_on_compute=False
+        window=train.gradient_accumulation_iters(devices, num_nodes),
+        sync_on_compute=False,
     ).to(fabric.device)
 
     fabric.barrier()
@@ -331,7 +335,7 @@ def fit(
             fabric.print("[Profiler] Started profiling with global synchronization")
 
     total_t0 = time.perf_counter()
-    warmup_iters = train.warmup_iters(devices, max_iters, train_dataloader)
+    warmup_iters = train.warmup_iters(devices, num_nodes, max_iters, train_dataloader)
 
     # Expected tokens per batch for validation
     expected_tokens_per_batch = train.micro_batch_size * model.max_seq_length
@@ -358,17 +362,17 @@ def fit(
         targets = train_data[:, 1 : (model.max_seq_length + 1)].contiguous().long()
 
         is_accumulating = (
-            state["iter_num"] % train.gradient_accumulation_iters(devices) != 0
+            state["iter_num"] % train.gradient_accumulation_iters(devices, num_nodes) != 0
         )
 
         if hasattr(training_strategy, "random_samples"):
             # if we update multiple sub-networks in each step, we need to further scale the gradient
             scale_loss = 1 / (
-                train.gradient_accumulation_iters(devices)
+                train.gradient_accumulation_iters(devices, num_nodes)
                 * training_strategy.random_samples
             )
         else:
-            scale_loss = 1 / train.gradient_accumulation_iters(devices)
+            scale_loss = 1 / train.gradient_accumulation_iters(devices, num_nodes)
 
         with fabric.no_backward_sync(model, enabled=is_accumulating):
             loss = training_strategy(model, input_ids, targets, scale_loss=scale_loss)
@@ -536,6 +540,7 @@ def main(
     optimizer: str | dict,
     training_strategy: str,
     parallel_strategy: str,
+    num_nodes: int = 1,
     enable_profiling: bool = False,
     profiling_output_dir: Path | None = None,
 ) -> None:
@@ -654,8 +659,28 @@ def main(
         train,
         eval,
         strategy,
+        num_nodes,
         profiler,
     )
+    # work around PyTorch issue https://github.com/pytorch/pytorch/issues/152162
+
+    # which does not like the lazy initialization to be called in dynamo.
+
+    # Happens with PyTorch 2.7.
+
+    if (
+        torch.__version__.startswith("2.7.")
+        and (model._forward_module.__class__.__name__ == "OptimizedModule")
+        and (
+            model._forward_module._orig_mod.__class__.__name__
+            == "FullyShardedDataParallel"
+        )
+    ):
+        from torch.distributed.fsdp._runtime_utils import _root_pre_forward
+
+        _root_pre_forward(
+            model._forward_module._orig_mod, model._forward_module._orig_mod, [], {}
+        )
 
     save_checkpoint(fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth")
 

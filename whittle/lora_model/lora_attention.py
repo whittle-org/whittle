@@ -50,10 +50,12 @@ class CausalSelfAttention(BaseCausalSelfAttention):
         self.kv_cache: KVCache | None = None
 
         self.config = config
-        self.apply_sliding_window_attention = (
+        self.apply_sliding_window_attention = False
+        if (
             config.sliding_window_size is not None
-            and block_idx % config.sliding_window_layer_stride == 0
-        )
+            and config.sliding_window_indices is not None
+        ):
+            self.apply_sliding_window_attention = config.sliding_window_indices[block_idx]
 
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.config.n_embd
@@ -70,79 +72,6 @@ class CausalSelfAttention(BaseCausalSelfAttention):
         self.q_per_kv = self.config.n_head // self.config.n_query_groups
         self.qkv_indices = None
         self.proj_indices = None
-
-    def set_sub_network(
-        self,
-        sub_network_n_embd: int,
-        sub_network_n_head: int,
-        sub_network_query_groups: int,
-        sub_network_head_size: int,
-    ):
-        """
-        Sets the CausalSelfAttention block to the specified sub-network dimensionality.
-
-        Args:
-            sub_network_n_embd: Embedding dimension of the sub-network
-            sub_network_n_head: Number of attention heads in the sub-network
-            sub_network_query_groups: Number of query groups for grouped-query attention (GQA).
-            sub_network_head_size: Size of each attention head in the sub-network.
-        """
-        self.sub_network_n_embd = (
-            sub_network_n_embd if sub_network_n_embd else self.config.n_embd
-        )
-        self.sub_network_n_head = (
-            sub_network_n_head if sub_network_n_head else self.config.n_head
-        )
-        self.sub_network_query_groups = (
-            sub_network_query_groups
-            if sub_network_query_groups
-            else self.config.n_query_groups
-        )
-        self.sub_network_head_size = (
-            sub_network_head_size if sub_network_head_size else self.config.head_size
-        )
-        if self.config.n_query_groups == 1:
-            q_per_kv = self.sub_network_n_head
-            self.sub_network_query_groups = 1
-        elif (
-            self.config.n_head != self.config.n_query_groups
-            and self.config.n_query_groups != 1
-        ):
-            self.sub_network_query_groups = (
-                sub_network_query_groups
-                if sub_network_query_groups
-                else self.config.n_query_groups
-            )
-            q_per_kv = self.sub_network_n_head // self.config.n_query_groups
-        elif self.config.n_head == self.config.n_query_groups:
-            q_per_kv = 1
-            self.sub_network_query_groups = self.sub_network_n_head
-        self.sub_network_qkv_shape = (
-            (q_per_kv + 2) * self.sub_network_head_size * self.sub_network_query_groups
-        )
-        self.sub_network_q_per_kv = int(q_per_kv)
-        self.qkv_indices = self.get_qkv_indices()
-        self.qkv.set_sub_network(
-            self.sub_network_n_embd,
-            self.sub_network_qkv_shape,
-            qkv_indices=self.qkv_indices,
-            sub_network_n_head=self.sub_network_n_head,
-            sub_network_query_groups=self.sub_network_query_groups,
-            sub_network_head_size=self.sub_network_head_size,
-            sub_network_q_per_kv=self.q_per_kv,
-        )
-        self.proj_indices = self.get_proj_indices()
-        self.proj.set_sub_network(
-            self.sub_network_head_size
-            * self.sub_network_query_groups
-            * self.sub_network_q_per_kv,
-            self.sub_network_n_embd,
-            self.proj_indices,
-        )
-        if self.config.attention_scores_scalar:
-            self.sub_attention_scaler = self.sub_network_n_embd // self.sub_network_n_head
-        else:
-            self.sub_attention_scaler = self.config.attention_scores_scalar
 
     def _load_from_state_dict(
         self, state_dict: dict, prefix: str, *args: Any, **kwargs: Any

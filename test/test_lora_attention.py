@@ -19,7 +19,7 @@ attention_configs = {
             n_query_groups=16,
             head_size=64,
             sliding_window_size=256,
-            sliding_window_layer_placing="interleaved",
+            sliding_window_indices=[1 if i % 2 == 0 else 0 for i in range(1)],
         ),
         "fix_head_size": True,
     },
@@ -51,7 +51,7 @@ attention_configs = {
 
 
 def init_attention(config):
-    attention = CausalSelfAttention(config, 2)
+    attention = CausalSelfAttention(config, 0)
     torch.manual_seed(0)
     attention.qkv.linear.weight.data = torch.randn_like(attention.qkv.linear.weight.data)
     attention.qkv.linear.bias.data = torch.randn_like(attention.qkv.linear.bias.data)
@@ -63,7 +63,7 @@ def init_attention(config):
 
 
 def init_lit_attention(config):
-    attention = LitCausalSelfAttention(config, 2)
+    attention = LitCausalSelfAttention(config, 0)
     torch.manual_seed(0)
     attention.qkv.weight.data = torch.randn_like(attention.qkv.weight.data)
     attention.qkv.bias.data = torch.randn_like(attention.qkv.bias.data)
@@ -73,7 +73,7 @@ def init_lit_attention(config):
 
 
 def init_lit_small_attention(config, base_attention, attention_super):
-    attention = LitCausalSelfAttention(config, 2)
+    attention = LitCausalSelfAttention(config, 0)
     torch.manual_seed(0)
     slices = tuple(slice(0, s) for s in attention.qkv.weight.data.size())[1]
     qkv_indices = (
@@ -102,15 +102,6 @@ def init_lit_small_attention(config, base_attention, attention_super):
 @pytest.mark.parametrize("attention_config", attention_configs.keys())
 def test_attention(attention_config):
     config = attention_configs[attention_config]["config"]
-    if config.sliding_window_size is not None:
-        config.sliding_window_layer_stride = (
-            1
-            if (
-                config.sliding_window_layer_placing is None
-                or config.sliding_window_layer_placing == "all"
-            )
-            else 2
-        )
 
     config.fix_head_size = attention_configs[attention_config]["fix_head_size"]
     if not config.fix_head_size:
@@ -164,12 +155,7 @@ def test_attention(attention_config):
     # check that our custom model produces the same output as LitGPT
     assert torch.all(out_lit_large == out_large)
     config.n_embd = attention.sub_network_n_embd
-    if config.n_query_groups == config.n_head:
-        config.n_head = attention.sub_network_n_head
-    else:
-        config.n_head = (
-            attention.sub_network_n_head // config.n_query_groups
-        ) * attention.sub_network_query_groups
+    config.n_head = attention.sub_network_n_head
     config.n_query_groups = attention.sub_network_query_groups
     config.head_size = attention.sub_network_head_size
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
