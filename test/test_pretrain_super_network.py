@@ -36,7 +36,7 @@ def test_training_strategies(
 
     fixed_config = {
         "sub_network_n_embd": 4,
-        "sub_network_intermediate_size": 93,
+        "sub_network_intermediate_size": 6,
         "sub_network_num_heads": 2,
         "sub_network_n_layers": 2,
     }
@@ -95,7 +95,7 @@ def test_pretrain(save_hyperparameters_mock, tmp_path, accelerator_device):
     with redirect_stdout(stdout):
         fixed_config = {
             "sub_network_n_embd": 4,
-            "sub_network_intermediate_size": 93,
+            "sub_network_intermediate_size": 6,
             "sub_network_num_heads": 4,
             "sub_network_n_layers": 2,
         }

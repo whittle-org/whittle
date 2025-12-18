@@ -70,7 +70,7 @@ def test_compute_weight_magnitude(mlp_type, norm_type):
 
     sub_network_config = {
         "sub_network_n_embd": 64,
-        "sub_network_intermediate_size": 1024,
+        "sub_network_intermediate_size": 128,
         "sub_network_num_heads": 8,
         "sub_network_n_layers": 1,
     }
