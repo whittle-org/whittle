@@ -35,8 +35,8 @@ class SparseGPT:
         Add a batch of input and output tensors to the layer and update the Hessian matrix.
 
         Args:
-            inp : The input tensor.
-            out : The output tensor.
+            inp: The input tensor.
+            out: The output tensor.
         """
         if len(inp.shape) == 2:
             inp = inp.unsqueeze(0)
