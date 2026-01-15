@@ -18,18 +18,22 @@ def test_embedding_shapes():
     out = emb(input_features)
     assert out.shape == (4, 8, 32)
 
+
 def test_embedding_shapes_indices_sampling():
     input_features = torch.randint(low=1, high=64, size=(4, 8))
     emb = Embedding(64, 32)
 
     out = emb(input_features)
     assert out.shape == (4, 8, 32)
-    emb.set_sub_network(0, [0, 2, 3]) # indices take precedence over sub_network_embedding_dim
+    emb.set_sub_network(
+        0, [0, 2, 3]
+    )  # indices take precedence over sub_network_embedding_dim
     out = emb(input_features)
     assert out.shape == (4, 8, 3)
     emb.set_sub_network(32)
     out = emb(input_features)
     assert out.shape == (4, 8, 32)
+
 
 def test_embedding_equivalence():
     input_features = torch.randint(low=1, high=64, size=(4, 8))
@@ -52,10 +56,11 @@ def test_embedding_equivalence():
     assert torch.all(out_small == out_small_layer)
     assert torch.all(out_large == out_large_layer)
 
+
 def test_embedding_equivalence_indices_sampling():
     input_features = torch.randint(low=1, high=6, size=(4, 8))
     emb = Embedding(6, 12)
-    emb.weight.data = torch.arange(6)[:, None] + torch.arange(12)*3.14
+    emb.weight.data = torch.arange(6)[:, None] + torch.arange(12) * 3.14
 
     emb.set_sub_network(2, [0, 11])
     out_small = emb(input_features)

@@ -6,6 +6,7 @@ from litgpt.model import RMSNorm
 from whittle.modules.layernorm import LayerNorm as LayerNormSuper
 from whittle.modules.rmsnorm import RMSNorm as RMSNormSuper
 
+
 class TestRMSNorm:
     def test_rmsnorm_shapes(self):
         input_features_large = torch.rand(8, 64)
@@ -20,7 +21,9 @@ class TestRMSNorm:
         rmsnorm.set_sub_network(sub_network_in_features=64)
         out = rmsnorm(input_features_large)
         assert out.shape == (8, 64)
-        rmsnorm.set_sub_network(sub_network_in_features=0, sampled_ln_indices=list(range(50)))
+        rmsnorm.set_sub_network(
+            sub_network_in_features=0, sampled_ln_indices=list(range(50))
+        )
         out = rmsnorm(input_features_large[:, :50])
         assert out.shape == (8, 50)
 
@@ -49,7 +52,9 @@ class TestRMSNorm:
         rmsnorm = RMSNormSuper(in_features=64, add_unit_offset=True)
         rmsnorm.reset_super_network()
         rmsnorm.weight.data = torch.arange(64, dtype=torch.float32)
-        rmsnorm.set_sub_network(sub_network_in_features=0, sampled_ln_indices=list(range(0, 64, 2)))
+        rmsnorm.set_sub_network(
+            sub_network_in_features=0, sampled_ln_indices=list(range(0, 64, 2))
+        )
         out_super_net = rmsnorm(input_features_small[:, :32])
 
         new_layer = RMSNorm(32, add_unit_offset=True)
@@ -57,6 +62,7 @@ class TestRMSNorm:
         out_new_layer = new_layer(input_features_small[:, :32])
 
         assert torch.all(out_super_net == out_new_layer)
+
 
 class TestLayerNorm:
     def test_layernorm_shapes(self):
@@ -72,10 +78,11 @@ class TestLayerNorm:
         layernorm.set_sub_network(sub_network_in_features=64)
         out = layernorm(input_features_large)
         assert out.shape == (8, 64)
-        layernorm.set_sub_network(sub_network_in_features=4, sampled_ln_indices=[0, 1, 62, 63])
+        layernorm.set_sub_network(
+            sub_network_in_features=4, sampled_ln_indices=[0, 1, 62, 63]
+        )
         out = layernorm(input_features_large[:, :4])
         assert out.shape == (8, 4)
-
 
     def test_layernorm_equivalence(self):
         input_features_large = torch.rand(8, 64)

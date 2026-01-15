@@ -158,7 +158,7 @@ class LinearProj(nn.Linear):
         """Set the linear transformation dimensions of the current sub-network."""
         self.sub_network_in_features = sub_network_in_features
         self.sub_network_out_features = sub_network_out_features
-        self.proj_indices = proj_indices
+        self.proj_indices = proj_indices  # type: ignore
 
     def reset_super_network(self):
         """Reset the linear transformation dimensions of the current sub-network to the super-network dimensionality."""

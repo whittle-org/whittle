@@ -131,14 +131,16 @@ class CausalSelfAttention(nn.Module):
         verify_indices(sampled_head_indices, heads_per_group, "sampled_head_indices")
         verify_indices(sampled_embd_indices, n_embd, "sampled_embd_indices")
         verify_indices(sampled_head_size_indices, head_size, "sampled_head_size_indices")
-        verify_indices(sampled_query_groups_indices, n_query_groups, "sampled_query_groups_indices")
+        verify_indices(
+            sampled_query_groups_indices, n_query_groups, "sampled_query_groups_indices"
+        )
 
     def get_qkv_indices(
-            self,
-            sampled_head_indices,
-            sampled_query_groups_indices,
-            sampled_head_size_indices,
-        ):
+        self,
+        sampled_head_indices,
+        sampled_query_groups_indices,
+        sampled_head_size_indices,
+    ):
         head_size = self.config.head_size
         n_head = self.config.n_head
         n_query_groups = self.config.n_query_groups
@@ -173,22 +175,30 @@ class CausalSelfAttention(nn.Module):
 
         q_parts, k_parts, v_parts = [], [], []
 
-        query_group_indices = torch.arange(sub_q_groups) if sampled_query_groups_indices is None else torch.tensor(sampled_query_groups_indices)
-        head_size_indices = torch.arange(sub_head_size) if sampled_head_size_indices is None else torch.tensor(sampled_head_size_indices)
+        query_group_indices = (
+            torch.arange(sub_q_groups)
+            if sampled_query_groups_indices is None
+            else torch.tensor(sampled_query_groups_indices)
+        )
+        head_size_indices = (
+            torch.arange(sub_head_size)
+            if sampled_head_size_indices is None
+            else torch.tensor(sampled_head_size_indices)
+        )
 
         # The q, k and v parts are sliced out according to the attention type
         # of the sub-network
         if sub_n_head == sub_q_groups:  # multi-head attention
             query_head_offsets = (
                 query_group_indices[:, None] * supernet_q_per_kv * head_size
-            ) # (sub_n_head, 1)
+            )  # (sub_n_head, 1)
 
             if sampled_head_indices is not None:
-                query_head_offsets = query_head_offsets + sampled_head_indices[0] * head_size
+                query_head_offsets = (
+                    query_head_offsets + sampled_head_indices[0] * head_size
+                )
 
-            kv_head_offsets = (
-                query_group_indices[:, None] * head_size
-            )  # (sub_n_head, 1)
+            kv_head_offsets = query_group_indices[:, None] * head_size  # (sub_n_head, 1)
 
             q_parts = (
                 q_block_start + query_head_offsets + head_size_indices
@@ -211,10 +221,17 @@ class CausalSelfAttention(nn.Module):
                 query_head_indices = torch.tensor(sampled_head_indices) * head_size
 
             q_parts = (
-                q_block_start + query_group_offset + query_head_indices[:, None] + head_size_indices[None, :]
+                q_block_start
+                + query_group_offset
+                + query_head_indices[:, None]
+                + head_size_indices[None, :]
             )  # (sub_n_head, sub_head_size)
-            k_parts = k_block_start + kv_group_offset + head_size_indices[None, :]   # (1, sub_head_size)
-            v_parts = v_block_start + kv_group_offset + head_size_indices[None, :]   # (1, sub_head_size)
+            k_parts = (
+                k_block_start + kv_group_offset + head_size_indices[None, :]
+            )  # (1, sub_head_size)
+            v_parts = (
+                v_block_start + kv_group_offset + head_size_indices[None, :]
+            )  # (1, sub_head_size)
 
         else:  # grouped query attention
             sub_q_group_offsets = (
@@ -226,9 +243,7 @@ class CausalSelfAttention(nn.Module):
             else:
                 per_kv_head_indices = torch.tensor(sampled_head_indices)
 
-            sub_q_per_kv_offsets = (
-                per_kv_head_indices * head_size
-            )  # (sub_q_per_kv,)
+            sub_q_per_kv_offsets = per_kv_head_indices * head_size  # (sub_q_per_kv,)
             q_offsets = (sub_q_group_offsets + sub_q_per_kv_offsets).view(
                 -1, 1
             )  # (sub_q_groups * sub_q_per_kv, 1)
@@ -463,7 +478,9 @@ class CausalSelfAttention(nn.Module):
         q = q.transpose(1, 2)  # (B, nh_q, T, hs)
         k = k.transpose(1, 2)  # (B, nh_k, T, hs)
         v = v.transpose(1, 2)  # (B, nh_v, T, hs)
-        rope_n_elem = math.ceil(self.sub_network_head_size * self.config.rotary_percentage)
+        rope_n_elem = math.ceil(
+            self.sub_network_head_size * self.config.rotary_percentage
+        )
         # apply rope to the first `rope_n_elem` elements of the query and key tensors
         q_roped = apply_rope(q[..., :rope_n_elem], cos, sin)
         k_roped = apply_rope(k[..., :rope_n_elem], cos, sin)
