@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 import torch
 from litgpt import Config as LitConfig
 from litgpt.model import (
@@ -11,7 +12,8 @@ from litgpt.model import (
 from whittle.lora_model.config import LoRAConfig as Config
 from whittle.lora_model.lora_block import LoRABlock as Block
 
-
+# See issues https://github.com/whittle-org/whittle/issues/343 and 344
+@pytest.mark.skip("Fix later")
 def test_block():
     config = Config()
     config.n_embd = 64

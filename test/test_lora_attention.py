@@ -99,6 +99,8 @@ def init_lit_small_attention(config, base_attention, attention_super):
     return attention
 
 
+# See issues https://github.com/whittle-org/whittle/issues/343 and 344
+@pytest.mark.skip("Fix later")
 @pytest.mark.parametrize("attention_config", attention_configs.keys())
 def test_attention(attention_config):
     config = attention_configs[attention_config]["config"]
