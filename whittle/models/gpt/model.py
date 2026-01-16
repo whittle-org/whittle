@@ -218,7 +218,7 @@ class GPT(nn.Module):
     def _verify_config(
         self,
         super_n_dim: int,
-        sub_n_dim: int,
+        sub_n_dim: list[int] | int,
         sampled_dim_indices: list[int] | list[list[int]] | None,
         n_layers: int,
     ):
@@ -246,10 +246,7 @@ class GPT(nn.Module):
                         " match the number of layers in the subnet ({n_layers})!"
                     )
                 for i, list_of_indices in enumerate(sampled_dim_indices):
-                    if isinstance(sub_n_dim, int):
-                        sub_dim = sub_n_dim
-                    else:
-                        sub_dim = sub_n_dim[i]
+                    sub_dim = sub_n_dim if isinstance(sub_n_dim, int) else sub_n_dim[i]
                     if len(list_of_indices) != sub_dim:  # type: ignore
                         raise IllegalSubNetworkError(
                             f"Number of indices in {list_of_indices} does not match the"
@@ -269,11 +266,11 @@ class GPT(nn.Module):
     def _infer_sub_network_sizes_from_indices(
         self,
         sub_network_n_embd: int | None = None,
-        sub_network_intermediate_size: int | None = None,
-        sub_network_num_heads: int | None = None,
+        sub_network_intermediate_size: list[int] | int | None = None,
+        sub_network_num_heads: list[int] | int | None = None,
         sub_network_n_layers: int | None = None,
-        sub_network_query_groups: int | None = None,
-        sub_network_head_size: int | None = None,
+        sub_network_query_groups: list[int] | int | None = None,
+        sub_network_head_size: list[int] | int | None = None,
         sampled_intermediate_indices: list[int] | list[list] | None = None,
         sampled_head_indices: list[int] | list[list] | None = None,
         sampled_query_group_indices: list[int] | list[list] | None = None,
@@ -281,6 +278,24 @@ class GPT(nn.Module):
         sampled_layer_indices: list[int] | None = None,
         sampled_embd_indices: list[int] | None = None,
     ):
+        if (
+            sub_network_n_embd is None
+            and sub_network_intermediate_size is None
+            and sub_network_num_heads is None
+            and sub_network_n_layers is None
+            and sub_network_query_groups is None
+            and sub_network_head_size is None
+            and sampled_intermediate_indices is None
+            and sampled_head_indices is None
+            and sampled_query_group_indices is None
+            and sampled_head_size_indices is None
+            and sampled_layer_indices is None
+            and sampled_embd_indices is None
+        ):
+            raise IllegalSubNetworkError(
+                "At least one of the parameters must be specified."
+            )
+
         def infer_sizes(indices):
             if isinstance(indices[0], list):
                 return [len(inds) for inds in indices]
@@ -327,7 +342,6 @@ class GPT(nn.Module):
             sub_network_n_layers = self.config.n_layer
 
         if sub_network_query_groups is None:
-            # sub_network_query_groups = sub_network_num_heads
             if (self.config.n_query_groups == self.config.n_head) and (
                 sub_network_num_heads is not None
             ):
@@ -349,11 +363,11 @@ class GPT(nn.Module):
     def _verify_sub_network(
         self,
         sub_network_n_embd: int,
-        sub_network_intermediate_size: int,
-        sub_network_num_heads: int,
+        sub_network_intermediate_size: int | list[int],
+        sub_network_num_heads: int | list[int],
         sub_network_n_layers: int,
-        sub_network_query_groups: int,
-        sub_network_head_size: int,
+        sub_network_query_groups: int | list[int],
+        sub_network_head_size: int | list[int],
         sampled_intermediate_indices: list[int] | list[list] | None = None,
         sampled_head_indices: list[int] | list[list] | None = None,
         sampled_query_group_indices: list[int] | list[list] | None = None,
@@ -406,12 +420,12 @@ class GPT(nn.Module):
 
     def set_sub_network(
         self,
-        sub_network_n_embd: int,
-        sub_network_intermediate_size: int,
-        sub_network_num_heads: int,
-        sub_network_n_layers: int,
-        sub_network_query_groups: int | None = None,
-        sub_network_head_size: int | None = None,
+        sub_network_n_embd: int | None = None,
+        sub_network_intermediate_size: int | list[int] | None = None,
+        sub_network_num_heads: int | list[int] | None = None,
+        sub_network_n_layers: int | None = None,
+        sub_network_query_groups: int | list[int] | None = None,
+        sub_network_head_size: int | list[int] | None = None,
         sampled_intermediate_indices: list[int] | list[list] | None = None,
         sampled_head_indices: list[int] | list[list] | None = None,
         sampled_query_group_indices: list[int] | list[list] | None = None,
@@ -530,10 +544,10 @@ class GPT(nn.Module):
                 device=self.cos.device,
             )
         else:
-            self.cos_list = [None for _ in range(self.sub_network_n_layers)] # type: ignore
-            self.sin_list = [None for _ in range(self.sub_network_n_layers)] # type: ignore
+            self.cos_list = [None for _ in range(self.sub_network_n_layers)]  # type: ignore
+            self.sin_list = [None for _ in range(self.sub_network_n_layers)]  # type: ignore
             for i, n_elem in enumerate(self.sub_network_rope_n_elem):
-                self.cos_list[i], self.sin_list[i] = self.rope_cache( # type: ignore
+                self.cos_list[i], self.sin_list[i] = self.rope_cache(  # type: ignore
                     seq_len=self._max_seq_length,
                     n_elem=n_elem,
                     device=self.cos.device,
