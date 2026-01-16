@@ -630,9 +630,6 @@ class GPT(nn.Module):
 
     def process_blocks(self, x, idx, input_pos, j, i, input_pos_maxp1, T):
         block = self.transformer.h[j]
-        cos, sin, mask, input_pos_maxp1_block = self.process_rope_cache(
-            self.cos, self.sin, input_pos, input_pos_maxp1, T
-        )
 
         if isinstance(self.cos_list, list):
             cos, sin = self.cos_list[i].to(idx.device), self.sin_list[i].to(idx.device)
