@@ -70,8 +70,8 @@ class GPT(nn.Module):
         self.sampled_head_size_indices: list[int] | list[list[int]] | None = None
         self.sampled_layer_indices: list[int] | None = None
         self.sampled_embd_indices: list[int] | None = None
-        self.cos_list: list = []
-        self.sin_list: list = []
+        self.cos_list = None
+        self.sin_list = None
         # self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
 
     @property
@@ -535,10 +535,10 @@ class GPT(nn.Module):
                 device=self.cos.device,
             )
         else:
-            self.cos_list = [None for _ in range(self.sub_network_n_layers)]
-            self.sin_list = [None for _ in range(self.sub_network_n_layers)]
+            self.cos_list = [None for _ in range(self.sub_network_n_layers)] # type: ignore
+            self.sin_list = [None for _ in range(self.sub_network_n_layers)] # type: ignore
             for i, n_elem in enumerate(self.sub_network_rope_n_elem):
-                self.cos_list[i], self.sin_list[i] = self.rope_cache(
+                self.cos_list[i], self.sin_list[i] = self.rope_cache( # type: ignore
                     seq_len=self._max_seq_length,
                     n_elem=n_elem,
                     device=self.cos.device,
