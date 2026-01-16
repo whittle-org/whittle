@@ -281,34 +281,29 @@ class GPT(nn.Module):
         sampled_layer_indices: list[int] | None = None,
         sampled_embd_indices: list[int] | None = None,
     ):
-        def infer_size(indices):
+        def infer_sizes(indices):
             if isinstance(indices[0], list):
-                return len(indices[0])
+                return [len(inds) for inds in indices]
             else:
                 return len(indices)
 
         if sub_network_n_embd is None and sampled_embd_indices is not None:
-            sub_network_n_embd = infer_size(sampled_embd_indices)
+            sub_network_n_embd = infer_sizes(sampled_embd_indices)
 
         if (
             sub_network_intermediate_size is None
             and sampled_intermediate_indices is not None
         ):
-            sub_network_intermediate_size = infer_size(sampled_intermediate_indices)
+            sub_network_intermediate_size = infer_sizes(sampled_intermediate_indices)
 
         if sub_network_query_groups is None and sampled_query_group_indices is not None:
-            if isinstance(sampled_query_group_indices[0], list):
-                sub_network_query_groups: list[int] = []  # type: ignore
-                for indices in sampled_query_group_indices:
-                    sub_network_query_groups.append(len(indices))  # type: ignore
-            else:
-                sub_network_query_groups = len(sampled_query_group_indices)
+            sub_network_query_groups = infer_sizes(sampled_query_group_indices)
 
         if sub_network_head_size is None and sampled_head_size_indices is not None:
-            sub_network_head_size = infer_size(sampled_head_size_indices)
+            sub_network_head_size = infer_sizes(sampled_head_size_indices)
 
         if sub_network_n_layers is None and sampled_layer_indices is not None:
-            sub_network_n_layers = infer_size(sampled_layer_indices)
+            sub_network_n_layers = infer_sizes(sampled_layer_indices)
 
         if sub_network_num_heads is None and sampled_head_indices is not None:
             if sub_network_query_groups is not None:
