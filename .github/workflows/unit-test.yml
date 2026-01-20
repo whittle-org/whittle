@@ -29,4 +29,18 @@ jobs:
           cache-dependency-glob: "**/pyproject.toml"  
       - name: Run pytest
         run: uv run --all-extras pytest -vvv
+      - name: Show resolved Python deps
+        run: |
+          uv run python -m pip --version
+          uv run python -m pip freeze --all
+          uv run python -c "import datasets; print('datasets', datasets.__version__)"
+          uv run python -c "import lm_eval; print('lm_eval', lm_eval.__version__)"
+      - name: Save dependency snapshot
+        run: |
+          uv run python -m pip freeze --all > deps.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deps
+          path: deps.txt
+
 
