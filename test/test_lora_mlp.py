@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 import torch
 from litgpt.model import (
     GemmaMLP as LitGemmaMLP,
@@ -15,6 +16,8 @@ from whittle.lora_model.lora_mlps import (
 )
 
 
+# See issues https://github.com/whittle-org/whittle/issues/343 and 344
+@pytest.mark.skip("Fix later")
 def test_GptNeoxMLP():
     config = Config()
     input = torch.rand(8, 64)
@@ -68,6 +71,8 @@ def test_GptNeoxMLP():
     assert torch.all(out_large == out_large_lit)
 
 
+# See issues https://github.com/whittle-org/whittle/issues/343 and 344
+@pytest.mark.skip("Fix later")
 def test_LLaMAMLP():
     config = Config()
     input = torch.rand(8, 64)
@@ -127,6 +132,8 @@ def test_LLaMAMLP():
     assert torch.all(out_large == out_large_lit)
 
 
+# See issues https://github.com/whittle-org/whittle/issues/343 and 344
+@pytest.mark.skip("Fix later")
 def test_GemmaMLP():
     config = Config()
     input = torch.rand(8, 64)

@@ -13,20 +13,32 @@ class LayerNorm(torch.nn.LayerNorm):
 
         # Set current sub-network to super-network
         self.sub_network_in_features = self.in_features
+        self.sampled_ln_indices: list[int] | None = None
 
-    def set_sub_network(self, sub_network_in_features: int):
+    def set_sub_network(
+        self, sub_network_in_features: int, sampled_ln_indices: list[int] | None = None
+    ):
         """Set the input dimensionality of the current sub-network."""
         self.sub_network_in_features = sub_network_in_features
+        self.sampled_ln_indices = sampled_ln_indices
 
     def reset_super_network(self):
         """Reset the input dimensionality of the current sub-network to the super-network dimensionality."""
         self.sub_network_in_features = self.in_features
+        self.sampled_ln_indices = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.sampled_ln_indices is None:
+            weight = self.weight[: self.sub_network_in_features]
+            bias = self.bias[: self.sub_network_in_features]
+        else:
+            weight = self.weight[self.sampled_ln_indices]
+            bias = self.bias[self.sampled_ln_indices]
+
         return F.layer_norm(
             x,
             (self.sub_network_in_features,),
-            weight=self.weight[: self.sub_network_in_features],
-            bias=self.bias[: self.sub_network_in_features],
+            weight=weight,
+            bias=bias,
             eps=self.eps,
         )

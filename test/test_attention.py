@@ -336,6 +336,483 @@ QKV_INDICES_TEST_CONFIGS = {
 }
 
 
+def _r(start, offset, indices=None):
+    vals = list(range(start, start + offset))
+    return vals if indices is None else [vals[i] for i in indices]
+
+
+QKV_INDICES_TEST_CONFIGS_GRANULAR = {
+    "gqa_to_mha_sample_head": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 3, 8),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [3],
+            None,
+            None,
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(24, 8)
+            + _r(64, 8)
+            + _r(104, 8)  # queries
+            + _r(160, 8 * 3)  # values
+            + _r(192, 8 * 3)  # keys
+        ),
+    ],
+    "gqa_to_mha_sample_kv_group": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 3, 8),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            None,
+            [0, 1, 2],
+            None,
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8)
+            + _r(40, 8)
+            + _r(80, 8)  # queries
+            + _r(160, 8 * 3)  # values
+            + _r(192, 8 * 3)  # keys
+        ),
+    ],
+    "gqa_to_mha_sample_head_indices": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 3, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            None,
+            None,
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8, [0, 4, 5, 7])
+            + _r(40, 8, [0, 4, 5, 7])
+            + _r(80, 8, [0, 4, 5, 7])  # queries
+            + _r(160, 8, [0, 4, 5, 7])
+            + _r(168, 8, [0, 4, 5, 7])
+            + _r(176, 8, [0, 4, 5, 7])  # keys
+            + _r(192, 8, [0, 4, 5, 7])
+            + _r(200, 8, [0, 4, 5, 7])
+            + _r(208, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+    "gqa_to_mha_sample_head_indices_2": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 3, 2),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            None,
+            None,
+            [0, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8, [0, 7])
+            + _r(40, 8, [0, 7])
+            + _r(80, 8, [0, 7])  # queries
+            + _r(160, 8, [0, 7])
+            + _r(168, 8, [0, 7])
+            + _r(176, 8, [0, 7])  # keys
+            + _r(192, 8, [0, 7])
+            + _r(200, 8, [0, 7])
+            + _r(208, 8, [0, 7])  # values
+        ),
+    ],
+    "gqa_to_mha_sample_everything_base_case": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 3, 8),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [3],
+            _r(0, 3),
+            _r(0, 8),
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(24, 8)
+            + _r(64, 8)
+            + _r(104, 8)  # queries
+            + _r(160, 8 * 3)  # values
+            + _r(192, 8 * 3)  # keys
+        ),
+    ],
+    "gqa_to_mha_sample_everything_2": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 3, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [3],
+            _r(0, 3),
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(24, 8, [0, 4, 5, 7])
+            + _r(64, 8, [0, 4, 5, 7])
+            + _r(104, 8, [0, 4, 5, 7])  # queries
+            + _r(160, 8, [0, 4, 5, 7])
+            + _r(168, 8, [0, 4, 5, 7])
+            + _r(176, 8, [0, 4, 5, 7])  # keys
+            + _r(192, 8, [0, 4, 5, 7])
+            + _r(200, 8, [0, 4, 5, 7])
+            + _r(208, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+    "gqa_to_mha_sample_everything_3": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 2, 2, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [3],
+            [1, 3],
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(64, 8, [0, 4, 5, 7])
+            + _r(144, 8, [0, 4, 5, 7])  # queries
+            + _r(168, 8, [0, 4, 5, 7])
+            + _r(184, 8, [0, 4, 5, 7])  # keys
+            + _r(200, 8, [0, 4, 5, 7])
+            + _r(216, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+    "mha_to_mha_sample_sample_first_head": [
+        (64, 4, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 3, 8),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0],
+            None,
+            None,
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8 * 3)  # queries
+            + _r(32, 8 * 3)  # keys
+            + _r(64, 8 * 3)  # values
+        ),
+    ],
+    "mha_to_mha_sample_query_groups": [
+        (64, 4, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 3, 8),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            None,
+            [0, 2, 3],
+            None,
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8)
+            + _r(16, 8)
+            + _r(24, 8)  # queries
+            + _r(32, 8)
+            + _r(48, 8)
+            + _r(56, 8)  # keys
+            + _r(64, 8)
+            + _r(80, 8)
+            + _r(88, 8)  # values
+        ),
+    ],
+    "mha_to_mha_sample_everything": [
+        (64, 4, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 3, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0],
+            [0, 2, 3],
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8, [0, 4, 5, 7])
+            + _r(16, 8, [0, 4, 5, 7])
+            + _r(24, 8, [0, 4, 5, 7])  # queries
+            + _r(32, 8, [0, 4, 5, 7])
+            + _r(48, 8, [0, 4, 5, 7])
+            + _r(56, 8, [0, 4, 5, 7])  # keys
+            + _r(64, 8, [0, 4, 5, 7])
+            + _r(80, 8, [0, 4, 5, 7])
+            + _r(88, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+    "mha_to_mha_sample_everything_2": [
+        (64, 4, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 1, 1, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0],
+            [2],
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(16, 8, [0, 4, 5, 7])  # queries
+            + _r(48, 8, [0, 4, 5, 7])  # keys
+            + _r(80, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+    "mha_to_mha_sample_everything_3": [
+        (64, 4, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 1, 1, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0],
+            [3],
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(24, 8, [0, 4, 5, 7])  # queries
+            + _r(56, 8, [0, 4, 5, 7])  # keys
+            + _r(88, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+    "mqa_to_mha_sample_heads": [
+        (64, 4, 1, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 1, 1, 8),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [3],
+            None,
+            None,
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(24, 8)  # queries
+            + _r(32, 8)  # keys
+            + _r(40, 8)  # values
+        ),
+    ],
+    "mqa_to_mha_sample_the_only_query_group": [
+        (64, 4, 1, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 1, 1, 8),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            None,
+            [0],
+            None,
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8)  # queries
+            + _r(32, 8)  # keys
+            + _r(40, 8)  # values
+        ),
+    ],
+    "mqa_to_mha_sample_head_sizes": [
+        (64, 4, 1, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 1, 1, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            None,
+            None,
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8, [0, 4, 5, 7])  # queries
+            + _r(32, 8, [0, 4, 5, 7])  # keys
+            + _r(40, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+    "mqa_to_mha_sample_everything": [
+        (64, 4, 1, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 1, 1, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [2],
+            [0],
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(16, 8, [0, 4, 5, 7])  # queries
+            + _r(32, 8, [0, 4, 5, 7])  # keys
+            + _r(40, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+    "mqa_to_mqa_sample_heads": [
+        (64, 4, 1, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 1, 8),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 2, 3],
+            None,
+            None,
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8)
+            + _r(16, 8)
+            + _r(24, 8)  # queries
+            + _r(32, 8)  # keys
+            + _r(40, 8)  # values
+        ),
+    ],
+    "mqa_to_mqa_sample_the_only_query_group": [
+        (64, 4, 1, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 1, 8),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            None,
+            [0],
+            None,
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8 * 3)  # queries
+            + _r(32, 8)  # keys
+            + _r(40, 8)  # values
+        ),
+    ],
+    "mqa_to_mqa_sample_head_sizes": [
+        (64, 4, 1, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 1, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            None,
+            None,
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8, [0, 4, 5, 7])
+            + _r(8, 8, [0, 4, 5, 7])
+            + _r(16, 8, [0, 4, 5, 7])  # queries
+            + _r(32, 8, [0, 4, 5, 7])  # keys
+            + _r(40, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+    "mqa_to_mqa_sample_everything": [
+        (64, 4, 1, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 3, 1, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [1, 2, 3],
+            [0],
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(8, 8, [0, 4, 5, 7])
+            + _r(16, 8, [0, 4, 5, 7])
+            + _r(24, 8, [0, 4, 5, 7])  # queries
+            + _r(32, 8, [0, 4, 5, 7])  # keys
+            + _r(40, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+    "gqa_to_mqa_sample_heads": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 4, 1, 8),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 2, 3, 4],
+            None,
+            None,
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8)
+            + _r(16, 8)
+            + _r(24, 8)
+            + _r(32, 8)  # queries
+            + _r(160, 8)  # keys
+            + _r(192, 8)  # values
+        ),
+    ],
+    "gqa_to_mqa_sample_query_groups": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 4, 1, 8),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            None,
+            [3],
+            None,
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(120, 8 * 4)  # queries
+            + _r(184, 8)  # keys
+            + _r(216, 8)  # values
+        ),
+    ],
+    "gqa_to_mqa_sample_head_sizes": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 4, 1, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            None,
+            None,
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8, [0, 4, 5, 7])
+            + _r(8, 8, [0, 4, 5, 7])
+            + _r(16, 8, [0, 4, 5, 7])
+            + _r(24, 8, [0, 4, 5, 7])  # queries
+            + _r(160, 8, [0, 4, 5, 7])  # keys
+            + _r(192, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+    "gqa_to_mqa_sample_everything": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 4, 1, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 1, 2, 4],
+            [3],
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(120, 8, [0, 4, 5, 7])
+            + _r(128, 8, [0, 4, 5, 7])
+            + _r(136, 8, [0, 4, 5, 7])
+            + _r(152, 8, [0, 4, 5, 7])  # queries
+            + _r(184, 8, [0, 4, 5, 7])  # keys
+            + _r(216, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+    "gqa_to_gqa_sample_heads": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 6, 2, 8),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 2, 4],
+            None,
+            None,
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8)
+            + _r(16, 8)
+            + _r(32, 8)  # queries for first group
+            + _r(40, 8)
+            + _r(56, 8)
+            + _r(72, 8)  # queries for second group
+            + _r(160, 8 * 2)  # keys
+            + _r(192, 8 * 2)  # values
+        ),
+    ],
+    "gqa_to_gqa_sample_query_groups": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 6, 2, 8),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            None,
+            [0, 3],
+            None,
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8 * 3)  # queries for first group
+            + _r(120, 8 * 3)  # queries for second group
+            + _r(160, 8)
+            + _r(184, 8)  # keys
+            + _r(192, 8)
+            + _r(216, 8)  # values
+        ),
+    ],
+    "gqa_to_gqa_sample_head_sizes": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 6, 2, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            None,
+            None,
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(0, 8, [0, 4, 5, 7])
+            + _r(8, 8, [0, 4, 5, 7])
+            + _r(16, 8, [0, 4, 5, 7])  # queries for the first group
+            + _r(40, 8, [0, 4, 5, 7])
+            + _r(48, 8, [0, 4, 5, 7])
+            + _r(56, 8, [0, 4, 5, 7])  # queries for the second group
+            + _r(160, 8, [0, 4, 5, 7])
+            + _r(168, 8, [0, 4, 5, 7])  # keys
+            + _r(192, 8, [0, 4, 5, 7])
+            + _r(200, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+    "gqa_to_gqa_sample_everything": [
+        (64, 20, 4, 8),  # supernet  n_embd, n_head, query_groups, head_size
+        (64, 6, 2, 4),  # subnet    n_embd, n_head, query_groups, head_size
+        (
+            [0, 2, 4],
+            [1, 3],
+            [0, 4, 5, 7],
+        ),  # sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices
+        (
+            _r(40, 8, [0, 4, 5, 7])
+            + _r(56, 8, [0, 4, 5, 7])
+            + _r(72, 8, [0, 4, 5, 7])  # queries for the first group
+            + _r(120, 8, [0, 4, 5, 7])
+            + _r(136, 8, [0, 4, 5, 7])
+            + _r(152, 8, [0, 4, 5, 7])  # queries for the second group
+            + _r(168, 8, [0, 4, 5, 7])
+            + _r(184, 8, [0, 4, 5, 7])  # keys
+            + _r(200, 8, [0, 4, 5, 7])
+            + _r(216, 8, [0, 4, 5, 7])  # values
+        ),
+    ],
+}
+
+
 @pytest.mark.parametrize("config_key", QKV_INDICES_TEST_CONFIGS.keys())
 def test_qkv_indices(config_key):
     supernet_config, subnet_config, correct_indices = QKV_INDICES_TEST_CONFIGS[config_key]
@@ -346,6 +823,40 @@ def test_qkv_indices(config_key):
     attn = CausalSelfAttention(config, 2)
 
     attn.set_sub_network(*subnet_config)
+
+    qkv_indices = attn.qkv_indices
+    assert qkv_indices is not None
+
+    _, sub_n_head, sub_n_query_groups, sub_head_size = subnet_config
+    assert qkv_indices.shape == (
+        (sub_n_head + 2 * sub_n_query_groups) * sub_head_size,
+    )  # (n heads + 2*num_groups)*head_size
+
+    correct_indices = torch.tensor(correct_indices)
+    assert torch.all(qkv_indices == correct_indices)
+
+
+@pytest.mark.parametrize("config_key", QKV_INDICES_TEST_CONFIGS_GRANULAR.keys())
+def test_qkv_indices_granular(config_key):
+    supernet_config, subnet_config, subnet_granular, correct_indices = (
+        QKV_INDICES_TEST_CONFIGS_GRANULAR[config_key]
+    )
+    n_embd, n_head, n_query_groups, head_size = supernet_config
+    sampled_head_indices, sampled_query_groups_indices, sampled_head_size_indices = (
+        subnet_granular
+    )
+
+    config = Config(
+        n_embd=n_embd, n_head=n_head, n_query_groups=n_query_groups, head_size=head_size
+    )
+    attn = CausalSelfAttention(config, 2)
+
+    attn.set_sub_network(
+        *subnet_config,
+        sampled_head_indices=sampled_head_indices,
+        sampled_query_groups_indices=sampled_query_groups_indices,
+        sampled_head_size_indices=sampled_head_size_indices,
+    )
 
     qkv_indices = attn.qkv_indices
     assert qkv_indices is not None

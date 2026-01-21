@@ -23,7 +23,11 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         self.sub_network_intermediate_size = self.intermediate_size
 
     def set_sub_network(
-        self, sub_network_n_embd: int, sub_network_intermediate_size: int
+        self,
+        sub_network_n_embd: int,
+        sub_network_intermediate_size: int,
+        sampled_intermediate_indices: list[int] | None = None,
+        sampled_embd_indices: list[int] | None = None,
     ):
         """
         Sets the dimensionality of the current sub-network MLP layers.
@@ -36,10 +40,16 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         self.sub_network_intermediate_size = sub_network_intermediate_size
 
         self.fc.set_sub_network(
-            self.sub_network_n_embd, self.sub_network_intermediate_size
+            self.sub_network_n_embd,
+            self.sub_network_intermediate_size,
+            sampled_in_indices=sampled_embd_indices,
+            sampled_out_indices=sampled_intermediate_indices,
         )
         self.proj.set_sub_network(
-            self.sub_network_intermediate_size, self.sub_network_n_embd
+            self.sub_network_intermediate_size,
+            self.sub_network_n_embd,
+            sampled_in_indices=sampled_intermediate_indices,
+            sampled_out_indices=sampled_embd_indices,
         )
 
     def reset_super_network(self):
@@ -66,7 +76,11 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         self.config = config
 
     def set_sub_network(
-        self, sub_network_n_embd: int, sub_network_intermediate_size: int
+        self,
+        sub_network_n_embd: int,
+        sub_network_intermediate_size: int,
+        sampled_intermediate_indices: list[int] | None = None,
+        sampled_embd_indices: list[int] | None = None,
     ):
         """
         Sets the dimensionality of the current sub-network MLP layers.
@@ -79,13 +93,22 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         self.sub_network_intermediate_size = sub_network_intermediate_size
 
         self.fc_1.set_sub_network(
-            self.sub_network_n_embd, self.sub_network_intermediate_size
+            self.sub_network_n_embd,
+            self.sub_network_intermediate_size,
+            sampled_in_indices=sampled_embd_indices,
+            sampled_out_indices=sampled_intermediate_indices,
         )
         self.fc_2.set_sub_network(
-            self.sub_network_n_embd, self.sub_network_intermediate_size
+            self.sub_network_n_embd,
+            self.sub_network_intermediate_size,
+            sampled_in_indices=sampled_embd_indices,
+            sampled_out_indices=sampled_intermediate_indices,
         )
         self.proj.set_sub_network(
-            self.sub_network_intermediate_size, self.sub_network_n_embd
+            self.sub_network_intermediate_size,
+            self.sub_network_n_embd,
+            sampled_in_indices=sampled_intermediate_indices,
+            sampled_out_indices=sampled_embd_indices,
         )
 
     def reset_super_network(self):

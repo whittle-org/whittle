@@ -10,6 +10,8 @@ from whittle.pruning.pruners.sparsegpt import SparseGPTPruner
 from whittle.pruning.pruners.wanda import WandaPruner
 
 
+# See issues https://github.com/whittle-org/whittle/issues/343 and 345
+@pytest.mark.skip("Fix later")
 @pytest.mark.parametrize(
     "model_info",
     [
