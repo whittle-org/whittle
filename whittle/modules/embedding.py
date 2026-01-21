@@ -49,13 +49,16 @@ class Embedding(torch.nn.Embedding):
         self.sub_network_embedding_dim = self.embedding_dim
         self.sampled_embd_dim_indices = None
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def extract_weights(self) -> torch.Tensor:
         weight = (
             self.weight[:, self.sampled_embd_dim_indices]
             if self.sampled_embd_dim_indices is not None
             else self.weight[:, : self.sub_network_embedding_dim]
         )
+        return weight
 
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        weight = self.extract_weights()
         return F.embedding(
             x,
             weight,

@@ -27,7 +27,7 @@ class LayerNorm(torch.nn.LayerNorm):
         self.sub_network_in_features = self.in_features
         self.sampled_ln_indices = None
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def extract_weights(self) -> tuple[torch.Tensor, torch.Tensor | None]:
         if self.sampled_ln_indices is None:
             weight = self.weight[: self.sub_network_in_features]
             bias = self.bias[: self.sub_network_in_features]
@@ -35,6 +35,10 @@ class LayerNorm(torch.nn.LayerNorm):
             weight = self.weight[self.sampled_ln_indices]
             bias = self.bias[self.sampled_ln_indices]
 
+        return weight, bias
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        weight, bias = self.extract_weights()
         return F.layer_norm(
             x,
             (self.sub_network_in_features,),

@@ -36,15 +36,7 @@ class RMSNorm(torch.nn.Module):
         self.sub_network_in_features = self.in_features
         self.sampled_ln_indices = None
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        assert self.sub_network_in_features is not None, (
-            "sub_network_in_features is not set"
-        )
-        dtype = x.dtype
-        x = x.float()
-        # NOTE: the original RMSNorm paper implementation is not equivalent
-        norm_x = torch.mean(x * x, dim=self.dim, keepdim=True)
-        x_normed = x * torch.rsqrt(norm_x + self.eps)
+    def extract_weight(self) -> torch.Tensor:
         if self.sampled_ln_indices is not None:
             weight = (
                 (1 + self.weight[self.sampled_ln_indices])
@@ -57,6 +49,19 @@ class RMSNorm(torch.nn.Module):
                 if self.add_unit_offset
                 else self.weight[: self.sub_network_in_features]
             )
+
+        return weight
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        assert self.sub_network_in_features is not None, (
+            "sub_network_in_features is not set"
+        )
+        dtype = x.dtype
+        x = x.float()
+        # NOTE: the original RMSNorm paper implementation is not equivalent
+        norm_x = torch.mean(x * x, dim=self.dim, keepdim=True)
+        x_normed = x * torch.rsqrt(norm_x + self.eps)
+        weight = self.extract_weight()
         return (x_normed * weight.float()).to(dtype=dtype)
 
     def reset_parameters(self) -> None:
