@@ -55,10 +55,10 @@ class Embedding(torch.nn.Embedding):
             if self.sampled_embd_dim_indices is not None
             else self.weight[:, : self.sub_network_embedding_dim]
         )
-        return weight
+        return weight, None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        weight = self.extract_weights()
+        weight, _ = self.extract_weights()
         return F.embedding(
             x,
             weight,

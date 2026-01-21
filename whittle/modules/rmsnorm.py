@@ -50,7 +50,7 @@ class RMSNorm(torch.nn.Module):
                 else self.weight[: self.sub_network_in_features]
             )
 
-        return weight
+        return weight, None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         assert self.sub_network_in_features is not None, (
@@ -61,7 +61,7 @@ class RMSNorm(torch.nn.Module):
         # NOTE: the original RMSNorm paper implementation is not equivalent
         norm_x = torch.mean(x * x, dim=self.dim, keepdim=True)
         x_normed = x * torch.rsqrt(norm_x + self.eps)
-        weight = self.extract_weight()
+        weight, _ = self.extract_weight()
         return (x_normed * weight.float()).to(dtype=dtype)
 
     def reset_parameters(self) -> None:
