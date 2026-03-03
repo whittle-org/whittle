@@ -11,7 +11,7 @@ def create_litgpt_config_for_subnet(supernet):
     config.n_head = supernet.sub_network_num_heads
     config.n_layer = supernet.sub_network_n_layers
     config.head_size = supernet.sub_network_head_size
-    config.rope_n_elem = math.ceil(config.rotary_percentage * config.head_size)
+    config.rope_n_elem = supernet.sub_network_rope_n_elem
     config.n_query_groups = supernet.sub_network_query_groups
     return config
 
