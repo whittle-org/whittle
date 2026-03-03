@@ -449,6 +449,52 @@ CONFIGS = {
             "sub_network_head_size": [2, 3],
         },
     },
+    "sampled_layers_and_query_group_indices_valid_1": {
+        "config": create_empty_config(
+            sampled_layer_indices=[0, 2], sampled_query_group_indices=[[3], [0, 1]]
+        ),
+        "expected": {
+            "sub_network_n_layers": 2,
+            "sub_network_query_groups": [1, 2],
+            "sub_network_num_heads": [2, 4],
+        },
+    },
+    "sampled_layers_and_head_indices_and_query_group_indices": {
+        "config": create_empty_config(
+            sampled_layer_indices=[0, 2],
+            sampled_head_indices=[1],
+            sampled_query_group_indices=[[3], [0, 1]],
+        ),
+        "expected": {
+            "sub_network_n_layers": 2,
+            "sub_network_query_groups": [1, 2],
+            "sub_network_num_heads": [1, 2],
+        },
+    },
+    "sampled_layers_and_n_query_groups": {
+        "config": create_empty_config(
+            sampled_layer_indices=[0, 2],
+            sampled_head_indices=[0, 1],
+            sub_network_query_groups=4,
+        ),
+        "expected": {
+            "sub_network_n_layers": 2,
+            "sub_network_query_groups": 4,
+            "sub_network_num_heads": 8,
+        },
+    },
+    "sampled_layers_and_head_indicies_and_num_heads": {
+        "config": create_empty_config(
+            sampled_layer_indices=[0, 2],
+            sampled_head_indices=[[0, 1], [0]],
+            sub_network_query_groups=4,
+        ),
+        "expected": {
+            "sub_network_n_layers": 2,
+            "sub_network_query_groups": 4,
+            "sub_network_num_heads": [8, 4],
+        },
+    },
 }
 
 
