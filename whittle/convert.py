@@ -1,6 +1,8 @@
-from litgpt.model import GPT as LitGPT
-import math
+from __future__ import annotations
+
 import copy
+
+from litgpt.model import GPT as LitGPT
 
 
 def create_litgpt_config_for_subnet(supernet):
@@ -15,8 +17,8 @@ def create_litgpt_config_for_subnet(supernet):
     config.n_query_groups = supernet.sub_network_query_groups
     return config
 
-def copy_weights_to_litgpt(whittle_model, lit_model):
 
+def copy_weights_to_litgpt(whittle_model, lit_model):
     def _copy_weights_and_biases(whittle_module, lit_module):
         if hasattr(whittle_module, "extract_weights"):
             W, b = whittle_module.extract_weights()
@@ -61,9 +63,7 @@ def copy_weights_to_litgpt(whittle_model, lit_model):
             _copy_weights_and_biases(whittle_block.mlp.fc_2, litgpt_block.mlp.fc_2)
 
         _copy_weights_and_biases(whittle_block.mlp.proj, litgpt_block.mlp.proj)
-        _copy_weights_and_biases(
-            whittle_block.post_mlp_norm, litgpt_block.post_mlp_norm
-        )
+        _copy_weights_and_biases(whittle_block.post_mlp_norm, litgpt_block.post_mlp_norm)
 
 
 def convert_subnet_to_litgpt(whittle_model, subnet_config):
