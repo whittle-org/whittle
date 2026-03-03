@@ -459,6 +459,12 @@ class GPT(nn.Module):
             sub_network_n_layers: Number of layers in the sub-network.
             sub_network_query_groups: Number of query groups in the sub-network. Defaults to None.
             sub_network_head_size: Size of each attention head in the sub-network. Defaults to None.
+            sampled_intermediate_indices: Sampled set of neurons for the intermediate dimension in the MLP block of a sub-network
+            sampled_head_indices: Sampled set of heads corresponding to every query group of a sub-network
+            sampled_query_group_indices: Sampled set of query groups for a sub-network
+            sampled_head_size_indices: Sampled set of neurons determining size of each attention head for a sub-network
+            sampled_layer_indices: Sampled set of layers from the total number of layers in a sub-network
+            sampled_embd_indices: Sampled set of neurons determining the sub-network width or embedding dimension
         """
         self.reset_super_network()
         sub_network_sizes = self._infer_sub_network_sizes_from_indices(
@@ -584,6 +590,7 @@ class GPT(nn.Module):
         """
         Resets the GPT model to the original super-network dimensionality.
         """
+
         rebuild_rope = self.sub_network_rope_n_elem != self.config.rope_n_elem
 
         self.sub_network_n_embd = self.config.n_embd
