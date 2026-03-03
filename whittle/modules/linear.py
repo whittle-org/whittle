@@ -45,7 +45,7 @@ class Linear(nn.Linear):
         self.sampled_in_indices = None
         self.sampled_out_indices = None
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def extract_weights(self) -> tuple[torch.Tensor, torch.Tensor | None]:
         out_idx = (
             self.sampled_out_indices
             if self.sampled_out_indices is not None
@@ -60,6 +60,10 @@ class Linear(nn.Linear):
         W = self.weight[out_idx][:, in_idx]
         b = self.bias[out_idx] if self.use_bias else None
 
+        return W, b
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        W, b = self.extract_weights()
         return F.linear(x, W, b)
 
 
