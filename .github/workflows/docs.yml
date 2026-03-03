@@ -22,7 +22,7 @@ jobs:
           prune-cache: false
           cache-dependency-glob: "**/pyproject.toml"
       - name: create virtual environment
-        run: uv venv --python 3.10
+        run: uv venv --python 3.10 --clear
       - name: Install
         run: uv pip install ".[all]"
       - name: Run mkdocs
