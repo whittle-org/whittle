@@ -42,12 +42,12 @@ class TestRMSNorm:
         small_layer.weight.data = rmsnorm.weight.data[:32]
         out_small_layer = small_layer(input_features_small)
 
-        new_layer = RMSNorm(64, add_unit_offset=True)
-        new_layer.weight.data = rmsnorm.weight.data[:64]
-        out_new_layer = new_layer(input_features_large)
+        large_layer = RMSNorm(64, add_unit_offset=True)
+        large_layer.weight.data = rmsnorm.weight.data[:64]
+        out_large_layer = large_layer(input_features_large)
 
         assert torch.all(out_small == out_small_layer)
-        assert torch.all(out_large == out_new_layer)
+        assert torch.all(out_large == out_large_layer)
 
         rmsnorm = RMSNormSuper(in_features=64, add_unit_offset=True)
         rmsnorm.reset_super_network()
@@ -57,11 +57,11 @@ class TestRMSNorm:
         )
         out_super_net = rmsnorm(input_features_small[:, :32])
 
-        new_layer = RMSNorm(32, add_unit_offset=True)
-        new_layer.weight.data = torch.arange(0, 64, 2, dtype=torch.float32)
-        out_new_layer = new_layer(input_features_small[:, :32])
+        large_layer = RMSNorm(32, add_unit_offset=True)
+        large_layer.weight.data = torch.arange(0, 64, 2, dtype=torch.float32)
+        out_large_layer = large_layer(input_features_small[:, :32])
 
-        assert torch.all(out_super_net == out_new_layer)
+        assert torch.all(out_super_net == out_large_layer)
 
 
 class TestLayerNorm:
