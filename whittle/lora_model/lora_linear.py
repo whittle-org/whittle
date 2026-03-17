@@ -64,6 +64,12 @@ class LoRALinear(LoRALayer):
         sub_network_in_features: int,
         sub_network_out_features: int,
     ):
+        """Sets the active input and output dimensions for the sub-network.
+
+        Args:
+            sub_network_in_features: Input dimension of the sub-network.
+            sub_network_out_features: Output dimension of the sub-network.
+        """
         self.sub_network_in_features = sub_network_in_features
         self.sub_network_out_features = sub_network_out_features
         self.linear.set_sub_network(sub_network_in_features, sub_network_out_features)
@@ -160,14 +166,24 @@ class LoRALinearProj(LoRALayer):
             self.reset_parameters()
 
     def set_sub_network(
-        self, sub_network_in_features, sub_network_out_features, proj_indices=None
+        self,
+        sub_network_in_features: int,
+        sub_network_out_features: int,
+        proj_indices: list[int] | None = None,
     ):
+        """Sets the active dimensions for the sub-network output projection.
+
+        Args:
+            sub_network_in_features: Input dimension of the sub-network.
+            sub_network_out_features: Output dimension of the sub-network.
+            proj_indices: Indices to select from the projection input dimension.
+        """
         self.sub_network_in_features = sub_network_in_features
         self.sub_network_out_features = sub_network_out_features
         self.linear.set_sub_network(
             sub_network_in_features, sub_network_out_features, proj_indices
         )
-        self.proj_indices = proj_indices
+        self.proj_indices = proj_indices  # type: ignore
 
     def reset_super_network(self):
         self.sub_network_in_features = self.in_features
