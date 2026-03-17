@@ -322,10 +322,14 @@ class GPT(nn.Module):
             sub_network_intermediate_size is None
             and sampled_intermediate_indices is not None
         ):
-            sub_network_intermediate_size = infer_sizes(sampled_intermediate_indices, "intermediate indices")
+            sub_network_intermediate_size = infer_sizes(
+                sampled_intermediate_indices, "intermediate indices"
+            )
 
         if sub_network_head_size is None and sampled_head_size_indices is not None:
-            sub_network_head_size = infer_sizes(sampled_head_size_indices, "head size indices")
+            sub_network_head_size = infer_sizes(
+                sampled_head_size_indices, "head size indices"
+            )
 
         if sub_network_n_layers is None and sampled_layer_indices is not None:
             sub_network_n_layers = infer_sizes(sampled_layer_indices, "layer indices")
@@ -337,7 +341,9 @@ class GPT(nn.Module):
         )
 
         if sub_network_query_groups is None and sampled_query_group_indices is not None:
-            sub_network_query_groups = infer_sizes(sampled_query_group_indices, "query group indices")
+            sub_network_query_groups = infer_sizes(
+                sampled_query_group_indices, "query group indices"
+            )
             n_heads_per_group = self.config.n_head // self.config.n_query_groups
             _sub_network_num_heads = n_heads_per_group * np.array(
                 sub_network_query_groups
@@ -345,7 +351,9 @@ class GPT(nn.Module):
             _sub_network_num_heads = _sub_network_num_heads.tolist()
 
         if sub_network_num_heads is None and sampled_head_indices is not None:
-            n_heads_per_group = np.array(infer_sizes(sampled_head_indices, "head indices"))
+            n_heads_per_group = np.array(
+                infer_sizes(sampled_head_indices, "head indices")
+            )
             n_query_groups = (
                 sub_network_query_groups
                 if sub_network_query_groups is not None

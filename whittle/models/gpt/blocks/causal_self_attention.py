@@ -139,7 +139,9 @@ class CausalSelfAttention(nn.Module):
             if indices is None:
                 return
             elif len(indices) == 0:
-                raise IllegalSubNetworkError(f"Sampled {property} cannot be an empty list")
+                raise IllegalSubNetworkError(
+                    f"Sampled {property} cannot be an empty list"
+                )
             elif max(indices) >= max_val:
                 raise IllegalSubNetworkError(
                     f"Sampled index cannot be greater than {max_val} for {property}"
