@@ -9,8 +9,7 @@ from whittle.exceptions import IllegalSubNetworkError
 from whittle.models.gpt import GPT
 
 
-def test_gpt():
-    torch.manual_seed(0)
+def get_default_test_config():
     config = Config()
     config.padded_vocab_size = 128
     config.n_embd = 64
@@ -26,6 +25,11 @@ def test_gpt():
     config.norm_eps = 1e-5
     config.lm_head_bias = True
     config.fix_head_size = False
+    return config
+
+
+def test_gpt():
+    config = get_default_test_config()
     gpt = GPT(config)
     gpt.transformer.wte.weight.data = torch.randn_like(gpt.transformer.wte.weight.data)
     gpt.lm_head.weight.data = torch.randn_like(gpt.lm_head.weight.data)
@@ -228,24 +232,6 @@ def test_gemma_2():
     assert torch.allclose(whittle_out, lit_out, atol=1e-3)
 
 
-def get_default_test_config():
-    config = Config()
-    config.padded_vocab_size = 128
-    config.n_embd = 64
-    config.intermediate_size = 64 * 4
-    config.n_head = 8
-    config.n_query_groups = 4
-    config.head_size = 8
-    config.n_layer = 2
-    config.block_size = 128
-    config.norm_class_name = "RMSNorm"
-    config.mlp_class_name = "LLaMAMLP"
-    config.rope_n_elem = int(config.rotary_percentage * config.head_size)
-    config.norm_eps = 1e-5
-    config.lm_head_bias = True
-    config.fix_head_size = False
-    return config
-
 
 def get_default_illegal_test_config():
     config = get_default_test_config()
@@ -384,7 +370,7 @@ CONFIGS = {
     },
     "only_sampled_head_indices_list_of_list": {
         "config": create_empty_config(
-            sampled_head_indices=[[0, 4, 5, 7], [2, 3]],
+            sampled_head_indices=[[0, 2, 0, 1], [2, 2]],
         ),
         "expected": {
             "sub_network_num_heads": [4 * 4, 2 * 4],
@@ -461,7 +447,7 @@ CONFIGS = {
     },
     "sampled_layers_and_head_indices_and_query_group_indices": {
         "config": create_empty_config(
-            sampled_layer_indices=[0, 2],
+            sampled_layer_indices=[0, 1],
             sampled_head_indices=[1],
             sampled_query_group_indices=[[3], [0, 1]],
         ),
@@ -483,7 +469,7 @@ CONFIGS = {
             "sub_network_num_heads": 8,
         },
     },
-    "sampled_layers_and_head_indicies_and_num_heads": {
+    "sampled_layers_and_head_indices_and_num_heads": {
         "config": create_empty_config(
             sampled_layer_indices=[0, 2],
             sampled_head_indices=[[0, 1], [0]],
