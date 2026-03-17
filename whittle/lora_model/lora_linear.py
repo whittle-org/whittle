@@ -166,7 +166,10 @@ class LoRALinearProj(LoRALayer):
             self.reset_parameters()
 
     def set_sub_network(
-        self, sub_network_in_features, sub_network_out_features, proj_indices=None
+        self,
+        sub_network_in_features: int,
+        sub_network_out_features: int,
+        proj_indices: list[int] | None = None,
     ):
         """Sets the active dimensions for the sub-network output projection.
 

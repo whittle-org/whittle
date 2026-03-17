@@ -100,11 +100,11 @@ class LoRAQKVLinear(LoRALayer):
         self,
         sub_network_in_features: int,
         sub_network_out_features: int,
-        qkv_indices=None,
-        sub_network_n_head=None,
-        sub_network_query_groups=None,
-        sub_network_head_size=None,
-        sub_network_q_per_kv=None,
+        qkv_indices: list[int] | None = None,
+        sub_network_n_head: int | None = None,
+        sub_network_query_groups: int | None = None,
+        sub_network_head_size: int | None = None,
+        sub_network_q_per_kv: int | None = None,
     ):
         """Sets the active dimensions for the sub-network QKV projection.
 
