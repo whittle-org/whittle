@@ -908,6 +908,15 @@ class WhittleLM(TemplateLM):
         sub_network_n_layers: int,
         sample_random_indices: bool = False,
     ) -> None:
+        """Sets the underlying GPT model to the specified sub-network dimensionality.
+
+        Args:
+            sub_network_n_embd: Embedding dimension of the sub-network.
+            sub_network_intermediate_size: Intermediate size of the sub-network MLP layers.
+            sub_network_num_heads: Number of attention heads in the sub-network.
+            sub_network_n_layers: Number of layers in the sub-network.
+            sample_random_indices: Whether to sample random indices for sub-network dimensions.
+        """
         self.model.set_sub_network(
             sub_network_n_embd=sub_network_n_embd,
             sub_network_intermediate_size=sub_network_intermediate_size,

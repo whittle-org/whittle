@@ -354,8 +354,8 @@ QKV_INDICES_TEST_CONFIGS_GRANULAR = {
             _r(24, 8)
             + _r(64, 8)
             + _r(104, 8)  # queries
-            + _r(160, 8 * 3)  # values
-            + _r(192, 8 * 3)  # keys
+            + _r(160, 8 * 3)  # keys
+            + _r(192, 8 * 3)  # values
         ),
     ],
     "gqa_to_mha_sample_kv_group": [
@@ -370,8 +370,8 @@ QKV_INDICES_TEST_CONFIGS_GRANULAR = {
             _r(0, 8)
             + _r(40, 8)
             + _r(80, 8)  # queries
-            + _r(160, 8 * 3)  # values
-            + _r(192, 8 * 3)  # keys
+            + _r(160, 8 * 3)  # keys
+            + _r(192, 8 * 3)  # values
         ),
     ],
     "gqa_to_mha_sample_head_indices": [
@@ -426,8 +426,8 @@ QKV_INDICES_TEST_CONFIGS_GRANULAR = {
             _r(24, 8)
             + _r(64, 8)
             + _r(104, 8)  # queries
-            + _r(160, 8 * 3)  # values
-            + _r(192, 8 * 3)  # keys
+            + _r(160, 8 * 3)  # keys
+            + _r(192, 8 * 3)  # values
         ),
     ],
     "gqa_to_mha_sample_everything_2": [

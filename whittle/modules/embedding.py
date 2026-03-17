@@ -33,26 +33,31 @@ class Embedding(torch.nn.Embedding):
 
         # the embedding dimensionality of the current sub-network
         self.sub_network_embedding_dim: int | None = embedding_dim
-        self.sampled_embd_dim_indices: list[int] | None = None
+        self.sampled_embd_indices: list[int] | None = None
 
     def set_sub_network(
         self,
         sub_network_embedding_dim: int,
         sampled_embd_dim_indices: list[int] | None = None,
     ):
-        """Set the embedding dimensionality of the current sub-network."""
+        """Sets the active embedding dimension for the sub-network.
+
+        Args:
+            sub_network_embedding_dim: Embedding dimension of the sub-network.
+            sampled_embd_dim_indices: Indices to select from the embedding dimension.
+        """
         self.sub_network_embedding_dim = sub_network_embedding_dim
-        self.sampled_embd_dim_indices = sampled_embd_dim_indices
+        self.sampled_embd_indices = sampled_embd_dim_indices
 
     def reset_super_network(self):
         """Reset the embedding dimensionality of the current sub-network to the super-network dimensionality"""
         self.sub_network_embedding_dim = self.embedding_dim
-        self.sampled_embd_dim_indices = None
+        self.sampled_embd_indices = None
 
     def extract_weights(self) -> torch.Tensor:
         weight = (
-            self.weight[:, self.sampled_embd_dim_indices]
-            if self.sampled_embd_dim_indices is not None
+            self.weight[:, self.sampled_embd_indices]
+            if self.sampled_embd_indices is not None
             else self.weight[:, : self.sub_network_embedding_dim]
         )
         return weight, None

@@ -35,6 +35,8 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         Args:
            sub_network_n_embd: Input and output embedding dimension of the sub-network.
            sub_network_intermediate_size: Hidden layer dimension of the sub-network MLP.
+           sampled_intermediate_indices: Indices to sample from the hidden layer dimension.
+           sampled_embd_indices: Indices to sample from the embedding dimension.
         """
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
@@ -88,6 +90,8 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         Args:
             sub_network_n_embd: Input and output embedding dimension of the sub-network.
             sub_network_intermediate_size: Hidden layer dimension of the sub-network MLP.
+            sampled_intermediate_indices: Indices to sample from the intermediate dimension.
+            sampled_embd_indices: Indices to sample from the embedding dimension.
         """
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size

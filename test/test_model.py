@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import pytest
 import torch
 from litgpt import Config
 from litgpt.model import GPT as LitGPT
 
+from whittle.exceptions import IllegalSubNetworkError
 from whittle.models.gpt import GPT
 
 
-def test_gpt():
-    torch.manual_seed(0)
+def get_default_test_config():
     config = Config()
     config.padded_vocab_size = 128
     config.n_embd = 64
@@ -24,6 +25,11 @@ def test_gpt():
     config.norm_eps = 1e-5
     config.lm_head_bias = True
     config.fix_head_size = False
+    return config
+
+
+def test_gpt():
+    config = get_default_test_config()
     gpt = GPT(config)
     gpt.transformer.wte.weight.data = torch.randn_like(gpt.transformer.wte.weight.data)
     gpt.lm_head.weight.data = torch.randn_like(gpt.lm_head.weight.data)
@@ -224,3 +230,280 @@ def test_gemma_2():
     whittle_out = whittle_model(x)
     lit_out = lit_model(x)
     assert torch.allclose(whittle_out, lit_out, atol=1e-3)
+
+
+def get_default_illegal_test_config():
+    config = get_default_test_config()
+    config.n_layer = 3
+    return config
+
+
+def create_empty_config(**kwargs):
+    config = {
+        "sub_network_n_embd": None,
+        "sub_network_intermediate_size": None,
+        "sub_network_num_heads": None,
+        "sub_network_n_layers": None,
+        "sub_network_query_groups": None,
+        "sub_network_head_size": None,
+        "sampled_intermediate_indices": None,
+        "sampled_head_indices": None,
+        "sampled_query_group_indices": None,
+        "sampled_head_size_indices": None,
+        "sampled_layer_indices": None,
+        "sampled_embd_indices": None,
+    }
+
+    config.update(**kwargs)
+    return config
+
+
+def get_default_sizes_config():
+    config = get_default_test_config()
+    return {
+        "sub_network_n_embd": config.n_embd,
+        "sub_network_intermediate_size": config.intermediate_size,
+        "sub_network_num_heads": config.n_head,
+        "sub_network_n_layers": config.n_layer,
+        "sub_network_query_groups": config.n_query_groups,
+        "sub_network_head_size": config.head_size,
+    }
+
+
+ILLEGAL_CONFIGS = {
+    "only_sampled_intermediate_indices_list_out_of_bounds": {
+        "config": create_empty_config(
+            sampled_intermediate_indices=[0, 4, 5, 256],
+        ),
+    },
+    "only_sampled_intermediate_indices_list_of_lists_out_of_bounds": {
+        "config": create_empty_config(
+            sampled_intermediate_indices=[[0, 4, 5, 256], [0], [16, 20]],
+        ),
+    },
+    "only_sampled_query_group_indices_list_of_lists_out_of_bounds": {
+        "config": create_empty_config(
+            sampled_query_group_indices=[
+                [0, 1],
+                [3],
+                [0, 4],
+            ],
+        ),
+    },
+    "only_sampled_query_group_indices_list_index_out_of_bounds": {
+        "config": create_empty_config(
+            sampled_query_group_indices=[4],
+        ),
+    },
+    "only_sampled_embd_indices_index_out_of_bounds": {
+        "config": create_empty_config(
+            sampled_embd_indices=[0, 32, 64],
+        ),
+    },
+    "only_sampled_n_layers_indices_index_out_of_bounds": {
+        "config": create_empty_config(
+            sampled_layer_indices=[0, 1, 2, 3],
+        ),
+    },
+    "only_sampled_head_size_indices_list_of_lists_out_of_bounds": {
+        "config": create_empty_config(
+            sampled_head_size_indices=[[0, 7], [0, 4, 8], [1, 2]],
+        ),
+    },
+    "only_sampled_head_size_indices_list_out_of_bounds": {
+        "config": create_empty_config(
+            sampled_head_size_indices=[0, 4, 8],
+        ),
+    },
+    "only_sampled_num_heads_out_of_bounds": {
+        "config": create_empty_config(
+            sampled_head_indices=[0, 4, 8],
+        ),
+    },
+    "only_sampled_num_heads_out_of_bounds_list_of_lists_1": {
+        "config": create_empty_config(
+            sampled_head_indices=[[0, 1], [0], [2]],
+        ),
+    },
+    "only_sampled_num_heads_out_of_bounds_list_of_lists_2": {
+        "config": create_empty_config(
+            sampled_head_indices=[[0, 1], [0], [0, 2]],
+        ),
+    },
+    "only_sampled_num_heads_out_of_bounds_list_of_lists_3": {
+        "config": create_empty_config(
+            sampled_head_indices=[[0, 1], [0], [0, 1, 2]],
+        ),
+    },
+    "sampled_layers_and_query_group_indices": {
+        "config": create_empty_config(
+            sampled_layer_indices=[0, 2], sampled_query_group_indices=[[4], [0, 1]]
+        ),
+    },
+}
+
+CONFIGS = {
+    "only_sampled_intermediate_indices_list": {
+        "config": create_empty_config(
+            sampled_intermediate_indices=[0, 4, 5, 255],
+        ),
+        "expected": {
+            "sub_network_intermediate_size": 4,
+        },
+    },
+    "only_sampled_intermediate_indices_list_of_lists": {
+        "config": create_empty_config(
+            sampled_intermediate_indices=[[0, 4, 5, 255], [0], [16, 20]],
+        ),
+        "expected": {
+            "sub_network_intermediate_size": [4, 1, 2],
+        },
+    },
+    "only_sampled_head_indices_list": {
+        "config": create_empty_config(
+            sampled_head_indices=[0, 1],
+        ),
+        "expected": {
+            "sub_network_num_heads": 8,
+        },
+    },
+    "only_sampled_head_indices_list_of_list": {
+        "config": create_empty_config(
+            sampled_head_indices=[[0, 2, 0, 1], [2, 2]],
+        ),
+        "expected": {
+            "sub_network_num_heads": [4 * 4, 2 * 4],
+        },
+    },
+    "only_sampled_query_group_indices_list_1": {
+        "config": create_empty_config(
+            sampled_query_group_indices=[1],
+        ),
+        "expected": {
+            "sub_network_query_groups": 1,
+            "sub_network_num_heads": 2,
+        },
+    },
+    "only_sampled_query_group_indices_list_2": {
+        "config": create_empty_config(
+            sampled_query_group_indices=[0, 1],
+        ),
+        "expected": {
+            "sub_network_query_groups": 2,
+            "sub_network_num_heads": 4,
+        },
+    },
+    "only_sampled_query_group_indices_list_of_lists": {
+        "config": create_empty_config(
+            sampled_query_group_indices=[
+                [0, 1],
+                [1],
+            ],
+        ),
+        "expected": {"sub_network_query_groups": [2, 1], "sub_network_num_heads": [4, 2]},
+    },
+    "only_sampled_n_layers_indices": {
+        "config": create_empty_config(
+            sampled_layer_indices=[0, 1],
+        ),
+        "expected": {
+            "sub_network_n_layers": 2,
+        },
+    },
+    "only_sampled_embd_indices": {
+        "config": create_empty_config(
+            sampled_embd_indices=[0, 32, 63],
+        ),
+        "expected": {
+            "sub_network_n_embd": 3,
+        },
+    },
+    "only_sampled_head_size_indices_list": {
+        "config": create_empty_config(
+            sampled_head_size_indices=[0, 4, 7],
+        ),
+        "expected": {
+            "sub_network_head_size": 3,
+        },
+    },
+    "only_sampled_head_size_indices_list_of_lists": {
+        "config": create_empty_config(
+            sampled_head_size_indices=[[0, 7], [0, 4, 7]],
+        ),
+        "expected": {
+            "sub_network_head_size": [2, 3],
+        },
+    },
+    "sampled_layers_and_query_group_indices_valid_1": {
+        "config": create_empty_config(
+            sampled_layer_indices=[0, 2], sampled_query_group_indices=[[3], [0, 1]]
+        ),
+        "expected": {
+            "sub_network_n_layers": 2,
+            "sub_network_query_groups": [1, 2],
+            "sub_network_num_heads": [2, 4],
+        },
+    },
+    "sampled_layers_and_head_indices_and_query_group_indices": {
+        "config": create_empty_config(
+            sampled_layer_indices=[0, 1],
+            sampled_head_indices=[1],
+            sampled_query_group_indices=[[3], [0, 1]],
+        ),
+        "expected": {
+            "sub_network_n_layers": 2,
+            "sub_network_query_groups": [1, 2],
+            "sub_network_num_heads": [1, 2],
+        },
+    },
+    "sampled_layers_and_n_query_groups": {
+        "config": create_empty_config(
+            sampled_layer_indices=[0, 2],
+            sampled_head_indices=[0, 1],
+            sub_network_query_groups=4,
+        ),
+        "expected": {
+            "sub_network_n_layers": 2,
+            "sub_network_query_groups": 4,
+            "sub_network_num_heads": 8,
+        },
+    },
+    "sampled_layers_and_head_indices_and_num_heads": {
+        "config": create_empty_config(
+            sampled_layer_indices=[0, 2],
+            sampled_head_indices=[[0, 1], [0]],
+            sub_network_query_groups=4,
+        ),
+        "expected": {
+            "sub_network_n_layers": 2,
+            "sub_network_query_groups": 4,
+            "sub_network_num_heads": [8, 4],
+        },
+    },
+}
+
+
+@pytest.mark.parametrize("config_key", CONFIGS.keys())
+def test_infer_subnetwork_sizes(config_key):
+    torch.manual_seed(0)
+    gpt = GPT(get_default_test_config())
+
+    test_config = CONFIGS[config_key]
+    configs = test_config["config"]
+    expected_results = get_default_sizes_config()
+    expected_results.update(test_config["expected"])
+    inferred_sizes = gpt._infer_sub_network_sizes_from_indices(**configs)
+
+    for key in expected_results.keys():
+        assert expected_results[key] == inferred_sizes[key]
+
+
+@pytest.mark.parametrize("config_key", ILLEGAL_CONFIGS.keys())
+def test_illegal_subnets(config_key):
+    gpt = GPT(get_default_illegal_test_config())
+
+    test_config = ILLEGAL_CONFIGS[config_key]
+    configs = test_config["config"]
+
+    with pytest.raises(IllegalSubNetworkError):
+        gpt.set_sub_network(**configs)
