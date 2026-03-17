@@ -29,6 +29,12 @@ class RMSNorm(torch.nn.Module):
     def set_sub_network(
         self, sub_network_in_features: int, sampled_ln_indices: list[int] | None = None
     ):
+        """Sets the active input dimension for the sub-network.
+
+        Args:
+            sub_network_in_features: Input dimension of the sub-network.
+            sampled_ln_indices: Indices to select from the input dimension.
+        """
         self.sub_network_in_features = sub_network_in_features
         self.sampled_ln_indices = sampled_ln_indices
 

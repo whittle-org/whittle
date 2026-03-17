@@ -86,6 +86,11 @@ class Block(litgpt.model.Block):
             sub_network_num_heads: Number of attention heads in the sub-network.
             sub_network_query_groups: Number of query groups in the sub-network.
             sub_network_head_size: Size of each attention head in the sub-network.
+            sampled_intermediate_indices: Indices for sampling the MLP intermediate dimension.
+            sampled_head_indices: Indices for sampling attention heads within each query group.
+            sampled_query_group_indices: Indices for sampling query groups.
+            sampled_head_size_indices: Indices for sampling head size dimensions.
+            sampled_embd_indices: Indices for sampling embedding dimensions.
         """
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size

@@ -106,6 +106,17 @@ class LoRAQKVLinear(LoRALayer):
         sub_network_head_size=None,
         sub_network_q_per_kv=None,
     ):
+        """Sets the active dimensions for the sub-network QKV projection.
+
+        Args:
+            sub_network_in_features: Input dimension of the sub-network.
+            sub_network_out_features: Output dimension of the sub-network.
+            qkv_indices: Indices to select from the QKV output dimension.
+            sub_network_n_head: Number of attention heads in the sub-network.
+            sub_network_query_groups: Number of query groups in the sub-network.
+            sub_network_head_size: Head size in the sub-network.
+            sub_network_q_per_kv: Number of queries per key/value in the sub-network.
+        """
         self.sub_network_in_features = sub_network_in_features
         self.sub_network_out_features = sub_network_out_features
         self.sub_network_n_head = sub_network_n_head
