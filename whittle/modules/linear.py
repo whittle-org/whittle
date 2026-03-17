@@ -91,7 +91,7 @@ class LinearQKV(nn.Linear):
         self.sub_network_in_features = in_features
         self.sub_network_out_features = out_features
         self.use_bias = bias
-        self.qkv_indices = None
+        self.qkv_indices: list[int] | None = None
 
     def set_sub_network(
         self,

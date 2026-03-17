@@ -119,14 +119,14 @@ class LoRAQKVLinear(LoRALayer):
         """
         self.sub_network_in_features = sub_network_in_features
         self.sub_network_out_features = sub_network_out_features
-        self.sub_network_n_head = sub_network_n_head
-        self.sub_network_query_groups = sub_network_query_groups
-        self.sub_network_head_size = sub_network_head_size
-        self.sub_network_q_per_kv = sub_network_q_per_kv
+        self.sub_network_n_head = sub_network_n_head  # type: ignore
+        self.sub_network_query_groups = sub_network_query_groups  # type: ignore
+        self.sub_network_head_size = sub_network_head_size  # type: ignore
+        self.sub_network_q_per_kv = sub_network_q_per_kv  # type: ignore
         self.linear.set_sub_network(
             sub_network_in_features, sub_network_out_features, qkv_indices
         )
-        self.qkv_indices = qkv_indices
+        self.qkv_indices = qkv_indices  # type: ignore
 
         # trigger resetting the indices for LoRA
         self._set_lora_ind()

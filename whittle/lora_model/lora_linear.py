@@ -183,7 +183,7 @@ class LoRALinearProj(LoRALayer):
         self.linear.set_sub_network(
             sub_network_in_features, sub_network_out_features, proj_indices
         )
-        self.proj_indices = proj_indices
+        self.proj_indices = proj_indices  # type: ignore
 
     def reset_super_network(self):
         self.sub_network_in_features = self.in_features
