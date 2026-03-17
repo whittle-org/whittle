@@ -76,6 +76,21 @@ class CausalSelfAttention(nn.Module):
         sampled_head_size_indices: list[int] | None = None,
         sampled_query_groups_indices: list[int] | None = None,
     ):
+        """Validates that the sub-network configuration is within super-network bounds.
+
+        Args:
+            subnet_n_embed: Embedding dimension of the sub-network.
+            subnet_n_head: Number of attention heads in the sub-network.
+            subnet_n_query_groups: Number of query groups in the sub-network.
+            subnet_head_size: Head size in the sub-network.
+            sampled_head_indices: Indices for sampling heads per query group.
+            sampled_embd_indices: Indices for sampling embedding dimensions.
+            sampled_head_size_indices: Indices for sampling head size dimensions.
+            sampled_query_groups_indices: Indices for sampling query groups.
+
+        Raises:
+            IllegalSubNetworkError: If any sub-network dimension exceeds super-network bounds.
+        """
         n_embd = self.config.n_embd
         head_size = self.config.head_size
         n_head = self.config.n_head
@@ -123,6 +138,10 @@ class CausalSelfAttention(nn.Module):
         def verify_indices(indices: list[int] | None, max_val: int, property: str):
             if indices is None:
                 return
+            elif len(indices) == 0:
+                raise IllegalSubNetworkError(
+                    f"Sampled {property} cannot be an empty list"
+                )
             elif max(indices) >= max_val:
                 raise IllegalSubNetworkError(
                     f"Sampled index cannot be greater than {max_val} for {property}"
@@ -279,7 +298,18 @@ class CausalSelfAttention(nn.Module):
         sampled_head_size_indices: list[int] | None = None,
         sampled_query_groups_indices: list[int] | None = None,
     ) -> None:
-        """Updates the sub-network configuration."""
+        """Updates the sub-network configuration.
+
+        Args:
+            sub_network_n_embd: Embedding dimension of the sub-network.
+            sub_network_n_head: Number of attention heads in the sub-network.
+            sub_network_query_groups: Number of query groups in the sub-network.
+            sub_network_head_size: Head size in the sub-network.
+            sampled_head_indices: Indices for sampling heads per query group.
+            sampled_embd_indices: Indices for sampling embedding dimensions.
+            sampled_head_size_indices: Indices for sampling head size dimensions.
+            sampled_query_groups_indices: Indices for sampling query groups.
+        """
 
         self._verify_subnet_is_legal(
             subnet_n_embed=sub_network_n_embd,
@@ -323,10 +353,14 @@ class CausalSelfAttention(nn.Module):
         Sets the CausalSelfAttention block to the specified sub-network dimensionality.
 
         Args:
-            sub_network_n_embd: Embedding dimension of the sub-network
-            sub_network_n_head: Number of attention heads in the sub-network
+            sub_network_n_embd: Embedding dimension of the sub-network.
+            sub_network_n_head: Number of attention heads in the sub-network.
             sub_network_query_groups: Number of query groups for grouped-query attention (GQA).
             sub_network_head_size: Size of each attention head in the sub-network.
+            sampled_head_indices: Indices for sampling heads within each query group.
+            sampled_embd_indices: Indices for sampling embedding dimensions.
+            sampled_head_size_indices: Indices for sampling head size dimensions.
+            sampled_query_groups_indices: Indices for sampling query groups.
         """
 
         def get_val(value: int | None, default: int) -> int:
