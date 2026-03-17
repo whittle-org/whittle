@@ -232,7 +232,6 @@ def test_gemma_2():
     assert torch.allclose(whittle_out, lit_out, atol=1e-3)
 
 
-
 def get_default_illegal_test_config():
     config = get_default_test_config()
     config.n_layer = 3
@@ -328,7 +327,7 @@ ILLEGAL_CONFIGS = {
     },
     "only_sampled_num_heads_out_of_bounds_list_of_lists_2": {
         "config": create_empty_config(
-            sampled_head_indices=[[0, 1], [0], [2]],
+            sampled_head_indices=[[0, 1], [0], [0, 2]],
         ),
     },
     "only_sampled_num_heads_out_of_bounds_list_of_lists_3": {
