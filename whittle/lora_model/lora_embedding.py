@@ -54,6 +54,11 @@ class LoRAEmbedding(LoRALayer):
             self.reset_parameters()
 
     def set_sub_network(self, sub_network_embedding_dim: int):
+        """Sets the active embedding dimension for the sub-network.
+
+        Args:
+            sub_network_embedding_dim: Embedding dimension of the sub-network.
+        """
         self.sub_network_embedding_dim = sub_network_embedding_dim
         self.embedding.set_sub_network(sub_network_embedding_dim)
         self.sub_network_embedding_dim = sub_network_embedding_dim

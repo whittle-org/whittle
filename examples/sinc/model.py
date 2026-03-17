@@ -24,6 +24,11 @@ class MLP(nn.Module):
         return x_
 
     def set_sub_network(self, num_units):
+        """Sets the active output dimension for the hidden layer.
+
+        Args:
+            num_units: Number of units in the hidden layer of the sub-network.
+        """
         self.hidden_layer.set_sub_network(self.hidden_dim, num_units)
         self.output_layer.set_sub_network(num_units, 1)
 

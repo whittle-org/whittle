@@ -28,6 +28,12 @@ class LeNet(nn.Module):
         return x
 
     def set_sub_network(self, fc1_out: int, fc2_out: int):
+        """Sets the active output dimensions for the fully connected layers.
+
+        Args:
+            fc1_out: Output dimension of the first fully connected layer.
+            fc2_out: Output dimension of the second fully connected layer.
+        """
         self.fc1.set_sub_network(
             sub_network_in_features=self.fc_base_out, sub_network_out_features=fc1_out
         )
