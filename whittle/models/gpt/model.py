@@ -271,7 +271,7 @@ class GPT(nn.Module):
 
         else:
             raise IllegalSubNetworkError(
-                f"f{sampled_dim_indices} is not a valid value for the list of indices."
+                f"{sampled_dim_indices} is not a valid value for the list of indices."
             )
 
     def _infer_sub_network_sizes_from_indices(
@@ -307,26 +307,28 @@ class GPT(nn.Module):
                 "At least one of the parameters must be specified."
             )
 
-        def infer_sizes(indices):
+        def infer_sizes(indices, property_name):
+            if len(indices) == 0:
+                raise IllegalSubNetworkError(f"Sampled {property_name} cannot be empty!")
             if isinstance(indices[0], list):
                 return [len(inds) for inds in indices]
             else:
                 return len(indices)
 
         if sub_network_n_embd is None and sampled_embd_indices is not None:
-            sub_network_n_embd = infer_sizes(sampled_embd_indices)
+            sub_network_n_embd = infer_sizes(sampled_embd_indices, "embedding indices")
 
         if (
             sub_network_intermediate_size is None
             and sampled_intermediate_indices is not None
         ):
-            sub_network_intermediate_size = infer_sizes(sampled_intermediate_indices)
+            sub_network_intermediate_size = infer_sizes(sampled_intermediate_indices, "intermediate indices")
 
         if sub_network_head_size is None and sampled_head_size_indices is not None:
-            sub_network_head_size = infer_sizes(sampled_head_size_indices)
+            sub_network_head_size = infer_sizes(sampled_head_size_indices, "head size indices")
 
         if sub_network_n_layers is None and sampled_layer_indices is not None:
-            sub_network_n_layers = infer_sizes(sampled_layer_indices)
+            sub_network_n_layers = infer_sizes(sampled_layer_indices, "layer indices")
 
         _sub_network_num_heads = (
             sub_network_num_heads
@@ -335,7 +337,7 @@ class GPT(nn.Module):
         )
 
         if sub_network_query_groups is None and sampled_query_group_indices is not None:
-            sub_network_query_groups = infer_sizes(sampled_query_group_indices)
+            sub_network_query_groups = infer_sizes(sampled_query_group_indices, "query group indices")
             n_heads_per_group = self.config.n_head // self.config.n_query_groups
             _sub_network_num_heads = n_heads_per_group * np.array(
                 sub_network_query_groups
@@ -343,7 +345,7 @@ class GPT(nn.Module):
             _sub_network_num_heads = _sub_network_num_heads.tolist()
 
         if sub_network_num_heads is None and sampled_head_indices is not None:
-            n_heads_per_group = np.array(infer_sizes(sampled_head_indices))
+            n_heads_per_group = np.array(infer_sizes(sampled_head_indices, "head indices"))
             n_query_groups = (
                 sub_network_query_groups
                 if sub_network_query_groups is not None
@@ -459,6 +461,12 @@ class GPT(nn.Module):
             sub_network_n_layers: Number of layers in the sub-network.
             sub_network_query_groups: Number of query groups in the sub-network. Defaults to None.
             sub_network_head_size: Size of each attention head in the sub-network. Defaults to None.
+            sampled_intermediate_indices: Indices for sampling the MLP intermediate dimension.
+            sampled_head_indices: Indices for sampling attention heads within each query group.
+            sampled_query_group_indices: Indices for sampling query groups.
+            sampled_head_size_indices: Indices for sampling head size dimensions.
+            sampled_layer_indices: Indices for selecting a subset of layers.
+            sampled_embd_indices: Indices for sampling embedding dimensions.
         """
         self.reset_super_network()
         sub_network_sizes = self._infer_sub_network_sizes_from_indices(
