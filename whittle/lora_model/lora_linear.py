@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from litgpt.lora import LoRALayer
 
-from whittle.modules.linear import Linear, LinearProj
+from whittle.modules.linear import Linear
 
 
 class LoRALinear(LoRALayer):
@@ -150,7 +150,7 @@ class LoRALinearProj(LoRALayer):
         **kwargs: Any,
     ):
         super().__init__(r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout)
-        self.linear = LinearProj(in_features, out_features, **kwargs)
+        self.linear = Linear(in_features, out_features, **kwargs)
         self.use_bias = self.linear.use_bias
         self.in_features = in_features
         self.out_features = out_features
@@ -181,7 +181,9 @@ class LoRALinearProj(LoRALayer):
         self.sub_network_in_features = sub_network_in_features
         self.sub_network_out_features = sub_network_out_features
         self.linear.set_sub_network(
-            sub_network_in_features, sub_network_out_features, proj_indices
+            sub_network_in_features,
+            sub_network_out_features,
+            sampled_in_indices=proj_indices,
         )
         self.proj_indices = proj_indices  # type: ignore
 

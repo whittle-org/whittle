@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from litgpt.lora import LoRALayer
 
-from whittle.modules.linear import LinearQKV
+from whittle.modules.linear import Linear
 
 
 class LoRAQKVLinear(LoRALayer):
@@ -33,7 +33,7 @@ class LoRAQKVLinear(LoRALayer):
         super().__init__(r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout)
         self.config = config
         assert out_features == (n_head + 2 * n_query_groups) * head_size
-        self.linear = LinearQKV(in_features, out_features, **kwargs)
+        self.linear = Linear(in_features, out_features, **kwargs)
         self.use_bias = self.linear.use_bias
         self.head_size = head_size
         self.fix_head_size = fix_head_size
@@ -124,7 +124,9 @@ class LoRAQKVLinear(LoRALayer):
         self.sub_network_head_size = sub_network_head_size  # type: ignore
         self.sub_network_q_per_kv = sub_network_q_per_kv  # type: ignore
         self.linear.set_sub_network(
-            sub_network_in_features, sub_network_out_features, qkv_indices
+            sub_network_in_features,
+            sub_network_out_features,
+            sampled_out_indices=qkv_indices,
         )
         self.qkv_indices = qkv_indices  # type: ignore
 
