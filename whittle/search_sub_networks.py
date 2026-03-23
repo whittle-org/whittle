@@ -78,7 +78,7 @@ def setup(
         resume: Path to a checkpoint directory to resume from in case training was interrupted, or ``True`` to resume
             from the latest checkpoint in ``out_dir``. An error will be raised if no checkpoint is found. Passing
             ``'auto'`` will resume from the latest checkpoint but not error if no checkpoint exists.
-        data: Data-related arguments. If not provided, the default is ``litgpt.data.TinyStories`` or ``litgpt.data.Alpaca`` for fine-tuned models.
+        data: Data-related arguments. If not provided, the default is ``litgpt.data.TinyStories``.
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
         search: Search-related arguments. See ``whittle.args.SearchArgs`` for details.
