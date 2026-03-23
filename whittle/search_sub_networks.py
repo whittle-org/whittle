@@ -11,8 +11,7 @@ import torch
 from lightning.fabric.strategies import FSDPStrategy
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
-from litgpt.data import Alpaca, DataModule, TinyStories
-from litgpt.finetune.lora import validate as finetune_validate
+from litgpt.data import DataModule, TinyStories
 from litgpt.model import Config
 from litgpt.pretrain import get_dataloaders, validate
 from litgpt.utils import (
@@ -62,7 +61,6 @@ def setup(
     efficiency_metric: str | None = "parameters",
     log_objective_names: bool | None = True,
     save_checkpoints: bool = True,
-    fine_tuned: bool = False,
     copy_config_files: bool = True,
     verbose: bool = True,
     num_workers: int = 4,
@@ -94,9 +92,6 @@ def setup(
         save_checkpoints: Whether to save checkpoints of the sub-networks, or config + path to super-network. Defaults to True.
             If False, `lit_model.pth` will have the following format:
             `{'sub_network_config': sub_network_config, 'parent_dir': checkpoint_dir}`
-        fine_tuned: Whether the model is fine-tuned. Defaults to False.
-            This flag determines the dataset to use if `data` is not provided. Additionally, it changes the validation function to use for evaluation.
-            fine_tuned=True: litgpt.finetune.lora.validate, fine_tuned=False: litgpt.pretrain.validate.
         copy_config_files: Whether to copy the config files from the super-network to the sub-networks. Defaults to True.
             If set to False, we save `parent_dir` to `lit_model.pth`. If save_checkpoints is False, this argument is ignored.
         verbose: Whether to print verbose output. Defaults to True.
@@ -119,15 +114,7 @@ def setup(
     )
 
     if data is None:
-        # import sys
-        # sys.path.append('../do-not-touch/compressing_llms')
-        # from datasets_custom.llamamini import LLaMaMini
-        # data = LLaMaMini() if fine_tuned else TinyStories()
-        data = (
-            Alpaca(num_workers=num_workers)
-            if fine_tuned
-            else TinyStories(num_workers=num_workers)
-        )
+        data = TinyStories(num_workers=num_workers)
 
     num_devices = int(parse_devices(devices))
     out_dir = init_out_dir(out_dir)
@@ -184,7 +171,6 @@ def setup(
         efficiency_metric,
         log_objective_names,
         save_checkpoints,
-        fine_tuned,
         copy_config_files,
         verbose,
     )
@@ -201,16 +187,12 @@ def _objective(
     verbose: bool | None = True,
     objective_1: str = "val_loss",
     objective_2: str = "parameters",
-    fine_tuned: bool = False,
 ) -> tuple[float, float]:
     model.select_sub_network(config)
 
-    if fine_tuned:
-        val_loss = finetune_validate(fabric, model, val_dataloader, eval, verbose=verbose)
-    else:
-        val_loss = validate(
-            fabric, model, val_dataloader, max_iters=eval.max_iters, verbose=verbose
-        )
+    val_loss = validate(
+        fabric, model, val_dataloader, max_iters=eval.max_iters, verbose=verbose
+    )
 
     if objective_1 == "perplexity":
         val_loss = torch.exp(val_loss)
@@ -244,7 +226,6 @@ def main(
     efficiency_metric: str = "parameters",
     log_objective_names: bool = True,
     save_checkpoints: bool = True,
-    fine_tuned: bool = False,
     copy_config_files: bool = True,
     verbose: bool = True,
 ) -> None:
@@ -320,7 +301,6 @@ def main(
             "eval": eval,
             "objective_1": performance_metric,
             "objective_2": efficiency_metric,
-            "fine_tuned": fine_tuned,
         },
         search_strategy=search.search_strategy,
         num_samples=search.iterations,

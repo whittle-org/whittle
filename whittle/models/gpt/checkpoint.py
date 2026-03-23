@@ -14,7 +14,6 @@ from litgpt.utils import (
     save_config,
 )
 
-from whittle.lora_model.config import LoRAConfig
 from whittle.models.gpt import GPT
 from whittle.models.gpt.extract import extract_current_sub_network
 
@@ -114,7 +113,7 @@ def save_sub_network(
 def load_checkpoint(
     checkpoint_dir: Path,
     model_cls: type[GPT] = GPT,
-    config_cls: type[Config] | type[LoRAConfig] = Config,
+    config_cls: type[Config] = Config,
     config_attr: dict[str, Any] | None = None,
 ) -> GPT:
     """
@@ -122,8 +121,8 @@ def load_checkpoint(
 
     Args:
         checkpoint_dir: The directory of the checkpoint.
-        model_cls: The model class to instantiate. Defaults to GPT. For LoRA, use whittle.lora.lora_model.GPT.
-        config_cls: The config class to instantiate. Defaults to Config. For LoRA, use whittle.lora.config.LoRAConfig.
+        model_cls: The model class to instantiate. Defaults to GPT.
+        config_cls: The config class to instantiate. Defaults to Config.
         config_attr: The attributes to set in the config after __init__. If None, config.fix_head_size is set to True.
             Defaults to None.
 
