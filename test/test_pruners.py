@@ -10,30 +10,19 @@ from whittle.pruning.pruners.sparsegpt import SparseGPTPruner
 from whittle.pruning.pruners.wanda import WandaPruner
 
 
-# See issues https://github.com/whittle-org/whittle/issues/343 and 345
-@pytest.mark.skip("Fix later")
-@pytest.mark.parametrize(
-    "model_info",
-    [
-        {
-            "config_name": "pythia-14m",
-        },
-        {
-            "config_name": "gemma-2-9b",
-        },
-        {
-            "config_name": "Llama-3-8B",
-        },
-        {
-            "config_name": "Llama-3.2-1B",
-        },
-    ],
+@pytest.fixture(
+    params=[
+        "pythia-14m",
+        "gemma-2-9b",
+        "Llama-3-8B",
+        "Llama-3.2-1B",
+    ]
 )
-def test_model_pruning(model_info, mock_tokenizer, accelerator_device):
+def pruner_model(request, accelerator_device):
     torch.manual_seed(0)
     config = Config.from_name(
-        model_info["config_name"],
-        block_size=6,
+        request.param,
+        block_size=64,
         sliding_window_size=3,
         n_layer=2,
         n_embd=32,
@@ -43,46 +32,46 @@ def test_model_pruning(model_info, mock_tokenizer, accelerator_device):
     config.model_type = "gpt"
     config.tie_embeddings = False
     config.use_cache = True
+    return GPT(config).to(accelerator_device)
 
-    model = GPT(config).to(accelerator_device)
-    pruner_wanda = WandaPruner()
-    pruner_sparsegpt = SparseGPTPruner()
-    pruner_magnitude = MagnitudePruner()
 
-    num_sequences = 128
-    max_seq_length = 512
-    batch_size = 8
-    int(num_sequences / batch_size)
+@pytest.fixture
+def pruner_dataloader(accelerator_device):
     dataset = TensorDataset(
-        torch.randint(0, 1000, size=(num_sequences, max_seq_length)),
-        torch.randint(0, 1000, size=(num_sequences, 1)),
+        torch.randint(0, 1000, size=(128, 64)),
+        torch.randint(0, 1000, size=(128, 1)),
     )
+    return DataLoader(dataset, batch_size=8)
 
-    dataloader = DataLoader(dataset, batch_size=batch_size)
 
-    sparsity_ratio_magnitude = pruner_magnitude(
-        model,
-        prune_n=2,
-        prune_m=4,
-    )
-    sparsity_ratio_wanda = pruner_wanda(
-        model=model,
-        dataloader=dataloader,
-        prune_n=2,
-        prune_m=4,
-        device=accelerator_device,
-        nsamples=32,
-    )
+# @pytest.mark.skip("Fix later")
+def test_magnitude_pruning(pruner_model):
+    pruner = MagnitudePruner()
+    sparsity_ratio = pruner(pruner_model, prune_n=2, prune_m=6)
+    assert abs(sparsity_ratio - 0.5) <= 0.4
 
-    sparsity_ratio_sparsegpt = pruner_sparsegpt(
-        model=model,
-        dataloader=dataloader,
-        prune_n=2,
+
+def test_wanda_pruning(pruner_model, pruner_dataloader, accelerator_device):
+    pruner = WandaPruner()
+    sparsity_ratio = pruner(
+        model=pruner_model,
+        dataloader=pruner_dataloader,
+        prune_n=1,
         prune_m=4,
         device=accelerator_device,
         nsamples=32,
     )
+    assert abs(sparsity_ratio - 0.5) <= 0.4
 
-    assert abs(sparsity_ratio_magnitude - 0.5) <= 0.4
-    assert abs(sparsity_ratio_wanda - 0.5) <= 0.4
-    assert abs(sparsity_ratio_sparsegpt - 0.5) <= 0.4
+
+def test_sparsegpt_pruning(pruner_model, pruner_dataloader, accelerator_device):
+    pruner = SparseGPTPruner()
+    sparsity_ratio = pruner(
+        model=pruner_model,
+        dataloader=pruner_dataloader,
+        prune_n=1,
+        prune_m=4,
+        device=accelerator_device,
+        nsamples=32,
+    )
+    assert abs(sparsity_ratio - 0.5) <= 0.4
