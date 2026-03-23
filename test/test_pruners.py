@@ -38,8 +38,8 @@ def pruner_model(request, accelerator_device):
 @pytest.fixture
 def pruner_dataloader(accelerator_device):
     dataset = TensorDataset(
-        torch.randint(0, 1000, size=(128, 64)),
-        torch.randint(0, 1000, size=(128, 1)),
+        torch.randint(0, 1000, size=(256, 64)),
+        torch.randint(0, 1000, size=(256, 1)),
     )
     return DataLoader(dataset, batch_size=8)
 
@@ -47,7 +47,7 @@ def pruner_dataloader(accelerator_device):
 # @pytest.mark.skip("Fix later")
 def test_magnitude_pruning(pruner_model):
     pruner = MagnitudePruner()
-    sparsity_ratio = pruner(pruner_model, prune_n=2, prune_m=6)
+    sparsity_ratio = pruner(pruner_model, prune_n=2, prune_m=4)
     assert abs(sparsity_ratio - 0.5) <= 0.4
 
 
@@ -56,7 +56,7 @@ def test_wanda_pruning(pruner_model, pruner_dataloader, accelerator_device):
     sparsity_ratio = pruner(
         model=pruner_model,
         dataloader=pruner_dataloader,
-        prune_n=1,
+        prune_n=2,
         prune_m=4,
         device=accelerator_device,
         nsamples=32,
@@ -69,7 +69,7 @@ def test_sparsegpt_pruning(pruner_model, pruner_dataloader, accelerator_device):
     sparsity_ratio = pruner(
         model=pruner_model,
         dataloader=pruner_dataloader,
-        prune_n=1,
+        prune_n=2,
         prune_m=4,
         device=accelerator_device,
         nsamples=32,
