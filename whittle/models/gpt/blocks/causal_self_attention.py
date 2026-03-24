@@ -435,12 +435,8 @@ class CausalSelfAttention(nn.Module):
                 norm_k_size = self.sub_network_head_size * self.sub_network_query_groups
             else:
                 norm_q_size = norm_k_size = self.sub_network_head_size
-            self.norm_q.set_sub_network(
-                norm_q_size
-            )
-            self.norm_k.set_sub_network(
-                norm_k_size
-            )
+            self.norm_q.set_sub_network(norm_q_size)
+            self.norm_k.set_sub_network(norm_k_size)
 
         # If attention scores scalar is enabled, update the sub-attention scaler
         if self.config.attention_scores_scalar:
@@ -561,10 +557,14 @@ class CausalSelfAttention(nn.Module):
             """
             if input_pos is None:
                 if mask is None:
-                    mask = torch.ones(T, T, dtype=q.dtype, device=q.device).triu(diagonal=1)
+                    mask = torch.ones(T, T, dtype=q.dtype, device=q.device).triu(
+                        diagonal=1
+                    )
                     mask.masked_fill_(mask.bool(), float("-inf"))
                     mask = mask.view(1, 1, *mask.shape)
-                sliding_window_mask = torch.full((T, T), float("-inf"), dtype=q.dtype, device=q.device)
+                sliding_window_mask = torch.full(
+                    (T, T), float("-inf"), dtype=q.dtype, device=q.device
+                )
                 for i in range(T):
                     window_start = max(0, i - self.config.sliding_window_size + 1)
                     sliding_window_mask[i, window_start : i + 1] = 0.0

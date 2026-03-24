@@ -231,6 +231,7 @@ def test_gemma_2():
     lit_out = lit_model(x)
     assert torch.allclose(whittle_out, lit_out, atol=1e-3)
 
+
 def test_qwen_3():
     T = 5
     config_qwen = Config.from_name(
@@ -249,6 +250,7 @@ def test_qwen_3():
     whittle_out = whittle_model(x)
     lit_out = lit_model(x)
     assert torch.allclose(whittle_out, lit_out, atol=1e-4)
+
 
 def get_default_illegal_test_config():
     config = get_default_test_config()

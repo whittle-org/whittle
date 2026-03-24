@@ -17,6 +17,7 @@ from litgpt.args import EvalArgs, TrainArgs
 from litgpt.data import DataModule
 from litgpt.generate.base import generate
 from litgpt.model import Config
+from litgpt.parser_config import save_hyperparameters
 from litgpt.prompts import save_prompt_style
 from litgpt.tokenizer import Tokenizer
 from litgpt.utils import (
@@ -37,7 +38,6 @@ from litgpt.utils import (
     parse_devices,
     select_sft_generate_example,
 )
-from litgpt.parser_config import save_hyperparameters
 from torch.utils.data import ConcatDataset, DataLoader
 from torchmetrics import RunningMean
 
