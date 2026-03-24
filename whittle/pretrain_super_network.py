@@ -39,8 +39,8 @@ from litgpt.utils import (
     num_parameters,
     parse_devices,
     save_config,
-    save_hyperparameters,
 )
+from litgpt.parser_config import save_hyperparameters
 from syne_tune.config_space import lograndint, randint
 from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean

@@ -35,9 +35,9 @@ from litgpt.utils import (
     load_checkpoint,
     num_parameters,
     parse_devices,
-    save_hyperparameters,
     select_sft_generate_example,
 )
+from litgpt.parser_config import save_hyperparameters
 from torch.utils.data import ConcatDataset, DataLoader
 from torchmetrics import RunningMean
 
