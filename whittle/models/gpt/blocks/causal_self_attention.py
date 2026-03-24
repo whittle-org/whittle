@@ -430,13 +430,16 @@ class CausalSelfAttention(nn.Module):
 
         # If normalization is enabled, set the sub-network dimensions for the normalization layers
         if self.config.norm_qk:
+            if self.config.norm_qk_type == "olmo2":
+                norm_q_size = self.sub_network_head_size * self.sub_network_n_head
+                norm_k_size = self.sub_network_head_size * self.sub_network_query_groups
+            else:
+                norm_q_size = norm_k_size = self.sub_network_head_size
             self.norm_q.set_sub_network(
-                self.sub_network_head_size
-                * self.sub_network_n_query_groups
-                * self.sub_network_q_per_kv
+                norm_q_size
             )
             self.norm_k.set_sub_network(
-                self.sub_network_head_size * self.sub_network_query_groups
+                norm_k_size
             )
 
         # If attention scores scalar is enabled, update the sub-attention scaler
@@ -494,7 +497,7 @@ class CausalSelfAttention(nn.Module):
         # Split qkv into query, key and value matrices.
         q, k, v = qkv.split((query_size, key_size, value_size), dim=-1)  # 3x(B, T, C*)
 
-        if self.config.norm_qk:
+        if self.config.norm_qk and self.config.norm_qk_type == "olmo2":
             q = self.norm_q(q)
             k = self.norm_k(k)
 
@@ -512,6 +515,9 @@ class CausalSelfAttention(nn.Module):
         q = q.transpose(1, 2)  # (B, nh_q, T, hs)
         k = k.transpose(1, 2)  # (B, nh_k, T, hs)
         v = v.transpose(1, 2)  # (B, nh_v, T, hs)
+        if self.config.norm_qk and self.config.norm_qk_type == "default":
+            q = self.norm_q(q)
+            k = self.norm_k(k)
         rope_n_elem = math.ceil(
             self.sub_network_head_size * self.config.rotary_percentage
         )
@@ -553,15 +559,17 @@ class CausalSelfAttention(nn.Module):
             │ True True  True  True  │  │ False False True True │  │ False False True  True  │
             └────────────────────────┘  └───────────────────────┘  └─────────────────────────┘
             """
-            if mask is None:
-                mask = torch.ones(T, T, dtype=q.dtype, device=q.device).triu(diagonal=1)
-                mask.masked_fill_(mask.bool(), float("-inf"))
-                mask = mask.view(1, 1, *mask.shape)
-            sliding_window_bias = torch.ones_like(mask).tril(
-                diagonal=-self.config.sliding_window_size
-            )
-            sliding_window_bias.masked_fill_(sliding_window_bias.bool(), float("-inf"))
-            mask += sliding_window_bias
+            if input_pos is None:
+                if mask is None:
+                    mask = torch.ones(T, T, dtype=q.dtype, device=q.device).triu(diagonal=1)
+                    mask.masked_fill_(mask.bool(), float("-inf"))
+                    mask = mask.view(1, 1, *mask.shape)
+                sliding_window_mask = torch.full((T, T), float("-inf"), dtype=q.dtype, device=q.device)
+                for i in range(T):
+                    window_start = max(0, i - self.config.sliding_window_size + 1)
+                    sliding_window_mask[i, window_start : i + 1] = 0.0
+                sliding_window_mask = sliding_window_mask.view(1, 1, T, T)
+                mask = sliding_window_mask
         # Efficient attention using Flash Attention CUDA kernels.
         # NOTE: efficient implementation is disabled if `mask` is not None or softcapping is enabled.
         # ↓ (B, nh, T, hs) @ (B, nh, T, hs).mT --> (B, nh, T, T) @ (B, nh, T, hs) --> (B, nh, T, hs)
