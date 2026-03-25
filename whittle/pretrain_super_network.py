@@ -17,6 +17,7 @@ from litgpt.args import EvalArgs, LogArgs, TrainArgs
 from litgpt.config import name_to_config
 from litgpt.data import DataModule, TinyLlama
 from litgpt.model import Config
+from litgpt.parser_config import save_hyperparameters
 from litgpt.pretrain import (
     get_dataloaders,
     get_lr,
@@ -39,7 +40,6 @@ from litgpt.utils import (
     num_parameters,
     parse_devices,
     save_config,
-    save_hyperparameters,
 )
 from syne_tune.config_space import lograndint, randint
 from torch.utils.data import DataLoader

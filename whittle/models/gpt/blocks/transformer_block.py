@@ -24,7 +24,11 @@ class Block(litgpt.model.Block):
                 " (non-parallel residual and shared attention norm)."
             )
 
-        self.norm_1 = self.norm_class()(config.n_embd, eps=config.norm_eps)
+        self.norm_1 = (
+            nn.Identity()
+            if not config.norm_1
+            else self.norm_class()(config.n_embd, eps=config.norm_eps)
+        )
         self.attn = CausalSelfAttention(config, block_idx)
         self.post_attention_norm = (
             self.norm_class()(config.n_embd, eps=config.norm_eps)
@@ -32,9 +36,13 @@ class Block(litgpt.model.Block):
             else nn.Identity()
         )
         self.norm_2: LayerNorm | RMSNorm | None = (
-            None
-            if config.shared_attention_norm
-            else self.norm_class()(config.n_embd, eps=config.norm_eps)
+            nn.Identity()
+            if not config.norm_2
+            else (
+                None
+                if config.shared_attention_norm
+                else self.norm_class()(config.n_embd, eps=config.norm_eps)
+            )
         )
         self.mlp = self.mlp_class()(config)
         self.post_mlp_norm = (
@@ -95,7 +103,8 @@ class Block(litgpt.model.Block):
         self.sub_network_n_embd = sub_network_n_embd
         self.sub_network_intermediate_size = sub_network_intermediate_size
         self.sub_network_num_heads = sub_network_num_heads
-        self.norm_1.set_sub_network(self.sub_network_n_embd, sampled_embd_indices)
+        if not isinstance(self.norm_1, nn.Identity):
+            self.norm_1.set_sub_network(self.sub_network_n_embd, sampled_embd_indices)
         self.attn.set_sub_network(
             self.sub_network_n_embd,
             self.sub_network_num_heads,
@@ -113,7 +122,8 @@ class Block(litgpt.model.Block):
                 self.sub_network_n_embd, sampled_embd_indices
             )
         if not self.config.shared_attention_norm and self.norm_2 is not None:
-            self.norm_2.set_sub_network(self.sub_network_n_embd, sampled_embd_indices)
+            if not isinstance(self.norm_2, nn.Identity):
+                self.norm_2.set_sub_network(self.sub_network_n_embd, sampled_embd_indices)
         self.mlp.set_sub_network(
             self.sub_network_n_embd,
             self.sub_network_intermediate_size,
@@ -134,10 +144,12 @@ class Block(litgpt.model.Block):
         self.sub_network_n_embd = self.config.n_embd
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
-        self.norm_1.reset_super_network()
+        if not isinstance(self.norm_1, nn.Identity):
+            self.norm_1.reset_super_network()
         self.attn.reset_super_network()
         if not self.config.shared_attention_norm:
-            self.norm_2.reset_super_network()
+            if self.norm_2 is not None and not isinstance(self.norm_2, nn.Identity):
+                self.norm_2.reset_super_network()
         self.mlp.reset_super_network()
         if isinstance(self.post_attention_norm, LayerNorm) or isinstance(
             self.post_attention_norm, RMSNorm

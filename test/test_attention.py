@@ -19,6 +19,7 @@ attention_configs = {
             n_query_groups=16,
             head_size=64,
             sliding_window_size=256,
+            n_layer=1,
             # only layer with idx 0, 2, 4, ... have sliding window attention
             sliding_window_indices=[1 if i % 2 == 0 else 0 for i in range(1)],
         ),
