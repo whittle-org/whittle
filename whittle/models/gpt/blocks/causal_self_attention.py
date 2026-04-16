@@ -514,9 +514,10 @@ class CausalSelfAttention(nn.Module):
         if self.config.norm_qk and self.config.norm_qk_type == "default":
             q = self.norm_q(q)
             k = self.norm_k(k)
-        rope_n_elem = math.ceil(
+        rope_n_elem = math.floor(
             self.sub_network_head_size * self.config.rotary_percentage
         )
+        rope_n_elem = max(1, rope_n_elem)  # Ensure at least 1 dimension is roped
         # apply rope to the first `rope_n_elem` elements of the query and key tensors
         q_roped = apply_rope(q[..., :rope_n_elem], cos, sin)
         k_roped = apply_rope(k[..., :rope_n_elem], cos, sin)
