@@ -185,7 +185,7 @@ def test_gpt():
 
 
 @pytest.mark.parametrize("model_name", MoE_MODEL_NAMES)
-def test_unsupported_models(model_name):
+def test_unsupported_moe_models(model_name):
     config = Config.from_name(model_name)
 
     with pytest.raises(
