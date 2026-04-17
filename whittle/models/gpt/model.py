@@ -33,6 +33,9 @@ class GPT(nn.Module):
     """An extension of litgpt's GPT model with support to adapt to sub-network dimensionality."""
 
     def __init__(self, config: Config) -> None:
+        if config.n_expert > 0:
+            raise ValueError("Mixture of Experts models are not currently supported.")
+
         super().__init__()
         assert config.padded_vocab_size is not None
         self.config = config

@@ -8,6 +8,20 @@ from litgpt.model import GPT as LitGPT
 from whittle.exceptions import IllegalSubNetworkError
 from whittle.models.gpt import GPT
 
+MoE_MODEL_NAMES = [
+    "Qwen3-235B-A22B",
+    "Qwen3-235B-A22B-Instruct-2507",
+    "Qwen3-235B-A22B-Thinking-2507",
+    "Qwen3-30B-A3B",
+    "Qwen3-30B-A3B-Base",
+    "Qwen3-30B-A3B-Instruct-2507",
+    "Qwen3-30B-A3B-Thinking-2507",
+    "Mixtral-8x22B-Instruct-v0.1",
+    "Mixtral-8x22B-v0.1",
+    "Mixtral-8x7B-Instruct-v0.1",
+    "Mixtral-8x7B-v0.1",
+]
+
 
 def get_default_test_config():
     config = Config()
@@ -168,6 +182,16 @@ def test_gpt():
         ]
     out_lit_small = lit_gpt_small(input)
     assert torch.allclose(out_lit_small, out_small, atol=1e-3)
+
+
+@pytest.mark.parametrize("model_name", MoE_MODEL_NAMES)
+def test_unsupported_models(model_name):
+    config = Config.from_name(model_name)
+
+    with pytest.raises(
+        ValueError, match="Mixture of Experts models are not currently supported."
+    ):
+        GPT(config)
 
 
 def copy_weights(model_source, model_target):
