@@ -194,6 +194,16 @@ def test_unsupported_models(model_name):
         GPT(config)
 
 
+def test_unsupported_latent_attention_models():
+    config = get_default_test_config()
+    config.latent_attention = {"num_latent_tokens": 16}
+
+    with pytest.raises(
+        ValueError, match="Latent Attention models are not currently supported."
+    ):
+        GPT(config)
+
+
 def copy_weights(model_source, model_target):
     for (_, p1), (_, p2) in zip(
         model_source.named_parameters(), model_target.named_parameters()

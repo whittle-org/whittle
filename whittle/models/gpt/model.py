@@ -29,12 +29,18 @@ from whittle.modules.linear import Linear
 from whittle.modules.rmsnorm import RMSNorm
 
 
+def assert_config_is_supported(config: Config):
+    if config.n_expert > 0:
+        raise ValueError("Mixture of Experts models are not currently supported.")
+    if config.latent_attention is not None:
+        raise ValueError("Latent Attention models are not currently supported.")
+
+
 class GPT(nn.Module):
     """An extension of litgpt's GPT model with support to adapt to sub-network dimensionality."""
 
     def __init__(self, config: Config) -> None:
-        if config.n_expert > 0:
-            raise ValueError("Mixture of Experts models are not currently supported.")
+        assert_config_is_supported(config)
 
         super().__init__()
         assert config.padded_vocab_size is not None
