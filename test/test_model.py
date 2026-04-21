@@ -266,6 +266,25 @@ def test_gemma_2():
     assert torch.allclose(whittle_out, lit_out, atol=1e-3)
 
 
+def test_gemma_3():
+    config_gemma = Config.from_name(
+        "gemma-3-1b-it",
+        block_size=6,
+        sliding_window_size=3,
+        n_layer=2,
+        n_embd=32,
+        intermediate_size=86,
+    )
+    config_gemma.fix_head_size = True
+    lit_model = LitGPT(config_gemma)
+    whittle_model = GPT(config_gemma)
+    copy_weights(lit_model, whittle_model)
+    x = torch.tensor([[9856, 23, 491, 1536, 304, 1234]], dtype=torch.int32)
+    whittle_out = whittle_model(x)
+    lit_out = lit_model(x)
+    assert torch.allclose(whittle_out, lit_out, atol=1e-3)
+
+
 def test_qwen_3():
     T = 5
     config_qwen = Config.from_name(

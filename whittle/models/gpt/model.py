@@ -686,7 +686,18 @@ class GPT(nn.Module):
         cos, sin, mask, input_pos_maxp1_block = self.process_rope_cache(
             cos, sin, input_pos, input_pos_maxp1, T
         )
-        x = block(x, cos, sin, mask, input_pos, input_pos_maxp1_block)
+
+        if self.config.rope_indices is not None:
+            x = block(
+                x,
+                cos[..., self.config.rope_indices[j]],
+                sin[..., self.config.rope_indices[j]],
+                mask,
+                input_pos,
+                input_pos_maxp1,
+            )
+        else:
+            x = block(x, cos, sin, mask, input_pos, input_pos_maxp1_block)
 
         return x
 
