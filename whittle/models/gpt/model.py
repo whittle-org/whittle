@@ -89,6 +89,13 @@ class GPT(nn.Module):
         # `self._norm_class` cannot be the type to keep the config json serializable
         if self.config.norm_class_name == "RMSNorm":
             return partial(RMSNorm, add_unit_offset="Gemma" in self.config.name)
+
+        if self.config.norm_class_name == "LayerNorm" and "OLMo" in self.config.name:
+            # this makes it equivalent to `torch.nn.functional.layer_norm`
+            # that is used by OLMo
+            # Table 5 caption in the OLMo paper shows this - https://aclanthology.org/2024.acl-long.841
+            return partial(torch.nn.LayerNorm, elementwise_affine=False)
+
         return LayerNorm
 
     @property
