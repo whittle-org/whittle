@@ -7,8 +7,23 @@ import torch.nn.functional as F
 class LayerNorm(torch.nn.LayerNorm):
     """An extension of PyTorch's `torch.nn.LayerNorm` with support  with support to sub-sample weights corresponding to the sub-network dimensionality."""
 
-    def __init__(self, in_features: int, eps: float = 1e-5):
-        super().__init__(in_features, eps)
+    def __init__(
+        self,
+        in_features: int,
+        eps: float = 1e-5,
+        elementwise_affine: bool = True,
+        bias: bool = True,
+        device=None,
+        dtype=None,
+    ):
+        super().__init__(
+            normalized_shape=in_features,
+            eps=eps,
+            elementwise_affine=elementwise_affine,
+            bias=bias,
+            device=device,
+            dtype=dtype,
+        )
         self.in_features = in_features
 
         # Set current sub-network to super-network

@@ -20,15 +20,15 @@ class Embedding(torch.nn.Embedding):
         dtype=None,
     ) -> None:
         super().__init__(
-            num_embeddings,
-            embedding_dim,
-            padding_idx,
-            max_norm,
-            norm_type,
-            scale_grad_by_freq,
-            sparse,
-            device,
-            dtype,
+            num_embeddings=num_embeddings,
+            embedding_dim=embedding_dim,
+            padding_idx=padding_idx,
+            max_norm=max_norm,
+            norm_type=norm_type,
+            scale_grad_by_freq=scale_grad_by_freq,
+            sparse=sparse,
+            device=device,
+            dtype=dtype,
         )
 
         # the embedding dimensionality of the current sub-network

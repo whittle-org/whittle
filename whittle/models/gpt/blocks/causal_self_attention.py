@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from functools import partial
 from typing import Any
 
 import torch
@@ -11,6 +12,8 @@ from litgpt.scripts.convert_hf_checkpoint import qkv_reassemble
 
 from whittle.exceptions import IllegalSubNetworkError
 from whittle.modules import Linear
+from whittle.modules.layernorm import LayerNorm
+from whittle.modules.rmsnorm import RMSNorm
 
 
 class CausalSelfAttention(nn.Module):
@@ -47,8 +50,9 @@ class CausalSelfAttention(nn.Module):
                 if config.norm_qk_type == "olmo2"
                 else config.head_size
             )
-            self.norm_q = config.norm_class(norm_q_size, eps=config.norm_eps)
-            self.norm_k = config.norm_class(norm_k_size, eps=config.norm_eps)
+            norm_class = self.norm_class()
+            self.norm_q = norm_class(norm_q_size, eps=config.norm_eps)
+            self.norm_k = norm_class(norm_k_size, eps=config.norm_eps)
         else:
             self.norm_q = self.norm_k = None
         # Set current sub-network to super-network
@@ -64,6 +68,19 @@ class CausalSelfAttention(nn.Module):
             self.sub_network_n_head // self.sub_network_query_groups
         )
         self.sub_attention_scaler = self.config.attention_scores_scalar
+
+    def norm_class(self):
+        # `self._norm_class` cannot be the type to keep the config json serializable
+        if self.config.norm_class_name == "RMSNorm":
+            return partial(RMSNorm, add_unit_offset="Gemma" in self.config.name)
+
+        if self.config.norm_class_name == "LayerNorm" and "OLMo" in self.config.name:
+            # this makes it equivalent to `torch.nn.functional.layer_norm`
+            # that is used by OLMo
+            # Table 5 caption in the OLMo paper shows this - https://aclanthology.org/2024.acl-long.841
+            return partial(torch.nn.LayerNorm, elementwise_affine=False)
+
+        return LayerNorm
 
     def _verify_subnet_is_legal(
         self,
