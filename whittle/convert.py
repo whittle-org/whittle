@@ -50,6 +50,9 @@ def copy_weights_to_litgpt(whittle_model, lit_model):
         _copy_weights_and_biases(whittle_block.norm_1, litgpt_block.norm_1)
         _copy_weights_and_biases(whittle_block.attn.qkv, litgpt_block.attn.qkv)
         _copy_weights_and_biases(whittle_block.attn.proj, litgpt_block.attn.proj)
+        if whittle_block.attn.config.norm_qk:
+            _copy_weights_and_biases(whittle_block.attn.norm_q, litgpt_block.attn.norm_q)
+            _copy_weights_and_biases(whittle_block.attn.norm_k, litgpt_block.attn.norm_k)
         _copy_weights_and_biases(
             whittle_block.post_attention_norm, litgpt_block.post_attention_norm
         )

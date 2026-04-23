@@ -42,7 +42,7 @@ class RMSNorm(torch.nn.Module):
         self.sub_network_in_features = self.in_features
         self.sampled_ln_indices = None
 
-    def extract_weight(self) -> torch.Tensor:
+    def extract_weights(self) -> torch.Tensor:
         if self.sampled_ln_indices is not None:
             weight = (
                 (1 + self.weight[self.sampled_ln_indices])
@@ -67,7 +67,7 @@ class RMSNorm(torch.nn.Module):
         # NOTE: the original RMSNorm paper implementation is not equivalent
         norm_x = torch.mean(x * x, dim=self.dim, keepdim=True)
         x_normed = x * torch.rsqrt(norm_x + self.eps)
-        weight, _ = self.extract_weight()
+        weight, _ = self.extract_weights()
         return (x_normed * weight.float()).to(dtype=dtype)
 
     def reset_parameters(self) -> None:
