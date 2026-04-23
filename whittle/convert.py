@@ -15,6 +15,13 @@ def create_litgpt_config_for_subnet(supernet):
     config.head_size = supernet.sub_network_head_size
     config.rope_n_elem = supernet.sub_network_rope_n_elem
     config.n_query_groups = supernet.sub_network_query_groups
+    # Whittle's attention recomputes the softmax scaler from the sub-network
+    # dimensions when `attention_scores_scalar` is set; mirror that so the
+    # converted LitGPT model uses the same scale.
+    if supernet.config.attention_scores_scalar:
+        config.attention_scores_scalar = (
+            supernet.sub_network_n_embd // supernet.sub_network_num_heads
+        )
     return config
 
 
@@ -26,7 +33,13 @@ def copy_weights_to_litgpt(whittle_model, lit_model):
             print(f"{whittle_module} has no method extract_weights")
 
         if hasattr(lit_module, "weight"):
-            lit_module.weight.data = W.data
+            w_data = W.data
+            # Whittle's RMSNorm.extract_weights folds `add_unit_offset` into the
+            # returned weight, but LitGPT's RMSNorm re-applies `(1 + weight)` in
+            # forward — subtract 1 to avoid applying the offset twice.
+            if getattr(lit_module, "add_unit_offset", False):
+                w_data = w_data - 1
+            lit_module.weight.data = w_data
 
         if hasattr(lit_module, "bias"):
             if b is None:
@@ -50,6 +63,9 @@ def copy_weights_to_litgpt(whittle_model, lit_model):
         _copy_weights_and_biases(whittle_block.norm_1, litgpt_block.norm_1)
         _copy_weights_and_biases(whittle_block.attn.qkv, litgpt_block.attn.qkv)
         _copy_weights_and_biases(whittle_block.attn.proj, litgpt_block.attn.proj)
+        if whittle_block.attn.config.norm_qk:
+            _copy_weights_and_biases(whittle_block.attn.norm_q, litgpt_block.attn.norm_q)
+            _copy_weights_and_biases(whittle_block.attn.norm_k, litgpt_block.attn.norm_k)
         _copy_weights_and_biases(
             whittle_block.post_attention_norm, litgpt_block.post_attention_norm
         )
