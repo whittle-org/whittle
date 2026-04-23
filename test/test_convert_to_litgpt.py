@@ -65,8 +65,8 @@ def test_equivalence(supernet, search_space_type, config_id):
     "model_name",
     [
         "Llama-3-8B",
-        # "gemma-2-9b", # TODO: Fix
-        # "gemma-3-1b-it", # TODO: Fix
+        "gemma-2-9b",
+        "gemma-3-1b-it",
         "OLMo-2-1124-7B",
         "Qwen3-0.6B",
     ],
