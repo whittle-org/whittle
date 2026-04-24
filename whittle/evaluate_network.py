@@ -49,7 +49,6 @@ def setup(
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
 
     config_attr = {
-        "fix_head_size": True,
         "model_type": "gpt",
         "tie_embeddings": False,
     }

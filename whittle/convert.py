@@ -18,7 +18,6 @@ from whittle.models.gpt.checkpoint import save_sub_network
 
 def create_litgpt_config_for_subnet(supernet):
     config = copy.deepcopy(supernet.config)
-    config.fix_head_size = True
     config.n_embd = supernet.sub_network_n_embd
     config.intermediate_size = supernet.sub_network_intermediate_size
     config.n_head = supernet.sub_network_num_heads

@@ -12,43 +12,19 @@ from litgpt.model import (
 from whittle.models.gpt.blocks import CausalSelfAttention
 
 attention_configs = {
-    "mha_fix_head_size_sliding": {
-        "config": Config(
-            n_embd=64,
-            n_head=16,
-            n_query_groups=16,
-            head_size=64,
-            sliding_window_size=256,
-            n_layer=1,
-            # only layer with idx 0, 2, 4, ... have sliding window attention
-            sliding_window_indices=[1 if i % 2 == 0 else 0 for i in range(1)],
-        ),
-        "fix_head_size": True,
-    },
-    "mha_fix_head_size": {
-        "config": Config(n_embd=64, n_head=16, n_query_groups=16, head_size=64),
-        "fix_head_size": True,
-    },
-    "gqa_fix_head_size": {
-        "config": Config(n_embd=64, n_head=16, n_query_groups=2, head_size=64),
-        "fix_head_size": True,
-    },
-    "mqa_fix_head_size": {
-        "config": Config(n_embd=64, n_head=16, n_query_groups=1, head_size=64),
-        "fix_head_size": True,
-    },
-    "mha_flexible_head_size": {
-        "config": Config(n_embd=64, n_head=16, n_query_groups=16),
-        "fix_head_size": False,
-    },
-    "gqa_flexible_head_size": {
-        "config": Config(n_embd=64, n_head=16, n_query_groups=2),
-        "fix_head_size": False,
-    },
-    "mqa_flexible_head_size": {
-        "config": Config(n_embd=64, n_head=16, n_query_groups=1),
-        "fix_head_size": False,
-    },
+    "mha_sliding": Config(
+        n_embd=64,
+        n_head=16,
+        n_query_groups=16,
+        head_size=64,
+        sliding_window_size=256,
+        n_layer=1,
+        # only layer with idx 0, 2, 4, ... have sliding window attention
+        sliding_window_indices=[1 if i % 2 == 0 else 0 for i in range(1)],
+    ),
+    "mha": Config(n_embd=64, n_head=16, n_query_groups=16, head_size=64),
+    "gqa": Config(n_embd=64, n_head=16, n_query_groups=2, head_size=64),
+    "mqa": Config(n_embd=64, n_head=16, n_query_groups=1, head_size=64),
 }
 
 
@@ -101,10 +77,7 @@ def init_lit_small_attention(config, base_attention, attention_super):
 
 @pytest.mark.parametrize("attention_config", attention_configs.keys())
 def test_attention(attention_config):
-    config = attention_configs[attention_config]["config"]
-    config.fix_head_size = attention_configs[attention_config]["fix_head_size"]
-    if not config.fix_head_size:
-        config.head_size = 32
+    config = attention_configs[attention_config]
     config.max_seq_len = 512
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
 
@@ -122,10 +95,7 @@ def test_attention(attention_config):
     assert out_large.shape == (8, seq_len, config.n_embd)
     lit_attention = init_lit_attention(config)
     out_lit_large = lit_attention(input, mask=mask, cos=cos, sin=sin)
-    if not config.fix_head_size:
-        sub_network_head_size = config.head_size // 2
-    else:
-        sub_network_head_size = config.head_size
+    sub_network_head_size = config.head_size
     if config.n_query_groups == 1:
         sub_network_query_groups = 1
         sub_network_n_head = config.n_head // 4

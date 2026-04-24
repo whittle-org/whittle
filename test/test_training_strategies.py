@@ -123,7 +123,6 @@ def test_integration_training_strategies_gpt(strategy, kd_loss):
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
     config.norm_eps = 1e-5
     config.lm_head_bias = True
-    config.fix_head_size = True
     gpt = GPT(config).to(device)
     inputs = torch.randint(0, 128, (1, 128)).to(device)
     outputs = torch.randn([1, 128, 128]).to(device)

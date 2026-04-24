@@ -71,7 +71,6 @@ def setup(
 
     print(f"Loading teacher model config from {teacher_checkpoint_dir}")
     config = Config.from_file(teacher_checkpoint_dir / "model_config.yaml")
-    config.fix_head_size = True
 
     hparams = capture_hparams()
     data = TinyStories() if data is None else data

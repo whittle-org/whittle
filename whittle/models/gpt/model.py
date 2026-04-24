@@ -542,18 +542,10 @@ class GPT(nn.Module):
             else self.config.n_query_groups
         )
 
-        if self.config.fix_head_size:  # TODO: Deprecate. Not used (always set to True)
-            if sub_network_sizes["sub_network_head_size"] is None:
-                self.sub_network_head_size = self.config.head_size
-            else:
-                self.sub_network_head_size = sub_network_sizes["sub_network_head_size"]
+        if sub_network_sizes["sub_network_head_size"] is None:
+            self.sub_network_head_size = self.config.head_size
         else:
-            if sub_network_sizes["sub_network_head_size"] is not None:
-                self.sub_network_head_size = sub_network_sizes["sub_network_head_size"]
-            else:
-                self.sub_network_head_size = (
-                    self.sub_network_n_embd // self.sub_network_num_heads
-                )
+            self.sub_network_head_size = sub_network_sizes["sub_network_head_size"]
 
         if sampled_layer_indices is not None:
             for i, j in enumerate(sampled_layer_indices):
