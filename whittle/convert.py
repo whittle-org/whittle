@@ -1,8 +1,19 @@
 from __future__ import annotations
 
 import copy
+import tempfile
+from pathlib import Path
+from typing import Any
 
+import torch
+from litgpt import Config
 from litgpt.model import GPT as LitGPT
+from litgpt.scripts.convert_lit_checkpoint import convert_lit_checkpoint
+from litgpt.utils import save_config
+
+from whittle.convert_to_litgpt import setup as convert_to_litgpt_setup
+from whittle.models.gpt import GPT
+from whittle.models.gpt.checkpoint import save_sub_network
 
 
 def create_litgpt_config_for_subnet(supernet):
@@ -89,3 +100,64 @@ def convert_subnet_to_litgpt(whittle_model, subnet_config):
     copy_weights_to_litgpt(whittle_model, lit_model)
     whittle_model.reset_super_network()
     return lit_model
+
+
+def save_as_hf_checkpoint(
+    whittle_model: GPT,
+    sub_network_config: dict[str, Any],
+    out_dir: Path | str,
+) -> None:
+    """
+    Convert a Whittle super-network + sub-network config into a Hugging Face
+    checkpoint on disk.
+
+    Staged internally through a temp directory:
+      1. Save the super-network as a parent LitGPT checkpoint.
+      2. Extract the sub-network with `save_sub_network` (format b).
+      3. Normalize to a plain LitGPT checkpoint via `whittle.convert_to_litgpt`.
+      4. Convert LitGPT -> HF via `litgpt.scripts.convert_lit_checkpoint`.
+
+    The final `out_dir` contains `model.pth` (HF state dict) and
+    `model_config.yaml` (the sub-network's LitGPT config).
+
+    Arguments:
+        whittle_model: The Whittle super-network to extract from.
+        sub_network_config: Sub-network config in the `select_sub_network`
+            schema (`embed_dim`, `mlp_ratio`, `num_heads`, `depth`,
+            `n_query_groups`, `head_size`).
+        out_dir: Directory to write the HF checkpoint into. Created if missing.
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory() as tmp_str:
+        tmp = Path(tmp_str)
+        parent_dir = tmp / "parent"
+        parent_dir.mkdir()
+        save_config(whittle_model.config, parent_dir)
+        torch.save(whittle_model.state_dict(), parent_dir / "lit_model.pth")
+
+        subnet_dir = tmp / "subnet"
+        save_sub_network(
+            whittle_model,
+            checkpoint_dir=parent_dir,
+            save_dir=subnet_dir,
+            sub_network_config=sub_network_config,
+            save_checkpoints=True,
+            copy_config_files=False,
+        )
+        whittle_model.reset_super_network()
+
+        litgpt_dir = tmp / "litgpt"
+        litgpt_dir.mkdir()
+        convert_to_litgpt_setup(
+            sub_network_dir=subnet_dir,
+            out_dir=litgpt_dir,
+            no_model_key=True,
+        )
+
+        convert_lit_checkpoint(checkpoint_dir=litgpt_dir, output_dir=out_dir)
+
+        # Keep the sub-network's model_config.yaml alongside the HF weights so
+        # callers can reconstruct the matching HF config.
+        save_config(Config.from_file(litgpt_dir / "model_config.yaml"), out_dir)
