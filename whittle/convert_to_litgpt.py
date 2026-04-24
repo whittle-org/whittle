@@ -101,7 +101,6 @@ def setup(
 
         # instantiate the super-network
         config = Config.from_file(model_path.parent / "model_config.yaml")
-        config.fix_head_size = True
         model = super_network_cls(config)
 
         # set the sub-network via the saved sub-network config

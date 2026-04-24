@@ -36,7 +36,6 @@ def supernet():
         )
 
     config = Config.from_file(config_path)
-    config.fix_head_size = True
     supernet = GPT(config)
     return supernet
 
@@ -79,7 +78,6 @@ def test_halved_subnet_matches_converted_litgpt(model_name):
         intermediate_size=86,
         padded_vocab_size=10000,
     )
-    config.fix_head_size = True
 
     whittle_model = GPT(config)
     whittle_model.eval()

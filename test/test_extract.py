@@ -14,11 +14,9 @@ from whittle.modules.rmsnorm import RMSNorm
 
 def test_extract_sub_network_mha() -> None:
     config = Config.from_name("pythia-70m")
-    config.fix_head_size = False
 
     super_network = GPT(config)
     sub_network_config = Config.from_name("pythia-14m")
-    sub_network_config.fix_head_size = False
 
     # set norm weights to random
     # the default is unit/zero vector which does not test the extract
@@ -53,7 +51,6 @@ def test_extract_sub_network_mha() -> None:
 
 def test_extract_sub_network_llamamlp_gqa() -> None:
     config = Config.from_name("micro-llama-300M")
-    config.fix_head_size = False
 
     super_network = GPT(config)
 
@@ -96,7 +93,6 @@ def test_extract_sub_network_llamamlp_gqa() -> None:
 
 def test_extract_sub_network_gemmamlp_mqa() -> None:
     config = Config.from_name("Gemma-2b")
-    config.fix_head_size = True
 
     # simulate a smaller network
     config.vocab_size = 256
@@ -143,7 +139,6 @@ def test_extract_sub_network_gemmamlp_mqa() -> None:
 
 def test_save_config() -> None:
     config = Config.from_name("micro-llama-300M")
-    config.fix_head_size = False
 
     super_network = GPT(config)
 

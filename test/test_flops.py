@@ -25,7 +25,6 @@ def test_compute_flops(mlp_type, norm_type):
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
     config.norm_eps = 1e-5
     config.lm_head_bias = True
-    config.fix_head_size = True
     config.mlp_class_name = mlp_type
     config.norm_class_name = norm_type
 

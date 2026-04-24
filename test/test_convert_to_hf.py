@@ -139,7 +139,6 @@ MODEL_CASES = [
 def test_whittle_to_hf_matches(tmp_path, model_name, config_kwargs, hf_builder, ties):
     # 1) Load a small whittle model
     config = Config.from_name(model_name, **config_kwargs)
-    config.fix_head_size = True
     whittle_model = GPT(config)
     if ties:
         whittle_model.lm_head.weight = whittle_model.transformer.wte.weight

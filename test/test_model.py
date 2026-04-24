@@ -38,7 +38,6 @@ def get_default_test_config():
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
     config.norm_eps = 1e-5
     config.lm_head_bias = True
-    config.fix_head_size = False
     return config
 
 
@@ -234,7 +233,6 @@ def test_llama_3_1():
         intermediate_size=86,
         padded_vocab_size=10000,
     )
-    config_llama.fix_head_size = True
     lit_model = LitGPT(config_llama)
     whittle_model = GPT(config_llama)
 
@@ -259,7 +257,6 @@ def test_llama_3_2():
         intermediate_size=86,
         padded_vocab_size=10000,
     )
-    config_llama.fix_head_size = True
     lit_model = LitGPT(config_llama)
     whittle_model = GPT(config_llama)
 
@@ -285,7 +282,6 @@ def test_gemma_2():
         n_embd=32,
         intermediate_size=86,
     )
-    config_gemma.fix_head_size = True
     lit_model = LitGPT(config_gemma)
     whittle_model = GPT(config_gemma)
 
@@ -311,7 +307,6 @@ def test_gemma_3():
         n_embd=32,
         intermediate_size=86,
     )
-    config_gemma.fix_head_size = True
     lit_model = LitGPT(config_gemma)
     whittle_model = GPT(config_gemma)
 
@@ -336,7 +331,6 @@ def test_olmo_2():
         n_embd=32,
         intermediate_size=86,
     )
-    config_olmo.fix_head_size = True
     lit_model = LitGPT(config_olmo)
     whittle_model = GPT(config_olmo)
 
@@ -363,7 +357,6 @@ def test_qwen_3():
         n_embd=32,
         intermediate_size=86,
     )
-    config_qwen.fix_head_size = True
     lit_model = LitGPT(config_qwen)
     whittle_model = GPT(config_qwen)
 
