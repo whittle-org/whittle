@@ -93,7 +93,7 @@ def _pythia_hf(cfg):
 MODEL_CASES = [
     pytest.param(
         "Qwen3-0.6B",
-        dict(block_size=10, n_layer=2, n_head=16, n_embd=32, intermediate_size=86),
+        dict(block_size=64, n_layer=16, n_head=16, n_embd=32, intermediate_size=86),
         _qwen3_hf,
         False,
         id="Qwen3-0.6B",
@@ -101,8 +101,8 @@ MODEL_CASES = [
     pytest.param(
         "Llama-3-8B",
         dict(
-            block_size=10,
-            n_layer=2,
+            block_size=64,
+            n_layer=16,
             n_embd=32,
             intermediate_size=86,
             padded_vocab_size=10000,
@@ -114,9 +114,9 @@ MODEL_CASES = [
     pytest.param(
         "gemma-2-9b",
         dict(
-            block_size=6,
+            block_size=64,
             sliding_window_size=3,
-            n_layer=2,
+            n_layer=16,
             n_embd=32,
             intermediate_size=86,
         ),
@@ -126,7 +126,7 @@ MODEL_CASES = [
     ),
     pytest.param(
         "pythia-14m",
-        dict(block_size=10, n_layer=2, n_head=4, n_embd=32, intermediate_size=128),
+        dict(block_size=64, n_layer=16, n_head=4, n_embd=32, intermediate_size=128),
         _pythia_hf,
         False,
         id="pythia-14m",
@@ -173,7 +173,9 @@ def test_whittle_to_hf_matches(tmp_path, model_name, config_kwargs, hf_builder, 
         whittle_model.lm_head.weight = whittle_model.transformer.wte.weight
 
     # 5) Compare outputs
-    x = torch.tensor([[9856, 23, 491, 1536, 304]], dtype=torch.int32)
+    x = torch.randint(
+        0, config.n_embd, size=(2, 64)
+    )  # use random input to avoid hitting tied weights
     whittle_model.set_sub_network(
         sub_network_n_embd=sub_cfg.n_embd,
         sub_network_intermediate_size=sub_cfg.intermediate_size,
@@ -185,4 +187,4 @@ def test_whittle_to_hf_matches(tmp_path, model_name, config_kwargs, hf_builder, 
     out_whittle = whittle_model(x)
     out_hf = hf_model(x)["logits"]
 
-    torch.testing.assert_close(out_whittle, out_hf, atol=1e-4, rtol=1e-4)
+    torch.testing.assert_close(out_whittle, out_hf, atol=1e-6, rtol=1e-6)
