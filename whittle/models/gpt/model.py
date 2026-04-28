@@ -544,16 +544,11 @@ class GPT(nn.Module):
             else self.config.n_query_groups
         )
 
-<<<<<<< HEAD
         if self.config.fix_head_size:
             if sub_network_sizes["sub_network_head_size"] is None:
                 self.sub_network_head_size = self.config.head_size
             else:
                 self.sub_network_head_size = sub_network_sizes["sub_network_head_size"]
-=======
-        if sub_network_sizes["sub_network_head_size"] is None:
-            self.sub_network_head_size = self.config.head_size
->>>>>>> 66b820e76564328d85f004a862ed0bc983227e20
         else:
             self.sub_network_head_size = sub_network_sizes["sub_network_head_size"]
 

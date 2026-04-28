@@ -16,7 +16,6 @@ from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
 
 
-
 class CausalSelfAttention(nn.Module):
     """Extension of litgpt's `litgpt.model.CausalSelfAttention` with support to adapt to sub-network dimensionality."""
 
