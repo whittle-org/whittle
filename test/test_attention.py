@@ -92,7 +92,7 @@ def test_attention(attention_config):
     out_large = attention(input, mask=mask, cos=cos, sin=sin)
 
     # check shape of super network attention
-    assert out_large.shape == (8, seq_len, config.n_embd)
+    assert out_large[0].shape == (8, seq_len, config.n_embd)
     lit_attention = init_lit_attention(config)
     out_lit_large = lit_attention(input, mask=mask, cos=cos, sin=sin)
     sub_network_head_size = config.head_size
@@ -119,10 +119,10 @@ def test_attention(attention_config):
     out_small = attention(input[:, :, : config.n_embd // 2], mask=mask, cos=cos, sin=sin)
 
     # check shape of sub-network attention
-    assert out_small.shape == (8, seq_len, config.n_embd // 2)
+    assert out_small[0].shape == (8, seq_len, config.n_embd // 2)
 
     # check that our custom model produces the same output as LitGPT
-    assert torch.all(out_lit_large == out_large)
+    assert torch.all(out_lit_large == out_large[0])
     config.n_embd = attention.sub_network_n_embd
     config.n_head = attention.sub_network_n_head
     config.n_query_groups = attention.sub_network_query_groups
@@ -145,7 +145,7 @@ def test_attention(attention_config):
         input[:, :, : config.n_embd], mask=mask, cos=cos, sin=sin
     )
     # check that our sub-networks the same output as equally sized LitGPT attention layer
-    assert torch.all(out_lit_small == out_small)
+    assert torch.all(out_lit_small == out_small[0])
 
 
 QKV_INDICES_TEST_CONFIGS = {

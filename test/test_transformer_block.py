@@ -44,7 +44,7 @@ def test_block():
     block.norm_2.bias.data = torch.randn_like(block.norm_2.bias.data)
     block.reset_super_network()
     out_large = block(input, cos, sin, mask)
-    assert out_large.shape == (8, 512, 64)
+    assert out_large[0].shape == (8, 512, 64)
     block.set_sub_network(
         sub_network_n_embd=32,
         sub_network_intermediate_size=32 * 4,
@@ -53,7 +53,7 @@ def test_block():
         sub_network_head_size=32 // 4,
     )
     out_small = block(input[:, :, :32], cos, sin, mask)
-    assert out_small.shape == (8, 512, 32)
+    assert out_small[0].shape == (8, 512, 32)
 
     lit_block = LitBlock(config, 0)
     lit_block.attn.qkv.weight.data = block.attn.qkv.weight.data
@@ -72,7 +72,7 @@ def test_block():
     lit_block.norm_2.bias.data = block.norm_2.bias.data
 
     out_lit_large = lit_block(input, cos, sin, mask)
-    assert torch.all(out_lit_large == out_large)
+    assert torch.all(out_lit_large == out_large[0])
 
     config.n_embd = 32
     config.n_head = 4
@@ -95,4 +95,4 @@ def test_block():
     lit_block_small.norm_2.bias.data = block.norm_2.bias.data
 
     out_lit_small = block(input[:, :, :32], cos, sin, mask)
-    assert torch.all(out_lit_small == out_small)
+    assert torch.all(out_lit_small[0] == out_small[0])

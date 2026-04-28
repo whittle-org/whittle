@@ -56,19 +56,24 @@ def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
     """
 
     sub_network = GPT(sub_network_config)
-
-    state_dict = extract_linear(model.lm_head, sub_network_config.sampled_embd_indices)
+    if hasattr(sub_network_config, "sampled_embd_indices"):
+        sampled_embd_indices = sub_network_config.sampled_embd_indices
+    else:
+        sampled_embd_indices = None
+    if hasattr(sub_network_config, "sampled_intermediate_indices"):
+        sampled_intermediate_indices = sub_network_config.sampled_intermediate_indices
+    else:
+        sampled_intermediate_indices = None
+    state_dict = extract_linear(model.lm_head, sampled_embd_indices)
     sub_network.lm_head.load_state_dict(state_dict)
 
-    state_dict = extract_embedding(
-        model.transformer.wte, sub_network_config.sampled_embd_indices
-    )
+    state_dict = extract_embedding(model.transformer.wte, sampled_embd_indices)
     sub_network.transformer.wte.load_state_dict(state_dict)
 
     extract_norm(
         model.transformer.ln_f,
         sub_network.transformer.ln_f,
-        sub_network_config.sampled_embd_indices,
+        sampled_embd_indices,
     )
 
     for i in range(sub_network_config.n_layer):
@@ -76,16 +81,14 @@ def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
         sub_network_block = sub_network.transformer.h[i]
 
         # Attention
-        extract_attention(
-            block.attn, sub_network_block.attn, sub_network_config.sampled_embd_indices
-        )
+        extract_attention(block.attn, sub_network_block.attn, sampled_embd_indices)
 
         # MLP
         extract_mlp(
             block.mlp,
             sub_network_block.mlp,
-            sub_network_config.sampled_intermediate_indices,
-            sub_network_config.sampled_embd_indices,
+            sampled_intermediate_indices,
+            sampled_embd_indices,
         )
         if sub_network_config.norm_qk is not None:
             if block.attn.norm_q:
@@ -97,25 +100,21 @@ def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
             # extract_norm(block.attn.norm_q, sub_network_block.attn.norm_q, sub_network_config.sampled_embd_indices)
             # extract_norm(block.attn.norm_k, sub_network_block.attn.norm_k, sub_network_config.sampled_embd_indices)
         # norm
-        extract_norm(
-            block.norm_1,
-            sub_network_block.norm_1,
-            sub_network_config.sampled_embd_indices,
-        )
+        extract_norm(block.norm_1, sub_network_block.norm_1, sampled_embd_indices)
         extract_norm(
             block.post_attention_norm,
             sub_network_block.post_attention_norm,
-            sub_network_config.sampled_embd_indices,
+            sampled_embd_indices,
         )
         extract_norm(
             block.norm_2,
             sub_network_block.norm_2,
-            sub_network_config.sampled_embd_indices,
+            sampled_embd_indices,
         )
         extract_norm(
             block.post_mlp_norm,
             sub_network_block.post_mlp_norm,
-            sub_network_config.sampled_embd_indices,
+            sampled_embd_indices,
         )
 
     return sub_network
