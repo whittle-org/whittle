@@ -183,7 +183,6 @@ class Test_WhittleLM:
     def test_logliklihood(self, checkpoint_dir, out_dir) -> None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-        config.fix_head_size = True
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config).to(device)
@@ -208,7 +207,6 @@ class Test_WhittleLM:
     def test_generate_until(self, checkpoint_dir) -> None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-        config.fix_head_size = True
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config).to(device)
@@ -223,7 +221,6 @@ class Test_WhittleLM:
     def test_logliklihood_rolling(self, checkpoint_dir) -> None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-        config.fix_head_size = True
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config).to(device)
@@ -238,7 +235,6 @@ class Test_WhittleLM:
     def test_toc_encode(self, checkpoint_dir) -> None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-        config.fix_head_size = True
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config).to(device)
@@ -253,7 +249,6 @@ class Test_WhittleLM:
     def test_toc_decode(self, checkpoint_dir) -> None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-        config.fix_head_size = True
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config).to(device)
@@ -268,7 +263,6 @@ class Test_WhittleLM:
     def test_batch_encode(self, checkpoint_dir) -> None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-        config.fix_head_size = True
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config).to(device)
@@ -283,7 +277,6 @@ class Test_WhittleLM:
     def test_model_generate(self, checkpoint_dir) -> None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-        config.fix_head_size = True
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config).to(device)
@@ -300,7 +293,6 @@ class Test_WhittleLM:
     def test_evaluate(self, checkpoint_dir, out_dir):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-        config.fix_head_size = True
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config).to(device)
@@ -343,14 +335,12 @@ class Test_WhittleLM:
         torch.manual_seed(0)
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-        config.fix_head_size = True
         config.model_type = "gpt"
         config.tie_embeddings = False
         gpt = GPT(config).to(device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
         gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
         config_14m = Config.from_file(str(checkpoint_dir_14m / "model_config.yaml"))
-        config_14m.fix_head_size = True
         config_14m.model_type = "gpt"
         config_14m.tie_embeddings = False
         gpt_14m = GPT(config_14m).to(device)

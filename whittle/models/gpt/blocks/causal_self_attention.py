@@ -16,6 +16,7 @@ from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
 
 
+
 class CausalSelfAttention(nn.Module):
     """Extension of litgpt's `litgpt.model.CausalSelfAttention` with support to adapt to sub-network dimensionality."""
 
@@ -52,8 +53,9 @@ class CausalSelfAttention(nn.Module):
                 if config.norm_qk_type == "olmo2"
                 else config.head_size
             )
-            self.norm_q = self.norm_class()(norm_q_size, eps=config.norm_eps)
-            self.norm_k = self.norm_class()(norm_k_size, eps=config.norm_eps)
+            norm_class = self.norm_class()
+            self.norm_q = norm_class(norm_q_size, eps=config.norm_eps)
+            self.norm_k = norm_class(norm_k_size, eps=config.norm_eps)
         else:
             self.norm_q = self.norm_k = None
         # Set current sub-network to super-network
@@ -75,6 +77,13 @@ class CausalSelfAttention(nn.Module):
         # `self._norm_class` cannot be the type to keep the config json serializable
         if self.config.norm_class_name == "RMSNorm":
             return partial(RMSNorm, add_unit_offset="Gemma" in self.config.name)
+
+        if self.config.norm_class_name == "LayerNorm" and "OLMo" in self.config.name:
+            # this makes it equivalent to `torch.nn.functional.layer_norm`
+            # that is used by OLMo
+            # Table 5 caption in the OLMo paper shows this - https://aclanthology.org/2024.acl-long.841
+            return partial(torch.nn.LayerNorm, elementwise_affine=False)
+
         return LayerNorm
 
     def _verify_subnet_is_legal(

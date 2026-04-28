@@ -42,7 +42,6 @@ def checkpoint_dir(tmp_path_factory):
     llama_dir.mkdir(parents=True, exist_ok=True)
     config = Config.from_name("micro-llama-300M")
     config.intermediate_size = 1024
-    config.fix_head_size = True
     save_config(config, llama_dir)
     model = GPT(config)
     random_init_weights(model)
@@ -55,7 +54,6 @@ def checkpoint_dir(tmp_path_factory):
     gemma_dir = checkpoint_dir / "google" / "gemma-2b"
     gemma_dir.mkdir(parents=True, exist_ok=True)
     config = Config.from_name("gemma-2b")
-    config.fix_head_size = True
     # simulate a smaller network
     config.vocab_size = 256
     config.n_embd = 32
@@ -95,7 +93,6 @@ def get_checkpoint_contents(copy_config_files, save_checkpoints):
 def test_checkpoints(tmp_path, checkpoint_dir, copy_config_files, save_checkpoints):
     checkpoint_dir = checkpoint_dir / "EleutherAI" / "pythia-14m"
     config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-    config.fix_head_size = True
 
     model = GPT(config)
     ckp = lazy_load(checkpoint_dir / "lit_model.pth")
@@ -151,7 +148,6 @@ def test_checkpoints(tmp_path, checkpoint_dir, copy_config_files, save_checkpoin
             assert "parent_dir" in checkpoint
 
         loaded_model = load_checkpoint(out_dir)
-        assert loaded_model.config.fix_head_size is True  # by default this should be set
 
         model.select_sub_network(sub_network_dict)
 
@@ -180,7 +176,6 @@ def test_convert_to_litgpt(
     litgpt_dir.mkdir(exist_ok=True)
 
     config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-    config.fix_head_size = True
 
     model = GPT(config)
     ckp = lazy_load(checkpoint_dir / "lit_model.pth")

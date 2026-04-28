@@ -116,7 +116,6 @@ def setup(
     if teacher_checkpoint_dir is not None:
         print(f"Loading teacher model config from {teacher_checkpoint_dir}")
         teacher_config = Config.from_file(teacher_checkpoint_dir / "model_config.yaml")
-        teacher_config.fix_head_size = True
     else:
         raise ValueError("teacher_checkpoint_dir is required")
 

@@ -123,8 +123,7 @@ def load_checkpoint(
         checkpoint_dir: The directory of the checkpoint.
         model_cls: The model class to instantiate. Defaults to GPT.
         config_cls: The config class to instantiate. Defaults to Config.
-        config_attr: The attributes to set in the config after __init__. If None, config.fix_head_size is set to True.
-            Defaults to None.
+        config_attr: The attributes to set in the config after __init__. Defaults to None.
 
     Returns:
         GPT: The loaded model.
@@ -155,11 +154,10 @@ def load_checkpoint(
             ckp = lazy_load(checkpoint_dir / "lit_model.pth")
 
     config = config_cls.from_file(checkpoint_dir / "model_config.yaml")
-    config_attr = {"fix_head_size": True} if config_attr is None else config_attr
-    for k, val in config_attr.items():
-        setattr(
-            config, k, val
-        )  # some args are not passed to __init__ - e.g. for config.fix_head_size = True
+    if config_attr is not None:
+        for k, val in config_attr.items():
+            # some args are not passed to __init__
+            setattr(config, k, val)
 
     model = model_cls(config)
     # for WhittleLM - it loads AutoTokenizer inside - either we copied it to checkpoint_dir, or it is referenced in parent_dir

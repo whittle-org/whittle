@@ -28,7 +28,6 @@ def pruner_model(request, accelerator_device):
         n_embd=32,
         intermediate_size=86,
     )
-    config.fix_head_size = True
     config.model_type = "gpt"
     config.tie_embeddings = False
     config.use_cache = True

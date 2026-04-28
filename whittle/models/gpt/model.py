@@ -29,10 +29,19 @@ from whittle.modules.linear import Linear
 from whittle.modules.rmsnorm import RMSNorm
 
 
+def assert_config_is_supported(config: Config):
+    if config.n_expert > 0:
+        raise ValueError("Mixture of Experts models are not currently supported.")
+    if config.latent_attention is not None:
+        raise ValueError("Latent Attention models are not currently supported.")
+
+
 class GPT(nn.Module):
     """An extension of litgpt's GPT model with support to adapt to sub-network dimensionality."""
 
-    def __init__(self, config: Config, compute_importance: bool = False) -> None:
+    def __init__(self, config: Config, compute_importance=False) -> None:
+        assert_config_is_supported(config)
+
         super().__init__()
         assert config.padded_vocab_size is not None
         self.config = config
@@ -82,6 +91,13 @@ class GPT(nn.Module):
         # `self._norm_class` cannot be the type to keep the config json serializable
         if self.config.norm_class_name == "RMSNorm":
             return partial(RMSNorm, add_unit_offset="Gemma" in self.config.name)
+
+        if self.config.norm_class_name == "LayerNorm" and "OLMo" in self.config.name:
+            # this makes it equivalent to `torch.nn.functional.layer_norm`
+            # that is used by OLMo
+            # Table 5 caption in the OLMo paper shows this - https://aclanthology.org/2024.acl-long.841
+            return partial(torch.nn.LayerNorm, elementwise_affine=False)
+
         return LayerNorm
 
     @property
@@ -528,18 +544,18 @@ class GPT(nn.Module):
             else self.config.n_query_groups
         )
 
+<<<<<<< HEAD
         if self.config.fix_head_size:
             if sub_network_sizes["sub_network_head_size"] is None:
                 self.sub_network_head_size = self.config.head_size
             else:
                 self.sub_network_head_size = sub_network_sizes["sub_network_head_size"]
+=======
+        if sub_network_sizes["sub_network_head_size"] is None:
+            self.sub_network_head_size = self.config.head_size
+>>>>>>> 66b820e76564328d85f004a862ed0bc983227e20
         else:
-            if sub_network_sizes["sub_network_head_size"] is not None:
-                self.sub_network_head_size = sub_network_sizes["sub_network_head_size"]
-            else:
-                self.sub_network_head_size = (
-                    self.sub_network_n_embd // self.sub_network_num_heads
-                )
+            self.sub_network_head_size = sub_network_sizes["sub_network_head_size"]
 
         if sampled_layer_indices is not None:
             for i, j in enumerate(sampled_layer_indices):
@@ -689,7 +705,18 @@ class GPT(nn.Module):
         cos, sin, mask, input_pos_maxp1_block = self.process_rope_cache(
             cos, sin, input_pos, input_pos_maxp1, T
         )
-        x = block(x, cos, sin, mask, input_pos, input_pos_maxp1_block)
+
+        if self.config.rope_indices is not None:
+            x = block(
+                x,
+                cos[..., self.config.rope_indices[j]],
+                sin[..., self.config.rope_indices[j]],
+                mask,
+                input_pos,
+                input_pos_maxp1,
+            )
+        else:
+            x = block(x, cos, sin, mask, input_pos, input_pos_maxp1_block)
 
         return x
 

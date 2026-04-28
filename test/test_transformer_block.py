@@ -18,7 +18,6 @@ def test_block():
     config.n_query_groups = 4
     config.head_size = 8
     config.intermediate_size = 64 * 4
-    config.fix_head_size = False
     config.mlp_class_name = "LLaMAMLP"
     config.max_seq_len = 512
     config.rotary_percentage = 0.25

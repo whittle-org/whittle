@@ -27,7 +27,6 @@ def test_objective():
     model_config = Config(
         block_size=2, n_layer=2, n_embd=4, n_head=2, padded_vocab_size=8
     )
-    model_config.fix_head_size = True
 
     dataset = torch.tensor([[0, 1, 2], [3, 4, 5], [0, 1, 2]])
     dataloader = DataLoader(dataset)

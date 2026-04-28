@@ -86,7 +86,6 @@ def setup(
 
     check_valid_checkpoint_dir(checkpoint_dir)
     config = Config.from_file(checkpoint_dir / "model_config.yaml")
-    config.fix_head_size = True
 
     if accelerator is None:
         accelerator = "cuda" if torch.cuda.is_available() else "cpu"
