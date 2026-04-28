@@ -32,7 +32,7 @@ from whittle.modules.rmsnorm import RMSNorm
 class GPT(nn.Module):
     """An extension of litgpt's GPT model with support to adapt to sub-network dimensionality."""
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, compute_importance=False) -> None:
         super().__init__()
         assert config.padded_vocab_size is not None
         self.config = config
@@ -43,7 +43,7 @@ class GPT(nn.Module):
             dict(
                 wte=Embedding(config.padded_vocab_size, config.n_embd),
                 h=nn.ModuleList(
-                    Block(config, block_idx) for block_idx in range(config.n_layer)
+                    Block(config, block_idx, compute_importance=compute_importance) for block_idx in range(config.n_layer)
                 ),
                 ln_f=self.norm_class(config.n_embd, eps=config.norm_eps),
             )
@@ -73,6 +73,9 @@ class GPT(nn.Module):
         self.sampled_embd_indices: list[int] | None = None
         self.cos_list = None
         self.sin_list = None
+        self.compute_importance = compute_importance
+        if self.compute_importance:
+            self.intermediate_outputs = {}
         # self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
 
     @property
@@ -491,6 +494,7 @@ class GPT(nn.Module):
             sampled_layer_indices=sampled_layer_indices,
             sampled_embd_indices=sampled_embd_indices,
         )
+        print(sub_network_sizes)
         self._verify_sub_network(
             **sub_network_sizes,
             sampled_intermediate_indices=sampled_intermediate_indices,
@@ -697,16 +701,25 @@ class GPT(nn.Module):
         x = self.transformer.wte(idx)  # type: ignore  # token embeddings of shape (b, t, n_embd)
         if self.config.scale_embeddings:
             x = x * torch.tensor(self.sub_network_n_embd**0.5, dtype=x.dtype)
-
+        if self.compute_importance:
+            self.intermediate_outputs["block_0"] = x.detach()
         if self.sampled_layer_indices is not None:
             for i, j in enumerate(self.sampled_layer_indices):
-                x = self.process_blocks(x, idx, input_pos, j, i, input_pos_maxp1, T)
-
+                x, (q,k,v,mask), mlp_importance = self.process_blocks(x, idx, input_pos, j, i, input_pos_maxp1, T)
+                if self.compute_importance:
+                    self.intermediate_outputs[f"block_{j+1}"] = x.detach()
+                    self.intermediate_outputs[f"block_{j}_attn_out"] = (q.detach(), k.detach(), v.detach(), mask.detach() if mask is not None else None)
+                    self.intermediate_outputs[f"block_{j}_mlp_importance"] = mlp_importance.detach()
         else:
             for i in range(self.sub_network_n_layers):
-                x = self.process_blocks(x, idx, input_pos, i, i, input_pos_maxp1, T)
-
+                x, (q,k,v,mask), mlp_importance = self.process_blocks(x, idx, input_pos, i, i, input_pos_maxp1, T)
+                if self.compute_importance:
+                    self.intermediate_outputs[f"block_{i+1}"] = x.detach()
+                    self.intermediate_outputs[f"block_{i}_attn_out"] = (q.detach(), k.detach(), v.detach(), mask.detach() if mask is not None else None)
+                    self.intermediate_outputs[f"block_{i}_mlp_importance"] = mlp_importance.detach()
         x = self.transformer.ln_f(x)  # type: ignore
+        if self.compute_importance:
+            self.intermediate_outputs["norm_f"] = x.detach()
         clamp_head = (
             partial(do_softcapping, thresh=self.config.final_logit_softcapping)
             if self.config.final_logit_softcapping is not None

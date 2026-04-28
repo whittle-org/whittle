@@ -36,7 +36,8 @@ def extract_current_sub_network(model: GPT) -> GPT:
     subnet_config.attention_scores_scalar = model.transformer.h[
         0
     ].attn.sub_attention_scaler
-
+    subnet_config.sampled_embd_indices = model.sampled_embd_indices
+    subnet_config.sampled_intermediate_indices = model.sampled_intermediate_indices
     return extract_sub_network(model, subnet_config)
 
 
@@ -56,76 +57,99 @@ def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
 
     sub_network = GPT(sub_network_config)
 
-    state_dict = extract_linear(model.lm_head)
+    state_dict = extract_linear(model.lm_head, sub_network_config.sampled_embd_indices)
     sub_network.lm_head.load_state_dict(state_dict)
 
-    state_dict = extract_embedding(model.transformer.wte)
+    state_dict = extract_embedding(model.transformer.wte, sub_network_config.sampled_embd_indices)
     sub_network.transformer.wte.load_state_dict(state_dict)
 
-    extract_norm(model.transformer.ln_f, sub_network.transformer.ln_f)
+    extract_norm(model.transformer.ln_f, sub_network.transformer.ln_f, sub_network_config.sampled_embd_indices)
 
     for i in range(sub_network_config.n_layer):
         block = model.transformer.h[i]
         sub_network_block = sub_network.transformer.h[i]
 
         # Attention
-        extract_attention(block.attn, sub_network_block.attn)
+        extract_attention(block.attn, sub_network_block.attn, sub_network_config.sampled_embd_indices)
 
         # MLP
-        extract_mlp(block.mlp, sub_network_block.mlp)
-
+        extract_mlp(block.mlp, sub_network_block.mlp, sub_network_config.sampled_intermediate_indices, sub_network_config.sampled_embd_indices)
+        if sub_network_config.norm_qk is not None:
+            state = block.attn.norm_q.state_dict()
+            sub_network_block.attn.norm_q.load_state_dict(state)
+            state = block.attn.norm_k.state_dict()
+            sub_network_block.attn.norm_k.load_state_dict(state)
+            #extract_norm(block.attn.norm_q, sub_network_block.attn.norm_q, sub_network_config.sampled_embd_indices)
+            #extract_norm(block.attn.norm_k, sub_network_block.attn.norm_k, sub_network_config.sampled_embd_indices)
         # norm
-        extract_norm(block.norm_1, sub_network_block.norm_1)
-        extract_norm(block.post_attention_norm, sub_network_block.post_attention_norm)
-        extract_norm(block.norm_2, sub_network_block.norm_2)
-        extract_norm(block.post_mlp_norm, sub_network_block.post_mlp_norm)
+        extract_norm(block.norm_1, sub_network_block.norm_1, sub_network_config.sampled_embd_indices)
+        extract_norm(block.post_attention_norm, sub_network_block.post_attention_norm, sub_network_config.sampled_embd_indices)
+        extract_norm(block.norm_2, sub_network_block.norm_2, sub_network_config.sampled_embd_indices)
+        extract_norm(block.post_mlp_norm, sub_network_block.post_mlp_norm, sub_network_config.sampled_embd_indices)
 
     return sub_network
 
 
-def extract_attention(super_network_attention, sub_network_attention):
+def extract_attention(super_network_attention, sub_network_attention, sampled_embd_indices=None):
     if super_network_attention.qkv_indices is not None:
-        sub_network_attention.qkv.weight.data = super_network_attention.qkv.weight.data[
-            super_network_attention.qkv_indices, :
-        ][:, 0 : sub_network_attention.sub_network_n_embd]
+        if sampled_embd_indices is not None:
+            sub_network_attention.qkv.weight.data = super_network_attention.qkv.weight.data[
+                super_network_attention.qkv_indices, :
+            ][:, sampled_embd_indices]
+        else:
+            sub_network_attention.qkv.weight.data = super_network_attention.qkv.weight.data[
+                super_network_attention.qkv_indices, :
+            ][:, 0 : sub_network_attention.sub_network_n_embd]
         if sub_network_attention.qkv.bias is not None:
             sub_network_attention.qkv.bias.data = super_network_attention.qkv.bias.data[
                 super_network_attention.qkv_indices
             ]
     else:
-        state_dict = extract_linear(super_network_attention.attn)
+        state_dict = extract_linear(super_network_attention.attn, sampled_input_indices=sampled_embd_indices, sampled_output_indices=sub_network_attention.qkv_indices)
         sub_network_attention.attn.load_state_dict(state_dict)
     if super_network_attention.proj_indices is not None:
-        sub_network_attention.proj.weight.data = super_network_attention.proj.weight.data[
-            0 : sub_network_attention.sub_network_n_embd
-        ][:, super_network_attention.proj_indices]
+        if sampled_embd_indices is not None:
+            sub_network_attention.proj.weight.data = super_network_attention.proj.weight.data[sampled_embd_indices, :][:, super_network_attention.proj_indices]
+        else:
+            sub_network_attention.proj.weight.data = super_network_attention.proj.weight.data[
+               0 : sub_network_attention.sub_network_n_embd, :][:, super_network_attention.proj_indices]
+            
         if sub_network_attention.proj.bias is not None:
-            sub_network_attention.proj.bias.data = super_network_attention.proj.bias.data[
-                0 : sub_network_attention.sub_network_n_embd
-            ]
+            if sampled_embd_indices is not None:
+                sub_network_attention.proj.bias.data = super_network_attention.proj.bias.data[
+                    sampled_embd_indices
+                ]
+            else:
+                sub_network_attention.proj.bias.data = super_network_attention.proj.bias.data[
+                    0 : sub_network_attention.sub_network_n_embd
+                ]
     else:
-        state_dict = extract_linear(super_network_attention.proj)
+        state_dict = extract_linear(super_network_attention.proj, sampled_input_indices=sub_network_attention.proj_indices, sampled_output_indices=sampled_embd_indices)
         sub_network_attention.proj.load_state_dict(state_dict)
     if super_network_attention.config.norm_qk:
-        extract_norm(super_network_attention.norm_q, sub_network_attention.norm_q)
-        extract_norm(super_network_attention.norm_k, sub_network_attention.norm_k)
+        state_dict = super_network_attention.norm_q.state_dict()
+        sub_network_attention.norm_q.load_state_dict(state_dict)
+        state_dict = super_network_attention.norm_k.state_dict()
+        sub_network_attention.norm_k.load_state_dict(state_dict)
 
 
-def extract_mlp(mlp, sub_mlp):
+def extract_mlp(mlp, sub_mlp, sampled_intermediate_indices=None, sampled_embd_indices=None):
     if isinstance(mlp, GptNeoxMLP):
-        state_dict = extract_linear(mlp.fc)
+        state_dict = extract_linear(mlp.fc, sampled_input_indices=sampled_embd_indices, sampled_output_indices=sampled_intermediate_indices)
         sub_mlp.fc.load_state_dict(state_dict)
 
-        state_dict = extract_linear(mlp.proj)
+        state_dict = extract_linear(mlp.proj, sampled_input_indices=sampled_intermediate_indices, sampled_output_indices=sampled_embd_indices)
         sub_mlp.proj.load_state_dict(state_dict)
     elif isinstance(mlp, LLaMAMLP):
-        state_dict = extract_linear(mlp.fc_1)
+        #print(len(sampled_embd_indices))
+        #print(len(sampled_intermediate_indices))
+        state_dict = extract_linear(mlp.fc_1, sampled_input_indices=sampled_embd_indices, sampled_output_indices=sampled_intermediate_indices)
         sub_mlp.fc_1.load_state_dict(state_dict)
 
-        state_dict = extract_linear(mlp.fc_2)
+        state_dict = extract_linear(mlp.fc_2, sampled_input_indices=sampled_embd_indices, sampled_output_indices=sampled_intermediate_indices)
         sub_mlp.fc_2.load_state_dict(state_dict)
 
-        state_dict = extract_linear(mlp.proj)
+        state_dict = extract_linear(mlp.proj, sampled_input_indices=sampled_intermediate_indices, sampled_output_indices=sampled_embd_indices)
         sub_mlp.proj.load_state_dict(state_dict)
     else:
         raise ValueError(
@@ -133,7 +157,7 @@ def extract_mlp(mlp, sub_mlp):
         )
 
 
-def extract_norm(norm, sub_norm):
+def extract_norm(norm, sub_norm, sampled_embd_indices=None):
     # nothing to extract
     if norm is None:
         assert sub_norm is None
@@ -150,13 +174,19 @@ def extract_norm(norm, sub_norm):
     super_state = norm.state_dict()
 
     new_state_dict = OrderedDict()
-    new_state_dict["weight"] = super_state["weight"][:in_feat_sub]
+    if sampled_embd_indices is not None:
+        new_state_dict["weight"] = super_state["weight"][sampled_embd_indices]
+    else:
+        new_state_dict["weight"] = super_state["weight"][:in_feat_sub]
 
     if isinstance(norm, RMSNorm):
         assert isinstance(sub_norm, RMSNorm)
     elif isinstance(norm, LayerNorm):
         assert isinstance(sub_norm, LayerNorm)
-        new_state_dict["bias"] = super_state["bias"][:in_feat_sub]
+        if sampled_embd_indices is not None:
+            new_state_dict["bias"] = super_state["bias"][sampled_embd_indices]
+        else:
+            new_state_dict["bias"] = super_state["bias"][:in_feat_sub]
     else:
         raise ValueError(
             "Cannot extract norm, supported norm classes are RMSNorm and LayerNorm."
@@ -165,25 +195,48 @@ def extract_norm(norm, sub_norm):
     sub_norm.load_state_dict(new_state_dict)
 
 
-def extract_linear(super_network_linear):
+def extract_linear(super_network_linear, sampled_input_indices=None, sampled_output_indices=None):
     super_network_state = super_network_linear.state_dict()
     in_feat_sub = super_network_linear.sub_network_in_features
     out_feat_sub = super_network_linear.sub_network_out_features
     new_state_dict = OrderedDict()
-    new_state_dict["weight"] = super_network_state["weight"][:out_feat_sub, :in_feat_sub]
+    if sampled_input_indices is not None and sampled_output_indices is not None:
+        new_state_dict["weight"] = super_network_state["weight"][
+            sampled_output_indices, :
+        ][:, sampled_input_indices]
+    elif sampled_input_indices is not None:
+        new_state_dict["weight"] = super_network_state["weight"][
+            0 : out_feat_sub, :
+        ][:, sampled_input_indices]
+    elif sampled_output_indices is not None:
+        new_state_dict["weight"] = super_network_state["weight"][
+            sampled_output_indices, :
+        ][:, 0 : in_feat_sub]
+    else:
+        new_state_dict["weight"] = super_network_state["weight"][:out_feat_sub, :in_feat_sub]
 
     if super_network_linear.use_bias:
-        new_state_dict["bias"] = super_network_state["bias"][:out_feat_sub]
+        if sampled_input_indices is not None and sampled_output_indices is not None:
+            new_state_dict["bias"] = super_network_state["bias"][sampled_output_indices]
+        elif sampled_output_indices is not None:
+            new_state_dict["bias"] = super_network_state["bias"][sampled_output_indices]
+        elif sampled_input_indices is not None:
+            new_state_dict["bias"] = super_network_state["bias"][:out_feat_sub]
+        else:
+            new_state_dict["bias"] = super_network_state["bias"][:out_feat_sub]
 
     return new_state_dict
 
 
-def extract_embedding(super_network_embedding):
+def extract_embedding(super_network_embedding, sampled_embd_indices=None):
     super_network_state = super_network_embedding.state_dict()
     new_state_dict = OrderedDict()
     sub_network_embedding_dim = super_network_embedding.sub_network_embedding_dim
-    new_state_dict["weight"] = super_network_state["weight"][
-        :, :sub_network_embedding_dim
-    ]
+    if sampled_embd_indices is not None:
+        new_state_dict["weight"] = super_network_state["weight"][
+            :, sampled_embd_indices
+        ]
+    else:
+        new_state_dict["weight"] = super_network_state["weight"][:, :sub_network_embedding_dim]
 
     return new_state_dict

@@ -3,24 +3,26 @@ from __future__ import annotations
 import litgpt
 import torch
 from litgpt import Config
-
+from torch.nn import functional as F
 from whittle.modules import Linear
 
 
 class GptNeoxMLP(litgpt.model.GptNeoxMLP):
     """An extension of litgp's `litgpt.model.GptNeoxMLP` with support to adapt to sub-network dimensionality."""
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, compute_importance = False) -> None:
         super().__init__(config)
         self.fc = Linear(config.n_embd, config.intermediate_size, bias=config.bias)
         self.proj = Linear(config.intermediate_size, config.n_embd, bias=config.bias)
         self.config = config
         self.in_features = config.n_embd
         self.intermediate_size = config.intermediate_size
+        self.compute_importance = compute_importance
 
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.in_features
         self.sub_network_intermediate_size = self.intermediate_size
+        
 
     def set_sub_network(
         self,
@@ -62,11 +64,17 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         self.fc.reset_super_network()
         self.proj.reset_super_network()
 
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.fc(x)
+        x_gelu = F.gelu(x, approximate=self.config.gelu_approximate)
+        if self.compute_importance:
+            return self.proj(x_gelu), x
+        return self.proj(x_gelu), None
 
 class LLaMAMLP(litgpt.model.LLaMAMLP):
     """An extension of litgp's `litgpt.model.LLaMAMLP` with support to adapt to sub-network dimensionality."""
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, compute_importance: bool = False) -> None:
         super().__init__(config)
         self.fc_1 = Linear(config.n_embd, config.intermediate_size, bias=config.bias)
         self.fc_2 = Linear(config.n_embd, config.intermediate_size, bias=config.bias)
@@ -76,6 +84,7 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         self.sub_network_n_embd: int | None = None
         self.sub_network_intermediate_size: int | None = None
         self.config = config
+        self.compute_importance = compute_importance
 
     def set_sub_network(
         self,
@@ -124,12 +133,21 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         self.fc_2.reset_super_network()
         self.proj.reset_super_network()
 
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x_fc_1 = self.fc_1(x)
+        x_fc_2 = self.fc_2(x)
+        x = F.silu(x_fc_1) * x_fc_2
+        if self.compute_importance:
+            return self.proj(x), x
+        return self.proj(x), None
+
+
 
 class GemmaMLP(LLaMAMLP):
     """Implementation of the forward pass of LLaMAMLP network."""
 
-    def __init__(self, config: Config) -> None:
-        super().__init__(config)
+    def __init__(self, config: Config, compute_importance: bool = False) -> None:
+        super().__init__(config, compute_importance=compute_importance)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x_fc_1 = self.fc_1(x)
@@ -138,4 +156,6 @@ class GemmaMLP(LLaMAMLP):
             torch.nn.functional.gelu(x_fc_1, approximate=self.config.gelu_approximate)
             * x_fc_2
         )
-        return self.proj(x)
+        if self.compute_importance:
+            return self.proj(x), x
+        return self.proj(x), None

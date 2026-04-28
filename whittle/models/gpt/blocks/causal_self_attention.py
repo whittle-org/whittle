@@ -11,12 +11,14 @@ from litgpt.scripts.convert_hf_checkpoint import qkv_reassemble
 
 from whittle.exceptions import IllegalSubNetworkError
 from whittle.modules import Linear
-
+from whittle.modules.layernorm import LayerNorm
+from whittle.modules.rmsnorm import RMSNorm
+from functools import partial
 
 class CausalSelfAttention(nn.Module):
     """Extension of litgpt's `litgpt.model.CausalSelfAttention` with support to adapt to sub-network dimensionality."""
 
-    def __init__(self, config: Config, block_idx: int) -> None:
+    def __init__(self, config: Config, block_idx: int, compute_importance: bool = False) -> None:
         super().__init__()
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
@@ -47,8 +49,8 @@ class CausalSelfAttention(nn.Module):
                 if config.norm_qk_type == "olmo2"
                 else config.head_size
             )
-            self.norm_q = config.norm_class(norm_q_size, eps=config.norm_eps)
-            self.norm_k = config.norm_class(norm_k_size, eps=config.norm_eps)
+            self.norm_q = self.norm_class()(norm_q_size, eps=config.norm_eps)
+            self.norm_k = self.norm_class()(norm_k_size, eps=config.norm_eps)
         else:
             self.norm_q = self.norm_k = None
         # Set current sub-network to super-network
@@ -64,7 +66,14 @@ class CausalSelfAttention(nn.Module):
             self.sub_network_n_head // self.sub_network_query_groups
         )
         self.sub_attention_scaler = self.config.attention_scores_scalar
+        self.compute_importance = compute_importance
 
+    def norm_class(self):
+        # `self._norm_class` cannot be the type to keep the config json serializable
+        if self.config.norm_class_name == "RMSNorm":
+            return partial(RMSNorm, add_unit_offset="Gemma" in self.config.name)
+        return LayerNorm
+    
     def _verify_subnet_is_legal(
         self,
         subnet_n_embed: int,
@@ -146,7 +155,8 @@ class CausalSelfAttention(nn.Module):
                 raise IllegalSubNetworkError(
                     f"Sampled index cannot be greater than {max_val} for {property}"
                 )
-
+        #print(f"Verifying sub-network legality with sampled indices - heads: {sampled_head_indices}, ")
+        #print(f"Verifying sub-network legality with sampled indices - {heads_per_group}")
         verify_indices(sampled_head_indices, heads_per_group, "sampled_head_indices")
         verify_indices(sampled_embd_indices, n_embd, "sampled_embd_indices")
         verify_indices(sampled_head_size_indices, head_size, "sampled_head_size_indices")
@@ -365,7 +375,7 @@ class CausalSelfAttention(nn.Module):
 
         def get_val(value: int | None, default: int) -> int:
             return value if value else default
-
+        
         sub_network_n_embd = get_val(sub_network_n_embd, self.config.n_embd)
         sub_network_n_head = get_val(sub_network_n_head, self.config.n_head)
         sub_network_query_groups = get_val(
@@ -412,7 +422,7 @@ class CausalSelfAttention(nn.Module):
             )
         ]
 
-        # Set the sub-network dimensions for the linear transformations
+        # Set the sub-network dimensions for the linear 
         self.qkv.set_sub_network(
             self.sub_network_n_embd,
             self.sub_network_qkv_shape,
@@ -581,7 +591,9 @@ class CausalSelfAttention(nn.Module):
             * self.sub_network_q_per_kv
             * self.sub_network_query_groups,
         )  # re-assemble all head outputs side by side
-        return self.proj(y)
+        if self.compute_importance:
+            return self.proj(y), (q, k, v, mask)
+        return self.proj(y), (None, None, None, None)
 
     def scaled_dot_product_attention(
         self,

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from functools import partial
-
+import torch
+from typing import Optional
 import litgpt
 import torch.nn as nn
 from litgpt import Config
@@ -15,7 +16,7 @@ from whittle.modules.rmsnorm import RMSNorm
 class Block(litgpt.model.Block):
     """An extension of litgpt's Transformer Block with support to adapt to sub-network dimensionality."""
 
-    def __init__(self, config: Config, block_idx: int) -> None:
+    def __init__(self, config: Config, block_idx: int, compute_importance=False) -> None:
         super().__init__(config, block_idx)
         self.config = config
         if not config.parallel_residual and config.shared_attention_norm:
@@ -24,12 +25,13 @@ class Block(litgpt.model.Block):
                 " (non-parallel residual and shared attention norm)."
             )
 
+        self.compute_importance = compute_importance
         self.norm_1 = (
             nn.Identity()
             if not config.norm_1
             else self.norm_class()(config.n_embd, eps=config.norm_eps)
         )
-        self.attn = CausalSelfAttention(config, block_idx)
+        self.attn = CausalSelfAttention(config, block_idx, compute_importance=compute_importance)
         self.post_attention_norm = (
             self.norm_class()(config.n_embd, eps=config.norm_eps)
             if config.post_attention_norm
@@ -44,7 +46,7 @@ class Block(litgpt.model.Block):
                 else self.norm_class()(config.n_embd, eps=config.norm_eps)
             )
         )
-        self.mlp = self.mlp_class()(config)
+        self.mlp = self.mlp_class()(config, compute_importance=compute_importance)
         self.post_mlp_norm = (
             self.norm_class()(config.n_embd, eps=config.norm_eps)
             if config.post_mlp_norm
@@ -159,3 +161,47 @@ class Block(litgpt.model.Block):
             self.post_mlp_norm, RMSNorm
         ):
             self.post_mlp_norm.reset_super_network()
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        cos: torch.Tensor,
+        sin: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+        input_pos: Optional[torch.Tensor] = None,
+        input_pos_maxp1: Optional[int] = None,
+    ) -> torch.Tensor:
+        """
+        Non-parallel residual       Parallel residual
+           ┌─ x                     ┌─ x ──────────────────┐             Note: if `shared_attention_norm` is True,
+           │  ↓                     │  ↓                   ↓                   the output from `norm_1` is reused
+           │  norm_1                │  norm_1  ───────►    norm_2
+           │  ↓                     │  ↓                   ↓
+           │  attn                  │  attn                MLP
+           │  ↓                     │  ↓                   ↓
+           |  post_attn_norm        |  post_attn_norm      post_mlp_norm
+           |  ↓                     |  ↓                   ↓
+        ┌─ └► +                     └► + ◄─────────────────┘
+        |     ↓
+        │     norm_2
+        │     ↓
+        │     MLP
+        │     ↓
+        |     post_mlp_norm
+        |     ↓
+        └───► +
+        """
+
+        x_normed = self.norm_1(x)
+        attention_output, (q,k,v,mask) = self.attn(x_normed, cos, sin, mask, input_pos, input_pos_maxp1)
+        attention_output = self.post_attention_norm(attention_output)
+
+        if self.config.parallel_residual:
+            if not self.config.shared_attention_norm:
+                x_normed = self.norm_2(x)
+            x = attention_output + x
+        else:
+            x = attention_output + x
+            x_normed = self.norm_2(x)
+        mlp_output, mlp_importance = self.mlp(x_normed)
+        return self.post_mlp_norm(mlp_output) + x, (q, k, v, mask), mlp_importance
