@@ -164,7 +164,6 @@ def setup(
     data = TinyLlama() if data is None else data
 
     config = Config.from_name(model_name) if model_config is None else model_config
-    config.fix_head_size = True
 
     precision = precision or get_default_supported_precision(training=True)
     num_devices = parse_devices(devices)

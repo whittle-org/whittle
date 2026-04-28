@@ -8,6 +8,20 @@ from litgpt.model import GPT as LitGPT
 from whittle.exceptions import IllegalSubNetworkError
 from whittle.models.gpt import GPT
 
+MoE_MODEL_NAMES = [
+    "Qwen3-235B-A22B",
+    "Qwen3-235B-A22B-Instruct-2507",
+    "Qwen3-235B-A22B-Thinking-2507",
+    "Qwen3-30B-A3B",
+    "Qwen3-30B-A3B-Base",
+    "Qwen3-30B-A3B-Instruct-2507",
+    "Qwen3-30B-A3B-Thinking-2507",
+    "Mixtral-8x22B-Instruct-v0.1",
+    "Mixtral-8x22B-v0.1",
+    "Mixtral-8x7B-Instruct-v0.1",
+    "Mixtral-8x7B-v0.1",
+]
+
 
 def get_default_test_config():
     config = Config()
@@ -24,7 +38,6 @@ def get_default_test_config():
     config.rope_n_elem = int(config.rotary_percentage * config.head_size)
     config.norm_eps = 1e-5
     config.lm_head_bias = True
-    config.fix_head_size = False
     return config
 
 
@@ -170,6 +183,41 @@ def test_gpt():
     assert torch.allclose(out_lit_small, out_small, atol=1e-3)
 
 
+@pytest.mark.parametrize("model_name", MoE_MODEL_NAMES)
+def test_unsupported_moe_models(model_name):
+    config = Config.from_name(model_name)
+
+    with pytest.raises(
+        ValueError, match="Mixture of Experts models are not currently supported."
+    ):
+        GPT(config)
+
+
+def test_unsupported_latent_attention_models():
+    config = get_default_test_config()
+    config.latent_attention = {"num_latent_tokens": 16}
+
+    with pytest.raises(
+        ValueError, match="Latent Attention models are not currently supported."
+    ):
+        GPT(config)
+
+
+def _halved_subnet_config(config):
+    return {
+        "sub_network_n_embd": max(1, config.n_embd // 2),
+        "sub_network_intermediate_size": max(1, config.intermediate_size // 2),
+        "sub_network_num_heads": max(1, config.n_head // 2),
+        "sub_network_n_layers": max(1, config.n_layer // 2),
+        "sub_network_query_groups": max(1, config.n_query_groups // 2),
+        "sub_network_head_size": config.head_size,
+    }
+
+
+def _count_params(model):
+    return sum(p.numel() for p in model.parameters())
+
+
 def copy_weights(model_source, model_target):
     for (_, p1), (_, p2) in zip(
         model_source.named_parameters(), model_target.named_parameters()
@@ -185,14 +233,20 @@ def test_llama_3_1():
         intermediate_size=86,
         padded_vocab_size=10000,
     )
-    config_llama.fix_head_size = True
     lit_model = LitGPT(config_llama)
     whittle_model = GPT(config_llama)
+
+    assert _count_params(whittle_model) == _count_params(lit_model)
+
     copy_weights(lit_model, whittle_model)
     x = torch.tensor([[9856, 23, 491, 1536, 304]], dtype=torch.int32)
     whittle_out = whittle_model(x)
     lit_out = lit_model(x)
     assert torch.allclose(whittle_out, lit_out, atol=1e-3)
+
+    whittle_model.reset_super_network()
+    whittle_model.set_sub_network(**_halved_subnet_config(config_llama))
+    whittle_model(x)
 
 
 def test_llama_3_2():
@@ -203,14 +257,20 @@ def test_llama_3_2():
         intermediate_size=86,
         padded_vocab_size=10000,
     )
-    config_llama.fix_head_size = True
     lit_model = LitGPT(config_llama)
     whittle_model = GPT(config_llama)
+
+    assert _count_params(whittle_model) == _count_params(lit_model)
+
     copy_weights(lit_model, whittle_model)
     x = torch.tensor([[9856, 23, 491, 1536, 304]], dtype=torch.int32)
     whittle_out = whittle_model(x)
     lit_out = lit_model(x)
     assert torch.allclose(whittle_out, lit_out, atol=1e-3)
+
+    whittle_model.reset_super_network()
+    whittle_model.set_sub_network(**_halved_subnet_config(config_llama))
+    whittle_model(x)
 
 
 def test_gemma_2():
@@ -222,14 +282,69 @@ def test_gemma_2():
         n_embd=32,
         intermediate_size=86,
     )
-    config_gemma.fix_head_size = True
     lit_model = LitGPT(config_gemma)
     whittle_model = GPT(config_gemma)
+
+    assert _count_params(whittle_model) == _count_params(lit_model)
+
     copy_weights(lit_model, whittle_model)
     x = torch.tensor([[9856, 23, 491, 1536, 304, 1234]], dtype=torch.int32)
     whittle_out = whittle_model(x)
     lit_out = lit_model(x)
     assert torch.allclose(whittle_out, lit_out, atol=1e-3)
+
+    whittle_model.reset_super_network()
+    whittle_model.set_sub_network(**_halved_subnet_config(config_gemma))
+    whittle_model(x)
+
+
+def test_gemma_3():
+    config_gemma = Config.from_name(
+        "gemma-3-1b-it",
+        block_size=6,
+        sliding_window_size=3,
+        n_layer=2,
+        n_embd=32,
+        intermediate_size=86,
+    )
+    lit_model = LitGPT(config_gemma)
+    whittle_model = GPT(config_gemma)
+
+    assert _count_params(whittle_model) == _count_params(lit_model)
+
+    copy_weights(lit_model, whittle_model)
+    x = torch.tensor([[9856, 23, 491, 1536, 304, 1234]], dtype=torch.int32)
+    whittle_out = whittle_model(x)
+    lit_out = lit_model(x)
+    assert torch.allclose(whittle_out, lit_out, atol=1e-3)
+
+    whittle_model.reset_super_network()
+    whittle_model.set_sub_network(**_halved_subnet_config(config_gemma))
+    whittle_model(x)
+
+
+def test_olmo_2():
+    config_olmo = Config.from_name(
+        "OLMo-2-1124-7B",
+        block_size=6,
+        n_layer=1,
+        n_embd=32,
+        intermediate_size=86,
+    )
+    lit_model = LitGPT(config_olmo)
+    whittle_model = GPT(config_olmo)
+
+    assert _count_params(whittle_model) == _count_params(lit_model)
+
+    copy_weights(lit_model, whittle_model)
+    x = torch.tensor([[9856, 23, 491, 1536, 304, 1234]], dtype=torch.int32)
+    whittle_out = whittle_model(x)
+    lit_out = lit_model(x)
+    assert torch.allclose(whittle_out, lit_out, atol=1e-3)
+
+    whittle_model.reset_super_network()
+    whittle_model.set_sub_network(**_halved_subnet_config(config_olmo))
+    whittle_model(x)
 
 
 def test_qwen_3():
@@ -242,14 +357,20 @@ def test_qwen_3():
         n_embd=32,
         intermediate_size=86,
     )
-    config_qwen.fix_head_size = True
     lit_model = LitGPT(config_qwen)
     whittle_model = GPT(config_qwen)
+
+    assert _count_params(whittle_model) == _count_params(lit_model)
+
     copy_weights(lit_model, whittle_model)
     x = torch.tensor([[9856, 23, 491, 1536, 304]], dtype=torch.int32)
     whittle_out = whittle_model(x)
     lit_out = lit_model(x)
     assert torch.allclose(whittle_out, lit_out, atol=1e-4)
+
+    whittle_model.reset_super_network()
+    whittle_model.set_sub_network(**_halved_subnet_config(config_qwen))
+    whittle_model(x)
 
 
 def get_default_illegal_test_config():

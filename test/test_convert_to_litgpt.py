@@ -13,6 +13,17 @@ from whittle.convert import convert_subnet_to_litgpt
 from whittle.models.gpt import GPT
 
 
+def _halved_subnet_config(config):
+    return {
+        "sub_network_n_embd": max(1, config.n_embd // 2),
+        "sub_network_intermediate_size": max(1, config.intermediate_size // 2),
+        "sub_network_num_heads": max(1, config.n_head // 2),
+        "sub_network_n_layers": max(1, config.n_layer // 2),
+        "sub_network_query_groups": max(1, config.n_query_groups // 2),
+        "sub_network_head_size": config.head_size,
+    }
+
+
 @pytest.fixture(scope="session")
 def supernet():
     model_id = "EleutherAI/pythia-14m"
@@ -25,7 +36,6 @@ def supernet():
         )
 
     config = Config.from_file(config_path)
-    config.fix_head_size = True
     supernet = GPT(config)
     return supernet
 
@@ -48,3 +58,37 @@ def test_equivalence(supernet, search_space_type, config_id):
     lit_out = lit_model(x)
 
     assert torch.allclose(out_whittle, lit_out)
+
+
+@pytest.mark.parametrize(
+    "model_name",
+    [
+        "Llama-3-8B",
+        "gemma-2-9b",
+        "gemma-3-1b-it",
+        "OLMo-2-1124-7B",
+        "Qwen3-0.6B",
+    ],
+)
+def test_halved_subnet_matches_converted_litgpt(model_name):
+    config = Config.from_name(
+        model_name,
+        n_layer=2,
+        n_embd=32,
+        intermediate_size=86,
+        padded_vocab_size=10000,
+    )
+
+    whittle_model = GPT(config)
+    whittle_model.eval()
+
+    subnet_config = _halved_subnet_config(config)
+    lit_model = convert_subnet_to_litgpt(whittle_model, subnet_config)
+    lit_model.eval()
+
+    x = torch.tensor([[9856, 23, 491, 1536, 304]], dtype=torch.int32)
+    whittle_model.set_sub_network(**subnet_config)
+    out_whittle = whittle_model(x)
+    out_lit = lit_model(x)
+
+    assert torch.allclose(out_whittle, out_lit, atol=1e-6)
