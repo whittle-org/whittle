@@ -1,15 +1,22 @@
-from importance.utils import get_dataloader
-from tqdm import tqdm
+from __future__ import annotations
+
+import numpy as np
 import torch
 from datasets import load_from_disk
-import numpy as np
+from tqdm import tqdm
+
+from importance.utils import get_dataloader
+
 global dataset_path
 dataset_path = "/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/"
 
+
 def compute_softmaxed_scores(scores_dict, dim):
     max_val = max(scores_dict.values())  # Get the maximum value
-    normalization_factor = sum([np.exp(v-max_val) for v in scores_dict.values()])
-    return {str(k): np.exp(v-max_val) / normalization_factor for k, v in scores_dict.items()}
+    normalization_factor = sum([np.exp(v - max_val) for v in scores_dict.values()])
+    return {
+        str(k): np.exp(v - max_val) / normalization_factor for k, v in scores_dict.items()
+    }
 
 
 def compute_ppl_block(max_length, model, tokenizer, batch_size=32, num_batches=10):
@@ -50,17 +57,12 @@ def compute_order_layers_ppl(
     for layer in range(model.config.n_layer):
         model.set_sub_network(
             **largest_model_config,
-            sampled_layer_indices=[
-                i for i in range(model.config.n_layer) if i != layer
-            ],
+            sampled_layer_indices=[i for i in range(model.config.n_layer) if i != layer],
             sub_network_n_layers=sub_network_n_layers,
         )  # drop layer corresponding to index_block
-        score = compute_ppl_block(
-            max_seq_len, model, tokenizer, batch_size, num_batches
-        )
+        score = compute_ppl_block(max_seq_len, model, tokenizer, batch_size, num_batches)
         layer_importance_scores[str(layer)] = score
     # compute mean over batches
-    
 
     # extract scores
     keys = list(layer_importance_scores.keys())

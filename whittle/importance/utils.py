@@ -1,28 +1,17 @@
-import os
-
 # os.environ['HF_DATASETS_OFFLINE'] = "1"
-from datasets import load_dataset
-from transformers import AutoTokenizer
-from torch.utils.data import DataLoader, Dataset
-import torch
-import numpy as np
-from tqdm import tqdm
-from whittle.modules.layernorm import LayerNorm
-from whittle.modules.rmsnorm import RMSNorm
-from whittle.models.gpt.blocks import GptNeoxMLP, GemmaMLP, LLaMAMLP
-import pickle
+from __future__ import annotations
 
-from datasets import load_dataset
-from transformers import AutoTokenizer
-from torch.utils.data import DataLoader, Dataset
+import copy
+
+import numpy as np
 import torch
+from datasets import load_dataset, load_from_disk
+from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
+
+from whittle.models.gpt.blocks import GemmaMLP, GptNeoxMLP, LLaMAMLP
 from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
-from whittle.models.gpt.blocks import GptNeoxMLP, GemmaMLP, LLaMAMLP
-import pickle
-import copy
-from datasets import load_from_disk
 
 
 def aggregate_by_scheme_distance(features, objective):
@@ -60,9 +49,7 @@ def aggregate_by_scheme(feature, scheme="mean"):
 def pairwise_euclidean_distance(features):
     device = "cpu"
     with torch.no_grad():  # Disable gradient tracking to save memory
-        feature_matrix = torch.stack(list(features.values())).to(
-            device
-        )
+        feature_matrix = torch.stack(list(features.values())).to(device)
         if feature_matrix.dim() == 1:
             feature_matrix = feature_matrix.unsqueeze(0)
 
@@ -77,9 +64,7 @@ def pairwise_euclidean_distance(features):
 def pairwise_cosine_similarity(features):
     device = "cpu"
     with torch.no_grad():
-        feature_matrix = torch.stack(list(features.values())).to(
-            device
-        )
+        feature_matrix = torch.stack(list(features.values())).to(device)
         if feature_matrix.dim() == 1:
             feature_matrix = feature_matrix.unsqueeze(0)
 
@@ -168,8 +153,14 @@ def get_dataloader_dataset(tokenizer, mixed_dataset, seq_len=512, batch_size=8):
     return DataLoader(dataset, batch_size=batch_size, shuffle=True), dataset
 
 
-def evaluate_wikitext(max_length, model, tokenizer, batch_size, num_batches, dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/"):
-    
+def evaluate_wikitext(
+    max_length,
+    model,
+    tokenizer,
+    batch_size,
+    num_batches,
+    dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/",
+):
     mixed_dataset = load_from_disk(dataset_path)
     dataloader = get_dataloader(tokenizer, mixed_dataset, max_length, batch_size)
     nlls = []
@@ -194,6 +185,7 @@ def evaluate_wikitext(max_length, model, tokenizer, batch_size, num_batches, dat
     ppl = torch.exp(torch.stack(nlls).mean())
     return ppl.item()
 
+
 class IndexDataset(Dataset):
     def __init__(self, tensors):
         self.tensors = tensors
@@ -204,22 +196,28 @@ class IndexDataset(Dataset):
     def __len__(self):
         return len(self.tensors)
 
+
 def process_data(samples, tokenizer, seq_len, field_name):
-    test_ids = tokenizer("\n\n".join(samples[field_name]), return_tensors='pt').input_ids[0]
+    test_ids = tokenizer("\n\n".join(samples[field_name]), return_tensors="pt").input_ids[
+        0
+    ]
     test_ids_batch = []
     nsamples = test_ids.numel() // seq_len
 
     for i in range(nsamples):
-        batch = test_ids[(i * seq_len):((i + 1) * seq_len)]
+        batch = test_ids[(i * seq_len) : ((i + 1) * seq_len)]
         test_ids_batch.append(batch)
     test_ids_batch = torch.stack(test_ids_batch)
     return IndexDataset(tensors=test_ids_batch)
 
+
 def evaluate_wikitext_correct(max_length, model, tokenizer, batch_size=1):
     # Load WikiText-2 dataset from Hugging Face
     dataset = load_dataset("wikitext", "wikitext-2-raw-v1", split="test")
-    dataset = process_data(dataset, tokenizer, max_length, 'text')
-    test_dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    dataset = process_data(dataset, tokenizer, max_length, "text")
+    test_dataloader = torch.utils.data.DataLoader(
+        dataset, batch_size=batch_size, shuffle=False
+    )
 
     nlls = []
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -237,15 +235,18 @@ def evaluate_wikitext_correct(max_length, model, tokenizer, batch_size=1):
             shift_logits = logits[:, :-1, :].contiguous()
             shift_labels = batch[:, 1:].contiguous()
 
-            loss = loss_fn(shift_logits.reshape(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            loss = loss_fn(
+                shift_logits.reshape(-1, shift_logits.size(-1)), shift_labels.view(-1)
+            )
 
         nlls.append(loss)
 
-        #if count + 1 == num_batches:
+        # if count + 1 == num_batches:
         #    break
 
     ppl = np.exp(torch.cat(nlls, dim=-1).mean().item())
     return ppl.item()
+
 
 @torch.no_grad()
 def evaluate(search_loader, model, device, sampled_config, num_batches):
@@ -261,8 +262,8 @@ def evaluate(search_loader, model, device, sampled_config, num_batches):
         world_size = torch.distributed.get_world_size()
         print(f"Rank {rank}: sampled model config: {sampled_config}")
     else:
-        print("sampled model config: {}".format(sampled_config))
-    print("sampled model config: {}".format(sampled_config))
+        print(f"sampled model config: {sampled_config}")
+    print(f"sampled model config: {sampled_config}")
 
     loss_fn = torch.nn.CrossEntropyLoss(reduction="none")
     for count, batch in enumerate(tqdm(search_loader, desc="Processing batches")):
@@ -274,7 +275,9 @@ def evaluate(search_loader, model, device, sampled_config, num_batches):
             shift_logits = logits[:, :-1, :].contiguous()
             shift_labels = batch["input_ids"][:, 1:].contiguous()
 
-            loss = loss_fn(shift_logits.reshape(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            loss = loss_fn(
+                shift_logits.reshape(-1, shift_logits.size(-1)), shift_labels.view(-1)
+            )
 
         nlls.append(loss)
     # Stack NLLs and compute mean
@@ -294,7 +297,7 @@ def evaluate(search_loader, model, device, sampled_config, num_batches):
 
     # Log perplexity
     if not torch.distributed.is_initialized() or rank == 0:
-        print("* PPL: {:.3f}".format(ppl.item()))
+        print(f"* PPL: {ppl.item():.3f}")
     model.module.reset_super_network()
     return {"ppl": ppl.item()}
 
@@ -369,10 +372,14 @@ def permute_model(embedding_order, head_order, mlp_order, model, name):
         permute_norm(embedding_order, block.norm_1)
         permute_norm(embedding_order, block.norm_2)
         permute_mlp(embedding_order, mlp_order, block.mlp)
-        indices_attn = block.attn.get_qkv_indices(sampled_head_indices=head_order, sampled_query_groups_indices=None, sampled_head_size_indices=list(range(model.config.head_size)))
+        indices_attn = block.attn.get_qkv_indices(
+            sampled_head_indices=head_order,
+            sampled_query_groups_indices=None,
+            sampled_head_size_indices=list(range(model.config.head_size)),
+        )
         indices_proj = indices_attn[
             : torch.searchsorted(
-               indices_attn, model.config.n_head * model.config.head_size, right=False
+                indices_attn, model.config.n_head * model.config.head_size, right=False
             )
         ]
         permute_attention(embedding_order, indices_attn, indices_proj, block.attn)
@@ -388,7 +395,7 @@ def permute_model_layerwise(embedding_order, head_order, mlp_order, model_base, 
     permute_norm(embedding_order, model.transformer.ln_f)
     for i, block in enumerate(model.transformer.h):
         if "pythia" in name:
-            shape = (
+            (
                 model.config.n_head + 2 * model.config.n_query_groups
             ) * model.config.head_size
             indices_attn = get_indices_pythia(

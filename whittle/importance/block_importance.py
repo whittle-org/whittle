@@ -1,20 +1,30 @@
-from importance.utils import get_dataloader
-from tqdm import tqdm
-import torch
+from __future__ import annotations
+
 import numpy as np
+import torch
 from datasets import load_from_disk
+from tqdm import tqdm
+
+from importance.utils import get_dataloader
 
 
 def compute_softmaxed_scores(scores_dict, dim):
     max_val = max(scores_dict.values())  # Get the maximum value
-    normalization_factor = sum([np.exp(v-max_val) for v in scores_dict.values()])
-    return {str(k): np.exp(v-max_val) / normalization_factor for k, v in scores_dict.items()}
+    normalization_factor = sum([np.exp(v - max_val) for v in scores_dict.values()])
+    return {
+        str(k): np.exp(v - max_val) / normalization_factor for k, v in scores_dict.items()
+    }
 
 
 def compute_block_importance(
-    max_length, model, tokenizer, batch_size=32, num_batches=10, dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/"
+    max_length,
+    model,
+    tokenizer,
+    batch_size=32,
+    num_batches=10,
+    dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/",
 ):
-    #print(dataset_path)
+    # print(dataset_path)
     mixed_dataset = load_from_disk(dataset_path)
     dataloader = get_dataloader(tokenizer, mixed_dataset, max_length, batch_size)
     device = "cuda:0" if torch.cuda.is_available() else "cpu"

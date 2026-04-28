@@ -1,12 +1,15 @@
-from importance.utils import get_dataloader
-from tqdm import tqdm
-import torch
+from __future__ import annotations
+
 import numpy as np
-#from whittle.loss.loss_factory import LossFactory
+import torch
+from datasets import load_from_disk
+from tqdm import tqdm
+
+# from whittle.loss.loss_factory import LossFactory
 from importance.utils import (
     aggregate_by_scheme,
+    get_dataloader,
 )
-from datasets import load_from_disk
 
 # Check if CUDA is available
 
@@ -34,7 +37,13 @@ def aggregate_across_batches(n_embd, embd_scores):
 
 
 def compute_importance_embd(
-    max_length, objective, model, tokenizer, batch_size, num_batches, dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/"
+    max_length,
+    objective,
+    model,
+    tokenizer,
+    batch_size,
+    num_batches,
+    dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/",
 ):
     mixed_dataset = load_from_disk(dataset_path)
     dataloader = get_dataloader(tokenizer, mixed_dataset, max_length, batch_size)
@@ -55,8 +64,8 @@ def compute_importance_embd(
             # intermediate_out is a dictionary saving intermediate activations
             for k in model.intermediate_outputs:
                 valid_keys_substr = ["norm"]
-                if (
-                    any(substr in k for substr in valid_keys_substr)
+                if any(
+                    substr in k for substr in valid_keys_substr
                 ):  # since we compute emb importance, only consider norm layers
                     for i in range(model.config.n_embd):
                         matrix_x_fc = model.intermediate_outputs[k].reshape(
@@ -69,6 +78,7 @@ def compute_importance_embd(
     embedding_ranks = aggregate_across_batches(model.config.n_embd, embd_scores)
     return embedding_ranks
 
+
 def compute_order_embd(
     function,
     max_seq_len,
@@ -79,8 +89,8 @@ def compute_order_embd(
     num_batches=10,
 ):
     embd_importance_scores = function(
-            max_seq_len, objective, model, tokenizer, batch_size, num_batches
-        )
+        max_seq_len, objective, model, tokenizer, batch_size, num_batches
+    )
     return [
         int(i)
         for i in sorted(

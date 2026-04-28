@@ -1,21 +1,33 @@
-from modules.utils import get_dataloader
-from tqdm import tqdm
-import torch
+from __future__ import annotations
+
 import numpy as np
-#from whittle.loss.loss_factory import LossFactory
+import torch
+from datasets import load_from_disk
+from tqdm import tqdm
+
+# from whittle.loss.loss_factory import LossFactory
 from modules.utils import (
     aggregate_by_scheme,
+    get_dataloader,
 )
-from datasets import load_from_disk
 
 
 def compute_softmaxed_scores(scores_dict, dim):
     max_val = max(scores_dict.values())  # Get the maximum value
-    normalization_factor = sum([np.exp(v-max_val) for v in scores_dict.values()])
-    return {str(k): np.exp(v-max_val) / normalization_factor for k, v in scores_dict.items()}
+    normalization_factor = sum([np.exp(v - max_val) for v in scores_dict.values()])
+    return {
+        str(k): np.exp(v - max_val) / normalization_factor for k, v in scores_dict.items()
+    }
+
 
 def compute_importance_head_size(
-    max_length, objective, model, tokenizer, batch_size=32, num_batches=10, dataset_path="dataloaders/wikitext/"
+    max_length,
+    objective,
+    model,
+    tokenizer,
+    batch_size=32,
+    num_batches=10,
+    dataset_path="dataloaders/wikitext/",
 ):
     mixed_dataset = load_from_disk(dataset_path)
     dataloader = get_dataloader(tokenizer, mixed_dataset, max_length, batch_size)
@@ -34,12 +46,16 @@ def compute_importance_head_size(
             _ = model(input_ids)
         for i in range(model.config.n_layer):  # iterate and sum up scores across layers
             k = f"block_{i}_attn_out"
-            q, k, v  = model.intermediate_outputs[k]
+            q, k, v = model.intermediate_outputs[k]
             for j in range(model.config.head_size):
-                head_size_q_act = q[:,:,:,j].reshape(-1)
-                head_size_k_act = k[:,:,:,j].reshape(-1)
-                head_size_v_act = v[:,:,:,j].reshape(-1)
-                head_size_score = aggregate_by_scheme(head_size_q_act, objective) + aggregate_by_scheme(head_size_k_act, objective) + aggregate_by_scheme(head_size_v_act, objective)
+                head_size_q_act = q[:, :, :, j].reshape(-1)
+                head_size_k_act = k[:, :, :, j].reshape(-1)
+                head_size_v_act = v[:, :, :, j].reshape(-1)
+                head_size_score = (
+                    aggregate_by_scheme(head_size_q_act, objective)
+                    + aggregate_by_scheme(head_size_k_act, objective)
+                    + aggregate_by_scheme(head_size_v_act, objective)
+                )
                 # aggregate across all layers for each batch and for each head j
                 head_dict[str(j)][count] += head_size_score
         if count + 1 == num_batches:
@@ -83,4 +99,3 @@ def compute_order_head_size(
             head_size_importance_scores, key=head_size_importance_scores.get, reverse=True
         )
     ]
-

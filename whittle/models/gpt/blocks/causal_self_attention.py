@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from functools import partial
 from typing import Any
 
 import torch
@@ -13,12 +14,14 @@ from whittle.exceptions import IllegalSubNetworkError
 from whittle.modules import Linear
 from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
-from functools import partial
+
 
 class CausalSelfAttention(nn.Module):
     """Extension of litgpt's `litgpt.model.CausalSelfAttention` with support to adapt to sub-network dimensionality."""
 
-    def __init__(self, config: Config, block_idx: int, compute_importance: bool = False) -> None:
+    def __init__(
+        self, config: Config, block_idx: int, compute_importance: bool = False
+    ) -> None:
         super().__init__()
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
@@ -73,7 +76,7 @@ class CausalSelfAttention(nn.Module):
         if self.config.norm_class_name == "RMSNorm":
             return partial(RMSNorm, add_unit_offset="Gemma" in self.config.name)
         return LayerNorm
-    
+
     def _verify_subnet_is_legal(
         self,
         subnet_n_embed: int,
@@ -155,8 +158,9 @@ class CausalSelfAttention(nn.Module):
                 raise IllegalSubNetworkError(
                     f"Sampled index cannot be greater than {max_val} for {property}"
                 )
-        #print(f"Verifying sub-network legality with sampled indices - heads: {sampled_head_indices}, ")
-        #print(f"Verifying sub-network legality with sampled indices - {heads_per_group}")
+
+        # print(f"Verifying sub-network legality with sampled indices - heads: {sampled_head_indices}, ")
+        # print(f"Verifying sub-network legality with sampled indices - {heads_per_group}")
         verify_indices(sampled_head_indices, heads_per_group, "sampled_head_indices")
         verify_indices(sampled_embd_indices, n_embd, "sampled_embd_indices")
         verify_indices(sampled_head_size_indices, head_size, "sampled_head_size_indices")
@@ -375,7 +379,7 @@ class CausalSelfAttention(nn.Module):
 
         def get_val(value: int | None, default: int) -> int:
             return value if value else default
-        
+
         sub_network_n_embd = get_val(sub_network_n_embd, self.config.n_embd)
         sub_network_n_head = get_val(sub_network_n_head, self.config.n_head)
         sub_network_query_groups = get_val(
@@ -422,7 +426,7 @@ class CausalSelfAttention(nn.Module):
             )
         ]
 
-        # Set the sub-network dimensions for the linear 
+        # Set the sub-network dimensions for the linear
         self.qkv.set_sub_network(
             self.sub_network_n_embd,
             self.sub_network_qkv_shape,

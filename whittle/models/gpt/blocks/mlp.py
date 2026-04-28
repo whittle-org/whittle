@@ -4,13 +4,14 @@ import litgpt
 import torch
 from litgpt import Config
 from torch.nn import functional as F
+
 from whittle.modules import Linear
 
 
 class GptNeoxMLP(litgpt.model.GptNeoxMLP):
     """An extension of litgp's `litgpt.model.GptNeoxMLP` with support to adapt to sub-network dimensionality."""
 
-    def __init__(self, config: Config, compute_importance = False) -> None:
+    def __init__(self, config: Config, compute_importance=False) -> None:
         super().__init__(config)
         self.fc = Linear(config.n_embd, config.intermediate_size, bias=config.bias)
         self.proj = Linear(config.intermediate_size, config.n_embd, bias=config.bias)
@@ -22,7 +23,6 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.in_features
         self.sub_network_intermediate_size = self.intermediate_size
-        
 
     def set_sub_network(
         self,
@@ -70,6 +70,7 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         if self.compute_importance:
             return self.proj(x_gelu), x
         return self.proj(x_gelu), None
+
 
 class LLaMAMLP(litgpt.model.LLaMAMLP):
     """An extension of litgp's `litgpt.model.LLaMAMLP` with support to adapt to sub-network dimensionality."""
@@ -140,7 +141,6 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         if self.compute_importance:
             return self.proj(x), x
         return self.proj(x), None
-
 
 
 class GemmaMLP(LLaMAMLP):

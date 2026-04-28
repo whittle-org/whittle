@@ -32,7 +32,7 @@ from whittle.modules.rmsnorm import RMSNorm
 class GPT(nn.Module):
     """An extension of litgpt's GPT model with support to adapt to sub-network dimensionality."""
 
-    def __init__(self, config: Config, compute_importance=False) -> None:
+    def __init__(self, config: Config, compute_importance: bool = False) -> None:
         super().__init__()
         assert config.padded_vocab_size is not None
         self.config = config
@@ -43,7 +43,8 @@ class GPT(nn.Module):
             dict(
                 wte=Embedding(config.padded_vocab_size, config.n_embd),
                 h=nn.ModuleList(
-                    Block(config, block_idx, compute_importance=compute_importance) for block_idx in range(config.n_layer)
+                    Block(config, block_idx, compute_importance=compute_importance)
+                    for block_idx in range(config.n_layer)
                 ),
                 ln_f=self.norm_class(config.n_embd, eps=config.norm_eps),
             )
@@ -74,9 +75,7 @@ class GPT(nn.Module):
         self.cos_list = None
         self.sin_list = None
         self.compute_importance = compute_importance
-        if self.compute_importance:
-            self.intermediate_outputs = {}
-        # self.transformer.wte.weight = self.lm_head.weight # weight tying: TODO: where does litgpt do this?
+        self.intermediate_outputs: dict[str, Any] = {}
 
     @property
     def norm_class(self):
@@ -141,7 +140,6 @@ class GPT(nn.Module):
     ) -> tuple[torch.Tensor, torch.Tensor]:
         if self.config.rope_adjustments is None:
             extra_config = None
-
         else:
             adjusted_params_required = [
                 "factor",
@@ -158,7 +156,6 @@ class GPT(nn.Module):
             if num_params_present == 0:
                 extra_config = None  # uses standard RoPE
             elif num_params_present == 4:
-                # These parameters should always be used together so that we don't interfere with standard rope
                 extra_config = {
                     name: self.config.rope_adjustments[name]
                     for name in adjusted_params_required
@@ -171,7 +168,6 @@ class GPT(nn.Module):
                     for name in adjusted_params_required
                 }
             else:
-                # Some but not all parameters are specified; raise an error
                 missing_params = [
                     param
                     for param, present in zip(adjusted_params_required, params_present)
@@ -192,13 +188,13 @@ class GPT(nn.Module):
             rope_local_base_freq=self.config.rope_local_base_freq,
         )
 
-    def set_block_config(self, block, i):
-        def is_none_or_list_of_ints(obj):
+    def set_block_config(self, block: Block, i: int) -> None:
+        def is_none_or_list_of_ints(obj: Any) -> bool:
             if obj is None:
                 return True
             return isinstance(obj, list) and all(isinstance(x, int) for x in obj)
 
-        def get_val(val, _type):
+        def get_val(val: Any, _type: type) -> Any:
             if _type is int:
                 return val if isinstance(val, int) else val[i]
             elif _type is list:
@@ -225,8 +221,10 @@ class GPT(nn.Module):
         sub_n_dim: list[int] | int,
         sampled_dim_indices: list[int] | list[list[int]] | None,
         n_layers: int,
-    ):
-        def _verify_subnet_dim_is_smaller_than_supernet(sub_dim, super_dim):
+    ) -> None:
+        def _verify_subnet_dim_is_smaller_than_supernet(
+            sub_dim: int, super_dim: int
+        ) -> None:
             if sub_dim > super_dim:
                 raise IllegalSubNetworkError(
                     "Dimension of subnet cannot be greater than the supernet's."
@@ -267,11 +265,11 @@ class GPT(nn.Module):
                     sub_dim = sub_n_dim if isinstance(sub_n_dim, int) else sub_n_dim[i]
                     _verify_num_indices_match_sub_dim(list_of_indices, sub_dim)
                     _verify_index_is_within_bounds(list_of_indices, super_n_dim)
-
             elif isinstance(sampled_dim_indices[0], int):
-                _verify_num_indices_match_sub_dim(sampled_dim_indices, sub_n_dim)
-                _verify_index_is_within_bounds(sampled_dim_indices, super_n_dim)
-
+                # Cast to list[Any] since mypy cannot narrow the element type here
+                flat_indices: list[Any] = sampled_dim_indices  # type: ignore[assignment]
+                _verify_num_indices_match_sub_dim(flat_indices, sub_n_dim)  # type: ignore[arg-type]
+                _verify_index_is_within_bounds(flat_indices, super_n_dim)
         else:
             raise IllegalSubNetworkError(
                 f"{sampled_dim_indices} is not a valid value for the list of indices."
@@ -291,7 +289,7 @@ class GPT(nn.Module):
         sampled_head_size_indices: list[int] | list[list] | None = None,
         sampled_layer_indices: list[int] | None = None,
         sampled_embd_indices: list[int] | None = None,
-    ):
+    ) -> dict[str, Any]:
         if (
             sub_network_n_embd is None
             and sub_network_intermediate_size is None
@@ -310,7 +308,7 @@ class GPT(nn.Module):
                 "At least one of the parameters must be specified."
             )
 
-        def infer_sizes(indices, property_name):
+        def infer_sizes(indices: list[Any], property_name: str) -> int | list[int]:
             if len(indices) == 0:
                 raise IllegalSubNetworkError(f"Sampled {property_name} cannot be empty!")
             if isinstance(indices[0], list):
@@ -319,7 +317,7 @@ class GPT(nn.Module):
                 return len(indices)
 
         if sub_network_n_embd is None and sampled_embd_indices is not None:
-            sub_network_n_embd = infer_sizes(sampled_embd_indices, "embedding indices")
+            sub_network_n_embd = infer_sizes(sampled_embd_indices, "embedding indices")  # type: ignore[assignment]
 
         if (
             sub_network_intermediate_size is None
@@ -327,17 +325,17 @@ class GPT(nn.Module):
         ):
             sub_network_intermediate_size = infer_sizes(
                 sampled_intermediate_indices, "intermediate indices"
-            )
+            )  # type: ignore[assignment]
 
         if sub_network_head_size is None and sampled_head_size_indices is not None:
             sub_network_head_size = infer_sizes(
                 sampled_head_size_indices, "head size indices"
-            )
+            )  # type: ignore[assignment]
 
         if sub_network_n_layers is None and sampled_layer_indices is not None:
-            sub_network_n_layers = infer_sizes(sampled_layer_indices, "layer indices")
+            sub_network_n_layers = infer_sizes(sampled_layer_indices, "layer indices")  # type: ignore[assignment]
 
-        _sub_network_num_heads = (
+        _sub_network_num_heads: list[int] | int = (
             sub_network_num_heads
             if sub_network_num_heads is not None
             else self.config.n_head
@@ -346,12 +344,11 @@ class GPT(nn.Module):
         if sub_network_query_groups is None and sampled_query_group_indices is not None:
             sub_network_query_groups = infer_sizes(
                 sampled_query_group_indices, "query group indices"
-            )
+            )  # type: ignore[assignment]
             n_heads_per_group = self.config.n_head // self.config.n_query_groups
-            _sub_network_num_heads = n_heads_per_group * np.array(
-                sub_network_query_groups
-            )
-            _sub_network_num_heads = _sub_network_num_heads.tolist()
+            _sub_network_num_heads = (
+                n_heads_per_group * np.array(sub_network_query_groups)
+            ).tolist()
 
         if sub_network_num_heads is None and sampled_head_indices is not None:
             n_heads_per_group = np.array(
@@ -362,8 +359,9 @@ class GPT(nn.Module):
                 if sub_network_query_groups is not None
                 else self.config.n_query_groups
             )
-            _sub_network_num_heads = n_heads_per_group * np.array(n_query_groups)
-            _sub_network_num_heads = _sub_network_num_heads.tolist()
+            _sub_network_num_heads = (
+                n_heads_per_group * np.array(n_query_groups)
+            ).tolist()
 
         sub_network_num_heads = _sub_network_num_heads
 
@@ -383,6 +381,7 @@ class GPT(nn.Module):
                 sub_network_query_groups = sub_network_num_heads
             else:
                 sub_network_query_groups = self.config.n_query_groups
+
         if sub_network_head_size is None:
             sub_network_head_size = self.config.head_size
 
@@ -407,8 +406,8 @@ class GPT(nn.Module):
         sampled_head_size_indices: list[int] | list[list] | None = None,
         sampled_layer_indices: list[int] | None = None,
         sampled_embd_indices: list[int] | None = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         if sampled_layer_indices is not None:
             if len(sampled_layer_indices) != sub_network_n_layers:
                 raise IllegalSubNetworkError(
@@ -463,15 +462,14 @@ class GPT(nn.Module):
     ) -> None:
         """
         Sets the GPT model to the specified sub-network dimensionality.
-        Input arguments are set to the specified sub-network dimensionality.
 
         Args:
             sub_network_n_embd: Embedding dimension of the sub-network.
             sub_network_intermediate_size: Intermediate size of the sub-network.
             sub_network_num_heads: Number of attention heads in the sub-network.
             sub_network_n_layers: Number of layers in the sub-network.
-            sub_network_query_groups: Number of query groups in the sub-network. Defaults to None.
-            sub_network_head_size: Size of each attention head in the sub-network. Defaults to None.
+            sub_network_query_groups: Number of query groups in the sub-network.
+            sub_network_head_size: Size of each attention head in the sub-network.
             sampled_intermediate_indices: Indices for sampling the MLP intermediate dimension.
             sampled_head_indices: Indices for sampling attention heads within each query group.
             sampled_query_group_indices: Indices for sampling query groups.
@@ -530,7 +528,7 @@ class GPT(nn.Module):
             else self.config.n_query_groups
         )
 
-        if self.config.fix_head_size:  # TODO: Deprecate. Not used (always set to True)
+        if self.config.fix_head_size:
             if sub_network_sizes["sub_network_head_size"] is None:
                 self.sub_network_head_size = self.config.head_size
             else:
@@ -600,7 +598,7 @@ class GPT(nn.Module):
             sub_network_query_groups=config.get("n_query_groups", None),
         )
 
-    def reset_super_network(self):
+    def reset_super_network(self) -> None:
         """
         Resets the GPT model to the original super-network dimensionality.
         """
@@ -610,32 +608,38 @@ class GPT(nn.Module):
         self.sub_network_intermediate_size = self.config.intermediate_size
         self.sub_network_num_heads = self.config.n_head
         self.sub_network_n_layers = self.config.n_layer
-        self.sub_network_head_size: int | None = self.config.head_size  # type: ignore
-        self.sub_network_query_groups: int | None = self.config.n_query_groups  # type: ignore
+        self.sub_network_head_size = self.config.head_size
+        self.sub_network_query_groups = self.config.n_query_groups
         self.sub_network_rope_n_elem = self.config.rope_n_elem
-        self.transformer.wte.reset_super_network()
-        self.transformer.ln_f.reset_super_network()
+        self.transformer.wte.reset_super_network()  # type: ignore
+        self.transformer.ln_f.reset_super_network()  # type: ignore
         for i in range(self.config.n_layer):
-            block = self.transformer.h[i]
+            block = self.transformer.h[i]  # type: ignore
             block.reset_super_network()
         self.lm_head.reset_super_network()
-        self.sampled_intermediate_indices: list[int] | list[list[int]] | None = None
-        self.sampled_head_indices: list[int] | list[list[int]] | None = None
-        self.sampled_query_group_indices: list[int] | list[list[int]] | None = None
-        self.sampled_head_size_indices: list[int] | list[list[int]] | None = None
-        self.sampled_layer_indices: list[int] | None = None
-        self.sampled_embd_indices: list[int] | None = None
+        # Plain assignments — no re-annotation, types already declared in __init__
+        self.sampled_intermediate_indices = None
+        self.sampled_head_indices = None
+        self.sampled_query_group_indices = None
+        self.sampled_head_size_indices = None
+        self.sampled_layer_indices = None
+        self.sampled_embd_indices = None
         self.cos_list = None
         self.sin_list = None
 
-        # rebuild the rope cache
         if rebuild_rope:
             self.reset_parameters()
 
-    def process_rope_cache(self, cos, sin, input_pos, input_pos_maxp1, T):
+    def process_rope_cache(
+        self,
+        cos: torch.Tensor,
+        sin: torch.Tensor,
+        input_pos: torch.Tensor | None,
+        input_pos_maxp1: int | None,
+        T: int,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, int | None]:
         if input_pos is not None:  # use the kv cache
             if input_pos.dim() > 2:
-                # otherwise, things go wrong in `apply_rope`
                 raise ValueError(
                     f"input_pos must have 1 or 2 dimensions, input_pos.shape = {input_pos.shape}"
                 )
@@ -652,27 +656,31 @@ class GPT(nn.Module):
                 raise TypeError("You need to call `gpt.set_kv_cache()`")
             mask = batched_index_select(self.mask_cache, 2, input_pos)
             if mask.dim() > 4:
-                # the mask cache has a batch dim of 1 in addition to the one
-                # we get if input_pos has a batch dimension
                 mask = mask.view(*(mask.shape[0:1] + mask.shape[2:]))
             if input_pos_maxp1 is not None:
-                # Shorten final dimension so it just covers all `input_pos` entries
                 if input_pos_maxp1 > self.max_seq_length:
                     raise ValueError(
                         f"Positions in 'input_pos' must be in [0,{self.max_seq_length})"
                     )
                 mask = mask[..., :input_pos_maxp1]
         else:
-            # unsqueeze to have a batch dimension
             cos = cos[:T].unsqueeze(0)
             sin = sin[:T].unsqueeze(0)
-            # `cos`, `sin` have shape (1, T, config.rope_n_elem)
-            mask = None  # defaults to causal mask
+            mask = None
             input_pos_maxp1 = None
         return cos, sin, mask, input_pos_maxp1
 
-    def process_blocks(self, x, idx, input_pos, j, i, input_pos_maxp1, T):
-        block = self.transformer.h[j]
+    def process_blocks(
+        self,
+        x: torch.Tensor,
+        idx: torch.Tensor,
+        input_pos: torch.Tensor | None,
+        j: int,
+        i: int,
+        input_pos_maxp1: int | None,
+        T: int,
+    ) -> torch.Tensor:
+        block = self.transformer.h[j]  # type: ignore
 
         if isinstance(self.cos_list, list):
             cos, sin = self.cos_list[i].to(idx.device), self.sin_list[i].to(idx.device)
@@ -698,25 +706,43 @@ class GPT(nn.Module):
                 f"Cannot forward sequence of length {T}, max seq length is only {self.max_seq_length}."
             )
 
-        x = self.transformer.wte(idx)  # type: ignore  # token embeddings of shape (b, t, n_embd)
+        x = self.transformer.wte(idx)  # type: ignore
         if self.config.scale_embeddings:
             x = x * torch.tensor(self.sub_network_n_embd**0.5, dtype=x.dtype)
         if self.compute_importance:
             self.intermediate_outputs["block_0"] = x.detach()
         if self.sampled_layer_indices is not None:
             for i, j in enumerate(self.sampled_layer_indices):
-                x, (q,k,v,mask), mlp_importance = self.process_blocks(x, idx, input_pos, j, i, input_pos_maxp1, T)
+                x, (q, k, v, mask), mlp_importance = self.process_blocks(
+                    x, idx, input_pos, j, i, input_pos_maxp1, T
+                )
                 if self.compute_importance:
-                    self.intermediate_outputs[f"block_{j+1}"] = x.detach()
-                    self.intermediate_outputs[f"block_{j}_attn_out"] = (q.detach(), k.detach(), v.detach(), mask.detach() if mask is not None else None)
-                    self.intermediate_outputs[f"block_{j}_mlp_importance"] = mlp_importance.detach()
+                    self.intermediate_outputs[f"block_{j + 1}"] = x.detach()
+                    self.intermediate_outputs[f"block_{j}_attn_out"] = (
+                        q.detach(),
+                        k.detach(),
+                        v.detach(),
+                        mask.detach() if mask is not None else None,
+                    )
+                    self.intermediate_outputs[f"block_{j}_mlp_importance"] = (
+                        mlp_importance.detach()
+                    )
         else:
             for i in range(self.sub_network_n_layers):
-                x, (q,k,v,mask), mlp_importance = self.process_blocks(x, idx, input_pos, i, i, input_pos_maxp1, T)
+                x, (q, k, v, mask), mlp_importance = self.process_blocks(
+                    x, idx, input_pos, i, i, input_pos_maxp1, T
+                )
                 if self.compute_importance:
-                    self.intermediate_outputs[f"block_{i+1}"] = x.detach()
-                    self.intermediate_outputs[f"block_{i}_attn_out"] = (q.detach(), k.detach(), v.detach(), mask.detach() if mask is not None else None)
-                    self.intermediate_outputs[f"block_{i}_mlp_importance"] = mlp_importance.detach()
+                    self.intermediate_outputs[f"block_{i + 1}"] = x.detach()
+                    self.intermediate_outputs[f"block_{i}_attn_out"] = (
+                        q.detach(),
+                        k.detach(),
+                        v.detach(),
+                        mask.detach() if mask is not None else None,
+                    )
+                    self.intermediate_outputs[f"block_{i}_mlp_importance"] = (
+                        mlp_importance.detach()
+                    )
         x = self.transformer.ln_f(x)  # type: ignore
         if self.compute_importance:
             self.intermediate_outputs["norm_f"] = x.detach()
@@ -726,7 +752,6 @@ class GPT(nn.Module):
             else nn.Identity()
         )
         if lm_head_chunk_size > 0:
-            # chunk the lm head logits to reduce the peak memory used by autograd
             return [
                 clamp_head(self.lm_head(x_i))
                 for x_i in x.split(lm_head_chunk_size, dim=1)
@@ -750,7 +775,6 @@ class GPT(nn.Module):
             rope_cache_length = self.sub_network_rope_n_elem
         if max_seq_length is None:
             max_seq_length = self.max_seq_length
-        # initialize the kv cache for all blocks
         for block in self.transformer.h:  # type: ignore
             block.attn.kv_cache = block.attn.build_kv_cache(
                 batch_size,
@@ -762,8 +786,6 @@ class GPT(nn.Module):
             )
 
         if self.mask_cache is None or self.mask_cache.size(3) != self.max_seq_length:
-            # passing `attn_mask` to SDPA disables the flash implementation. since we only need the mask
-            # for the kv-cache support (only during inference), we only create it in that situation
             self.mask_cache = build_mask_cache(self.max_seq_length, device)
 
     def clear_kv_cache(self) -> None:

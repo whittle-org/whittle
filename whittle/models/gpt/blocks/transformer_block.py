@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from functools import partial
-import torch
-from typing import Optional
+
 import litgpt
+import torch
 import torch.nn as nn
 from litgpt import Config
 
@@ -31,13 +31,15 @@ class Block(litgpt.model.Block):
             if not config.norm_1
             else self.norm_class()(config.n_embd, eps=config.norm_eps)
         )
-        self.attn = CausalSelfAttention(config, block_idx, compute_importance=compute_importance)
+        self.attn = CausalSelfAttention(
+            config, block_idx, compute_importance=compute_importance
+        )
         self.post_attention_norm = (
             self.norm_class()(config.n_embd, eps=config.norm_eps)
             if config.post_attention_norm
             else nn.Identity()
         )
-        self.norm_2: LayerNorm | RMSNorm | None = (
+        self.norm_2: LayerNorm | RMSNorm | nn.Identity | None = (
             nn.Identity()
             if not config.norm_2
             else (
@@ -117,9 +119,7 @@ class Block(litgpt.model.Block):
             sampled_head_size_indices,
             sampled_query_group_indices,
         )
-        if isinstance(self.post_attention_norm, LayerNorm) or isinstance(
-            self.post_attention_norm, RMSNorm
-        ):
+        if isinstance(self.post_attention_norm, (LayerNorm, RMSNorm)):
             self.post_attention_norm.set_sub_network(
                 self.sub_network_n_embd, sampled_embd_indices
             )
@@ -132,9 +132,7 @@ class Block(litgpt.model.Block):
             sampled_intermediate_indices,
             sampled_embd_indices,
         )
-        if isinstance(self.post_mlp_norm, LayerNorm) or isinstance(
-            self.post_mlp_norm, RMSNorm
-        ):
+        if isinstance(self.post_mlp_norm, (LayerNorm, RMSNorm)):
             self.post_mlp_norm.set_sub_network(
                 self.sub_network_n_embd, sampled_embd_indices
             )
@@ -153,13 +151,9 @@ class Block(litgpt.model.Block):
             if self.norm_2 is not None and not isinstance(self.norm_2, nn.Identity):
                 self.norm_2.reset_super_network()
         self.mlp.reset_super_network()
-        if isinstance(self.post_attention_norm, LayerNorm) or isinstance(
-            self.post_attention_norm, RMSNorm
-        ):
+        if isinstance(self.post_attention_norm, (LayerNorm, RMSNorm)):
             self.post_attention_norm.reset_super_network()
-        if isinstance(self.post_mlp_norm, LayerNorm) or isinstance(
-            self.post_mlp_norm, RMSNorm
-        ):
+        if isinstance(self.post_mlp_norm, (LayerNorm, RMSNorm)):
             self.post_mlp_norm.reset_super_network()
 
     def forward(
@@ -167,9 +161,9 @@ class Block(litgpt.model.Block):
         x: torch.Tensor,
         cos: torch.Tensor,
         sin: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
-        input_pos: Optional[torch.Tensor] = None,
-        input_pos_maxp1: Optional[int] = None,
+        mask: torch.Tensor | None = None,
+        input_pos: torch.Tensor | None = None,
+        input_pos_maxp1: int | None = None,
     ) -> torch.Tensor:
         """
         Non-parallel residual       Parallel residual
@@ -191,17 +185,21 @@ class Block(litgpt.model.Block):
         |     ↓
         └───► +
         """
-
         x_normed = self.norm_1(x)
-        attention_output, (q,k,v,mask) = self.attn(x_normed, cos, sin, mask, input_pos, input_pos_maxp1)
+        attention_output, (q, k, v, mask) = self.attn(
+            x_normed, cos, sin, mask, input_pos, input_pos_maxp1
+        )
         attention_output = self.post_attention_norm(attention_output)
 
         if self.config.parallel_residual:
             if not self.config.shared_attention_norm:
-                x_normed = self.norm_2(x)
+                # norm_2 is None only when shared_attention_norm=True, so reuse x_normed
+                x_normed = self.norm_2(x) if self.norm_2 is not None else x_normed
             x = attention_output + x
         else:
             x = attention_output + x
-            x_normed = self.norm_2(x)
+            # When shared_attention_norm=True, norm_2 is None — reuse norm_1 output
+            x_normed = self.norm_2(x) if self.norm_2 is not None else x_normed
+
         mlp_output, mlp_importance = self.mlp(x_normed)
         return self.post_mlp_norm(mlp_output) + x, (q, k, v, mask), mlp_importance
