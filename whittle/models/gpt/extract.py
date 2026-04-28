@@ -88,10 +88,12 @@ def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
             sub_network_config.sampled_embd_indices,
         )
         if sub_network_config.norm_qk is not None:
-            state = block.attn.norm_q.state_dict()
-            sub_network_block.attn.norm_q.load_state_dict(state)
-            state = block.attn.norm_k.state_dict()
-            sub_network_block.attn.norm_k.load_state_dict(state)
+            if block.attn.norm_q:
+                state = block.attn.norm_q.state_dict()
+                sub_network_block.attn.norm_q.load_state_dict(state)
+            if block.attn.norm_k:
+                state = block.attn.norm_k.state_dict()
+                sub_network_block.attn.norm_k.load_state_dict(state)
             # extract_norm(block.attn.norm_q, sub_network_block.attn.norm_q, sub_network_config.sampled_embd_indices)
             # extract_norm(block.attn.norm_k, sub_network_block.attn.norm_k, sub_network_config.sampled_embd_indices)
         # norm
