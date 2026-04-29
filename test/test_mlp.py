@@ -25,12 +25,12 @@ def test_GptNeoxMLP():
     gpt_neox_mlp.proj.bias.data = torch.randn_like(gpt_neox_mlp.proj.bias.data)
     gpt_neox_mlp.reset_super_network()
     out_large = gpt_neox_mlp(input)
-    assert out_large[0].shape == (8, 64)
+    assert out_large.shape == (8, 64)
     gpt_neox_mlp.set_sub_network(
         sub_network_n_embd=32, sub_network_intermediate_size=32 * 4
     )
     out_small = gpt_neox_mlp(input[:8, :32])
-    assert out_small[0].shape == (8, 32)
+    assert out_small.shape == (8, 32)
 
     litgpt_neox_mlp_large = LitGptNeoxMLP(config)
     litgpt_neox_mlp_large.fc.weight.data = gpt_neox_mlp.fc.weight.data
@@ -52,8 +52,8 @@ def test_GptNeoxMLP():
     ]
     litgpt_neox_mlp_small.proj.bias.data = gpt_neox_mlp.proj.bias.data[: config.n_embd]
     out_small_lit = litgpt_neox_mlp_small(input[:8, :32])
-    assert torch.all(out_small[0] == out_small_lit)
-    assert torch.all(out_large[0] == out_large_lit)
+    assert torch.all(out_small == out_small_lit)
+    assert torch.all(out_large == out_large_lit)
 
 
 def test_LLaMAMLP():
@@ -72,10 +72,10 @@ def test_LLaMAMLP():
     llama_mlp.proj.bias.data = torch.randn_like(llama_mlp.proj.bias.data)
     llama_mlp.reset_super_network()
     out_large = llama_mlp(input)
-    assert out_large[0].shape == (8, 64)
+    assert out_large.shape == (8, 64)
     llama_mlp.set_sub_network(sub_network_n_embd=32, sub_network_intermediate_size=32 * 4)
     out_small = llama_mlp(input[:8, :32])
-    assert out_small[0].shape == (8, 32)
+    assert out_small.shape == (8, 32)
 
     litllama_mlp_large = LitLLaMAMLP(config)
     litllama_mlp_large.fc_1.weight.data = llama_mlp.fc_1.weight.data
@@ -105,8 +105,8 @@ def test_LLaMAMLP():
     ]
     litllama_mlp_small.proj.bias.data = llama_mlp.proj.bias.data[: config.n_embd]
     out_small_lit = litllama_mlp_small(input[:8, :32])
-    assert torch.all(out_small[0] == out_small_lit)
-    assert torch.all(out_large[0] == out_large_lit)
+    assert torch.all(out_small == out_small_lit)
+    assert torch.all(out_large == out_large_lit)
 
 
 def test_GemmaMLP():
@@ -125,10 +125,10 @@ def test_GemmaMLP():
     gemma_mlp.proj.bias.data = torch.randn_like(gemma_mlp.proj.bias.data)
     gemma_mlp.reset_super_network()
     out_large = gemma_mlp(input)
-    assert out_large[0].shape == (8, 64)
+    assert out_large.shape == (8, 64)
     gemma_mlp.set_sub_network(sub_network_n_embd=32, sub_network_intermediate_size=32 * 4)
     out_small = gemma_mlp(input[:8, :32])
-    assert out_small[0].shape == (8, 32)
+    assert out_small.shape == (8, 32)
 
     litgemma_mlp_large = LitGemmaMLP(config)
     litgemma_mlp_large.fc_1.weight.data = gemma_mlp.fc_1.weight.data
@@ -158,5 +158,5 @@ def test_GemmaMLP():
     ]
     litgemma_mlp_small.proj.bias.data = gemma_mlp.proj.bias.data[: config.n_embd]
     out_small_lit = litgemma_mlp_small(input[:8, :32])
-    assert torch.all(out_small[0] == out_small_lit)
-    assert torch.all(out_large[0] == out_large_lit)
+    assert torch.all(out_small == out_small_lit)
+    assert torch.all(out_large == out_large_lit)

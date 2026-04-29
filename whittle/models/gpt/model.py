@@ -711,6 +711,36 @@ class GPT(nn.Module):
 
         return x
 
+    def _collect_importance(
+        self, x_pre_ln_f: torch.Tensor, x_post_ln_f: torch.Tensor
+    ) -> None:
+        active_indices = (
+            list(self.sampled_layer_indices)
+            if self.sampled_layer_indices is not None
+            else list(range(self.sub_network_n_layers))
+        )
+        for k, j in enumerate(active_indices):
+            block = self.transformer.h[j]  # type: ignore
+            self.intermediate_outputs[f"block_{j}"] = block._block_input
+            if k + 1 < len(active_indices):
+                next_j = active_indices[k + 1]
+                self.intermediate_outputs[f"block_{j + 1}"] = self.transformer.h[
+                    next_j
+                ]._block_input  # type: ignore
+            else:
+                self.intermediate_outputs[f"block_{j + 1}"] = x_pre_ln_f.detach()
+            q, k_t, v, mask = block.attn._attn_cache  # type: ignore
+            self.intermediate_outputs[f"block_{j}_attn_out"] = (
+                q.detach(),
+                k_t.detach(),
+                v.detach(),
+                mask.detach() if mask is not None else None,
+            )
+            self.intermediate_outputs[f"block_{j}_mlp_importance"] = (
+                block.mlp._mlp_cache.detach()  # type: ignore
+            )
+        self.intermediate_outputs["norm_f"] = x_post_ln_f.detach()
+
     def forward(
         self,
         idx: torch.Tensor,
@@ -727,43 +757,18 @@ class GPT(nn.Module):
         x = self.transformer.wte(idx)  # type: ignore
         if self.config.scale_embeddings:
             x = x * torch.tensor(self.sub_network_n_embd**0.5, dtype=x.dtype)
-        if self.compute_importance:
-            self.intermediate_outputs["block_0"] = x.detach()
         if self.sampled_layer_indices is not None:
             for i, j in enumerate(self.sampled_layer_indices):
-                x, (q, k, v, mask), mlp_importance = self.process_blocks(
-                    x, idx, input_pos, j, i, input_pos_maxp1, T
-                )
-                if self.compute_importance:
-                    self.intermediate_outputs[f"block_{j + 1}"] = x.detach()
-                    self.intermediate_outputs[f"block_{j}_attn_out"] = (
-                        q.detach(),
-                        k.detach(),
-                        v.detach(),
-                        mask.detach() if mask is not None else None,
-                    )
-                    self.intermediate_outputs[f"block_{j}_mlp_importance"] = (
-                        mlp_importance.detach()
-                    )
+                x = self.process_blocks(x, idx, input_pos, j, i, input_pos_maxp1, T)
         else:
             for i in range(self.sub_network_n_layers):
-                x, (q, k, v, mask), mlp_importance = self.process_blocks(
-                    x, idx, input_pos, i, i, input_pos_maxp1, T
-                )
-                if self.compute_importance:
-                    self.intermediate_outputs[f"block_{i + 1}"] = x.detach()
-                    self.intermediate_outputs[f"block_{i}_attn_out"] = (
-                        q.detach(),
-                        k.detach(),
-                        v.detach(),
-                        mask.detach() if mask is not None else None,
-                    )
-                    self.intermediate_outputs[f"block_{i}_mlp_importance"] = (
-                        mlp_importance.detach()
-                    )
+                x = self.process_blocks(x, idx, input_pos, i, i, input_pos_maxp1, T)
+        x_pre_ln_f = x
         x = self.transformer.ln_f(x)  # type: ignore
+
         if self.compute_importance:
-            self.intermediate_outputs["norm_f"] = x.detach()
+            self._collect_importance(x_pre_ln_f, x)
+
         clamp_head = (
             partial(do_softcapping, thresh=self.config.final_logit_softcapping)
             if self.config.final_logit_softcapping is not None
