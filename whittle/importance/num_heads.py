@@ -5,26 +5,22 @@ import torch
 from datasets import load_from_disk
 from tqdm import tqdm
 
-# from whittle.loss.loss_factory import LossFactory
-from importance.utils import (
+from whittle.importance.utils import (
     aggregate_by_scheme,
     get_dataloader,
+    normalize_ranks,
+    sort_keys_by_score,
 )
-
-global dataset_path
-dataset_path = "/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/"
-
-
-def compute_softmaxed_scores(scores_dict, dim):
-    max_val = max(scores_dict.values())  # Get the maximum value
-    normalization_factor = sum([np.exp(v - max_val) for v in scores_dict.values()])
-    return {
-        str(k): np.exp(v - max_val) / normalization_factor for k, v in scores_dict.items()
-    }
 
 
 def compute_importance_heads(
-    max_length, objective, model, tokenizer, batch_size=32, num_batches=10
+    max_length,
+    objective,
+    model,
+    tokenizer,
+    batch_size=32,
+    num_batches=10,
+    dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/",
 ):
     mixed_dataset = load_from_disk(dataset_path)
 
@@ -62,21 +58,7 @@ def compute_importance_heads(
 
     for i in range(model.config.n_head):
         head_dict[str(i)] = np.mean(np.array(head_dict[str(i)])).item()
-    # extract scores
-    keys = list(head_dict.keys())
-    scores = np.array([head_dict[k] for k in keys])
-
-    # get descending ranks: higher score → higher rank
-    order = np.argsort(-scores)  # descending order
-    ranks = np.empty_like(order)
-    ranks[order] = np.arange(1, len(scores) + 1)  # rank starts at 1
-
-    # normalize ranks to [0, 1]
-    norm_ranks = (ranks - ranks.min()) / (ranks.max() - ranks.min())
-
-    # replace scores with normalized ranks
-    head_ranks = {k: norm_ranks[i] for i, k in enumerate(keys)}
-    return head_ranks
+    return normalize_ranks(head_dict, descending=True)
 
 
 def compute_order_heads(
@@ -86,18 +68,17 @@ def compute_order_heads(
     head_importance_scores = function(
         max_seq_len, objective, model, tokenizer, batch_size, num_batches
     )
-    if isinstance(head_importance_scores, list):
-        return head_importance_scores
-    return [
-        int(i)
-        for i in sorted(
-            head_importance_scores, key=head_importance_scores.get, reverse=True
-        )
-    ]
+    return sort_keys_by_score(head_importance_scores)
 
 
 def compute_importance_head_groups(
-    max_length, objective, model, tokenizer, batch_size=32, num_batches=10
+    max_length,
+    objective,
+    model,
+    tokenizer,
+    batch_size=32,
+    num_batches=10,
+    dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/",
 ):
     mixed_dataset = load_from_disk(dataset_path)
     dataloader = get_dataloader(tokenizer, mixed_dataset, max_length, batch_size)
@@ -145,7 +126,6 @@ def compute_importance_head_groups(
             head_dict[str(i)][str(j)] = torch.mean(
                 torch.tensor(head_dict[str(i)][str(j)])
             )
-        # head_dict[str(i)] = compute_softmaxed_scores(head_dict[str(i)], 0)
     return head_dict
 
 
@@ -159,11 +139,4 @@ def compute_order_head_groups(
     group_importance_scores = {}
     for group in head_importance_scores:
         group_importance_scores[group] = sum(head_importance_scores[group].values())
-    if isinstance(group_importance_scores, list):
-        return group_importance_scores
-    return [
-        int(i)
-        for i in sorted(
-            group_importance_scores, key=group_importance_scores.get, reverse=True
-        )
-    ]
+    return sort_keys_by_score(group_importance_scores)

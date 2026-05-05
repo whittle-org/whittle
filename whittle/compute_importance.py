@@ -177,7 +177,6 @@ if __name__ == "__main__":
         layer_order = compute_order_block_importance(
             compute_block_importance,
             args.max_seq_len,
-            args.objective,
             model,
             tokenizer,
             batch_size,
@@ -188,7 +187,6 @@ if __name__ == "__main__":
             args.max_seq_len,
             model,
             tokenizer,
-            largest_model_config,
             batch_size,
             num_batches,
         )
