@@ -8,15 +8,13 @@ from tqdm import tqdm
 from whittle.importance.utils import (
     aggregate_by_scheme,
     get_dataloader,
-    normalize_ranks,
     sort_keys_by_score,
 )
 
 
 def aggregate_across_batches(n_embd, embd_scores):
     # mean over batches per embedding dimension
-    embd_scores = {str(i): np.mean(embd_scores[str(i)]) for i in range(n_embd)}
-    return normalize_ranks(embd_scores, descending=True)
+    return {str(i): np.mean(embd_scores[str(i)]) for i in range(n_embd)}
 
 
 def compute_importance_embd(
@@ -46,9 +44,9 @@ def compute_importance_embd(
             _ = model(input_ids)  # save activations in forward
             # intermediate_out is a dictionary saving intermediate activations
             for k in model.intermediate_outputs:
-                valid_keys_substr = ["norm"]
+                NORM_KEY = ["norm_f"]
                 if any(
-                    substr in k for substr in valid_keys_substr
+                    substr in k for substr in NORM_KEY
                 ):  # since we compute emb importance, only consider norm layers
                     for i in range(model.config.n_embd):
                         matrix_x_fc = model.intermediate_outputs[k].reshape(

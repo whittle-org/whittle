@@ -7,7 +7,6 @@ from tqdm import tqdm
 
 from whittle.importance.utils import (
     get_dataloader,
-    normalize_ranks,
     sort_keys_by_score,
 )
 
@@ -56,13 +55,13 @@ def compute_block_importance(
         if count + 1 == num_batches:
             break
 
-    # Calculate the inverted block importance aggregating over batches
-    bi_dict = {
+    # Calculate the inverted block importance aggregating over batches.
+    # Higher 1 - cos(input, output) means the block transformed the
+    # representation more, i.e. the block is more important.
+    return {
         str(i): 1 - np.mean(np.array(bi_dict[str(i)]))
         for i in range(model.config.n_layer)
     }
-    # lower cosine similarity → more important block, so rank ascending
-    return normalize_ranks(bi_dict, descending=False)
 
 
 def compute_order_block_importance(

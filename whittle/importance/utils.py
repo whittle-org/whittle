@@ -14,21 +14,6 @@ from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
 
 
-def normalize_ranks(scores_dict, descending: bool = True):
-    """Convert a {key: score} dict to {key: rank-normalised-to-[0, 1]}.
-
-    Highest-scoring key gets rank 1 when ``descending=True``; the resulting
-    rank is then min-max scaled into [0, 1].
-    """
-    keys = list(scores_dict.keys())
-    scores = np.array([scores_dict[k] for k in keys])
-    order = np.argsort(-scores) if descending else np.argsort(scores)
-    ranks = np.empty_like(order)
-    ranks[order] = np.arange(1, len(scores) + 1)
-    norm_ranks = (ranks - ranks.min()) / (ranks.max() - ranks.min())
-    return {k: norm_ranks[i] for i, k in enumerate(keys)}
-
-
 def sort_keys_by_score(scores_dict):
     """Return integer keys of ``scores_dict`` sorted by descending score."""
     return [int(i) for i in sorted(scores_dict, key=scores_dict.get, reverse=True)]

@@ -8,7 +8,6 @@ from tqdm import tqdm
 from whittle.importance.utils import (
     aggregate_by_scheme,
     get_dataloader,
-    normalize_ranks,
     sort_keys_by_score,
 )
 
@@ -39,7 +38,7 @@ def compute_importance_intermediate_size(
             _ = model(input_ids)  # save activations in forward
             # intermediate_out is a dictionary saving intermediate activations
             for k in model.intermediate_outputs:
-                if "mlp" in k:
+                if "mlp_importance" in k:
                     for i in range(model.config.intermediate_size):
                         matrix_x_fc = model.intermediate_outputs[k].reshape(
                             -1, model.config.intermediate_size
@@ -52,7 +51,8 @@ def compute_importance_intermediate_size(
     # mean over batches
     for i in range(model.config.intermediate_size):
         mlp_scores[str(i)] = np.mean(np.array(mlp_scores[str(i)]))
-    return normalize_ranks(mlp_scores, descending=True)
+
+    return mlp_scores
 
 
 def compute_order_intermediate_dims(

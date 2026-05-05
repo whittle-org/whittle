@@ -8,7 +8,6 @@ from tqdm import tqdm
 from whittle.importance.utils import (
     aggregate_by_scheme,
     get_dataloader,
-    normalize_ranks,
     sort_keys_by_score,
 )
 
@@ -58,7 +57,7 @@ def compute_importance_head_size(
     for i in range(model.config.head_size):
         head_dict[str(i)] = np.mean(np.array(head_dict[str(i)]))
 
-    return normalize_ranks(head_dict, descending=True)
+    return head_dict
 
 
 def compute_order_head_size(
