@@ -14,9 +14,9 @@ def compute_ppl_block(
     max_length,
     model,
     tokenizer,
+    dataset_path,
     batch_size=32,
     num_batches=10,
-    dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/",
 ):
     mixed_dataset = load_from_disk(dataset_path)
     dataloader = get_dataloader(tokenizer, mixed_dataset, max_length, batch_size)
@@ -44,9 +44,9 @@ def compute_order_layers_ppl(
     max_seq_len,
     model,
     tokenizer,
+    dataset_path,
     batch_size=32,
     num_batches=10,
-    dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/",
 ):
     model.reset_super_network()
     layer_importance_scores = {}
@@ -61,7 +61,7 @@ def compute_order_layers_ppl(
             sampled_layer_indices=[i for i in range(model.config.n_layer) if i != layer],
         )  # drop layer corresponding to index_block
         score = compute_ppl_block(
-            max_seq_len, model, tokenizer, batch_size, num_batches, dataset_path
+            max_seq_len, model, tokenizer, dataset_path, batch_size, num_batches
         )
         layer_importance_scores[str(layer)] = score
     # higher PPL after dropping → more important layer

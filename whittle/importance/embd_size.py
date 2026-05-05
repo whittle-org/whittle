@@ -24,7 +24,7 @@ def compute_importance_embd(
     tokenizer,
     batch_size,
     num_batches,
-    dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/",
+    dataset_path,
 ):
     mixed_dataset = load_from_disk(dataset_path)
     dataloader = get_dataloader(tokenizer, mixed_dataset, max_length, batch_size)

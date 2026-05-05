@@ -17,9 +17,9 @@ def compute_importance_heads(
     objective,
     model,
     tokenizer,
+    dataset_path,
     batch_size=32,
     num_batches=10,
-    dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/",
 ):
     mixed_dataset = load_from_disk(dataset_path)
 
@@ -75,9 +75,9 @@ def compute_importance_head_groups(
     objective,
     model,
     tokenizer,
+    dataset_path,
     batch_size=32,
     num_batches=10,
-    dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/",
 ):
     mixed_dataset = load_from_disk(dataset_path)
     dataloader = get_dataloader(tokenizer, mixed_dataset, max_length, batch_size)
