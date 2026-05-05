@@ -11,6 +11,8 @@ from whittle.importance.utils import (
     sort_keys_by_score,
 )
 
+FINAL_NORM_KEY = "norm_f"
+
 
 def aggregate_across_batches(n_embd, embd_scores):
     # mean over batches per embedding dimension
@@ -42,18 +44,12 @@ def compute_importance_embd(
 
         with torch.no_grad():  # don't compute grad, save memory
             _ = model(input_ids)  # save activations in forward
-            # intermediate_out is a dictionary saving intermediate activations
-            for k in model.intermediate_outputs:
-                NORM_KEY = ["norm_f"]
-                if any(
-                    substr in k for substr in NORM_KEY
-                ):  # since we compute emb importance, only consider norm layers
-                    for i in range(model.config.n_embd):
-                        matrix_x_fc = model.intermediate_outputs[k].reshape(
-                            -1, model.config.n_embd
-                        )[:, i]  # extract the output corresponding to ith neuron
-                        importance_agg = aggregate_by_scheme(matrix_x_fc, objective)
-                        embd_scores[f"{i}"][count] += importance_agg
+            final_hidden = model.intermediate_outputs[FINAL_NORM_KEY].reshape(
+                -1, model.config.n_embd
+            )
+            for i in range(model.config.n_embd):
+                importance_agg = aggregate_by_scheme(final_hidden[:, i], objective)
+                embd_scores[f"{i}"][count] += importance_agg
         if count + 1 == num_batches:
             break
     return aggregate_across_batches(model.config.n_embd, embd_scores)
