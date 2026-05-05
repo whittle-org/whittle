@@ -88,9 +88,8 @@ def compute_importance_head_groups(
     head_dict = {}
     # initialize zero score for all batches, all heads
     for i in range(model.config.n_query_groups):
-        head_dict[str(i)] = {}
-        for j in range(model.config.n_head // model.config.n_query_groups):
-            head_dict[f"{i}"][f"{j}"] = [0 for _ in range(num_batches)]
+        head_dict[str(i)] = [0 for _ in range(num_batches)]
+
     n_heads_per_group = model.config.n_head // model.config.n_query_groups
     for count, batch in enumerate(tqdm(dataloader, desc="Processing batches")):
         # Each batch of size B, S
@@ -100,31 +99,31 @@ def compute_importance_head_groups(
         for i in range(model.config.n_layer):  # iterate and sum up scores across layers
             k = f"block_{i}_attn_out"
             q, k, v, mask = model.intermediate_outputs[k]
-            for j in range(model.config.n_query_groups):
-                for h in range(n_heads_per_group):
-                    act_q = q[:, j * n_heads_per_group + h, :, :].unsqueeze(1)
-                    act_k = k[:, j, :, :].unsqueeze(1)
-                    act_v = v[:, j, :, :].unsqueeze(1)
-                    head_act = model.transformer.h[i].attn.scaled_dot_product_attention(
-                        act_q,
-                        act_k,
-                        act_v,
-                        mask,
-                    )
-                    head_act = head_act.reshape(batch_size, max_length, -1)
-                    head_act = torch.norm(head_act, dim=-1)
-                    head_act_norm = aggregate_by_scheme(head_act, objective)
-                    # aggregate across all layers for each batch and for each head j
-                    head_dict[str(j)][str(h)][count] += head_act_norm
+            for query_group in range(model.config.n_query_groups):
+                q_indices = slice(
+                    query_group * n_heads_per_group, (query_group + 1) * n_heads_per_group
+                )
+                kv_indices = query_group * n_heads_per_group
+                act_q = q[:, q_indices, :, :]
+                act_k = k[:, kv_indices, :, :].unsqueeze(1)
+                act_v = v[:, kv_indices, :, :].unsqueeze(1)
+                head_act = model.transformer.h[i].attn.scaled_dot_product_attention(
+                    act_q,
+                    act_k,
+                    act_v,
+                    mask,
+                )
+                head_act = head_act.reshape(batch_size, max_length, -1)
+                head_act = torch.norm(head_act, dim=-1)
+                head_act_norm = aggregate_by_scheme(head_act, objective)
+                # aggregate across all layers for each batch and for each head j
+                head_dict[str(query_group)][count] += head_act_norm
 
         if count + 1 == num_batches:
             break
 
     for i in range(model.config.n_query_groups):
-        for j in range(n_heads_per_group):
-            head_dict[str(i)][str(j)] = torch.mean(
-                torch.tensor(head_dict[str(i)][str(j)])
-            )
+        head_dict[str(i)] = torch.mean(torch.tensor(head_dict[str(i)]))
     return head_dict
 
 
