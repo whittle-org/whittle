@@ -14,6 +14,11 @@ from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
 
 
+def sort_keys_by_score(scores_dict):
+    """Return integer keys of ``scores_dict`` sorted by descending score."""
+    return [int(i) for i in sorted(scores_dict, key=scores_dict.get, reverse=True)]
+
+
 def aggregate_by_scheme_distance(features, objective):
     if objective == "euclidean":
         return pairwise_euclidean_distance(features)

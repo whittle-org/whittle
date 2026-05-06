@@ -71,6 +71,7 @@ class CausalSelfAttention(nn.Module):
         )
         self.sub_attention_scaler = self.config.attention_scores_scalar
         self.compute_importance = compute_importance
+        self._attn_cache: tuple | None = None
 
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
@@ -604,8 +605,8 @@ class CausalSelfAttention(nn.Module):
             * self.sub_network_query_groups,
         )  # re-assemble all head outputs side by side
         if self.compute_importance:
-            return self.proj(y), (q, k, v, mask)
-        return self.proj(y), (None, None, None, None)
+            self._attn_cache = (q, k, v, mask)
+        return self.proj(y)
 
     def scaled_dot_product_attention(
         self,

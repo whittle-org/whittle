@@ -26,6 +26,7 @@ class Block(litgpt.model.Block):
             )
 
         self.compute_importance = compute_importance
+        self._block_input: torch.Tensor | None = None
         self.norm_1 = (
             nn.Identity()
             if not config.norm_1
@@ -185,10 +186,10 @@ class Block(litgpt.model.Block):
         |     ↓
         └───► +
         """
+        if self.compute_importance:
+            self._block_input = x.detach()
         x_normed = self.norm_1(x)
-        attention_output, (q, k, v, mask) = self.attn(
-            x_normed, cos, sin, mask, input_pos, input_pos_maxp1
-        )
+        attention_output = self.attn(x_normed, cos, sin, mask, input_pos, input_pos_maxp1)
         attention_output = self.post_attention_norm(attention_output)
 
         if self.config.parallel_residual:
@@ -201,5 +202,5 @@ class Block(litgpt.model.Block):
             # When shared_attention_norm=True, norm_2 is None — reuse norm_1 output
             x_normed = self.norm_2(x) if self.norm_2 is not None else x_normed
 
-        mlp_output, mlp_importance = self.mlp(x_normed)
-        return self.post_mlp_norm(mlp_output) + x, (q, k, v, mask), mlp_importance
+        mlp_output = self.mlp(x_normed)
+        return self.post_mlp_norm(mlp_output) + x

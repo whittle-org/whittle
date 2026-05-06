@@ -19,6 +19,7 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         self.in_features = config.n_embd
         self.intermediate_size = config.intermediate_size
         self.compute_importance = compute_importance
+        self._mlp_cache: torch.Tensor | None = None
 
         # Set current sub-network to super-network
         self.sub_network_n_embd = self.in_features
@@ -68,8 +69,8 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
         x = self.fc(x)
         x_gelu = F.gelu(x, approximate=self.config.gelu_approximate)
         if self.compute_importance:
-            return self.proj(x_gelu), x
-        return self.proj(x_gelu), None
+            self._mlp_cache = x
+        return self.proj(x_gelu)
 
 
 class LLaMAMLP(litgpt.model.LLaMAMLP):
@@ -86,6 +87,7 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         self.sub_network_intermediate_size: int | None = None
         self.config = config
         self.compute_importance = compute_importance
+        self._mlp_cache: torch.Tensor | None = None
 
     def set_sub_network(
         self,
@@ -139,8 +141,8 @@ class LLaMAMLP(litgpt.model.LLaMAMLP):
         x_fc_2 = self.fc_2(x)
         x = F.silu(x_fc_1) * x_fc_2
         if self.compute_importance:
-            return self.proj(x), x
-        return self.proj(x), None
+            self._mlp_cache = x
+        return self.proj(x)
 
 
 class GemmaMLP(LLaMAMLP):
@@ -157,5 +159,5 @@ class GemmaMLP(LLaMAMLP):
             * x_fc_2
         )
         if self.compute_importance:
-            return self.proj(x), x
-        return self.proj(x), None
+            self._mlp_cache = x
+        return self.proj(x)

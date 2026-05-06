@@ -5,35 +5,18 @@ import torch
 from datasets import load_from_disk
 from tqdm import tqdm
 
-# from whittle.loss.loss_factory import LossFactory
-from importance.utils import (
+from whittle.importance.utils import (
     aggregate_by_scheme,
     get_dataloader,
+    sort_keys_by_score,
 )
 
-# Check if CUDA is available
+FINAL_NORM_KEY = "norm_f"
 
 
 def aggregate_across_batches(n_embd, embd_scores):
-    # compute mean over batches
-    embd_scores = {str(i): np.mean(embd_scores[str(i)]) for i in range(n_embd)}
-
-    # extract scores
-    keys = list(embd_scores.keys())
-    scores = np.array([embd_scores[k] for k in keys])
-
-    # get descending ranks: higher score → higher rank
-    order = np.argsort(-scores)  # descending order
-    ranks = np.empty_like(order)
-    ranks[order] = np.arange(1, len(scores) + 1)  # rank starts at 1
-
-    # normalize ranks to [0, 1]
-    norm_ranks = (ranks - ranks.min()) / (ranks.max() - ranks.min())
-
-    # replace scores with normalized ranks
-    embd_ranks = {k: norm_ranks[i] for i, k in enumerate(keys)}
-
-    return embd_ranks
+    # mean over batches per embedding dimension
+    return {str(i): np.mean(embd_scores[str(i)]) for i in range(n_embd)}
 
 
 def compute_importance_embd(
@@ -43,7 +26,7 @@ def compute_importance_embd(
     tokenizer,
     batch_size,
     num_batches,
-    dataset_path="/work/dlclarge2/sukthank-whittle/dense-lotteries/dataloaders/wikitext/",
+    dataset_path,
 ):
     mixed_dataset = load_from_disk(dataset_path)
     dataloader = get_dataloader(tokenizer, mixed_dataset, max_length, batch_size)
@@ -61,22 +44,15 @@ def compute_importance_embd(
 
         with torch.no_grad():  # don't compute grad, save memory
             _ = model(input_ids)  # save activations in forward
-            # intermediate_out is a dictionary saving intermediate activations
-            for k in model.intermediate_outputs:
-                valid_keys_substr = ["norm"]
-                if any(
-                    substr in k for substr in valid_keys_substr
-                ):  # since we compute emb importance, only consider norm layers
-                    for i in range(model.config.n_embd):
-                        matrix_x_fc = model.intermediate_outputs[k].reshape(
-                            -1, model.config.n_embd
-                        )[:, i]  # extract the output corresponding to ith neuron
-                        importance_agg = aggregate_by_scheme(matrix_x_fc, objective)
-                        embd_scores[f"{i}"][count] += importance_agg
+            final_hidden = model.intermediate_outputs[FINAL_NORM_KEY].reshape(
+                -1, model.config.n_embd
+            )
+            for i in range(model.config.n_embd):
+                importance_agg = aggregate_by_scheme(final_hidden[:, i], objective)
+                embd_scores[f"{i}"][count] += importance_agg
         if count + 1 == num_batches:
             break
-    embedding_ranks = aggregate_across_batches(model.config.n_embd, embd_scores)
-    return embedding_ranks
+    return aggregate_across_batches(model.config.n_embd, embd_scores)
 
 
 def compute_order_embd(
@@ -91,9 +67,4 @@ def compute_order_embd(
     embd_importance_scores = function(
         max_seq_len, objective, model, tokenizer, batch_size, num_batches
     )
-    return [
-        int(i)
-        for i in sorted(
-            embd_importance_scores, key=embd_importance_scores.get, reverse=True
-        )
-    ]
+    return sort_keys_by_score(embd_importance_scores)
