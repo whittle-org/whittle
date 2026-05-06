@@ -19,7 +19,9 @@ from whittle.modules.rmsnorm import RMSNorm
 class CausalSelfAttention(nn.Module):
     """Extension of litgpt's `litgpt.model.CausalSelfAttention` with support to adapt to sub-network dimensionality."""
 
-    def __init__(self, config: Config, block_idx: int) -> None:
+    def __init__(
+        self, config: Config, block_idx: int, compute_importance: bool = False
+    ) -> None:
         super().__init__()
         shape = (config.n_head + 2 * config.n_query_groups) * config.head_size
         # key, query, value projections for all heads, but in a batch
@@ -68,6 +70,8 @@ class CausalSelfAttention(nn.Module):
             self.sub_network_n_head // self.sub_network_query_groups
         )
         self.sub_attention_scaler = self.config.attention_scores_scalar
+        self.compute_importance = compute_importance
+        self._attn_cache: tuple | None = None
 
     def norm_class(self):
         # `self._norm_class` cannot be the type to keep the config json serializable
@@ -164,6 +168,8 @@ class CausalSelfAttention(nn.Module):
                     f"Sampled index cannot be greater than {max_val} for {property}"
                 )
 
+        # print(f"Verifying sub-network legality with sampled indices - heads: {sampled_head_indices}, ")
+        # print(f"Verifying sub-network legality with sampled indices - {heads_per_group}")
         verify_indices(sampled_head_indices, heads_per_group, "sampled_head_indices")
         verify_indices(sampled_embd_indices, n_embd, "sampled_embd_indices")
         verify_indices(sampled_head_size_indices, head_size, "sampled_head_size_indices")
@@ -429,7 +435,7 @@ class CausalSelfAttention(nn.Module):
             )
         ]
 
-        # Set the sub-network dimensions for the linear transformations
+        # Set the sub-network dimensions for the linear
         self.qkv.set_sub_network(
             self.sub_network_n_embd,
             self.sub_network_qkv_shape,
@@ -598,6 +604,8 @@ class CausalSelfAttention(nn.Module):
             * self.sub_network_q_per_kv
             * self.sub_network_query_groups,
         )  # re-assemble all head outputs side by side
+        if self.compute_importance:
+            self._attn_cache = (q, k, v, mask)
         return self.proj(y)
 
     def scaled_dot_product_attention(

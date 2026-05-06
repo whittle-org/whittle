@@ -64,13 +64,17 @@ class WandaPruner(Pruner):
 
             for j in range(nsamples):
                 with torch.no_grad():
-                    outs[j] = layer(
+                    temp_out = layer(
                         inps[j],
                         mask=attention_mask,
                         cos=model.cos.unsqueeze(0),
                         sin=model.sin.unsqueeze(0),
                         input_pos=position_ids,
                     )
+                    if isinstance(temp_out, tuple):
+                        outs[j] = temp_out[0]
+                    else:
+                        outs[j] = temp_out
 
             for h in handles:
                 h.remove()
@@ -94,12 +98,16 @@ class WandaPruner(Pruner):
 
             for j in range(nsamples):
                 with torch.no_grad():
-                    outs[j] = layer(
+                    temp_out = layer(
                         inps[j],
                         mask=attention_mask,
                         cos=model.cos.unsqueeze(0),
                         sin=model.sin.unsqueeze(0),
                         input_pos=position_ids,
                     )[0]
+                    if isinstance(temp_out, tuple):
+                        outs[j] = temp_out[0]
+                    else:
+                        outs[j] = temp_out
 
             inps, outs = outs, inps
