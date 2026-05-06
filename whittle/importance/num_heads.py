@@ -131,10 +131,7 @@ def compute_order_head_groups(
     function, max_seq_len, objective, model, tokenizer, batch_size=32, num_batches=10
 ):
     model.reset_super_network()
-    head_importance_scores = function(
+    group_importance_scores = function(
         max_seq_len, objective, model, tokenizer, batch_size, num_batches
     )
-    group_importance_scores = {}
-    for group in head_importance_scores:
-        group_importance_scores[group] = sum(head_importance_scores[group].values())
     return sort_keys_by_score(group_importance_scores)
