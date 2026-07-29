@@ -5,33 +5,35 @@ import io
 import json
 import os
 import pickle
+from typing import Any
 
 import numpy as np
 import torch
 import transformers
 from litgpt import Config
 
-from importance.block_importance import (
+from whittle.importance.block_importance import (
     compute_block_importance,
     compute_order_block_importance,
 )
-from importance.drop_layer import compute_order_layers_ppl
-from importance.embd_size import compute_importance_embd, compute_order_embd
-from importance.intermediate_size import (
+from whittle.importance.drop_layer import compute_order_layers_ppl
+from whittle.importance.embd_size import compute_importance_embd, compute_order_embd
+from whittle.importance.intermediate_size import (
     compute_importance_intermediate_size,
     compute_order_intermediate_dims,
 )
-from importance.num_heads import (
+from whittle.importance.num_heads import (
     compute_importance_head_groups,
     compute_importance_heads,
     compute_order_head_groups,
     compute_order_heads,
 )
-from importance.utils import evaluate_wikitext
-from metrics.parameters import compute_parameters
-from models.gpt.model import GPT
-from sampling.random_sampler import RandomSampler
-from search.search_spaces import search_spaces
+from whittle.importance.utils import evaluate_wikitext
+from whittle.metrics.parameters import compute_parameters
+from whittle.models.gpt.extract import extract_current_sub_network
+from whittle.models.gpt.model import GPT
+from whittle.sampling.random_sampler import RandomSampler
+from whittle.search.search_spaces import search_spaces
 
 
 def get_configs(sampler: RandomSampler, n: int = 5) -> list[dict]:
@@ -50,9 +52,9 @@ def evaluate_configs(
     configs: list[dict],
     search_space: object,
     layer_order: list[int] | None = None,
-) -> tuple[list[float], list[int]]:
+) -> tuple[list[float], list[float]]:
     ppls: list[float] = []
-    params: list[int] = []
+    params: list[float] = []
     for c in configs:
         if layer_order is None:
             model.set_sub_network(**space.cast(c))
@@ -120,7 +122,7 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = GPT(config, compute_importance=True)
 
-    model.name_or_path = os.path.join("checkpoints", model_id)
+    model.name_or_path = os.path.join("checkpoints", model_id)  # type: ignore[assignment]
     model.load_state_dict(torch.load(model_path, map_location="cpu"))
     model.to(torch.bfloat16)
     model.to(device)
@@ -133,7 +135,7 @@ if __name__ == "__main__":
     sampler = RandomSampler(space.config_space, seed=args.seed)
     configs = get_configs(sampler=sampler, n=args.n_configs)
 
-    largest_model_config: dict[str, object] = {
+    largest_model_config: dict[str, Any] = {
         "sub_network_n_embd": config.n_embd,
         "sub_network_intermediate_size": [config.intermediate_size] * config.n_layer,
         "sub_network_num_heads": [config.n_head] * config.n_layer,
@@ -247,8 +249,6 @@ if __name__ == "__main__":
 
     print("PPL of full network before", before_sorting)
     print("PPL of full network after", after_sorting)
-
-    from models.gpt.extract import extract_current_sub_network
 
     permuted_model = extract_current_sub_network(model)
     permuted_model.to(torch.bfloat16)
