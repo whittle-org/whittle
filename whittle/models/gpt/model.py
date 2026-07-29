@@ -508,7 +508,6 @@ class GPT(nn.Module):
             sampled_layer_indices=sampled_layer_indices,
             sampled_embd_indices=sampled_embd_indices,
         )
-        print(sub_network_sizes)
         self._verify_sub_network(
             **sub_network_sizes,
             sampled_intermediate_indices=sampled_intermediate_indices,
