@@ -33,7 +33,7 @@ from whittle.metrics.parameters import compute_parameters
 from whittle.models.gpt.extract import extract_current_sub_network
 from whittle.models.gpt.model import GPT
 from whittle.sampling.random_sampler import RandomSampler
-from whittle.search.search_spaces import search_spaces
+from whittle.search.search_spaces import SimpleSearchSpace, search_spaces
 
 
 def get_configs(sampler: RandomSampler, n: int = 5) -> list[dict]:
@@ -50,14 +50,14 @@ def compute_avg_decrease(ppl_before: np.ndarray, ppl_after: np.ndarray) -> float
 def evaluate_configs(
     model: GPT,
     configs: list[dict],
-    search_space: object,
+    search_space: SimpleSearchSpace,
     layer_order: list[int] | None = None,
 ) -> tuple[list[float], list[float]]:
     ppls: list[float] = []
     params: list[float] = []
     for c in configs:
         if layer_order is None:
-            model.set_sub_network(**space.cast(c))
+            model.set_sub_network(**search_space.cast(c))
             param = compute_parameters(model)
             ppl = evaluate_wikitext(
                 args.max_seq_len, model, tokenizer, batch_size, num_batches
@@ -67,7 +67,7 @@ def evaluate_configs(
         else:
             layer_order_top_k = sorted(layer_order[: int(c["depth"])])
             model.set_sub_network(
-                **space.cast(c), sampled_layer_indices=layer_order_top_k
+                **search_space.cast(c), sampled_layer_indices=layer_order_top_k
             )
             param = compute_parameters(model)
             ppl = evaluate_wikitext(
