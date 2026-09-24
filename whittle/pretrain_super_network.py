@@ -6,7 +6,7 @@ import time
 from dataclasses import asdict
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import lightning as L
 import torch
@@ -45,7 +45,6 @@ from syne_tune.config_space import lograndint, randint
 from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
-from whittle.metrics.profiler import DistributedGPUProfiler
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.sampling.random_sampler import RandomSampler
@@ -55,6 +54,9 @@ from whittle.training_strategies import (
     StandardStrategy,
 )
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
+
+if TYPE_CHECKING:
+    from whittle.metrics.profiler import DistributedGPUProfiler
 
 training_strategies_cls = {
     "sandwich": SandwichStrategy,

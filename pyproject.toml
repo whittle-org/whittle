@@ -70,13 +70,14 @@ dev = [
     "mkdocs-gen-files",
     "mkdocs-literate-nav",
     "mkdocstrings[python]",
-    "nvidia-ml-py3",
+    "whittle[profiling]",   # mkdocstrings imports whittle.metrics.profiler
     "black",                # Allows mkdocstrings to do formatting...
 ]
 
-distributed = ["triton"]
-
-all = ["whittle[dev]", "whittle[distributed]"]
+profiling = [
+    "nvidia-ml-py",
+    "psutil",
+]
 
 [tool.setuptools.packages.find]
 include = ["whittle", "whittle.*"]
