@@ -17,6 +17,7 @@ from lightning.fabric.utilities.throughput import ThroughputMonitor
 from litgpt import Config, Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.data import DataModule, TinyStories
+from litgpt.parser_config import save_hyperparameters
 from litgpt.pretrain import (
     get_dataloaders,
     get_lr,
@@ -34,7 +35,6 @@ from litgpt.utils import (
     load_checkpoint,
     parse_devices,
     save_config,
-    save_hyperparameters,
 )
 from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
@@ -197,6 +197,7 @@ def setup(
         teacher_logits_dir,
         use_saved_logits,
         random_init_student,
+        num_nodes=num_nodes,
     )
 
 
@@ -222,6 +223,7 @@ def main(
     teacher_logits_dir: Path | None = None,
     use_saved_logits: bool = False,
     random_init_student: bool = False,
+    num_nodes: int = 1,
 ):
     if fabric.global_rank == 0 and out_dir is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -446,6 +448,7 @@ def main(
         distill,
         logits_loader,
         use_saved_logits,
+        num_nodes=num_nodes,
     )
 
     save_checkpoint(
@@ -601,6 +604,7 @@ def fit(
     distill: DistillArgs,
     logits_loader: SavedLogitsLoader | None = None,
     use_saved_logits: bool = False,
+    num_nodes: int = 1,
 ) -> dict[str, Any]:
     teacher = state["teacher"]
     student = state["model"]
@@ -639,18 +643,21 @@ def fit(
     max_tokens_per_device = train.max_tokens // fabric.world_size
     tokens_per_iter = train.micro_batch_size * student.max_seq_length
     max_iters = max_tokens_per_device // tokens_per_iter
-    log_iter_interval = train.log_interval * train.gradient_accumulation_iters(devices)
+    log_iter_interval = train.log_interval * train.gradient_accumulation_iters(
+        devices, num_nodes
+    )
     initial_iter = state["iter_num"]
     train_iterator = CycleIterator(train_dataloader)
 
     running_loss = RunningMean(
-        window=train.gradient_accumulation_iters(devices), sync_on_compute=False
+        window=train.gradient_accumulation_iters(devices, num_nodes),
+        sync_on_compute=False,
     ).to(fabric.device)
 
     fabric.barrier()
     total_t0 = time.perf_counter()
 
-    warmup_iters = train.warmup_iters(devices, max_iters, train_dataloader)
+    warmup_iters = train.warmup_iters(devices, num_nodes, max_iters, train_dataloader)
 
     for train_data in train_iterator:
         if state["iter_num"] >= max_iters:
@@ -673,7 +680,7 @@ def fit(
         targets = train_data[:, 1 : (student.max_seq_length + 1)].contiguous().long()
 
         is_accumulating = (
-            state["iter_num"] % train.gradient_accumulation_iters(devices) != 0
+            state["iter_num"] % train.gradient_accumulation_iters(devices, num_nodes) != 0
         )
         with fabric.no_backward_sync(student, enabled=is_accumulating):
             # Get teacher logits
@@ -698,7 +705,7 @@ def fit(
             loss = distill_loss(
                 logits_reshaped, targets_reshaped, teacher_logits_reshaped
             )
-            fabric.backward(loss / train.gradient_accumulation_iters(devices))
+            fabric.backward(loss / train.gradient_accumulation_iters(devices, num_nodes))
 
         running_loss.update(loss.detach())
 
