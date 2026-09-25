@@ -5,33 +5,35 @@ import io
 import json
 import os
 import pickle
+from typing import Any
 
 import numpy as np
 import torch
 import transformers
 from litgpt import Config
 
-from importance.block_importance import (
+from whittle.importance.block_importance import (
     compute_block_importance,
     compute_order_block_importance,
 )
-from importance.drop_layer import compute_order_layers_ppl
-from importance.embd_size import compute_importance_embd, compute_order_embd
-from importance.intermediate_size import (
+from whittle.importance.drop_layer import compute_order_layers_ppl
+from whittle.importance.embd_size import compute_importance_embd, compute_order_embd
+from whittle.importance.intermediate_size import (
     compute_importance_intermediate_size,
     compute_order_intermediate_dims,
 )
-from importance.num_heads import (
+from whittle.importance.num_heads import (
     compute_importance_head_groups,
     compute_importance_heads,
     compute_order_head_groups,
     compute_order_heads,
 )
-from importance.utils import evaluate_wikitext
-from metrics.parameters import compute_parameters
-from models.gpt.model import GPT
-from sampling.random_sampler import RandomSampler
-from search.search_spaces import search_spaces
+from whittle.importance.utils import evaluate_wikitext
+from whittle.metrics.parameters import compute_parameters
+from whittle.models.gpt.extract import extract_current_sub_network
+from whittle.models.gpt.model import GPT
+from whittle.sampling.random_sampler import RandomSampler
+from whittle.search.search_spaces import SimpleSearchSpace, search_spaces
 
 
 def get_configs(sampler: RandomSampler, n: int = 5) -> list[dict]:
@@ -48,31 +50,24 @@ def compute_avg_decrease(ppl_before: np.ndarray, ppl_after: np.ndarray) -> float
 def evaluate_configs(
     model: GPT,
     configs: list[dict],
-    search_space: object,
+    search_space: SimpleSearchSpace,
+    max_seq_len: int,
+    tokenizer: Any,
+    batch_size: int,
+    num_batches: int,
     layer_order: list[int] | None = None,
-) -> tuple[list[float], list[int]]:
+) -> tuple[list[float], list[float]]:
     ppls: list[float] = []
-    params: list[int] = []
+    params: list[float] = []
     for c in configs:
-        if layer_order is None:
-            model.set_sub_network(**space.cast(c))
-            param = compute_parameters(model)
-            ppl = evaluate_wikitext(
-                args.max_seq_len, model, tokenizer, batch_size, num_batches
-            )
-            ppls.append(ppl)
-            params.append(param)
-        else:
-            layer_order_top_k = sorted(layer_order[: int(c["depth"])])
-            model.set_sub_network(
-                **space.cast(c), sampled_layer_indices=layer_order_top_k
-            )
-            param = compute_parameters(model)
-            ppl = evaluate_wikitext(
-                args.max_seq_len, model, tokenizer, batch_size, num_batches
-            )
-            ppls.append(ppl)
-            params.append(param)
+        sub_network: dict[str, Any] = dict(search_space.cast(c))
+        if layer_order is not None:
+            sub_network["sampled_layer_indices"] = sorted(layer_order[: int(c["depth"])])
+        model.set_sub_network(**sub_network)
+        params.append(compute_parameters(model))
+        ppls.append(
+            evaluate_wikitext(max_seq_len, model, tokenizer, batch_size, num_batches)
+        )
     return ppls, params
 
 
@@ -144,7 +139,9 @@ if __name__ == "__main__":
     before_sorting = evaluate_wikitext(
         args.max_seq_len, model, tokenizer, batch_size, num_batches
     )
-    ppls_before, params_before = evaluate_configs(model, configs, space, layer_order=None)
+    ppls_before, params_before = evaluate_configs(
+        model, configs, space, args.max_seq_len, tokenizer, batch_size, num_batches
+    )
     model.reset_super_network()
 
     embedding_order = compute_order_embd(
@@ -240,15 +237,20 @@ if __name__ == "__main__":
         args.max_seq_len, model, tokenizer, batch_size, num_batches
     )
     ppls_after, params_after = evaluate_configs(
-        model, configs, space, layer_order=layer_order
+        model,
+        configs,
+        space,
+        args.max_seq_len,
+        tokenizer,
+        batch_size,
+        num_batches,
+        layer_order=layer_order,
     )
     ppls_after.append(after_sorting)
     ppls_before.append(before_sorting)
 
     print("PPL of full network before", before_sorting)
     print("PPL of full network after", after_sorting)
-
-    from models.gpt.extract import extract_current_sub_network
 
     permuted_model = extract_current_sub_network(model)
     permuted_model.to(torch.bfloat16)
