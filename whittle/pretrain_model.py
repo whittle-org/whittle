@@ -24,7 +24,7 @@ from litgpt.pretrain import (
     get_dataloaders,
     initialize_weights,
     save_config,
-    validate,  # get_lr,
+    validate,
     validate_args,
 )
 from litgpt.utils import (
@@ -181,7 +181,6 @@ def setup(
         quit()
     # saved with each checkpoint; `locals()` holds only the arguments at this point
     hyperparameters = dump_hyperparameters(setup, locals())
-    # data.val_split_fraction = 0.01 #if data.val_split_fraction is None else data.val_split_fraction
     if initial_checkpoint_dir is not None:
         initial_checkpoint_dir = extend_checkpoint_dir(initial_checkpoint_dir)
 
@@ -299,7 +298,7 @@ def main(
     fabric.print(f"Time to instantiate model: {time.perf_counter() - t0:.02f} seconds.")
     fabric.print(f"Total parameters: {num_parameters(model):,}")
 
-    # model = torch.compile(model)
+    # torch.compile is not used (it is off in the paper runs)
     model = fabric.setup(model)
 
     extra_kwargs = {"fused": fabric.device.type == "cuda"}
