@@ -232,8 +232,11 @@ def main(
 
     tokenizer = Tokenizer(checkpoint_dir)
 
+    # the data loader gives sequences of `max_seq_length + 1` tokens, and the
+    # validation uses `model.max_seq_length` of them; both must be the same
+    max_seq_length = train.max_seq_length or config.block_size
     train_dataloader, val_dataloader = get_dataloaders(
-        fabric, data, tokenizer, train, train.max_seq_length
+        fabric, data, tokenizer, train, max_seq_length
     )
 
     train_dataloader, val_dataloader = fabric.setup_dataloaders(
@@ -260,8 +263,7 @@ def main(
 
     train_time = time.perf_counter()
 
-    longest_seq_length = len(val_dataloader.dataset)
-    model.max_seq_length = min(longest_seq_length, train.max_seq_length or int("inf"))
+    model.max_seq_length = max_seq_length
 
     search_space = {
         "embed_dim": lograndint(1, config.n_embd),
