@@ -38,7 +38,7 @@ from litgpt.pretrain import (
     get_dataloaders,
     initialize_weights,
     validate_args,
-    validate,#get_lr,
+    validate,  # get_lr,
     save_config,
     copy_config_files,
 )
@@ -88,7 +88,7 @@ def get_lr(
             — original WSD proposal
     """
     post_warmup = max_iters - warmup_iters
-    stable_end  = warmup_iters + int(stable_ratio * post_warmup)
+    stable_end = warmup_iters + int(stable_ratio * post_warmup)
 
     # 1) linear warmup
     if it < warmup_iters:
@@ -104,7 +104,7 @@ def get_lr(
 
     # 4) decay  learning_rate → min_lr
     decay_iters = max_iters - stable_end
-    progress    = (it - stable_end) / decay_iters   # 0.0 → 1.0
+    progress = (it - stable_end) / decay_iters  # 0.0 → 1.0
 
     if decay_type == "linear":
         # Qwen3 default: linear anneal [2]
@@ -112,12 +112,13 @@ def get_lr(
     elif decay_type == "cosine":
         coeff = 0.5 * (1.0 + math.cos(math.pi * progress))
     elif decay_type == "exponential":
-        r     = min_lr / learning_rate if learning_rate > 0 else 1.0
-        return learning_rate * (r ** progress)
+        r = min_lr / learning_rate if learning_rate > 0 else 1.0
+        return learning_rate * (r**progress)
     else:
         raise ValueError(f"Unknown decay_type '{decay_type}'")
 
     return min_lr + coeff * (learning_rate - min_lr)
+
 
 def setup(
     model_name: str,
@@ -299,13 +300,11 @@ def main(
     fabric.print(f"Time to instantiate model: {time.perf_counter() - t0:.02f} seconds.")
     fabric.print(f"Total parameters: {num_parameters(model):,}")
 
-    #model = torch.compile(model)
+    # model = torch.compile(model)
     model = fabric.setup(model)
 
     extra_kwargs = {"fused": fabric.device.type == "cuda"}
-    optimizer = instantiate_torch_optimizer(
-        optimizer, model.parameters(), **extra_kwargs
-    )
+    optimizer = instantiate_torch_optimizer(optimizer, model.parameters(), **extra_kwargs)
     optimizer = fabric.setup_optimizers(optimizer)
 
     train_dataloader, val_dataloader = get_dataloaders(
@@ -365,7 +364,9 @@ def main(
     )
 
     # Save final checkpoint
-    save_checkpoint(fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth", hyperparameters)
+    save_checkpoint(
+        fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth", hyperparameters
+    )
 
     total_tokens = (
         state["iter_num"]
@@ -424,9 +425,7 @@ def fit(
         model_fwd = lambda: meta_model(x)  # noqa: F821
         model_loss = lambda y: chunked_cross_entropy(y, x, chunk_size=0)  # noqa: F821
         measured_flops = measure_flops(meta_model, model_fwd, model_loss)
-        fabric.print(
-            f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}"
-        )
+        fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
         del meta_model, x
 
     max_tokens_per_device = train.max_tokens // fabric.world_size
@@ -469,15 +468,12 @@ def fit(
         targets = train_data[:, 1 : (model.max_seq_length + 1)].contiguous().long()
 
         is_accumulating = (
-            state["iter_num"] % train.gradient_accumulation_iters(devices, num_nodes)
-            != 0
+            state["iter_num"] % train.gradient_accumulation_iters(devices, num_nodes) != 0
         )
         with fabric.no_backward_sync(model, enabled=is_accumulating):
             logits = model(input_ids)
             loss = chunked_cross_entropy(logits, targets)
-            fabric.backward(
-                loss / train.gradient_accumulation_iters(devices, num_nodes)
-            )
+            fabric.backward(loss / train.gradient_accumulation_iters(devices, num_nodes))
 
         running_loss.update(loss.detach())
 
