@@ -287,9 +287,7 @@ def main(
     teacher = fabric.setup(teacher)
     load_checkpoint(fabric, teacher, checkpoint)
     teacher.eval()
-    teacher_val_loss = validate(
-        fabric, teacher, val_dataloader, max_iters=eval.max_iters
-    )
+    teacher_val_loss = validate(fabric, teacher, val_dataloader, max_iters=eval.max_iters)
     teacher_val_loss = teacher_val_loss.item()
     teacher_val_ppl = math.exp(teacher_val_loss)
 
@@ -352,7 +350,9 @@ def main(
     )
 
     # Save final checkpoint
-    save_checkpoint(fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth", hyperparameters)
+    save_checkpoint(
+        fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth", hyperparameters
+    )
 
     total_tokens = (
         state["iter_num"]
@@ -429,9 +429,7 @@ def fit(
         model_fwd = lambda: meta_model(x)  # noqa: F821
         model_loss = lambda y: chunked_cross_entropy(y, x, chunk_size=0)  # noqa: F821
         measured_flops = measure_flops(meta_model, model_fwd, model_loss)
-        fabric.print(
-            f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}"
-        )
+        fabric.print(f"Measured TFLOPs: {measured_flops * fabric.world_size / 1e12:.2f}")
         del meta_model, x
 
     max_tokens_per_device = train.max_tokens // fabric.world_size
@@ -474,8 +472,7 @@ def fit(
         targets = train_data[:, 1 : (student.max_seq_length + 1)].contiguous().long()
 
         is_accumulating = (
-            state["iter_num"] % train.gradient_accumulation_iters(devices, num_nodes)
-            != 0
+            state["iter_num"] % train.gradient_accumulation_iters(devices, num_nodes) != 0
         )
         with fabric.no_backward_sync(student, enabled=is_accumulating):
             logits = student(input_ids)
@@ -555,9 +552,7 @@ def fit(
             and state["step_count"] % eval.interval == 0
         ):
             t0 = time.perf_counter()
-            val_loss = validate(
-                fabric, student, val_dataloader, max_iters=eval.max_iters
-            )
+            val_loss = validate(fabric, student, val_dataloader, max_iters=eval.max_iters)
             val_loss = val_loss.item()
             td = time.perf_counter() - t0
 
