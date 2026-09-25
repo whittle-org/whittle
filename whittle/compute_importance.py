@@ -106,7 +106,6 @@ if __name__ == "__main__":
     model_path = os.path.join("checkpoints", model_id, "lit_model.pth")
 
     config = Config.from_file(config_path)
-    config.fix_head_size = True
     config.model_type = "gpt"
     with open(config_path_hf) as f:
         hf_config = json.load(f)
@@ -127,13 +126,6 @@ if __name__ == "__main__":
 
     sampler = RandomSampler(space.config_space, seed=args.seed)
     configs = get_configs(sampler=sampler, n=args.n_configs)
-
-    largest_model_config: dict[str, object] = {
-        "sub_network_n_embd": config.n_embd,
-        "sub_network_intermediate_size": [config.intermediate_size] * config.n_layer,
-        "sub_network_num_heads": [config.n_head] * config.n_layer,
-        "sub_network_n_layers": config.n_layer,
-    }
 
     model.reset_super_network()
     before_sorting = evaluate_wikitext(
