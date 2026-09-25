@@ -3,52 +3,53 @@
 from __future__ import annotations
 
 import math
+import os
 import pprint
 import time
 from dataclasses import asdict
+from datetime import timedelta
 from pathlib import Path
-import os
+from typing import Literal
+
 import lightning as L
 import torch
-from datetime import timedelta
 from lightning.fabric.strategies import DDPStrategy
-from typing import Literal
-from torch.utils.data import DataLoader
+from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, LogArgs, TrainArgs
 from litgpt.config import name_to_config
 from litgpt.data import DataModule, TinyLlama
-from torchmetrics.aggregation import RunningMean
-from litgpt.model import GPT, Block
-from litgpt.model import Config
+from litgpt.model import GPT, Config
+from litgpt.pretrain import (
+    copy_config_files,
+    get_dataloaders,
+    get_lr,
+    initialize_weights,
+    save_config,
+    validate,
+    validate_args,
+)
 from litgpt.utils import (
+    CycleIterator,
     capture_hparams,
     check_nvlink_connectivity,
     choose_logger,
+    chunked_cross_entropy,
     extend_checkpoint_dir,
     find_resume_path,
     get_default_supported_precision,
     init_out_dir,
     instantiate_torch_optimizer,
+    load_checkpoint,
     num_parameters,
     parse_devices,
-    chunked_cross_entropy,
-    CycleIterator,
 )
-from litgpt.pretrain import (
-    get_dataloaders,
-    initialize_weights,
-    validate_args,
-    validate,
-    get_lr,
-    save_config,
-    copy_config_files,
-)
-from litgpt.utils import load_checkpoint
-from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
+from torch.utils.data import DataLoader
+from torchmetrics.aggregation import RunningMean
+
 from whittle.args import DistillArgs
-from whittle.loss.kd_loss import DistillLoss
 from whittle.hyperparameters import dump_hyperparameters, save_hyperparameters
+from whittle.loss.kd_loss import DistillLoss
 
 
 def setup(
