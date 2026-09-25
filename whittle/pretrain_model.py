@@ -161,7 +161,8 @@ def setup(
         model_name: The name of the model to pretrain. Choose from names in
             ``litgpt.config``. Use "list" to list the supported models.
         model_config: A ``litgpt.Config`` object to define the model architecture.
-            Overrides the `model_name` if specified.
+            Overrides the `model_name` if specified. Mutually exclusive with
+            ``config_path``.
         out_dir: Directory in which to save checkpoints and logs. If running in a
             Lightning Studio Job, look for it in /teamspace/jobs/<job-name>/share.
         precision: The precision to use for training. Determines a compatible
@@ -188,8 +189,8 @@ def setup(
         seed: The random seed to use for reproducibility.
         init_from: ``"scratch"`` to initialize the weights at random, or the path to a
             ``.pth`` file with a raw state dict to load.
-        config_path: Optional path to a ``model_config.yaml`` file. If set, it
-            replaces ``model_config``.
+        config_path: Optional path to a ``model_config.yaml`` file. Overrides the
+            `model_name` if specified. Mutually exclusive with ``model_config``.
     """
     if model_name == "list":
         available_models = "\n".join(sorted(name_to_config))
@@ -204,6 +205,8 @@ def setup(
         tokenizer_dir = extend_checkpoint_dir(tokenizer_dir)
 
     if config_path is not None:
+        if model_config is not None:
+            raise ValueError("Pass either `model_config` or `config_path`, not both.")
         model_config = Config.from_file(config_path)
 
     hparams = capture_hparams()

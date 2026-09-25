@@ -101,7 +101,8 @@ def setup(
         model_name: The name of the student model. Choose from names in
             ``litgpt.config``. Use "list" to list the supported models.
         model_config: A ``litgpt.Config`` object for the student architecture.
-            Currently it has no effect; use ``config_path``.
+            Currently it has no effect; use ``config_path``. Mutually exclusive with
+            ``config_path``.
         out_dir: Directory in which to save checkpoints and logs. If running in a
             Lightning Studio Job, look for it in /teamspace/jobs/<job-name>/share.
         precision: The precision to use for training. Determines a compatible
@@ -132,7 +133,8 @@ def setup(
         init_from: ``"scratch"`` to initialize the student weights at random, or the
             path to a ``.pth`` file with a raw state dict to load.
         config_path: Path to the ``model_config.yaml`` file of the student. Currently
-            required: without it, ``setup`` raises ``UnboundLocalError``.
+            required: without it, ``setup`` raises ``UnboundLocalError``. Mutually
+            exclusive with ``model_config``.
     """
     if model_name == "list":
         available_models = "\n".join(sorted(name_to_config))
@@ -156,6 +158,8 @@ def setup(
         tokenizer_dir = extend_checkpoint_dir(tokenizer_dir)
 
     if config_path is not None:
+        if model_config is not None:
+            raise ValueError("Pass either `model_config` or `config_path`, not both.")
         student_config = Config.from_file(config_path)
 
     hparams = capture_hparams()
