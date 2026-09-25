@@ -56,35 +56,38 @@ def get_lr(
     stable_ratio: float = 0.85,
     decay_type: str = "linear",
 ) -> float:
-    """
-    Warmup-Stable-Decay (WSD) schedule, drop-in replacement for cosine get_lr.
+    """Returns the learning rate of a Warmup-Stable-Decay (WSD) schedule.
 
-    Timeline (derived from warmup_iters / max_iters):
-      [0,            warmup_iters)   → linear warmup  0 → learning_rate
-      [warmup_iters, stable_end)     → constant        learning_rate
-      [stable_end,   max_iters)      → decay           learning_rate → min_lr
-      [max_iters,    ...)            → floor            min_lr
+    It is a drop-in replacement for the cosine `get_lr` of litgpt. The phases follow
+    from `warmup_iters` and `max_iters`:
+
+    - `[0, warmup_iters)`: linear warmup from 0 to `learning_rate`.
+    - `[warmup_iters, stable_end)`: constant `learning_rate`.
+    - `[stable_end, max_iters)`: decay from `learning_rate` to `min_lr`.
+    - `[max_iters, ...)`: constant `min_lr`.
+
+    References: Zhou et al. (2026), "How to Set the Batch Size", arXiv:2601.05034 (a
+    1000-step warmup for Qwen3); the Qwen3 Technical Report, arXiv:2505.09388 (WSD with
+    a linear decay to 10% of the peak learning rate); Hu et al. (2024), MiniCPM,
+    arXiv:2404.06395 (the original WSD schedule).
 
     Args:
-        learning_rate:  peak lr  (= optimizer.defaults["lr"])
-        it:             current iteration / step
-        warmup_iters:   length of linear warmup                         [1]
-        max_iters:      total training steps (warmup + stable + decay)
-        min_lr:         floor lr, typically 0.1 × learning_rate         [2]
-        stable_ratio:   fraction of (max_iters - warmup_iters) spent at
-                        peak lr before decay begins. Default 0.85 means
-                        85 % stable, 15 % decay.
-        decay_type:     "linear"      — Qwen3 default          [2]
-                        "cosine"      — smooth alternative
-                        "exponential" — aggressive tail
+        learning_rate: The peak learning rate (`optimizer.defaults["lr"]`).
+        it: The current iteration.
+        warmup_iters: The number of warmup iterations.
+        max_iters: The total number of iterations (warmup, stable, and decay).
+        min_lr: The final learning rate, typically 0.1 times `learning_rate`.
+        stable_ratio: The fraction of `max_iters - warmup_iters` at the peak learning
+            rate before the decay starts. The default 0.85 means 85% stable and 15%
+            decay.
+        decay_type: `"linear"` (the Qwen3 default), `"cosine"` (smooth), or
+            `"exponential"` (a steep tail).
 
-    References:
-        [1] Zhou et al. (2026) "How to Set the Batch Size …" arXiv:2601.05034
-            — 1 000-step warmup standardised for Qwen3
-        [2] Qwen3 Technical Report, arXiv:2505.09388
-            — WSD schedule; linear decay to 10 % of peak lr in annealing
-        [3] Hu et al. (2024) MiniCPM, arXiv:2404.06395
-            — original WSD proposal
+    Returns:
+        The learning rate for iteration `it`.
+
+    Raises:
+        ValueError: If `decay_type` is not one of the three types.
     """
     post_warmup = max_iters - warmup_iters
     stable_end = warmup_iters + int(stable_ratio * post_warmup)
@@ -106,7 +109,7 @@ def get_lr(
     progress = (it - stable_end) / decay_iters  # 0.0 → 1.0
 
     if decay_type == "linear":
-        # Qwen3 default: linear anneal [2]
+        # Qwen3 default: linear anneal
         coeff = 1.0 - progress
     elif decay_type == "cosine":
         coeff = 0.5 * (1.0 + math.cos(math.pi * progress))
@@ -149,31 +152,44 @@ def setup(
     init_from: str = "scratch",
     config_path: str | None = None,
 ):
-    """Pretrain a model.
+    """Pretrain a litgpt model with a warmup-stable-decay learning rate.
+
+    Unlike `whittle.pretrain_super_network`, this trains one plain litgpt model, not a
+    super-network.
 
     Arguments:
-        model_name: The name of the model to pretrain. Choose from names in ``litgpt.config``. Use "list" to list the supported models.
-        model_config: A ``litgpt.Config`` object to define the model architecture. Mutually exclusive with
-            ``model_config``. Overrides the `model_name` if specified.
-        out_dir: Directory in which to save checkpoints and logs. If running in a Lightning Studio Job, look for it in
-            /teamspace/jobs/<job-name>/share.
-        precision: The precision to use for finetuning. Determines a compatible precision setting by default.
-        initial_checkpoint_dir: Optional path to a checkpoint directory to initialize the model from.
-            Useful for continued pretraining. Mutually exclusive with ``resume``.
-        resume: Path to a checkpoint directory to resume from in case training was interrupted, or ``True`` to resume
-            from the latest checkpoint in ``out_dir``. An error will be raised if no checkpoint is found. Passing
-            ``'auto'`` will resume from the latest checkpoint but not error if no checkpoint exists.
-        data: Data-related arguments. If not provided, the default is ``litgpt.data.TinyLlama``.
+        model_name: The name of the model to pretrain. Choose from names in
+            ``litgpt.config``. Use "list" to list the supported models.
+        model_config: A ``litgpt.Config`` object to define the model architecture.
+            Overrides the `model_name` if specified.
+        out_dir: Directory in which to save checkpoints and logs. If running in a
+            Lightning Studio Job, look for it in /teamspace/jobs/<job-name>/share.
+        precision: The precision to use for training. Determines a compatible
+            precision setting by default.
+        initial_checkpoint_dir: Optional path to a checkpoint directory to initialize
+            the model from. Useful for continued pretraining. Mutually exclusive with
+            ``resume``.
+        resume: Path to a checkpoint directory to resume from in case training was
+            interrupted, or ``True`` to resume from the latest checkpoint in
+            ``out_dir``. An error will be raised if no checkpoint is found. Passing
+            ``'auto'`` will resume from the latest checkpoint but not error if no
+            checkpoint exists.
+        data: Data-related arguments. If not provided, the default is
+            ``litgpt.data.TinyLlama``.
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
+        log: Logger-related arguments. See ``litgpt.args.LogArgs`` for details.
         optimizer: An optimizer name (such as "AdamW") or config.
-
         devices: How many devices/GPUs to use. Uses all GPUs by default.
         num_nodes: How many nodes the code is being run on.
-        tokenizer_dir: Optional path to the tokenizer dir that was used for preprocessing the dataset. Only some data
-            module require this.
+        tokenizer_dir: Optional path to the tokenizer dir that was used for
+            preprocessing the dataset. Only some data module require this.
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
+        init_from: ``"scratch"`` to initialize the weights at random, or the path to a
+            ``.pth`` file with a raw state dict to load.
+        config_path: Optional path to a ``model_config.yaml`` file. If set, it
+            replaces ``model_config``.
     """
     if model_name == "list":
         available_models = "\n".join(sorted(name_to_config))
