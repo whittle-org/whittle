@@ -51,6 +51,9 @@ from whittle.sampling.random_sampler import RandomSampler
 
 torch._dynamo.config.suppress_errors = True
 
+# Upper limit on the random student sub-networks to try before giving up
+MAX_STUDENT_SAMPLES = 1000
+
 
 def setup(
     out_dir: Path = Path("out/distill"),
@@ -294,7 +297,15 @@ def main(
         search_space = get_search_space(teacher_config)
         sampler = RandomSampler(search_space, seed=seed)
         valid = False
+        attempts = 0
+        last_error: Exception | None = None
         while not valid:
+            if attempts >= MAX_STUDENT_SAMPLES:
+                raise RuntimeError(
+                    f"No student sub-network with a parameter ratio in "
+                    f"[{min_ratio}, {max_ratio}] after {attempts} samples."
+                ) from last_error
+            attempts += 1
             random_config = sampler.sample()
             fabric.print(f"Random subnetwork config: {random_config}")
             subnetwork = {
@@ -351,6 +362,7 @@ def main(
                         torch.cuda.empty_cache()
 
             except Exception as e:
+                last_error = e
                 fabric.print(f"Error during subnet extraction: {e}")
                 fabric.print("Retrying with different random config...")
                 continue
