@@ -77,7 +77,6 @@ def setup(
         beta=0.7,
         loss="forward_kld",
         weight_scheme="other",
-        top_k=None,
     ),
     eval: EvalArgs = EvalArgs(interval=1000, max_iters=100),
     log: LogArgs = LogArgs(),
@@ -396,7 +395,6 @@ def fit(
         temperature=distill.temperature,
         loss=distill.loss,
         weight_scheme=distill.weight_scheme,
-        top_k=distill.top_k,
     )
     vocab_size_student = student.config.vocab_size
     vocab_size_teacher = teacher.config.vocab_size
