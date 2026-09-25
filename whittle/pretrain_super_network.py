@@ -17,7 +17,6 @@ from litgpt.args import EvalArgs, LogArgs, TrainArgs
 from litgpt.config import name_to_config
 from litgpt.data import DataModule, TinyLlama
 from litgpt.model import Config
-from litgpt.parser_config import save_hyperparameters
 from litgpt.pretrain import (
     get_dataloaders,
     get_lr,
@@ -45,6 +44,7 @@ from syne_tune.config_space import lograndint, randint
 from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
+from whittle.hyperparameters import dump_hyperparameters, save_hyperparameters
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.sampling.random_sampler import RandomSampler
@@ -141,6 +141,9 @@ def setup(
         available_models = "\n".join(sorted(name_to_config))
         print(f"Available values:\n{available_models}")
         quit()
+
+    # saved with each checkpoint; `locals()` holds only the arguments at this point
+    hyperparameters = dump_hyperparameters(setup, locals())
 
     if initial_checkpoint_dir is not None:
         initial_checkpoint_dir = extend_checkpoint_dir(initial_checkpoint_dir)
@@ -250,16 +253,20 @@ def setup(
         num_nodes=num_nodes,
         enable_profiling=enable_profiling,
         profiling_output_dir=profiling_output_dir,
+        hyperparameters=hyperparameters,
     )
 
 
-def save_checkpoint(fabric, state, tokenizer_dir, checkpoint_file):
+def save_checkpoint(
+    fabric, state, tokenizer_dir, checkpoint_file, hyperparameters: str | None = None
+):
     model = state["model"]
     checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
     fabric.print(f"Saving checkpoint to {str(checkpoint_file)!r}")
     fabric.save(checkpoint_file, state)
     if fabric.global_rank == 0:
-        save_hyperparameters(setup, checkpoint_file.parent)
+        if hyperparameters is not None:
+            save_hyperparameters(hyperparameters, checkpoint_file.parent)
         if tokenizer_dir is not None:
             copy_config_files(tokenizer_dir, checkpoint_file.parent)
         save_config(model.config, checkpoint_file.parent)
@@ -278,6 +285,7 @@ def fit(
     training_strategy: BaseTrainingStrategy,
     num_nodes: int = 1,
     profiler: DistributedGPUProfiler | None = None,
+    hyperparameters: str | None = None,
 ) -> Path | None:
     model = state["model"]
     optimizer = state["optimizer"]
@@ -501,6 +509,7 @@ def fit(
                 state,
                 tokenizer_dir,
                 out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth",
+                hyperparameters=hyperparameters,
             )
 
     profiling_output_file = None
@@ -544,6 +553,7 @@ def main(
     num_nodes: int = 1,
     enable_profiling: bool = False,
     profiling_output_dir: Path | None = None,
+    hyperparameters: str | None = None,
 ) -> None:
     validate_args(train, eval, initial_checkpoint_dir, resume)
 
@@ -662,6 +672,7 @@ def main(
         strategy,
         num_nodes,
         profiler,
+        hyperparameters=hyperparameters,
     )
     # work around PyTorch issue https://github.com/pytorch/pytorch/issues/152162
 
@@ -683,7 +694,13 @@ def main(
             model._forward_module._orig_mod, model._forward_module._orig_mod, [], {}
         )
 
-    save_checkpoint(fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth")
+    save_checkpoint(
+        fabric,
+        state,
+        tokenizer_dir,
+        out_dir / "final" / "lit_model.pth",
+        hyperparameters=hyperparameters,
+    )
 
     expected_tokens_per_batch = train.micro_batch_size * model.max_seq_length
     local_total_tokens = state["iter_num"] * expected_tokens_per_batch

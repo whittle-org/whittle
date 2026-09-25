@@ -17,7 +17,6 @@ from lightning.fabric.utilities.throughput import ThroughputMonitor
 from litgpt import Config, Tokenizer
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.data import DataModule, TinyStories
-from litgpt.parser_config import save_hyperparameters
 from litgpt.pretrain import (
     get_dataloaders,
     get_lr,
@@ -40,6 +39,7 @@ from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
 from whittle.args import DistillArgs
+from whittle.hyperparameters import dump_hyperparameters, save_hyperparameters
 from whittle.loss.kd_loss import DistillLoss
 from whittle.metrics.flops import compute_flops
 from whittle.metrics.parameters import compute_parameters
@@ -116,6 +116,9 @@ def setup(
         use_saved_logits: Whether to use pre-computed teacher logits from files or compute them online.
         random_init_student: If True, the student sub-network will be randomly initialized instead of inheriting weights from the teacher.
     """
+    # saved with each checkpoint; `locals()` holds only the arguments at this point
+    hyperparameters = dump_hyperparameters(setup, locals())
+
     if teacher_checkpoint_dir is not None:
         print(f"Loading teacher model config from {teacher_checkpoint_dir}")
         teacher_config = Config.from_file(teacher_checkpoint_dir / "model_config.yaml")
@@ -201,6 +204,7 @@ def setup(
         use_saved_logits,
         random_init_student,
         num_nodes=num_nodes,
+        hyperparameters=hyperparameters,
     )
 
 
@@ -227,6 +231,7 @@ def main(
     use_saved_logits: bool = False,
     random_init_student: bool = False,
     num_nodes: int = 1,
+    hyperparameters: str | None = None,
 ):
     if fabric.global_rank == 0 and out_dir is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -461,6 +466,7 @@ def main(
         logits_loader,
         use_saved_logits,
         num_nodes=num_nodes,
+        hyperparameters=hyperparameters,
     )
 
     save_checkpoint(
@@ -468,6 +474,7 @@ def main(
         student_state,
         tokenizer_dir,
         out_dir / "distill" / "lit_model.pth" if out_dir else None,
+        hyperparameters=hyperparameters,
     )
 
     total_tokens = (
@@ -617,6 +624,7 @@ def fit(
     logits_loader: SavedLogitsLoader | None = None,
     use_saved_logits: bool = False,
     num_nodes: int = 1,
+    hyperparameters: str | None = None,
 ) -> dict[str, Any]:
     teacher = state["teacher"]
     student = state["model"]
@@ -810,6 +818,7 @@ def fit(
                 student_state,
                 tokenizer_dir,
                 out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth",
+                hyperparameters=hyperparameters,
             )
             fabric.barrier()
 
@@ -830,13 +839,16 @@ def fit(
     return metrics
 
 
-def save_checkpoint(fabric, state, tokenizer_dir, checkpoint_file):
+def save_checkpoint(
+    fabric, state, tokenizer_dir, checkpoint_file, hyperparameters: str | None = None
+):
     model = state["model"]
     checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
     fabric.print(f"Saving checkpoint to {str(checkpoint_file)!r}")
     fabric.save(checkpoint_file, state)
     if fabric.global_rank == 0:
-        save_hyperparameters(setup, checkpoint_file.parent)
+        if hyperparameters is not None:
+            save_hyperparameters(hyperparameters, checkpoint_file.parent)
         if tokenizer_dir is not None:
             copy_config_files(tokenizer_dir, checkpoint_file.parent)
         save_config(model.config, checkpoint_file.parent)

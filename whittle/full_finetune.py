@@ -17,7 +17,6 @@ from litgpt.args import EvalArgs, TrainArgs
 from litgpt.data import DataModule
 from litgpt.generate.base import generate
 from litgpt.model import Config
-from litgpt.parser_config import save_hyperparameters
 from litgpt.prompts import save_prompt_style
 from litgpt.tokenizer import Tokenizer
 from litgpt.utils import (
@@ -42,6 +41,7 @@ from torch.utils.data import ConcatDataset, DataLoader
 from torchmetrics import RunningMean
 
 from whittle.data.llamamini import LLaMaMini
+from whittle.hyperparameters import dump_hyperparameters, save_hyperparameters
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.pretrain_super_network import get_search_space, training_strategies_cls
@@ -100,6 +100,9 @@ def setup(
         access_token: Optional API token to access models with restrictions.
         accelerator: The accelerator to use for training. Possible choices: "cuda", "cpu".
     """
+    # saved with each checkpoint; `locals()` holds only the arguments at this point
+    hyperparameters = dump_hyperparameters(setup, locals())
+
     checkpoint_dir = auto_download_checkpoint(
         model_name=checkpoint_dir, access_token=access_token
     )
@@ -171,6 +174,7 @@ def setup(
         eval,
         optimizer,
         training_strategy,
+        hyperparameters=hyperparameters,
     )
 
 
@@ -187,6 +191,7 @@ def main(
     eval: EvalArgs,
     optimizer: str | dict,
     training_strategy: str,
+    hyperparameters: str | None = None,
 ) -> None:
     validate_args(train, eval)
 
@@ -253,6 +258,7 @@ def main(
         eval,
         data,
         strategy,
+        hyperparameters=hyperparameters,
     )
     training_time = time.perf_counter() - train_time
     output = create_finetuning_performance_report(
@@ -281,7 +287,8 @@ def main(
     if fabric.global_rank == 0:
         # Copy checkpoint files from original checkpoint dir
         copy_config_files(checkpoint_dir, save_path.parent)
-        save_hyperparameters(setup, save_path.parent)
+        if hyperparameters is not None:
+            save_hyperparameters(hyperparameters, save_path.parent)
         save_prompt_style(data.prompt_style, save_path.parent)
 
 
@@ -298,6 +305,7 @@ def fit(
     eval: EvalArgs,
     data: DataModule,
     training_strategy: BaseTrainingStrategy,
+    hyperparameters: str | None = None,
 ) -> dict[str, float]:
     model = state["model"]
     optimizer = state["optimizer"]
@@ -490,7 +498,8 @@ def fit(
             fabric.save(checkpoint_file, state)
             if fabric.global_rank == 0:
                 copy_config_files(checkpoint_dir, checkpoint_file.parent)
-                save_hyperparameters(setup, checkpoint_file.parent)
+                if hyperparameters is not None:
+                    save_hyperparameters(hyperparameters, checkpoint_file.parent)
                 save_prompt_style(data.prompt_style, checkpoint_file.parent)
 
     total_token_counts = {}

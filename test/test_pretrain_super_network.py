@@ -12,6 +12,7 @@ from unittest.mock import ANY, Mock
 
 import pytest
 import torch
+import yaml  # type: ignore[import-untyped]
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import Config
 from torch.utils.data import DataLoader
@@ -77,11 +78,7 @@ def test_training_strategies(
 
 # Set CUDA_VISIBLE_DEVICES for FSDP hybrid-shard, if fewer GPUs are used than are available
 @mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0"})
-# If we were to use `save_hyperparameters()`, we would have to patch `sys.argv` or otherwise
-# the CLI would capture pytest args, but unfortunately patching would mess with subprocess
-# launching, so we need to mock `save_hyperparameters()`
-@mock.patch("whittle.pretrain_super_network.save_hyperparameters")
-def test_pretrain(save_hyperparameters_mock, tmp_path, accelerator_device):
+def test_pretrain(tmp_path, accelerator_device):
     model_config = Config(
         block_size=2, n_layer=2, n_embd=8, n_head=4, padded_vocab_size=8
     )
@@ -141,11 +138,18 @@ def test_pretrain(save_hyperparameters_mock, tmp_path, accelerator_device):
     assert checkpoint_dirs.issubset(out_dir_contents)
     assert all((out_dir / p).is_dir() for p in checkpoint_dirs)
     for checkpoint_dir in checkpoint_dirs:
-        # the `tokenizer_dir` is None by default, so only 'lit_model.pth' shows here
+        # the `tokenizer_dir` is None by default, so no tokenizer files show here
         assert set(os.listdir(out_dir / checkpoint_dir)) == {
+            "hyperparameters.yaml",
             "lit_model.pth",
             "model_config.yaml",
         }
+        # the arguments of the call are saved, not the arguments of pytest
+        hyperparameters = yaml.safe_load(
+            (out_dir / checkpoint_dir / "hyperparameters.yaml").read_text()
+        )
+        assert hyperparameters["model_config"]["n_embd"] == 8
+        assert hyperparameters["train"]["max_tokens"] == 16
 
     assert (out_dir / "logs" / "tensorboard" / "version_0").is_dir()
 
@@ -159,9 +163,7 @@ def test_pretrain(save_hyperparameters_mock, tmp_path, accelerator_device):
 # Set CUDA_VISIBLE_DEVICES for FSDP hybrid-shard, if fewer GPUs are used than are available
 @mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0,1"})
 @mock.patch("litgpt.pretrain.L.Fabric.load_raw")
-# See comment in `test_pretrain` why we need to mock `save_hyperparameters()`
-@mock.patch("whittle.pretrain_super_network.save_hyperparameters")
-def test_initial_checkpoint_dir(_, load_mock, tmp_path):
+def test_initial_checkpoint_dir(load_mock, tmp_path):
     model_config = Config(
         block_size=2, n_layer=2, n_embd=8, n_head=4, padded_vocab_size=8
     )

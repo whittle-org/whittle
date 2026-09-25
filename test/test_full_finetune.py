@@ -118,11 +118,7 @@ def test_training_strategies(
 
 # Set CUDA_VISIBLE_DEVICES for FSDP hybrid-shard, if fewer GPUs are used than are available
 @mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0"})
-# If we were to use `save_hyperparameters()`, we would have to patch `sys.argv` or otherwise
-# the CLI would capture pytest args, but unfortunately patching would mess with subprocess
-# launching, so we need to mock `save_hyperparameters()`
-@mock.patch("whittle.full_finetune.save_hyperparameters")
-def test_full_finetune(save_hyper_mock, tmp_path, accelerator_device, ensure_checkpoint):
+def test_full_finetune(tmp_path, accelerator_device, ensure_checkpoint):
     Config(block_size=2, n_layer=2, n_embd=8, n_head=4, padded_vocab_size=8)
 
     # Use tokens within vocab size (0 to 7)
@@ -186,7 +182,7 @@ def test_full_finetune(save_hyper_mock, tmp_path, accelerator_device, ensure_che
     assert checkpoint_dirs.issubset(out_dir_contents)
     assert all((out_dir / p).is_dir() for p in checkpoint_dirs)
     for checkpoint_dir in checkpoint_dirs:
-        required_files = {"lit_model.pth", "model_config.yaml"}
+        required_files = {"hyperparameters.yaml", "lit_model.pth", "model_config.yaml"}
         actual_files = set(os.listdir(out_dir / checkpoint_dir))
         assert required_files.issubset(actual_files)
 

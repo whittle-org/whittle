@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 import torch
+import yaml  # type: ignore[import-untyped]
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import Config
 from litgpt.utils import save_config
@@ -67,9 +68,7 @@ def run_distill(tmp_path, sample_mock_kwargs, min_ratio=0.01, max_ratio=0.99):
 
 
 @mock.patch.dict(os.environ, {"DISABLE_TORCH_COMPILE": "1"})
-# See `test_pretrain` in test_pretrain_super_network.py for why we mock this
-@mock.patch("whittle.distill.save_hyperparameters")
-def test_distill(save_hyperparameters_mock, tmp_path):
+def test_distill(tmp_path):
     # a single-element side_effect stops the test if the student sampling retries
     out_dir = run_distill(tmp_path, {"side_effect": [STUDENT_CONFIG]})
 
@@ -77,8 +76,12 @@ def test_distill(save_hyperparameters_mock, tmp_path):
         assert (out_dir / checkpoint_dir / "lit_model.pth").is_file()
         student = Config.from_file(out_dir / checkpoint_dir / "model_config.yaml")
         assert (student.n_embd, student.n_layer, student.n_head) == (4, 1, 2)
-
-    save_hyperparameters_mock.assert_called()
+        # the arguments of the call are saved, not the arguments of pytest
+        hyperparameters = yaml.safe_load(
+            (out_dir / checkpoint_dir / "hyperparameters.yaml").read_text()
+        )
+        assert hyperparameters["min_ratio"] == 0.01
+        assert hyperparameters["train"]["max_tokens"] == 8
 
 
 @mock.patch("whittle.distill.MAX_STUDENT_SAMPLES", 3)
