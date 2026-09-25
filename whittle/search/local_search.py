@@ -145,16 +145,6 @@ class LocalSearch(StochasticSearcher):
                     config = deepcopy(start_point)
                     config[hp_name] = new_value
                     return config
-
-        # mutation_name = np.random.choice(list(self._mutations.keys()))
-        #
-        # config = self._mutations[mutation_name](start_point)
-
-        # sample mutation
-        # name = np.random.choice(hypers)
-        # mutation = self._mutations[name]
-
-        # return mutation(config)
         return None
 
     def is_efficient(self, costs):
