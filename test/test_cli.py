@@ -59,7 +59,18 @@ def test_cli_parser_data():
 
 
 @pytest.mark.parametrize(
-    "command", ["pretrain", "search", "evaluate", "prune", "download", "serve", "chat"]
+    "command",
+    [
+        "pretrain",
+        "search",
+        "evaluate",
+        "prune",
+        "pretrain_model",
+        "distill_model",
+        "download",
+        "serve",
+        "chat",
+    ],
 )
 def test_cli_commands(command):
     """Test that each CLI command is properly registered and can be called with --help."""
