@@ -37,10 +37,17 @@ def create_litgpt_config_for_subnet(supernet):
 
 def copy_weights_to_litgpt(whittle_model, lit_model):
     def _copy_weights_and_biases(whittle_module, lit_module):
-        if hasattr(whittle_module, "extract_weights"):
-            W, b = whittle_module.extract_weights()
-        else:
-            print(f"{whittle_module} has no method extract_weights")
+        # Norm slots are nn.Identity when the config disables them. LitGPT uses
+        # nn.Identity in the same positions, so there is nothing to copy.
+        if isinstance(whittle_module, torch.nn.Identity):
+            return
+
+        if not hasattr(whittle_module, "extract_weights"):
+            raise TypeError(
+                f"Cannot convert {type(whittle_module).__name__} to LitGPT: expected a "
+                "Whittle module exposing extract_weights()."
+            )
+        W, b = whittle_module.extract_weights()
 
         if hasattr(lit_module, "weight"):
             w_data = W.data

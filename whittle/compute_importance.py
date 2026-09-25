@@ -114,7 +114,7 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = GPT(config, compute_importance=True)
 
-    model.name_or_path = os.path.join("checkpoints", model_id)
+    model.name_or_path = os.path.join("checkpoints", model_id)  # type: ignore[assignment]
     model.load_state_dict(torch.load(model_path, map_location="cpu"))
     model.to(torch.bfloat16)
     model.to(device)
