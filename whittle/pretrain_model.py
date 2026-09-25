@@ -77,6 +77,8 @@ def setup(
     seed: int = 42,
     init_from: str = "scratch",
     config_path: str | None = None,
+    lr_stable_ratio: float = 0.85,
+    lr_decay_type: Literal["linear", "cosine", "exponential"] = "linear",
 ):
     """Pretrain a litgpt model with a warmup-stable-decay learning rate.
 
@@ -117,6 +119,10 @@ def setup(
             ``.pth`` file with a raw state dict to load.
         config_path: Optional path to a ``model_config.yaml`` file. Overrides the
             `model_name` if specified. Mutually exclusive with ``model_config``.
+        lr_stable_ratio: The fraction of the iterations after the warmup that keep the
+            peak learning rate before the decay starts.
+        lr_decay_type: The shape of the learning rate decay: ``"linear"``,
+            ``"cosine"``, or ``"exponential"``.
     """
     if model_name == "list":
         available_models = "\n".join(sorted(name_to_config))
@@ -193,6 +199,8 @@ def setup(
         optimizer=optimizer,
         init_from=init_from,
         hyperparameters=hyperparameters,
+        lr_stable_ratio=lr_stable_ratio,
+        lr_decay_type=lr_decay_type,
     )
 
 
@@ -213,6 +221,8 @@ def main(
     num_nodes: int = 1,
     init_from: str = "scratch",
     hyperparameters: str | None = None,
+    lr_stable_ratio: float = 0.85,
+    lr_decay_type: str = "linear",
 ) -> None:
     validate_args(train, eval, initial_checkpoint_dir, resume)
 
@@ -304,6 +314,8 @@ def main(
         train=train,
         eval=eval,
         hyperparameters=hyperparameters,
+        lr_stable_ratio=lr_stable_ratio,
+        lr_decay_type=lr_decay_type,
     )
 
     # Save final checkpoint
@@ -347,6 +359,8 @@ def fit(
     eval: EvalArgs,
     num_nodes: int = 1,
     hyperparameters: str | None = None,
+    lr_stable_ratio: float = 0.85,
+    lr_decay_type: str = "linear",
 ) -> None:
     model = state["model"]
     optimizer = state["optimizer"]
@@ -406,6 +420,8 @@ def fit(
             warmup_iters,
             max_iters,
             train.min_lr,
+            stable_ratio=lr_stable_ratio,
+            decay_type=lr_decay_type,
         )
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
