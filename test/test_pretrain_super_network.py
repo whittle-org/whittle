@@ -180,3 +180,13 @@ def test_initial_checkpoint_dir(_, load_mock, tmp_path):
     )
 
     load_mock.assert_called_once_with(tmp_path / "lit_model.pth", ANY)
+
+
+def test_get_search_space_covers_full_network():
+    config = Config(n_layer=2, n_embd=8, n_head=4, intermediate_size=32)
+    search_space = pretrain_super_network.get_search_space(config)
+
+    assert search_space["sub_network_n_embd"].upper == config.n_embd
+    assert search_space["sub_network_intermediate_size"].upper == config.intermediate_size
+    assert search_space["sub_network_num_heads"].upper == config.n_head
+    assert search_space["sub_network_n_layers"].upper == config.n_layer
