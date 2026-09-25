@@ -95,7 +95,8 @@ def convert_and_evaluate(
         )
         return
 
-    pprint(locals())
+    # print the arguments, but not the model: its repr is the whole layer structure
+    pprint({name: value for name, value in locals().items() if name != "model"})
 
     if not (isinstance(batch_size, int) and batch_size > 0) and not (
         isinstance(batch_size, str) and batch_size.startswith("auto")
