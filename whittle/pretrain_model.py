@@ -297,7 +297,7 @@ def main(
         model = GPT(config)
     if init_from == "scratch":
         initialize_weights(fabric, model, n_layer=config.n_layer, n_embd=config.n_embd)
-        print("Initialized model from scratch")
+        fabric.print("Initialized model from scratch")
     else:  # load from init from as path
         if not init_from:
             raise ValueError(
@@ -305,7 +305,7 @@ def main(
             )
         state_dict = torch.load(init_from, map_location="cpu")
         model.load_state_dict(state_dict)
-        print(f"Initialized model from {init_from}")
+        fabric.print(f"Initialized model from {init_from}")
     if train.tie_embeddings:
         model.transformer.wte.weight = model.lm_head.weight
     if train.max_seq_length:

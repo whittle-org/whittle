@@ -263,7 +263,7 @@ def main(
             n_layer=student_config.n_layer,
             n_embd=student_config.n_embd,
         )
-        print("Initialized  student model from scratch")
+        fabric.print("Initialized student model from scratch")
     else:  # load from init from as path
         if not init_from:
             raise ValueError(
@@ -271,7 +271,7 @@ def main(
             )
         state_dict = torch.load(init_from, map_location="cpu")
         student_model.load_state_dict(state_dict)
-        print(f"Initialized student model from {init_from}")
+        fabric.print(f"Initialized student model from {init_from}")
     if train.tie_embeddings:
         student_model.transformer.wte.weight = student_model.lm_head.weight
     if train.max_seq_length:
