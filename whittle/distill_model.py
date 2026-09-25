@@ -132,7 +132,6 @@ def setup(
         raise ValueError(
             "A teacher model checkpoint directory must be provided for distillation."
         )
-    # data.val_split_fraction = 0.01 #if data.val_split_fraction is None else data.val_split_fraction
     if initial_checkpoint_dir is not None:
         initial_checkpoint_dir = extend_checkpoint_dir(initial_checkpoint_dir)
 
@@ -294,7 +293,6 @@ def main(
     teacher_val_ppl = math.exp(teacher_val_loss)
 
     fabric.print(f"Teacher model loaded from {teacher_checkpoint_dir} (not compiled)")
-    # fabric.print(f"Teacher model has {compute_parameters(teacher):,} parameters")
     fabric.print(
         f"Teacher model validation loss: {teacher_val_loss:.3f}, validation PPL: {teacher_val_ppl:.3f}"
     )
@@ -483,12 +481,9 @@ def fit(
         )
         with fabric.no_backward_sync(student, enabled=is_accumulating):
             logits = student(input_ids)
-            # logits = logits[:, :, :vocab_size] # adjust for different vocab sizes
             teacher.eval()
             with torch.inference_mode():
                 teacher_logits = teacher(input_ids)
-                # teacher_logits = teacher_logits[:, :, :vocab_size] # adjust for different vocab sizes
-            # teacher_logits = teacher_logits.clone()
         logits_reshaped = logits.view(-1, logits.size(-1))
         targets_reshaped = targets.view(-1)
         teacher_logits_reshaped = teacher_logits.view(-1, teacher_logits.size(-1))
