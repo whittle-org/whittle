@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from syne_tune.config_space import randint
+from syne_tune.config_space import choice, randint
 
 from whittle.sampling.param_bins import ParamBins
 from whittle.search import multi_objective_search
 from whittle.search.baselines import methods
+from whittle.search.local_search import LocalSearch
 
 
 def objective(config, **kwargs):
@@ -116,3 +117,42 @@ def test_param_bins(bin_t, bin_s, bin_n):
     assert bins.current_bin_length == bin_s + 1
     # all almost filled - 1 filled (- tolerance)
     assert sum([b == bin_s for b in bins.bins]) == bin_n - bin_t - 1
+
+
+def local_search(config_space, seed=0):
+    start_point = {"fixed": 1, "free": 5}
+    return LocalSearch(
+        config_space,
+        metric=["a", "b"],
+        start_point=start_point,
+        random_seed=seed,
+    ), start_point
+
+
+def test_local_search_neighbour_skips_fixed_hyperparameters():
+    # "fixed" has one possible value, so only "free" can change
+    searcher, start_point = local_search({"fixed": choice([1]), "free": randint(0, 10)})
+
+    for _ in range(20):
+        neighbour = searcher._sample_random_neighbour(start_point)
+        assert neighbour is not None
+        assert neighbour["fixed"] == 1
+        assert neighbour["free"] != start_point["free"]
+
+
+def test_local_search_neighbour_none_when_nothing_can_change():
+    searcher, start_point = local_search({"fixed": choice([1]), "free": choice([5])})
+
+    assert searcher._sample_random_neighbour(start_point) is None
+
+
+def test_local_search_neighbour_is_reproducible():
+    config_space = {"fixed": randint(0, 10), "free": randint(0, 10)}
+    neighbours = []
+    for _ in range(2):
+        searcher, start_point = local_search(config_space, seed=123)
+        neighbours.append(
+            [searcher._sample_random_neighbour(start_point) for _ in range(5)]
+        )
+
+    assert neighbours[0] == neighbours[1]

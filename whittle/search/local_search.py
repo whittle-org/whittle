@@ -128,20 +128,23 @@ class LocalSearch(StochasticSearcher):
                 self._metric_op = dict(zip(self._metric, [-1.0] * len(self._metric)))
 
     def _sample_random_neighbour(self, start_point):
-        # get actual hyperparameters from the search space
-        config = deepcopy(start_point)
-        hypers = []
-        for k, v in self.config_space.items():
-            if isinstance(v, Domain):
-                hypers.append(k)
+        """Returns a copy of `start_point` with one hyperparameter changed.
 
-        hp_name = np.random.choice(hypers)
-        hp = self.config_space[hp_name]
-        for i in range(MAX_SAMPLES):
-            new_value = hp.sample()
-            if new_value != start_point[hp_name]:
-                config[hp_name] = new_value
-                return config
+        The hyperparameters are tried in a random order. Returns None only if no
+        hyperparameter of the search space can change, which ends the search.
+        """
+        # get actual hyperparameters from the search space
+        hypers = [k for k, v in self.config_space.items() if isinstance(v, Domain)]
+
+        for index in self.random_state.permutation(len(hypers)):
+            hp_name = hypers[index]
+            hp = self.config_space[hp_name]
+            for _ in range(MAX_SAMPLES):
+                new_value = hp.sample(random_state=self.random_state)
+                if new_value != start_point[hp_name]:
+                    config = deepcopy(start_point)
+                    config[hp_name] = new_value
+                    return config
 
         # mutation_name = np.random.choice(list(self._mutations.keys()))
         #
@@ -152,6 +155,7 @@ class LocalSearch(StochasticSearcher):
         # mutation = self._mutations[name]
 
         # return mutation(config)
+        return None
 
     def is_efficient(self, costs):
         is_efficient = np.ones(costs.shape[0], dtype=bool)
