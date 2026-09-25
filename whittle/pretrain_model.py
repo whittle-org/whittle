@@ -195,7 +195,7 @@ def setup(
 
     config = Config.from_name(model_name) if model_config is None else model_config
     precision = precision or get_default_supported_precision(training=True)
-    devices = parse_devices(devices)
+    num_devices = int(parse_devices(devices))
     out_dir = init_out_dir(out_dir)
     # in case the dataset requires the Tokenizer
     tokenizer = Tokenizer(tokenizer_dir) if tokenizer_dir is not None else None
@@ -209,20 +209,20 @@ def setup(
         log_args=asdict(log),
     )
 
-    if devices * num_nodes > 1:
+    if num_devices * num_nodes > 1:
         strategy = DDPStrategy()
     else:
         strategy = "auto"
 
     fabric = L.Fabric(
-        devices=devices,
+        devices=num_devices,
         num_nodes=num_nodes,
         strategy=strategy,
         precision=precision,
         loggers=[logger],
     )
 
-    if torch.cuda.is_available() and devices > 1:
+    if torch.cuda.is_available() and num_devices > 1:
         check_nvlink_connectivity(fabric)
 
     fabric.launch()
@@ -233,7 +233,7 @@ def setup(
 
     main(
         fabric=fabric,
-        devices=devices,
+        devices=num_devices,
         num_nodes=num_nodes,
         seed=seed,
         initial_checkpoint_dir=initial_checkpoint_dir,
