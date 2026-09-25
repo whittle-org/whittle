@@ -47,7 +47,7 @@ classifiers = [
 
 [project.urls]
 homepage = "https://github.com/whittle-org/whittle"
-# TODO: documentation = "https://whittle-org.github.io/whittle/"
+documentation = "https://whittle-org.github.io/whittle/latest/"
 
 [project.scripts]
 whittle = "whittle.__main__:main"

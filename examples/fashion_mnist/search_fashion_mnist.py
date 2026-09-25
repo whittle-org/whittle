@@ -105,5 +105,7 @@ if __name__ == "__main__":
         plt.title("Pareto front for Fashion MNIST")
         plt.legend()
         plt.tight_layout()
-        plt.savefig(f"pareto_front_{args.training_strategy}_{args.search_strategy}.png", dpi=300)
+        plt.savefig(
+            f"pareto_front_{args.training_strategy}_{args.search_strategy}.png", dpi=300
+        )
         plt.show()
