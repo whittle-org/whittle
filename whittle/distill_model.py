@@ -148,7 +148,7 @@ def setup(
         Config.from_name(model_name) if student_config is None else student_config
     )
     precision = precision or get_default_supported_precision(training=True)
-    devices = parse_devices(devices)
+    num_devices = int(parse_devices(devices))
     out_dir = init_out_dir(out_dir)
     # in case the dataset requires the Tokenizer
     tokenizer = Tokenizer(tokenizer_dir) if tokenizer_dir is not None else None
@@ -162,20 +162,20 @@ def setup(
         log_args=asdict(log),
     )
 
-    if devices * num_nodes > 1:
+    if num_devices * num_nodes > 1:
         strategy = DDPStrategy()
     else:
         strategy = "auto"
 
     fabric = L.Fabric(
-        devices=devices,
+        devices=num_devices,
         num_nodes=num_nodes,
         strategy=strategy,
         precision=precision,
         loggers=[logger],
     )
 
-    if torch.cuda.is_available() and devices > 1:
+    if torch.cuda.is_available() and num_devices > 1:
         check_nvlink_connectivity(fabric)
 
     fabric.launch()
@@ -187,7 +187,7 @@ def setup(
     main(
         fabric=fabric,
         teacher_checkpoint_dir=teacher_checkpoint_dir,
-        devices=devices,
+        devices=num_devices,
         num_nodes=num_nodes,
         seed=seed,
         initial_checkpoint_dir=initial_checkpoint_dir,
@@ -235,6 +235,7 @@ def main(
 
     fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
 
+    assert student_config is not None
     t0 = time.perf_counter()
     with fabric.init_module(empty_init=True):
         student_model = GPT(student_config)
@@ -410,7 +411,7 @@ def fit(
     if vocab_size_student > vocab_size_teacher:
         vocab_size = vocab_size_teacher
     else:
-        vocab_size = vocab_size_student
+        vocab_size = vocab_size_student  # noqa: F841  # unused until vocab slicing is fixed
     if eval.initial_validation:
         val_loss = validate(fabric, student, val_dataloader, max_iters=eval.max_iters)
         val_loss = f"{val_loss:.3f}"
