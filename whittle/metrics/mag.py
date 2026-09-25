@@ -10,6 +10,7 @@ from whittle.modules.layernorm import LayerNorm
 from whittle.modules.rmsnorm import RMSNorm
 
 
+@torch.no_grad()
 def compute_weight_magnitude(model: GPT) -> float:
     """
     Computes the sum of the weight magnitudes of the current sub-network of a GPT model. Make sure to set the
@@ -34,6 +35,7 @@ def compute_weight_magnitude(model: GPT) -> float:
     return magnitude
 
 
+@torch.no_grad()
 def compute_weight_magnitude_mlp(mlp):
     if isinstance(mlp, GptNeoxMLP):
         layers = [mlp.proj, mlp.fc]
@@ -51,6 +53,7 @@ def compute_weight_magnitude_mlp(mlp):
     return mag
 
 
+@torch.no_grad()
 def compute_weight_magnitude_layer_norm(layer):
     if layer is None:
         return 0
@@ -69,6 +72,7 @@ def compute_weight_magnitude_layer_norm(layer):
     return float(mag)
 
 
+@torch.no_grad()
 def compute_weight_magnitude_linear_layer(layer):
     n = layer.sub_network_in_features
     m = layer.sub_network_out_features
@@ -78,12 +82,14 @@ def compute_weight_magnitude_linear_layer(layer):
     return float(mag)
 
 
+@torch.no_grad()
 def compute_weight_magnitude_embedding(layer):
     n = layer.sub_network_embedding_dim
     mag = torch.sum(torch.abs(layer.weight[:, :n]))
     return float(mag)
 
 
+@torch.no_grad()
 def compute_weight_magnitude_attention(layer):
     mag = 0
     mag = mag + compute_weight_magnitude_linear_layer(layer.qkv)
