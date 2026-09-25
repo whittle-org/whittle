@@ -233,3 +233,28 @@ def test_convert_to_litgpt(
 
             # this should still work even for checkpoints in litgpt format
             load_checkpoint(target_dir)
+
+
+def test_select_sub_network_rejects_set_sub_network_keys(tmp_path):
+    model = GPT(Config(block_size=4, n_layer=2, n_embd=8, n_head=2, padded_vocab_size=8))
+    set_sub_network_keys = {
+        "sub_network_n_embd": 4,
+        "sub_network_intermediate_size": 8,
+        "sub_network_num_heads": 1,
+        "sub_network_n_layers": 1,
+    }
+
+    with pytest.raises(ValueError, match="set_sub_network"):
+        model.select_sub_network(set_sub_network_keys)
+    with pytest.raises(ValueError, match="missing: \\['embed_dim'"):
+        save_sub_network(
+            model,
+            checkpoint_dir=tmp_path / "parent",
+            save_dir=tmp_path / "sub_network",
+            sub_network_config=set_sub_network_keys,
+        )
+
+    # the documented keys work
+    model.select_sub_network({"embed_dim": 4, "mlp_ratio": 2, "num_heads": 1, "depth": 1})
+    assert model.sub_network_n_embd == 4
+    assert model.sub_network_intermediate_size == 8
