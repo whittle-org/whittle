@@ -1,17 +1,18 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 
+from __future__ import annotations
+
 import math
 import pprint
 import time
 from dataclasses import asdict
 from pathlib import Path
-from typing import Dict, Optional, Union
 import os
 import lightning as L
 import torch
 from datetime import timedelta
 from lightning.fabric.strategies import DDPStrategy
-from typing_extensions import Literal
+from typing import Literal
 from torch.utils.data import DataLoader
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, LogArgs, TrainArgs
@@ -52,13 +53,13 @@ from whittle.hyperparameters import dump_hyperparameters, save_hyperparameters
 
 def setup(
     model_name: str,
-    model_config: Optional[Config] = None,
+    model_config: Config | None = None,
     out_dir: Path = Path("out/pretrain"),
     precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
     teacher_checkpoint_dir: Path | None = None,
-    initial_checkpoint_dir: Optional[Path] = None,
-    resume: Union[bool, Literal["auto"], Path] = False,
-    data: Optional[DataModule] = None,
+    initial_checkpoint_dir: Path | None = None,
+    resume: bool | Literal["auto"] | Path = False,
+    data: DataModule | None = None,
     train: TrainArgs = TrainArgs(
         save_interval=1000,
         log_interval=1,
@@ -80,14 +81,14 @@ def setup(
     ),
     eval: EvalArgs = EvalArgs(interval=1000, max_iters=100),
     log: LogArgs = LogArgs(),
-    optimizer: Union[str, Dict] = "AdamW",
-    devices: Union[int, str] = "auto",
+    optimizer: str | dict = "AdamW",
+    devices: int | str = "auto",
     num_nodes: int = 1,
-    tokenizer_dir: Optional[Path] = None,
+    tokenizer_dir: Path | None = None,
     logger_name: Literal["wandb", "tensorboard", "csv", "mlflow"] = "tensorboard",
     seed: int = 42,
     init_from: str = "scratch",
-    config_path: Optional[str] = None,
+    config_path: str | None = None,
 ):
     """Pretrain a model.
 
@@ -211,21 +212,21 @@ def main(
     teacher_checkpoint_dir: Path,
     devices: int,
     seed: int,
-    initial_checkpoint_dir: Optional[Path],
-    resume: Union[bool, Literal["auto"], Path],
+    initial_checkpoint_dir: Path | None,
+    resume: bool | Literal["auto"] | Path,
     data: DataModule,
     teacher_config: Config,
     out_dir: Path,
-    tokenizer_dir: Optional[Path],
-    tokenizer: Optional[Tokenizer],
+    tokenizer_dir: Path | None,
+    tokenizer: Tokenizer | None,
     train: TrainArgs,
     eval: EvalArgs,
-    optimizer: Union[str, Dict],
+    optimizer: str | dict,
     num_nodes: int = 1,
     distill: DistillArgs = DistillArgs(),
     student_config: Config | None = None,
     init_from: str = "scratch",
-    hyperparameters: Optional[str] = None,
+    hyperparameters: str | None = None,
 ) -> None:
     validate_args(train, eval, initial_checkpoint_dir, resume)
 
@@ -384,12 +385,12 @@ def fit(
     train_dataloader: DataLoader,
     val_dataloader: DataLoader,
     out_dir: Path,
-    tokenizer_dir: Optional[Path],
+    tokenizer_dir: Path | None,
     train: TrainArgs,
     distill: DistillArgs,
     eval: EvalArgs,
     num_nodes: int = 1,
-    hyperparameters: Optional[str] = None,
+    hyperparameters: str | None = None,
 ) -> None:
     student = state["model"]
     teacher = state["teacher"]
