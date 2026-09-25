@@ -91,31 +91,48 @@ def setup(
     init_from: str = "scratch",
     config_path: str | None = None,
 ):
-    """Pretrain a model.
+    """Distil a teacher litgpt model into a student litgpt model.
+
+    Unlike `whittle.distill`, the student is not a sub-network of the teacher. It can
+    have any litgpt architecture, and it starts from scratch or from a raw state dict.
+    Each checkpoint contains the student, the optimizer, and also the teacher.
 
     Arguments:
-        model_name: The name of the model to pretrain. Choose from names in ``litgpt.config``. Use "list" to list the supported models.
-        model_config: A ``litgpt.Config`` object to define the model architecture. Mutually exclusive with
-            ``model_config``. Overrides the `model_name` if specified.
-        out_dir: Directory in which to save checkpoints and logs. If running in a Lightning Studio Job, look for it in
-            /teamspace/jobs/<job-name>/share.
-        precision: The precision to use for finetuning. Determines a compatible precision setting by default.
-        initial_checkpoint_dir: Optional path to a checkpoint directory to initialize the model from.
-            Useful for continued pretraining. Mutually exclusive with ``resume``.
-        resume: Path to a checkpoint directory to resume from in case training was interrupted, or ``True`` to resume
-            from the latest checkpoint in ``out_dir``. An error will be raised if no checkpoint is found. Passing
-            ``'auto'`` will resume from the latest checkpoint but not error if no checkpoint exists.
-        data: Data-related arguments. If not provided, the default is ``litgpt.data.TinyLlama``.
+        model_name: The name of the student model. Choose from names in
+            ``litgpt.config``. Use "list" to list the supported models.
+        model_config: A ``litgpt.Config`` object for the student architecture.
+            Currently it has no effect; use ``config_path``.
+        out_dir: Directory in which to save checkpoints and logs. If running in a
+            Lightning Studio Job, look for it in /teamspace/jobs/<job-name>/share.
+        precision: The precision to use for training. Determines a compatible
+            precision setting by default.
+        teacher_checkpoint_dir: The litgpt checkpoint directory of the teacher. It must
+            contain ``model_config.yaml`` and ``lit_model.pth``. Required.
+        initial_checkpoint_dir: Optional path to a checkpoint directory to initialize
+            the student from. Mutually exclusive with ``resume``.
+        resume: Path to a checkpoint directory to resume from in case training was
+            interrupted, or ``True`` to resume from the latest checkpoint in
+            ``out_dir``. An error will be raised if no checkpoint is found. Passing
+            ``'auto'`` will resume from the latest checkpoint but not error if no
+            checkpoint exists.
+        data: Data-related arguments. If not provided, the default is
+            ``litgpt.data.TinyLlama``.
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
+        distill: Distillation-related arguments (loss, temperature, and the weights
+            ``alpha`` and ``beta``). See ``whittle.args.DistillArgs`` for details.
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
+        log: Logger-related arguments. See ``litgpt.args.LogArgs`` for details.
         optimizer: An optimizer name (such as "AdamW") or config.
-
         devices: How many devices/GPUs to use. Uses all GPUs by default.
         num_nodes: How many nodes the code is being run on.
-        tokenizer_dir: Optional path to the tokenizer dir that was used for preprocessing the dataset. Only some data
-            module require this.
+        tokenizer_dir: Optional path to the tokenizer dir that was used for
+            preprocessing the dataset. Only some data module require this.
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
+        init_from: ``"scratch"`` to initialize the student weights at random, or the
+            path to a ``.pth`` file with a raw state dict to load.
+        config_path: Path to the ``model_config.yaml`` file of the student. Currently
+            required: without it, ``setup`` raises ``UnboundLocalError``.
     """
     if model_name == "list":
         available_models = "\n".join(sorted(name_to_config))
