@@ -40,7 +40,6 @@ from litgpt.pretrain import (
     validate_args,
     validate,
     get_lr,
-    save_hyperparameters,
     save_config,
     copy_config_files,
 )
@@ -48,6 +47,7 @@ from litgpt.utils import load_checkpoint
 from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
 from whittle.args import DistillArgs
 from whittle.loss.kd_loss import DistillLoss
+from whittle.hyperparameters import dump_hyperparameters, save_hyperparameters
 
 
 def setup(
@@ -119,6 +119,8 @@ def setup(
         available_models = "\n".join(sorted(name_to_config))
         print(f"Available values:\n{available_models}")
         quit()
+    # saved with each checkpoint; `locals()` holds only the arguments at this point
+    hyperparameters = dump_hyperparameters(setup, locals())
     if (
         teacher_checkpoint_dir is not None
     ):  # We currently only use litgpt models - no further pretraining/finetuning
@@ -200,6 +202,7 @@ def setup(
         eval=eval,
         optimizer=optimizer,
         init_from=init_from,
+        hyperparameters=hyperparameters,
     )
 
 
@@ -222,6 +225,7 @@ def main(
     distill: DistillArgs = DistillArgs(),
     student_config: Config | None = None,
     init_from: str = "scratch",
+    hyperparameters: Optional[str] = None,
 ) -> None:
     validate_args(train, eval, initial_checkpoint_dir, resume)
 
@@ -344,10 +348,11 @@ def main(
         train=train,
         eval=eval,
         distill=distill,
+        hyperparameters=hyperparameters,
     )
 
     # Save final checkpoint
-    save_checkpoint(fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth")
+    save_checkpoint(fabric, state, tokenizer_dir, out_dir / "final" / "lit_model.pth", hyperparameters)
 
     total_tokens = (
         state["iter_num"]
@@ -384,6 +389,7 @@ def fit(
     distill: DistillArgs,
     eval: EvalArgs,
     num_nodes: int = 1,
+    hyperparameters: Optional[str] = None,
 ) -> None:
     student = state["model"]
     teacher = state["teacher"]
@@ -572,6 +578,7 @@ def fit(
                 state,
                 tokenizer_dir,
                 out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth",
+                hyperparameters,
             )
 
     # Final validation
@@ -584,13 +591,14 @@ def fit(
         )
 
 
-def save_checkpoint(fabric, state, tokenizer_dir, checkpoint_file):
+def save_checkpoint(fabric, state, tokenizer_dir, checkpoint_file, hyperparameters=None):
     model = state["model"]
     checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
     fabric.print(f"Saving checkpoint to {str(checkpoint_file)!r}")
     fabric.save(checkpoint_file, state)
     if fabric.global_rank == 0:
-        save_hyperparameters(setup, checkpoint_file.parent)
+        if hyperparameters is not None:
+            save_hyperparameters(hyperparameters, checkpoint_file.parent)
         if tokenizer_dir is not None:
             copy_config_files(tokenizer_dir, checkpoint_file.parent)
         save_config(model.config, checkpoint_file.parent)
