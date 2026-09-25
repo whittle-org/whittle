@@ -93,7 +93,7 @@ def setup(
 ):
     """Distil a teacher litgpt model into a student litgpt model.
 
-    Unlike `whittle.distill`, the student is not a sub-network of the teacher. It can
+    Unlike `whittle.distill_super_network`, the student is not a sub-network of the teacher. It can
     have any litgpt architecture, and it starts from scratch or from a raw state dict.
     Each checkpoint contains the student, the optimizer, and also the teacher.
 
