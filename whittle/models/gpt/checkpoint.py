@@ -56,7 +56,11 @@ def save_sub_network(
         super_network: The super-network model.
         checkpoint_dir: The directory of the parent super-network checkpoint (for copying config files in a), as a parent dir in b), c)).
         save_dir: The directory to save the sub-network checkpoint.
-        sub_network_config: The sub-network config to save. If None, the current active sub-network checkpoint is saved
+        sub_network_config: The sub-network config to save, in the format of
+            `GPT.select_sub_network` (`embed_dim`, `mlp_ratio`, `num_heads`, `depth`, and
+            optionally `head_size` and `n_query_groups`). This is not the format of the
+            keyword arguments of `GPT.set_sub_network`.
+            If None, the current active sub-network checkpoint is saved
             (i.e. it is necessary to call .set_sub_network before calling this function).
             Required if `save_checkpoints` is False.
             Defaults to None.

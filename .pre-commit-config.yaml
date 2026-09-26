@@ -10,27 +10,9 @@ repos:
     rev: v4.6.0
     hooks:
       - id: check-added-large-files
-        files: ".*"
       - id: check-case-conflict
-        files: ".*"
       - id: check-merge-conflict
-        files: ".*"
-      - id: check-yaml
-        files: ".*"
-      - id: end-of-file-fixer
-        files: ".*"
-        types: ["yaml"]
-      - id: check-toml
-        files: ".*"
-        types: ["toml"]
       - id: debug-statements
-        files: '^src/.*\.py$'
-  - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.29.1
-    hooks:
-      - id: check-github-workflows
-        files: '^github/workflows/.*\.ya?ml$'
-        types: ["yaml"]
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.11.1
     hooks:

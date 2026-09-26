@@ -4,6 +4,7 @@ Adapted from the original LitGPT code.
 
 from __future__ import annotations
 
+import copy
 import os
 from contextlib import redirect_stdout
 from io import StringIO
@@ -12,10 +13,15 @@ from unittest.mock import Mock
 
 import pytest
 import torch
+import yaml  # type: ignore[import-untyped]
 from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import Config
 from litgpt.data.alpaca import Alpaca
-from litgpt.utils import auto_download_checkpoint, check_valid_checkpoint_dir
+from litgpt.utils import (
+    auto_download_checkpoint,
+    check_valid_checkpoint_dir,
+    instantiate_torch_optimizer,
+)
 from torch.utils.data import DataLoader, Dataset
 
 from whittle import full_finetune
@@ -118,11 +124,7 @@ def test_training_strategies(
 
 # Set CUDA_VISIBLE_DEVICES for FSDP hybrid-shard, if fewer GPUs are used than are available
 @mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0"})
-# If we were to use `save_hyperparameters()`, we would have to patch `sys.argv` or otherwise
-# the CLI would capture pytest args, but unfortunately patching would mess with subprocess
-# launching, so we need to mock `save_hyperparameters()`
-@mock.patch("whittle.full_finetune.save_hyperparameters")
-def test_full_finetune(save_hyper_mock, tmp_path, accelerator_device, ensure_checkpoint):
+def test_full_finetune(tmp_path, accelerator_device, ensure_checkpoint):
     Config(block_size=2, n_layer=2, n_embd=8, n_head=4, padded_vocab_size=8)
 
     # Use tokens within vocab size (0 to 7)
@@ -186,9 +188,15 @@ def test_full_finetune(save_hyper_mock, tmp_path, accelerator_device, ensure_che
     assert checkpoint_dirs.issubset(out_dir_contents)
     assert all((out_dir / p).is_dir() for p in checkpoint_dirs)
     for checkpoint_dir in checkpoint_dirs:
-        required_files = {"lit_model.pth", "model_config.yaml"}
+        required_files = {"hyperparameters.yaml", "lit_model.pth", "model_config.yaml"}
         actual_files = set(os.listdir(out_dir / checkpoint_dir))
         assert required_files.issubset(actual_files)
+
+    # the run used the default optimizer, with a learning rate for fine-tuning
+    hyperparameters = yaml.safe_load(
+        (out_dir / "final" / "hyperparameters.yaml").read_text()
+    )
+    assert hyperparameters["optimizer"]["init_args"]["lr"] == 2e-5
 
     # logs only appear on rank 0
     logs = stdout.getvalue()
@@ -196,3 +204,22 @@ def test_full_finetune(save_hyper_mock, tmp_path, accelerator_device, ensure_che
     assert logs.count("val loss") == 4
 
     assert "Number of trainable parameters: 14,067,712" in logs
+
+
+def test_default_optimizer_does_not_change():
+    parameters = list(torch.nn.Linear(2, 2).parameters())
+    default = full_finetune.DEFAULT_OPTIMIZER
+    expected = {
+        "class_path": "torch.optim.AdamW",
+        "init_args": {"lr": 2e-5, "weight_decay": 0.0, "betas": [0.9, 0.95]},
+    }
+
+    for _ in range(2):
+        # the same call as in `full_finetune.main`, with an extra keyword argument
+        # that litgpt adds to `init_args`
+        optimizer = instantiate_torch_optimizer(
+            copy.deepcopy(default), parameters, foreach=False
+        )
+        assert optimizer.defaults["lr"] == 2e-5
+
+    assert default == expected

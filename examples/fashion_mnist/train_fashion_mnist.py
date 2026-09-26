@@ -134,12 +134,11 @@ if __name__ == "__main__":
             total_number_of_steps=args.epochs * len(train_loader),
             random_samples=2,
             sampler=sampler,
-            loss_function=nn.functional.cross_entropy
+            loss_function=nn.functional.cross_entropy,
         ),
         "ats": ATS(
             random_samples=2, sampler=sampler, loss_function=nn.functional.cross_entropy
         ),
-
     }
     update_op = training_strategies[args.training_strategy]
 

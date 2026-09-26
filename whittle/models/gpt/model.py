@@ -594,7 +594,32 @@ class GPT(nn.Module):
     def select_sub_network(self, config: dict[str, Any]) -> None:
         """
         Selects and sets the sub-network configuration based on the provided configuration.
+
+        This is the format that the search, `save_sub_network`, and `load_checkpoint`
+        use. It differs from the keyword arguments of `set_sub_network`.
+
+        Args:
+            config: The sub-network configuration, with these keys:
+
+                - `embed_dim`: embedding dimension.
+                - `mlp_ratio`: intermediate size divided by `embed_dim`.
+                - `num_heads`: number of attention heads.
+                - `depth`: number of layers.
+                - `head_size` (optional): head size.
+                - `n_query_groups` (optional): number of query groups.
+
+        Raises:
+            ValueError: If a required key is missing, for example because `config` uses
+                the `set_sub_network` keys (`sub_network_n_embd`, ...).
         """
+        required = ("embed_dim", "mlp_ratio", "num_heads", "depth")
+        missing = [key for key in required if key not in config]
+        if missing:
+            raise ValueError(
+                f"The sub-network config needs the keys {list(required)}, but these are "
+                f"missing: {missing}. For a config with the keys of `set_sub_network` "
+                "(`sub_network_n_embd`, ...), call `set_sub_network(**config)` instead."
+            )
         self.set_sub_network(
             sub_network_n_embd=config["embed_dim"],
             sub_network_intermediate_size=int(config["mlp_ratio"] * config["embed_dim"]),

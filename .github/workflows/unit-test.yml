@@ -29,4 +29,3 @@ jobs:
           cache-dependency-glob: "**/pyproject.toml"  
       - name: Run pytest
         run: uv run --all-extras pytest -vvv
-

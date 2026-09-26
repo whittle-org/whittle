@@ -34,12 +34,12 @@ from litgpt.utils import (
     load_checkpoint,
     parse_devices,
     save_config,
-    save_hyperparameters,
 )
 from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
 from whittle.args import DistillArgs
+from whittle.hyperparameters import dump_hyperparameters, save_hyperparameters
 from whittle.loss.kd_loss import DistillLoss
 from whittle.metrics.flops import compute_flops
 from whittle.metrics.parameters import compute_parameters
@@ -50,6 +50,9 @@ from whittle.pretrain_super_network import get_search_space
 from whittle.sampling.random_sampler import RandomSampler
 
 torch._dynamo.config.suppress_errors = True
+
+# Upper limit on the random student sub-networks to try before giving up
+MAX_STUDENT_SAMPLES = 1000
 
 
 def setup(
@@ -113,6 +116,9 @@ def setup(
         use_saved_logits: Whether to use pre-computed teacher logits from files or compute them online.
         random_init_student: If True, the student sub-network will be randomly initialized instead of inheriting weights from the teacher.
     """
+    # saved with each checkpoint; `locals()` holds only the arguments at this point
+    hyperparameters = dump_hyperparameters(setup, locals())
+
     if teacher_checkpoint_dir is not None:
         print(f"Loading teacher model config from {teacher_checkpoint_dir}")
         teacher_config = Config.from_file(teacher_checkpoint_dir / "model_config.yaml")
@@ -197,6 +203,8 @@ def setup(
         teacher_logits_dir,
         use_saved_logits,
         random_init_student,
+        num_nodes=num_nodes,
+        hyperparameters=hyperparameters,
     )
 
 
@@ -222,6 +230,8 @@ def main(
     teacher_logits_dir: Path | None = None,
     use_saved_logits: bool = False,
     random_init_student: bool = False,
+    num_nodes: int = 1,
+    hyperparameters: str | None = None,
 ):
     if fabric.global_rank == 0 and out_dir is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -292,7 +302,15 @@ def main(
         search_space = get_search_space(teacher_config)
         sampler = RandomSampler(search_space, seed=seed)
         valid = False
+        attempts = 0
+        last_error: Exception | None = None
         while not valid:
+            if attempts >= MAX_STUDENT_SAMPLES:
+                raise RuntimeError(
+                    f"No student sub-network with a parameter ratio in "
+                    f"[{min_ratio}, {max_ratio}] after {attempts} samples."
+                ) from last_error
+            attempts += 1
             random_config = sampler.sample()
             fabric.print(f"Random subnetwork config: {random_config}")
             subnetwork = {
@@ -349,6 +367,7 @@ def main(
                         torch.cuda.empty_cache()
 
             except Exception as e:
+                last_error = e
                 fabric.print(f"Error during subnet extraction: {e}")
                 fabric.print("Retrying with different random config...")
                 continue
@@ -446,6 +465,8 @@ def main(
         distill,
         logits_loader,
         use_saved_logits,
+        num_nodes=num_nodes,
+        hyperparameters=hyperparameters,
     )
 
     save_checkpoint(
@@ -453,6 +474,7 @@ def main(
         student_state,
         tokenizer_dir,
         out_dir / "distill" / "lit_model.pth" if out_dir else None,
+        hyperparameters=hyperparameters,
     )
 
     total_tokens = (
@@ -601,6 +623,8 @@ def fit(
     distill: DistillArgs,
     logits_loader: SavedLogitsLoader | None = None,
     use_saved_logits: bool = False,
+    num_nodes: int = 1,
+    hyperparameters: str | None = None,
 ) -> dict[str, Any]:
     teacher = state["teacher"]
     student = state["model"]
@@ -639,18 +663,21 @@ def fit(
     max_tokens_per_device = train.max_tokens // fabric.world_size
     tokens_per_iter = train.micro_batch_size * student.max_seq_length
     max_iters = max_tokens_per_device // tokens_per_iter
-    log_iter_interval = train.log_interval * train.gradient_accumulation_iters(devices)
+    log_iter_interval = train.log_interval * train.gradient_accumulation_iters(
+        devices, num_nodes
+    )
     initial_iter = state["iter_num"]
     train_iterator = CycleIterator(train_dataloader)
 
     running_loss = RunningMean(
-        window=train.gradient_accumulation_iters(devices), sync_on_compute=False
+        window=train.gradient_accumulation_iters(devices, num_nodes),
+        sync_on_compute=False,
     ).to(fabric.device)
 
     fabric.barrier()
     total_t0 = time.perf_counter()
 
-    warmup_iters = train.warmup_iters(devices, max_iters, train_dataloader)
+    warmup_iters = train.warmup_iters(devices, num_nodes, max_iters, train_dataloader)
 
     for train_data in train_iterator:
         if state["iter_num"] >= max_iters:
@@ -673,7 +700,7 @@ def fit(
         targets = train_data[:, 1 : (student.max_seq_length + 1)].contiguous().long()
 
         is_accumulating = (
-            state["iter_num"] % train.gradient_accumulation_iters(devices) != 0
+            state["iter_num"] % train.gradient_accumulation_iters(devices, num_nodes) != 0
         )
         with fabric.no_backward_sync(student, enabled=is_accumulating):
             # Get teacher logits
@@ -698,7 +725,7 @@ def fit(
             loss = distill_loss(
                 logits_reshaped, targets_reshaped, teacher_logits_reshaped
             )
-            fabric.backward(loss / train.gradient_accumulation_iters(devices))
+            fabric.backward(loss / train.gradient_accumulation_iters(devices, num_nodes))
 
         running_loss.update(loss.detach())
 
@@ -791,6 +818,7 @@ def fit(
                 student_state,
                 tokenizer_dir,
                 out_dir / f"step-{state['step_count']:08d}" / "lit_model.pth",
+                hyperparameters=hyperparameters,
             )
             fabric.barrier()
 
@@ -811,13 +839,16 @@ def fit(
     return metrics
 
 
-def save_checkpoint(fabric, state, tokenizer_dir, checkpoint_file):
+def save_checkpoint(
+    fabric, state, tokenizer_dir, checkpoint_file, hyperparameters: str | None = None
+):
     model = state["model"]
     checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
     fabric.print(f"Saving checkpoint to {str(checkpoint_file)!r}")
     fabric.save(checkpoint_file, state)
     if fabric.global_rank == 0:
-        save_hyperparameters(setup, checkpoint_file.parent)
+        if hyperparameters is not None:
+            save_hyperparameters(hyperparameters, checkpoint_file.parent)
         if tokenizer_dir is not None:
             copy_config_files(tokenizer_dir, checkpoint_file.parent)
         save_config(model.config, checkpoint_file.parent)

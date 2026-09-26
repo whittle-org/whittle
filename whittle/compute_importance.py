@@ -51,30 +51,23 @@ def evaluate_configs(
     model: GPT,
     configs: list[dict],
     search_space: SimpleSearchSpace,
+    max_seq_len: int,
+    tokenizer: Any,
+    batch_size: int,
+    num_batches: int,
     layer_order: list[int] | None = None,
 ) -> tuple[list[float], list[float]]:
     ppls: list[float] = []
     params: list[float] = []
     for c in configs:
-        if layer_order is None:
-            model.set_sub_network(**search_space.cast(c))
-            param = compute_parameters(model)
-            ppl = evaluate_wikitext(
-                args.max_seq_len, model, tokenizer, batch_size, num_batches
-            )
-            ppls.append(ppl)
-            params.append(param)
-        else:
-            layer_order_top_k = sorted(layer_order[: int(c["depth"])])
-            model.set_sub_network(
-                **search_space.cast(c), sampled_layer_indices=layer_order_top_k
-            )
-            param = compute_parameters(model)
-            ppl = evaluate_wikitext(
-                args.max_seq_len, model, tokenizer, batch_size, num_batches
-            )
-            ppls.append(ppl)
-            params.append(param)
+        sub_network: dict[str, Any] = dict(search_space.cast(c))
+        if layer_order is not None:
+            sub_network["sampled_layer_indices"] = sorted(layer_order[: int(c["depth"])])
+        model.set_sub_network(**sub_network)
+        params.append(compute_parameters(model))
+        ppls.append(
+            evaluate_wikitext(max_seq_len, model, tokenizer, batch_size, num_batches)
+        )
     return ppls, params
 
 
@@ -113,7 +106,6 @@ if __name__ == "__main__":
     model_path = os.path.join("checkpoints", model_id, "lit_model.pth")
 
     config = Config.from_file(config_path)
-    config.fix_head_size = True
     config.model_type = "gpt"
     with open(config_path_hf) as f:
         hf_config = json.load(f)
@@ -135,18 +127,13 @@ if __name__ == "__main__":
     sampler = RandomSampler(space.config_space, seed=args.seed)
     configs = get_configs(sampler=sampler, n=args.n_configs)
 
-    largest_model_config: dict[str, Any] = {
-        "sub_network_n_embd": config.n_embd,
-        "sub_network_intermediate_size": [config.intermediate_size] * config.n_layer,
-        "sub_network_num_heads": [config.n_head] * config.n_layer,
-        "sub_network_n_layers": config.n_layer,
-    }
-
     model.reset_super_network()
     before_sorting = evaluate_wikitext(
         args.max_seq_len, model, tokenizer, batch_size, num_batches
     )
-    ppls_before, params_before = evaluate_configs(model, configs, space, layer_order=None)
+    ppls_before, params_before = evaluate_configs(
+        model, configs, space, args.max_seq_len, tokenizer, batch_size, num_batches
+    )
     model.reset_super_network()
 
     embedding_order = compute_order_embd(
@@ -242,7 +229,14 @@ if __name__ == "__main__":
         args.max_seq_len, model, tokenizer, batch_size, num_batches
     )
     ppls_after, params_after = evaluate_configs(
-        model, configs, space, layer_order=layer_order
+        model,
+        configs,
+        space,
+        args.max_seq_len,
+        tokenizer,
+        batch_size,
+        num_batches,
+        layer_order=layer_order,
     )
     ppls_after.append(after_sorting)
     ppls_before.append(before_sorting)

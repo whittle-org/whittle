@@ -62,6 +62,7 @@ class StratifiedRandomSampler(RandomSampler):
             if self.param_bins.put_in_bin(config):
                 break
 
+            tries += 1
             if tries > self.max_tries:
                 raise ValueError(
                     "Could not find a valid configuration in StratifiedRandomSampler. Try increasing max_tries or increasing empty_bin_tolerance."

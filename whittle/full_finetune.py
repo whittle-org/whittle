@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 import math
 import os
@@ -17,7 +18,6 @@ from litgpt.args import EvalArgs, TrainArgs
 from litgpt.data import DataModule
 from litgpt.generate.base import generate
 from litgpt.model import Config
-from litgpt.parser_config import save_hyperparameters
 from litgpt.prompts import save_prompt_style
 from litgpt.tokenizer import Tokenizer
 from litgpt.utils import (
@@ -42,11 +42,19 @@ from torch.utils.data import ConcatDataset, DataLoader
 from torchmetrics import RunningMean
 
 from whittle.data.llamamini import LLaMaMini
+from whittle.hyperparameters import dump_hyperparameters, save_hyperparameters
 from whittle.models.gpt import GPT
 from whittle.models.gpt.blocks import Block
 from whittle.pretrain_super_network import get_search_space, training_strategies_cls
 from whittle.sampling.random_sampler import RandomSampler
 from whittle.training_strategies.base_strategy import BaseTrainingStrategy
+
+# A pre-trained model needs a small learning rate. With the torch default of 1e-3,
+# a few steps of super-network fine-tuning ruin the pre-trained weights.
+DEFAULT_OPTIMIZER: dict = {
+    "class_path": "torch.optim.AdamW",
+    "init_args": {"lr": 2e-5, "weight_decay": 0.0, "betas": [0.9, 0.95]},
+}
 
 
 def setup(
@@ -71,7 +79,7 @@ def setup(
         min_lr=4e-5,
     ),
     eval: EvalArgs = EvalArgs(interval=600, max_new_tokens=100),
-    optimizer: str | dict = "AdamW",
+    optimizer: str | dict = DEFAULT_OPTIMIZER,
     training_strategy: str = "sandwich",
     logger_name: Literal["wandb", "tensorboard", "csv"] = "csv",
     seed: int = 1337,
@@ -93,13 +101,18 @@ def setup(
         data: Data-related arguments. If not provided, the default is ``litgpt.data.Alpaca``.
         train: Training-related arguments. See ``litgpt.args.TrainArgs`` for details.
         eval: Evaluation-related arguments. See ``litgpt.args.EvalArgs`` for details.
-        optimizer: An optimizer name (such as "AdamW") or config.
+        optimizer: An optimizer name (such as "AdamW") or config. Defaults to AdamW with
+            lr 2e-5, weight decay 0.0, and betas (0.9, 0.95). A name alone uses the
+            torch defaults (lr 1e-3 for AdamW), which is too high for fine-tuning.
         training_strategy: Training strategy for super-network training. Possible choices: sandwich, standard
         logger_name: The name of the logger to send metrics to.
         seed: The random seed to use for reproducibility.
         access_token: Optional API token to access models with restrictions.
         accelerator: The accelerator to use for training. Possible choices: "cuda", "cpu".
     """
+    # saved with each checkpoint; `locals()` holds only the arguments at this point
+    hyperparameters = dump_hyperparameters(setup, locals())
+
     checkpoint_dir = auto_download_checkpoint(
         model_name=checkpoint_dir, access_token=access_token
     )
@@ -171,6 +184,7 @@ def setup(
         eval,
         optimizer,
         training_strategy,
+        hyperparameters=hyperparameters,
     )
 
 
@@ -187,6 +201,7 @@ def main(
     eval: EvalArgs,
     optimizer: str | dict,
     training_strategy: str,
+    hyperparameters: str | None = None,
 ) -> None:
     validate_args(train, eval)
 
@@ -210,7 +225,8 @@ def main(
 
     model = fabric.setup(model)
 
-    optimizer = instantiate_torch_optimizer(optimizer, model.parameters())
+    # a copy, because litgpt updates the `init_args` of a dict config in place
+    optimizer = instantiate_torch_optimizer(copy.deepcopy(optimizer), model.parameters())
     optimizer = fabric.setup_optimizers(optimizer)
     scheduler = get_lr_scheduler(
         optimizer, warmup_steps=train.lr_warmup_steps, max_steps=lr_max_steps
@@ -253,6 +269,7 @@ def main(
         eval,
         data,
         strategy,
+        hyperparameters=hyperparameters,
     )
     training_time = time.perf_counter() - train_time
     output = create_finetuning_performance_report(
@@ -281,7 +298,8 @@ def main(
     if fabric.global_rank == 0:
         # Copy checkpoint files from original checkpoint dir
         copy_config_files(checkpoint_dir, save_path.parent)
-        save_hyperparameters(setup, save_path.parent)
+        if hyperparameters is not None:
+            save_hyperparameters(hyperparameters, save_path.parent)
         save_prompt_style(data.prompt_style, save_path.parent)
 
 
@@ -298,6 +316,7 @@ def fit(
     eval: EvalArgs,
     data: DataModule,
     training_strategy: BaseTrainingStrategy,
+    hyperparameters: str | None = None,
 ) -> dict[str, float]:
     model = state["model"]
     optimizer = state["optimizer"]
@@ -490,7 +509,8 @@ def fit(
             fabric.save(checkpoint_file, state)
             if fabric.global_rank == 0:
                 copy_config_files(checkpoint_dir, checkpoint_file.parent)
-                save_hyperparameters(setup, checkpoint_file.parent)
+                if hyperparameters is not None:
+                    save_hyperparameters(hyperparameters, checkpoint_file.parent)
                 save_prompt_style(data.prompt_style, checkpoint_file.parent)
 
     total_token_counts = {}

@@ -128,30 +128,24 @@ class LocalSearch(StochasticSearcher):
                 self._metric_op = dict(zip(self._metric, [-1.0] * len(self._metric)))
 
     def _sample_random_neighbour(self, start_point):
+        """Returns a copy of `start_point` with one hyperparameter changed.
+
+        The hyperparameters are tried in a random order. Returns None only if no
+        hyperparameter of the search space can change, which ends the search.
+        """
         # get actual hyperparameters from the search space
-        config = deepcopy(start_point)
-        hypers = []
-        for k, v in self.config_space.items():
-            if isinstance(v, Domain):
-                hypers.append(k)
+        hypers = [k for k, v in self.config_space.items() if isinstance(v, Domain)]
 
-        hp_name = np.random.choice(hypers)
-        hp = self.config_space[hp_name]
-        for i in range(MAX_SAMPLES):
-            new_value = hp.sample()
-            if new_value != start_point[hp_name]:
-                config[hp_name] = new_value
-                return config
-
-        # mutation_name = np.random.choice(list(self._mutations.keys()))
-        #
-        # config = self._mutations[mutation_name](start_point)
-
-        # sample mutation
-        # name = np.random.choice(hypers)
-        # mutation = self._mutations[name]
-
-        # return mutation(config)
+        for index in self.random_state.permutation(len(hypers)):
+            hp_name = hypers[index]
+            hp = self.config_space[hp_name]
+            for _ in range(MAX_SAMPLES):
+                new_value = hp.sample(random_state=self.random_state)
+                if new_value != start_point[hp_name]:
+                    config = deepcopy(start_point)
+                    config[hp_name] = new_value
+                    return config
+        return None
 
     def is_efficient(self, costs):
         is_efficient = np.ones(costs.shape[0], dtype=bool)
@@ -218,47 +212,3 @@ class LocalSearch(StochasticSearcher):
             "This searcher requires TrialSchedulerWithSearcher scheduler"
         )
         super().configure_scheduler(scheduler)
-
-    def clone_from_state(self, state: dict[str, Any]):
-        raise NotImplementedError
-
-
-if __name__ == "__main__":
-    from nas_fine_tuning.sampling import SmallSearchSpace
-    from syne_tune.config_space import Categorical
-    from syne_tune.tuner import Trial
-    from transformers import AutoConfig
-
-    config = AutoConfig.from_pretrained("bert-base-cased")
-    ss = SmallSearchSpace(config)
-
-    start_point = {"num_layers": 12, "num_heads": 12, "num_units": 3072}
-
-    ls = LS(
-        ss.get_syne_tune_config_space(),
-        start_point=start_point,
-        metric=["a", "b"],
-        random_seed=412,
-        mode=["min", "min"],
-    )
-
-    def get_default(config_space):
-        config = {}
-        for k, v in config_space.items():
-            if isinstance(v, Domain):
-                if isinstance(v, Categorical):
-                    config[k] = v.categories[0]
-                else:
-                    config[k] = v.upper
-        return config
-
-    print(get_default(ss.get_syne_tune_config_space()))
-
-    for i in range(10):
-        trial = ls.suggest(trial_id=i)
-        print(trial)
-        # ls._update(trial_id=i, config=config, result={'a': np.random.rand(), 'b':np.random.rand()})
-        result = {"a": np.random.rand(), "b": np.random.rand()}
-        ls.on_trial_result(
-            Trial(trial_id=i, config=trial.config, creation_time=None), result=result
-        )

@@ -11,7 +11,7 @@ from unittest.mock import Mock
 import pytest
 import torch
 from lightning.fabric import Fabric
-from litgpt.args import EvalArgs
+from litgpt.args import EvalArgs, TrainArgs
 from litgpt.config import Config
 from litgpt.scripts.download import download_from_hub
 from litgpt.utils import lazy_load
@@ -67,6 +67,43 @@ def get_checkpoint_contents(copy_config_files, save_checkpoints):
         }
     # other config files are in the parent super-net directory
     return {"lit_model.pth", "model_config.yaml"}
+
+
+@pytest.mark.parametrize("max_seq_length", [16, None])
+def test_search_uses_train_max_seq_length(tmp_path, checkpoint_dir, max_seq_length):
+    # 3 validation samples, so that the number of samples differs from the length
+    dataset = torch.tensor([[0, 1, 2], [3, 4, 5], [0, 1, 2]])
+    dataloader = DataLoader(dataset, batch_size=3)
+    seen = {}
+
+    def fake_search(objective, search_space, objective_kwargs, **kwargs):
+        seen["max_seq_length"] = objective_kwargs["model"].max_seq_length
+        seen["block_size"] = objective_kwargs["model"].config.block_size
+        return {"configs": [], "is_pareto_optimal": []}
+
+    with (
+        mock.patch(
+            "whittle.search_sub_networks.get_dataloaders",
+            return_value=(dataloader, dataloader),
+        ) as get_dataloaders_mock,
+        mock.patch(
+            "whittle.search_sub_networks.multi_objective_search", side_effect=fake_search
+        ),
+    ):
+        search_sub_networks.setup(
+            checkpoint_dir,
+            devices=1,
+            out_dir=tmp_path / "out",
+            train=TrainArgs(max_seq_length=max_seq_length),
+            search=SearchArgs(iterations=1),
+            verbose=False,
+        )
+
+    # without max_seq_length, the block size of the model is used
+    expected = max_seq_length if max_seq_length is not None else seen["block_size"]
+    # the data loader and the validation use the same sequence length
+    assert get_dataloaders_mock.call_args.args[4] == expected
+    assert seen["max_seq_length"] == expected
 
 
 @pytest.mark.parametrize("copy_config_files", [True, False])

@@ -15,7 +15,7 @@ and allows to compress many state-of-the-art models.
 
 ## Installation
 
-Whittle supports and is tested for python 3.9 to 3.11. 
+Whittle supports and is tested for python 3.10 to 3.12. 
 
 You can install whittle with: 
 ```bash

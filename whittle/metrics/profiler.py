@@ -13,12 +13,19 @@ import time
 from pathlib import Path
 
 import lightning as L
-import psutil
-import pynvml
 import torch
 from litgpt.args import TrainArgs
 
 from whittle.models.gpt.model import GPT
+
+try:
+    import psutil
+    import pynvml
+except ImportError as e:
+    raise ImportError(
+        "The profiler needs the optional `profiling` dependencies. "
+        "Install them with `pip install 'whittle[profiling]'`."
+    ) from e
 
 
 class DistributedGPUProfiler:
