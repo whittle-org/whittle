@@ -9,7 +9,9 @@ from litgpt.chat.base import main as chat_fn
 from litgpt.deploy.serve import run_server as serve_fn
 from litgpt.scripts.download import download_from_hub as download_fn
 
+from whittle.distill_model import setup as distill_model_fn
 from whittle.evaluate_network import setup as evaluate_fn
+from whittle.pretrain_model import setup as pretrain_model_fn
 from whittle.pretrain_super_network import setup as pretrain_fn
 from whittle.prune import setup as prune_fn
 from whittle.search_sub_networks import setup as search_fn
@@ -21,6 +23,8 @@ def main() -> None:
         "search": search_fn,
         "evaluate": evaluate_fn,
         "prune": prune_fn,
+        "pretrain_model": pretrain_model_fn,
+        "distill_model": distill_model_fn,
         "download": download_fn,
         "serve": serve_fn,
         "chat": chat_fn,

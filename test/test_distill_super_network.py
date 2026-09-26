@@ -12,7 +12,7 @@ from litgpt.config import Config
 from litgpt.utils import save_config
 from torch.utils.data import DataLoader
 
-from whittle import distill
+from whittle import distill_super_network
 from whittle.args import DistillArgs
 from whittle.models.gpt import GPT
 
@@ -39,13 +39,14 @@ def run_distill(tmp_path, sample_mock_kwargs, min_ratio=0.01, max_ratio=0.99):
     out_dir = tmp_path / "out"
     with (
         mock.patch(
-            "whittle.distill.get_dataloaders", Mock(return_value=(dataloader, dataloader))
+            "whittle.distill_super_network.get_dataloaders",
+            Mock(return_value=(dataloader, dataloader)),
         ),
         mock.patch(
             "whittle.sampling.random_sampler.RandomSampler.sample", **sample_mock_kwargs
         ),
     ):
-        distill.setup(
+        distill_super_network.setup(
             out_dir=out_dir,
             precision="32-true",
             teacher_checkpoint_dir=teacher_dir,
@@ -84,7 +85,7 @@ def test_distill(tmp_path):
         assert hyperparameters["train"]["max_tokens"] == 8
 
 
-@mock.patch("whittle.distill.MAX_STUDENT_SAMPLES", 3)
+@mock.patch("whittle.distill_super_network.MAX_STUDENT_SAMPLES", 3)
 def test_distill_stops_when_ratio_is_unreachable(tmp_path):
     # the student has about 13% of the teacher parameters
     with pytest.raises(RuntimeError, match=r"\[0.9, 0.95\] after 3 samples"):
@@ -96,9 +97,9 @@ def test_distill_stops_when_ratio_is_unreachable(tmp_path):
         )
 
 
-@mock.patch("whittle.distill.MAX_STUDENT_SAMPLES", 3)
+@mock.patch("whittle.distill_super_network.MAX_STUDENT_SAMPLES", 3)
 @mock.patch(
-    "whittle.distill.extract_current_sub_network",
+    "whittle.distill_super_network.extract_current_sub_network",
     side_effect=ValueError("extraction failed"),
 )
 def test_distill_stops_when_extraction_fails(extract_mock, tmp_path):
