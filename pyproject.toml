@@ -1,6 +1,6 @@
 [project]
 name = "whittle"
-version = "0.5.1"
+version = "0.6.0"
 description = "Two-stage neural architecture search for large language models"
 # alphabetic order
 authors = [
@@ -89,7 +89,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.5.1"
+version = "0.6.0"
 update_changelog_on_bump = true
 major_version_zero = true
 version_files = ["pyproject.toml:version", "whittle/__version__.py"]

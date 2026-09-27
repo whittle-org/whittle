@@ -1,3 +1,51 @@
+## 0.6.0 (2026-09-27)
+
+### Feat
+
+- add pretrain and distill scripts for models (#376)
+- add code for importance sorting (#370)
+- add Whittle to Hugging Face checkpoint conversion (#368)
+- throw error when unsupported models are initialized (#363)
+- add support for qwen3 (#360)
+- instantiate LitGPT model from Whittle supernet (#352)
+- add granular sampling for sub-networks (#342)
+- add GPU performance profiling capabilities (#318)
+- Updated distillation workflow to store and load (top-k) logits (#319)
+- update to litgpt 0.5.10 (#332)
+- doc for workflows (#294)
+-  update causal attention and model for litgpt 0.5.7 (#291)
+
+### Fix
+
+- document the breaking changes since 0.5.1 (#377)
+- repair broken workflows and remove dead code (#375)
+- use absolute whittle imports in compute_importance (#373)
+- fix conversion of model to LitGPT (#367)
+- fix qk normalization in attention layers (#365)
+- fix gemma-3 models (#362)
+- add empty index validation and fix error message f-string (#357)
+- fix setting subnetwork (GQA to MHA) (#337)
+- fix regression (#334)
+- fix subnet nheads (#324)
+- deprecate python 3.9 (#317)
+- **lora_finetuning**: fix bug when using stratified_random strategy (#315)
+- remove unnecessary GPU to CPU synchronizations (#314)
+- **pretraining**: disable torch.compile() supernet (#313)
+- **measure_flops**: fix bug in measuring flops (#309)
+- **lora**: fix crash in LoRA finetuning of supernet (#304)
+- fix broken HF access token for LlaMaMini (#302)
+- **evaluation**: fix bug in subnetwork evaluation (#300)
+- fix crash when checkpointing (#296)
+
+### Refactor
+
+- tidy package exports and cleanup (#374)
+- improve naming consistency across modules and tests (#356)
+- vectorize computation of qkv indices (#335)
+- **finetuning**: update finetuning for litgpt 0.5.7 (#310)
+- 278 add unit tests for workflow to ci (#287)
+- Remove DeepSpeed  (#292)
+
 ## 0.5.1 (2025-04-22)
 
 ### Fix
