@@ -13,6 +13,8 @@
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/whittle-org/whittle/blob/main/LICENSE)
 [![PyPI version](https://img.shields.io/pypi/v/whittle?color=informational)](https://pypi.org/project/whittle/)
 
+**New to whittle?** Start with the Colab notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1qo5BSfinM-GYO_v1MfTWUaAf7kID2B83)
+
 Whittle is a Python library for compressing large language models (LLMs) 
 by extracting sub-networks to balance performance and efficiency. It is based on [LitGPT](https://github.com/Lightning-AI/litgpt)
 and allows to compress many state-of-the-art models.
@@ -44,7 +46,7 @@ pip install -e .
 ```
 ### Getting started with whittle  
 
-To explore and understand different functionalities of ```whittle``` checkout [this](https://colab.research.google.com/drive/1i_FjIf_qCTJFcp0emOHX9E6I6j6kkIcH?usp=sharing) colab notebook and ```examples/```
+To explore and understand different functionalities of ```whittle``` checkout [this](https://colab.research.google.com/drive/1qo5BSfinM-GYO_v1MfTWUaAf7kID2B83) colab notebook.
 
 ## Projects that use whittle
 
