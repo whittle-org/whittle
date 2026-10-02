@@ -1,5 +1,23 @@
 ## 0.6.0 (2026-09-27)
 
+### BREAKING CHANGE
+
+- LoRA fine-tuning is removed, with the modules `whittle.lora` and `whittle.lora_model`.
+- DeepSpeed support is removed, and the extras `whittle[distributed]` and `whittle[all]` no longer exist.
+- The modules `whittle.tutorials` and `whittle.models.gpt.utils` are removed.
+- `whittle.distill` is renamed to `whittle.distill_super_network`; run it with `python -m whittle.distill_super_network`.
+- The `initial_checkpoint_dir` argument of `whittle.distill_super_network.setup` is renamed to `teacher_checkpoint_dir`.
+- The attention layer `CausalSelfAttention.attn` is renamed to `qkv`, and `LinearQKV`, `LinearProj`, and `CausalSelfAttention.get_proj_indices` are removed. Checkpoints with the old `attn.attn` keys still load.
+- `Embedding.sampled_embd_dim_indices` is renamed to `sampled_embd_indices`.
+- These arguments are removed: `fine_tuned` of `search_sub_networks.setup`, `params_estimator` of `StratifiedRandomSampler`, and `lora` of `BaseTrainingStrategy`.
+- `FixedParamGridSampler.get_parameters` and `LocalSearch.clone_from_state` are removed.
+- `config.fix_head_size` is ignored. Without `sub_network_head_size`, a sub-network always uses `config.head_size`.
+- `GPT` raises `ValueError` for mixture-of-experts and latent-attention configs.
+- The default optimizer of `full_finetune` is AdamW with lr 2e-5, weight decay 0.0, and betas (0.9, 0.95). It was AdamW with the torch defaults (lr 1e-3, weight decay 0.01, betas (0.9, 0.999)).
+- New defaults in `distill_super_network`: temperature 10, alpha 0.3, beta 0.7, `eval.interval` 50, and a student ratio of 0.6 to 0.61. They were 5, 0.6, 0.4, 1000, and 0.3 to 0.7.
+- Python 3.9 is no longer supported.
+- whittle needs litgpt 0.5.12 (was 0.5.0), torch>=2.5, transformers>=4.51.3,<4.54, syne-tune 0.13.0, and lm-eval<0.4.9.1.
+
 ### Feat
 
 - add pretrain and distill scripts for models (#376)
