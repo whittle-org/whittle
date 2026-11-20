@@ -3,6 +3,7 @@ from __future__ import annotations
 from unittest import mock
 
 import pytest
+from lightning.fabric.strategies import DDPStrategy, FSDPStrategy
 from litgpt import Config
 from litgpt.utils import save_config
 
@@ -54,3 +55,48 @@ def test_student_config_source(tmp_path, source):
         assert student_config.n_layer == Config.from_name("pythia-14m").n_layer
     else:
         assert (student_config.n_layer, student_config.n_embd) == (2, 8)
+
+
+def test_subnetwork_student_rejects_a_student_config(tmp_path):
+    config = Config(block_size=2, n_layer=2, n_embd=8, n_head=4, padded_vocab_size=8)
+    save_config(config, tmp_path)
+
+    with pytest.raises(ValueError, match="samples the student architecture"):
+        distill_model.setup(
+            model_config=config,
+            subnetwork_student=True,
+            teacher_checkpoint_dir=tmp_path,
+            out_dir=tmp_path / "out",
+        )
+
+
+def test_student_is_required_without_subnetwork_student(tmp_path):
+    config = Config(block_size=2, n_layer=2, n_embd=8, n_head=4, padded_vocab_size=8)
+    save_config(config, tmp_path)
+
+    with pytest.raises(ValueError, match="or set `subnetwork_student`"):
+        distill_model.setup(teacher_checkpoint_dir=tmp_path, out_dir=tmp_path / "out")
+
+
+@pytest.mark.parametrize(
+    "strategy, expected", [("ddp", DDPStrategy), ("fsdp", FSDPStrategy)]
+)
+def test_strategy(tmp_path, strategy, expected):
+    save_config(Config.from_name("pythia-14m"), tmp_path)
+
+    with (
+        mock.patch("whittle.distill_model.main"),
+        mock.patch("whittle.distill_model.L.Fabric") as fabric_mock,
+        mock.patch("torch.cuda.is_available", return_value=False),
+    ):
+        distill_model.setup(
+            "pythia-14m",
+            teacher_checkpoint_dir=tmp_path,
+            out_dir=tmp_path / "out",
+            precision="32-true",
+            devices=2,
+            logger_name="csv",
+            strategy=strategy,
+        )
+
+    assert isinstance(fabric_mock.call_args.kwargs["strategy"], expected)
