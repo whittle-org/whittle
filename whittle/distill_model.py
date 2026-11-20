@@ -47,6 +47,7 @@ from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
 from whittle.args import DistillArgs
+from whittle.convert import create_litgpt_config_for_subnet
 from whittle.hyperparameters import dump_hyperparameters, save_hyperparameters
 from whittle.loss.kd_loss import DistillLoss
 from whittle.metrics.parameters import compute_parameters
@@ -311,12 +312,14 @@ def main(
     t0 = time.perf_counter()
     if subnetwork_student:
         student_model = sample_subnetwork_student(
-            fabric, teacher_config, teacher_checkpoint, seed, min_ratio, max_ratio
+            fabric,
+            teacher_config,
+            teacher_checkpoint,
+            seed,
+            min_ratio,
+            max_ratio,
+            random_init_student,
         )
-        if random_init_student:
-            with fabric.init_module():
-                student_model = WhittleGPT(student_model.config)
-            fabric.print("Randomly initialized the student sub-network")
     else:
         assert student_config is not None
         with fabric.init_module(empty_init=True):
@@ -482,21 +485,24 @@ def sample_subnetwork_student(
     seed: int,
     min_ratio: float,
     max_ratio: float,
+    random_init: bool,
 ) -> WhittleGPT:
-    """Extract a random sub-network of the teacher with a parameter ratio in
-    ``[min_ratio, max_ratio]``.
+    """Sample a random sub-network of the teacher with a parameter ratio in
+    ``[min_ratio, max_ratio]``. It inherits the teacher's weights unless
+    ``random_init`` is set.
 
     It is taken from a memory-mapped CPU copy of the teacher, since the training
     teacher is sharded under FSDP.
     """
-    state_dict = torch.load(teacher_checkpoint, mmap=True, weights_only=False)
-    state_dict = state_dict.get("model", state_dict)
     with torch.device("meta"):
         teacher = WhittleGPT(teacher_config)
-    teacher.load_state_dict(state_dict, strict=False, assign=True)
-    missing = [name for name, p in teacher.named_parameters() if p.is_meta]
-    if missing:
-        raise ValueError(f"{teacher_checkpoint} has no weights for {missing}")
+    if not random_init:
+        state_dict = torch.load(teacher_checkpoint, mmap=True, weights_only=False)
+        state_dict = state_dict.get("model", state_dict)
+        teacher.load_state_dict(state_dict, strict=False, assign=True)
+        missing = [name for name, p in teacher.named_parameters() if p.is_meta]
+        if missing:
+            raise ValueError(f"{teacher_checkpoint} has no weights for {missing}")
 
     sampler = RandomSampler(get_search_space(teacher_config), seed=seed)
     teacher_params = compute_parameters(teacher)
@@ -514,7 +520,14 @@ def sample_subnetwork_student(
                     "depth": config["sub_network_n_layers"],
                 }
             )
-            student = extract_current_sub_network(teacher)
+            ratio = compute_parameters(teacher) / teacher_params
+            if not min_ratio <= ratio <= max_ratio:
+                continue
+            if random_init:
+                with fabric.init_module():
+                    student = WhittleGPT(create_litgpt_config_for_subnet(teacher))
+            else:
+                student = extract_current_sub_network(teacher)
         except Exception as e:
             last_error = e
             fabric.print(f"Error during subnet extraction: {e}")
@@ -522,10 +535,8 @@ def sample_subnetwork_student(
             continue
         finally:
             teacher.reset_super_network()
-        ratio = compute_parameters(student) / teacher_params
-        if min_ratio <= ratio <= max_ratio:
-            fabric.print(f"Model parameter reduction: {ratio:.2%}")
-            return student
+        fabric.print(f"Model parameter reduction: {ratio:.2%}")
+        return student
     raise RuntimeError(
         f"No student sub-network with a parameter ratio in "
         f"[{min_ratio}, {max_ratio}] after {MAX_STUDENT_SAMPLES} samples."

@@ -40,6 +40,7 @@ def run_distill(
     max_ratio=0.99,
     whittle_format=False,
     student_config=None,
+    random_init_student=False,
 ):
     teacher_config = Config(
         block_size=2, n_layer=2, n_embd=8, n_head=4, padded_vocab_size=8
@@ -83,6 +84,7 @@ def run_distill(
             devices=1,
             min_ratio=min_ratio,
             max_ratio=max_ratio,
+            random_init_student=random_init_student,
         )
     return out_dir
 
@@ -109,6 +111,18 @@ def test_distill(tmp_path, whittle_format):
         )
         assert hyperparameters["min_ratio"] == 0.01
         assert hyperparameters["train"]["max_tokens"] == 8
+
+
+@mock.patch.dict(os.environ, {"DISABLE_TORCH_COMPILE": "1"})
+@mock.patch("whittle.distill_model.extract_current_sub_network")
+def test_distill_random_init_skips_extraction(extract_mock, tmp_path):
+    out_dir = run_distill(
+        tmp_path, {"side_effect": [STUDENT_CONFIG]}, random_init_student=True
+    )
+
+    extract_mock.assert_not_called()
+    student = Config.from_file(out_dir / "final" / "model_config.yaml")
+    assert (student.n_embd, student.n_layer, student.n_head) == (4, 1, 2)
 
 
 @mock.patch.dict(os.environ, {"DISABLE_TORCH_COMPILE": "1"})
