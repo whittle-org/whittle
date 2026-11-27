@@ -63,7 +63,6 @@ def validate(
     test_loss = test_loss / num_batches
     accuracy = total_correct / num_items
 
-    # print(f"Testset accuracy: {100 * accuracy:>0.1f}%, average loss: {test_loss:>7f}")
     return 100 * accuracy, loss.cpu().item()
 
 

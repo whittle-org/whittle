@@ -20,11 +20,11 @@ class SparseGPTPruner(Pruner):
         **kwargs: Any,
     ) -> None:
         """
-        Prunes a pre-trained model using the Sparse GPT method by Frantar an Alistarh.
+        Prunes a pre-trained model using the Sparse GPT method by Frantar and Alistarh.
 
         Frantar, E. and Alistarh, D.
         SparseGPT: Massive language models can be accurately pruned in one-shot.
-        arXiv preprint arXiv:2301.00774,
+        arXiv preprint arXiv:2301.00774.
 
         Args:
             model: The model to be pruned.

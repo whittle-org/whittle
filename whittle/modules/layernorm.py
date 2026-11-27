@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 
 class LayerNorm(torch.nn.LayerNorm):
-    """An extension of PyTorch's `torch.nn.LayerNorm` with support  with support to sub-sample weights corresponding to the sub-network dimensionality."""
+    """An extension of PyTorch's `torch.nn.LayerNorm` with support to sub-sample weights corresponding to the sub-network dimensionality."""
 
     def __init__(
         self,

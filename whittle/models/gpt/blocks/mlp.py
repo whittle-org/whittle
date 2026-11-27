@@ -9,7 +9,7 @@ from whittle.modules import Linear
 
 
 class GptNeoxMLP(litgpt.model.GptNeoxMLP):
-    """An extension of litgp's `litgpt.model.GptNeoxMLP` with support to adapt to sub-network dimensionality."""
+    """An extension of litgpt's `litgpt.model.GptNeoxMLP` with support to adapt to sub-network dimensionality."""
 
     def __init__(self, config: Config, compute_importance=False) -> None:
         super().__init__(config)
@@ -74,7 +74,7 @@ class GptNeoxMLP(litgpt.model.GptNeoxMLP):
 
 
 class LLaMAMLP(litgpt.model.LLaMAMLP):
-    """An extension of litgp's `litgpt.model.LLaMAMLP` with support to adapt to sub-network dimensionality."""
+    """An extension of litgpt's `litgpt.model.LLaMAMLP` with support to adapt to sub-network dimensionality."""
 
     def __init__(self, config: Config, compute_importance: bool = False) -> None:
         super().__init__(config)

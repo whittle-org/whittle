@@ -13,7 +13,6 @@ from whittle.models.gpt.model import GPT as WhittleGPT
 
 @pytest.fixture(scope="session")
 def checkpoint_dir(tmp_path_factory):
-    # img = compute_expensive_image()
     checkpoint_dir = tmp_path_factory.getbasetemp()
     download_from_hub(repo_id="EleutherAI/pythia-70m", checkpoint_dir=checkpoint_dir)
     return pathlib.Path(checkpoint_dir) / "EleutherAI" / "pythia-70m"
@@ -22,20 +21,19 @@ def checkpoint_dir(tmp_path_factory):
 def test_checkpoint_loading(checkpoint_dir):
     torch.manual_seed(0)
     config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-    input_ids = torch.randint(0, config.vocab_size, (1, config.block_size))  # .cuda()
+    input_ids = torch.randint(0, config.vocab_size, (1, config.block_size))
 
-    model = LitGPT(config)  # .cuda()
+    model = LitGPT(config)
     model.load_state_dict(
         torch.load(str(checkpoint_dir / "lit_model.pth"), weights_only=True)
     )
     # test output
     model.eval()
     output_lit = model(input_ids)
-    # from litgpt.super_model import Config
     # pip install litgpt
     # litgpt download --repo_id stabilityai/stablelm-base-alpha-3b
     config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
-    model = WhittleGPT(config)  # .cuda()
+    model = WhittleGPT(config)
     model.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
     # test output
     model.eval()

@@ -80,7 +80,7 @@ def params_mlp(mlp: nn.Module):
 
 def compute_parameters(model: GPT) -> float:
     """
-    Computes parameters of the current sub-network of a GPT mmodel. Make sure to set the sub-network before
+    Computes parameters of the current sub-network of a GPT model. Make sure to set the sub-network before
     calling this function.
 
     Refs:

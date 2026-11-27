@@ -21,7 +21,7 @@ log = logging.getLogger("mkdocs")
 
 @mkdocs.plugins.event_priority(-50)
 def on_startup(**kwargs: Any) -> None:
-    # Remove deperecation warnings from the doc build log
+    # Remove deprecation warnings from the doc build log
     warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 

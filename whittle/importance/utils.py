@@ -1,4 +1,3 @@
-# os.environ['HF_DATASETS_OFFLINE'] = "1"
 from __future__ import annotations
 
 import copy
@@ -106,7 +105,6 @@ def tokenize_function(examples, tokenizer, seq_len):
         target_ids = torch.zeros_like(input_ids)
         target_ids[:, 0:-1] = input_ids[:, 1:]
         target_ids[:, -1] = -100
-        # target_ids[:, -1] = tokenizer.pad_token_id  # Target padding
         input_ids_li.append(torch.squeeze(input_ids))
         target_ids_li.append(torch.squeeze(target_ids))
 
@@ -169,8 +167,6 @@ def evaluate_wikitext(
     mixed_dataset = load_from_disk(dataset_path)
     dataloader = get_dataloader(tokenizer, mixed_dataset, max_length, batch_size)
     nlls = []
-    # device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    # model.to(device)
     model.eval()
     torch.manual_seed(2809)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -245,9 +241,6 @@ def evaluate_wikitext_correct(max_length, model, tokenizer, batch_size=1):
             )
 
         nlls.append(loss)
-
-        # if count + 1 == num_batches:
-        #    break
 
     ppl = np.exp(torch.cat(nlls, dim=-1).mean().item())
     return ppl.item()
@@ -365,11 +358,9 @@ def get_indices_pythia(head_order, n_head, head_size):
 
 
 def permute_model(embedding_order, head_order, mlp_order, model, name):
-    # print("head_order", head_order)
     model.transformer.wte.weight.data = model.transformer.wte.weight.data[
         :, embedding_order
     ]
-    # print(head_order)
     model.lm_head.weight.data = model.lm_head.weight.data[:, embedding_order]
     permute_norm(embedding_order, model.transformer.ln_f)
 
@@ -417,7 +408,6 @@ def permute_model_layerwise(embedding_order, head_order, mlp_order, model_base, 
             heads_per_group = model.config.n_head // model.config.n_query_groups
             head_size = model.config.head_size
             indices_attn = []
-            # print(head_order[f"{i}"])
             for ids in head_order[f"{i}"]:
                 start = ids * (heads_per_group + 2) * head_size
                 end = (ids + 1) * (heads_per_group + 2) * head_size

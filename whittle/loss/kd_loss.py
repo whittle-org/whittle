@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import torch
 import torch.nn.functional as F
 from torch import nn
 
@@ -60,7 +61,7 @@ class DistillLoss(nn.Module):
         self.distill_loss = loss
         self.weight_scheme = weight_scheme
 
-    def forward(self, logits, labels, teacher_logits) -> nn.Tensor:
+    def forward(self, logits, labels, teacher_logits) -> torch.Tensor:
         """
         Compute the distillation loss.
 
