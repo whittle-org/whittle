@@ -17,7 +17,7 @@
 
 Whittle is a Python library for compressing large language models (LLMs) 
 by extracting sub-networks to balance performance and efficiency. It is based on [LitGPT](https://github.com/Lightning-AI/litgpt)
-and allows to compress many state-of-the-art models.
+and allows compressing many state-of-the-art models.
 
 
 - **Neural Architecture Search:** Workflows for [pre-training super-networks](whittle/pretrain_super_network.py) and [multi-objective search](whittle/search_sub_networks.py) to select sub-networks.
@@ -55,5 +55,5 @@ To explore and understand different functionalities of ```whittle``` checkout [t
 
 ## How to get involved
 
-We more than happy for any code contribution. If you are interested in contribution to whittle, 
+We are more than happy about any code contribution. If you are interested in contributing to whittle, 
 please read our [contribution guide](CONTRIBUTING.md).

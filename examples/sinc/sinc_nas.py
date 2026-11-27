@@ -64,8 +64,6 @@ if __name__ == "__main__":
     y = f(x)
 
     data = np.empty((num_data_points, 2))
-    # data[:, 0] = (x - np.mean(x)) / np.std(x)
-    # data[:, 1] = (y - np.mean(y)) / np.std(y)
     data[:, 0] = x
     data[:, 1] = y
 
@@ -83,21 +81,14 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
     current_best = None
-    # if args.st_checkpoint_dir is not None:
-    #     os.makedirs(args.st_checkpoint_dir, exist_ok=True)
     lc_valid = []
     lc_train = []
 
     sampler = RandomSampler(search_space, seed=args.seed, cast_search_space=False)
     training_strategies = {
-        # 'standard': train_epoch,
         "sandwich": SandwichStrategy(
             sampler=sampler, loss_function=nn.functional.mse_loss
         ),
-        # 'sandwich_kd': train_sandwich_kd,
-        # 'random': train_random,
-        # 'ats': train_ats,
-        # 'random_linear': partial(train_random_linear,  total_number_of_steps=args.epochs * 500 // args.batch_size),
     }
     update_op = training_strategies[args.training_strategy]
 

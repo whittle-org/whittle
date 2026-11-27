@@ -74,7 +74,6 @@ def copy_subnetwork_weights(sub_network, super_network):
 
 @pytest.fixture(scope="session")
 def checkpoint_dir(tmp_path_factory):
-    # img = compute_expensive_image()
     checkpoint_dir = tmp_path_factory.getbasetemp()
     download_from_hub(repo_id="EleutherAI/pythia-70m", checkpoint_dir=checkpoint_dir)
     return pathlib.Path(checkpoint_dir) / "EleutherAI" / "pythia-70m"
@@ -82,7 +81,6 @@ def checkpoint_dir(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def checkpoint_dir_14m(tmp_path_factory):
-    # img = compute_expensive_image()
     checkpoint_dir = tmp_path_factory.getbasetemp()
     download_from_hub(repo_id="EleutherAI/pythia-14m", checkpoint_dir=checkpoint_dir)
     return pathlib.Path(checkpoint_dir) / "EleutherAI" / "pythia-14m"
@@ -90,14 +88,12 @@ def checkpoint_dir_14m(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def out_dir(tmp_path_factory):
-    # img = compute_expensive_image()
     out_dir = tmp_path_factory.getbasetemp()
 
     return pathlib.Path(out_dir) / "out_dir"
 
 
 class Test_WhittleLM:
-    # torch.use_deterministic_algorithms(True)
     task_manager = tasks.TaskManager()
     task_list = task_manager.load_task_or_group(["arc_easy", "gsm8k", "wikitext"])
     version_minor = sys.version_info.minor
@@ -180,7 +176,7 @@ class Test_WhittleLM:
         -7158.90625,
     ]
 
-    def test_logliklihood(self, checkpoint_dir, out_dir) -> None:
+    def test_loglikelihood(self, checkpoint_dir, out_dir) -> None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
         config.model_type = "gpt"
@@ -188,7 +184,6 @@ class Test_WhittleLM:
         gpt = GPT(config).to(device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
-        # model = LitGPT(config)
         gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
         LM = WhittleLM(pretrained=gpt, dtype="float32", device=device)
         res = LM.loglikelihood(self.MULTIPLE_CH)
@@ -212,13 +207,12 @@ class Test_WhittleLM:
         gpt = GPT(config).to(device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
-        # model = LitGPT(config)
         gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
         LM = WhittleLM(pretrained=gpt, dtype="float32", device=device)
         res = LM.generate_until(self.generate_until)
         assert res == self.generate_until_RES
 
-    def test_logliklihood_rolling(self, checkpoint_dir) -> None:
+    def test_loglikelihood_rolling(self, checkpoint_dir) -> None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
         config.model_type = "gpt"
@@ -226,13 +220,12 @@ class Test_WhittleLM:
         gpt = GPT(config).to(device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
-        # model = LitGPT(config)
         gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
         LM = WhittleLM(pretrained=gpt, dtype="float32", device=device)
         res = LM.loglikelihood_rolling(self.ROLLING)
         assert np.allclose(res, self.ROLLING_RES, atol=1e-1)
 
-    def test_toc_encode(self, checkpoint_dir) -> None:
+    def test_tok_encode(self, checkpoint_dir) -> None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
         config.model_type = "gpt"
@@ -240,13 +233,12 @@ class Test_WhittleLM:
         gpt = GPT(config).to(device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
-        # model = LitGPT(config)
         gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
         LM = WhittleLM(pretrained=gpt, dtype="float32", device=device)
         res = LM.tok_encode(self.TEST_STRING)
         assert res == [12110, 2534]
 
-    def test_toc_decode(self, checkpoint_dir) -> None:
+    def test_tok_decode(self, checkpoint_dir) -> None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         config = Config.from_file(str(checkpoint_dir / "model_config.yaml"))
         config.model_type = "gpt"
@@ -254,7 +246,6 @@ class Test_WhittleLM:
         gpt = GPT(config).to(device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
-        # model = LitGPT(config)
         gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
         LM = WhittleLM(pretrained=gpt, dtype="float32", device=device)
         res = LM.tok_decode([12110, 2534])
@@ -268,7 +259,6 @@ class Test_WhittleLM:
         gpt = GPT(config).to(device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
-        # model = LitGPT(config)
         gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
         LM = WhittleLM(pretrained=gpt, dtype="float32", device=device)
         res = LM.tok_batch_encode([self.TEST_STRING, "bar foo"])[0].tolist()
@@ -282,7 +272,6 @@ class Test_WhittleLM:
         gpt = GPT(config).to(device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
-        # model = LitGPT(config)
         gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
         LM = WhittleLM(pretrained=gpt, dtype="float32", device=device)
         context = LM.tok_batch_encode([self.TEST_STRING])[0].to(device)
@@ -298,7 +287,6 @@ class Test_WhittleLM:
         gpt = GPT(config).to(device)
         gpt.name_or_path = "EleutherAI/pythia-70m"
 
-        # model = LitGPT(config)
         gpt.load_state_dict(torch.load(str(checkpoint_dir / "lit_model.pth")))
         convert_and_evaluate(
             model=gpt,

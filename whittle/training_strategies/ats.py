@@ -10,7 +10,7 @@ class ATS(BaseTrainingStrategy):
     ATS strategy.
 
     Follows the approach by Mohtashami et al. and updates a set of randomly sampled sub-networks if
-    if the current step is even, otherwise it updates the super-network.
+    the current step is even, otherwise it updates the super-network.
 
     refs:
         Masked Training of Neural Networks with Partial Gradients

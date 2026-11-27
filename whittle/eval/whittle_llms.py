@@ -31,31 +31,6 @@ from transformers.models.auto.modeling_auto import (
 from whittle.models.gpt import GPT
 
 
-def _get_accelerate_args(
-    device_map_option="auto",
-    max_memory_per_gpu=None,
-    max_cpu_memory=None,
-    offload_folder="./offload",
-    gpus=None,
-):
-    """Returns the kwargs needed to apply `accelerate` in `AutoModel.from_pretrained`."""
-    max_memory = {}
-    if max_memory_per_gpu is not None:
-        max_memory_per_gpu_map = {
-            device_idx: max_memory_per_gpu for device_idx in range(gpus)
-        }
-        max_memory.update(max_memory_per_gpu_map)
-    if max_cpu_memory is not None:
-        max_memory["cpu"] = max_cpu_memory
-
-    args = {}
-    if max_memory:
-        args["max_memory"] = max_memory
-    args["device_map"] = device_map_option
-    args["offload_folder"] = offload_folder
-    return args
-
-
 def configure_pad_token(
     tokenizer: PreTrainedTokenizerBase,
     model_config: PretrainedConfig | None = None,
@@ -248,11 +223,7 @@ class WhittleLM(TemplateLM):
 
     @property
     def model(self):
-        # returns the model, unwrapping it if using Accelerate
-        if hasattr(self, "accelerator"):
-            return self.accelerator.unwrap_model(self._model)
-        else:
-            return self._model
+        return self._model
 
     @property
     def eot_token_id(self):
@@ -453,14 +424,6 @@ class WhittleLM(TemplateLM):
             else:
                 raise
 
-        if self.world_size > 1:
-            # if multi-GPU, always take minimum over all selected batch sizes
-            max_rnk_bs = torch.tensor([batch_size], device=self.device)
-            gathered = self.accelerator.gather(max_rnk_bs).cpu().detach().numpy().tolist()
-            batch_size = min(gathered)
-            clear_torch_cache()
-            return batch_size
-
         clear_torch_cache()
         return batch_size
 
@@ -579,9 +542,6 @@ class WhittleLM(TemplateLM):
                     if generation_kwargs.get("top_p") is not None
                     else 0.0,
                     eos_id=generation_kwargs.get("eos_token_id"),
-                    # pad_token_id=self.tokenizer.pad_token_id,
-                    # use_cache=True,
-                    # **generation_kwargs,
                 )
                 .data.cpu()
                 .numpy()
@@ -640,29 +600,14 @@ class WhittleLM(TemplateLM):
             # TODO: Right now, we pass single EOT token to the Encoder and the full context to the decoder, in seq2seq case
             rolling_token_windows = [(None,) + x for x in rolling_token_windows]
 
-            pad_amnt = 0
-            if self.world_size > 1:
-                # We pad out the external document-level iterator so the inner iterator doesn't hang
-                mytensor = torch.tensor(len(rolling_token_windows), device=self.device)
-                gathered = (
-                    self.accelerator.gather(mytensor).cpu().detach().numpy().tolist()
-                )
-
-                pad_amnt = max(gathered) - gathered[self.rank]
-                if pad_amnt > 0:
-                    rolling_token_windows += pad_amnt * [rolling_token_windows[0]]
-
             string_nll = self._loglikelihood_tokens(
                 requests=rolling_token_windows,
                 disable_tqdm=True,
                 override_bs=adaptive_batch_size,
             )
 
-            if (self.world_size > 1) and (pad_amnt > 0):
-                string_nll = [x[0] for x in string_nll[:-pad_amnt]]
-            else:
-                # discard is_greedy
-                string_nll = [x[0] for x in string_nll]
+            # discard is_greedy
+            string_nll = [x[0] for x in string_nll]
 
             string_nll = sum(string_nll)
             loglikelihoods.append(string_nll)
@@ -883,7 +828,6 @@ class WhittleLM(TemplateLM):
                     max_equal = (greedy_tokens == cont_toks).all()
 
                     # Obtain log-probs at the corresponding continuation token indices
-                    # last_token_slice = logits[:, -1, :].squeeze(0).tolist()
                     logits = torch.gather(logits, 2, cont_toks.unsqueeze(-1)).squeeze(
                         -1
                     )  # [1, seq]

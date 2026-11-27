@@ -66,7 +66,7 @@ def setup(
         data: Data module for pruning calibration. If None, uses Alpaca dataset.
         devices: How many devices/GPUs to use.
         num_nodes: How many nodes the code is being run on.
-        prune: Pruning-related arguments. See ``whittle.args.PruneArgs`` for details.
+        prune: Pruning-related arguments. See ``whittle.args.PruningArgs`` for details.
         max_seq_length: Maximum sequence length for the dataloader.
         seed: The random seed to use for reproducibility.
         access_token: Optional API token to access models with restrictions.
@@ -203,25 +203,13 @@ def main(
     if fabric.global_rank == 0:
         config_save_path = out_dir / "model_config.yaml"
         try:
-            # Convert the config object to a dictionary for saving
-            if hasattr(config, "as_dict"):
-                config_dict = config.as_dict()
-            elif hasattr(config, "__dict__"):  # For Namespace-like objects
-                config_dict = vars(config)
-            else:  # Fallback: try converting specific known attrs? Or raise error?
-                # For now, assume it's convertible or log warning
-                config_dict = vars(config)
-                fabric.print(
-                    "Warning: Config object type might not be fully serializable. Trying vars()."
-                )
+            config_dict = vars(config)
 
             with open(config_save_path, "w", encoding="utf-8") as f:
                 yaml.dump(config_dict, f, indent=4)  # Added indent for readability
             fabric.print(f"Saved model config to {config_save_path}")
         except Exception as e:
             fabric.print(f"ERROR: Failed to save model_config.yaml: {e}")
-            # Optionally raise the error or exit depending on severity
-            # raise e
 
 
 if __name__ == "__main__":

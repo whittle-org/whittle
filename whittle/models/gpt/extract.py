@@ -97,8 +97,6 @@ def extract_sub_network(model: GPT, sub_network_config: Config) -> GPT:
             if block.attn.norm_k:
                 state = block.attn.norm_k.state_dict()
                 sub_network_block.attn.norm_k.load_state_dict(state)
-            # extract_norm(block.attn.norm_q, sub_network_block.attn.norm_q, sub_network_config.sampled_embd_indices)
-            # extract_norm(block.attn.norm_k, sub_network_block.attn.norm_k, sub_network_config.sampled_embd_indices)
         # norm
         extract_norm(block.norm_1, sub_network_block.norm_1, sampled_embd_indices)
         extract_norm(
@@ -204,8 +202,6 @@ def extract_mlp(
         )
         sub_mlp.proj.load_state_dict(state_dict)
     elif isinstance(mlp, LLaMAMLP):
-        # print(len(sampled_embd_indices))
-        # print(len(sampled_intermediate_indices))
         state_dict = extract_linear(
             mlp.fc_1,
             sampled_input_indices=sampled_embd_indices,
