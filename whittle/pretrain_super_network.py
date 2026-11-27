@@ -112,7 +112,7 @@ def setup(
     Arguments:
         model_name: The name of the model to pretrain. Choose from names in ``litgpt.config``. Use "list" to list the supported models.
         model_config: A ``litgpt.Config`` object to define the model architecture. Mutually exclusive with
-            ``model_config``. Overrides the `model_name` if specified.
+            ``model_name``. Overrides the `model_name` if specified.
         out_dir: Directory in which to save checkpoints and logs. If running in a Lightning Studio Job, look for it in
             /teamspace/jobs/<job-name>/share.
         precision: The precision to use for finetuning. Determines a compatible precision setting by default.

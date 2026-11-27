@@ -168,8 +168,6 @@ class CausalSelfAttention(nn.Module):
                     f"Sampled index cannot be greater than {max_val} for {property}"
                 )
 
-        # print(f"Verifying sub-network legality with sampled indices - heads: {sampled_head_indices}, ")
-        # print(f"Verifying sub-network legality with sampled indices - {heads_per_group}")
         verify_indices(sampled_head_indices, heads_per_group, "sampled_head_indices")
         verify_indices(sampled_embd_indices, n_embd, "sampled_embd_indices")
         verify_indices(sampled_head_size_indices, head_size, "sampled_head_size_indices")

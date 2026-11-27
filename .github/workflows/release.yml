@@ -116,7 +116,7 @@ jobs:
           ref: "main" # Necessary to download the latest of main as this will have been updated on the step before
           fetch-tags: 1
           fetch-depth: 0
-      - name: Download the build artifiact
+      - name: Download the build artifact
         uses: actions/download-artifact@v4
         with:
           name: build-output

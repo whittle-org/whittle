@@ -171,6 +171,6 @@ plugins:
 
 nav:
   - Home: "index.md"
-    # Auto generated with docs/api_generator.py
+    # Auto generated with docs/_scripts/api_generator.py
   - API: "api/"
   - Contributing: "contributing.md"

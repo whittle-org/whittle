@@ -7,7 +7,7 @@ visualizations showing GPU utilization, tokens per second, and other metrics acr
 different node/GPU configurations.
 
 Example Usage:
-    python visualize_tps_profiler.py --profiling-dir /path/to/profiling/directory --output-dir /path/to/output/directory
+    python distributed_profiler_visualizer.py --profiling-dir /path/to/profiling/directory --output-dir /path/to/output/directory
 
 """
 

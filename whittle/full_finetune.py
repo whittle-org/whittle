@@ -74,8 +74,6 @@ def setup(
         epochs=5,
         max_seq_length=None,
         max_steps=10000,
-        #        max_tokens=int(3e12),  # 3 trillion
-        #        max_norm=1.0,
         min_lr=4e-5,
     ),
     eval: EvalArgs = EvalArgs(interval=600, max_new_tokens=100),

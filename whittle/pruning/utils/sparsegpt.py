@@ -94,8 +94,6 @@ class SparseGPT:
         H = torch.linalg.cholesky(H, upper=True)
         Hinv = H
 
-        mask = None
-
         for i1 in range(0, self.columns, blocksize):
             i2 = min(i1 + blocksize, self.columns)
             count = i2 - i1
@@ -107,12 +105,9 @@ class SparseGPT:
             Hinv1 = Hinv[i1:i2, i1:i2]
 
             if prune_n == 0:
-                if mask is not None:
-                    mask1 = mask[:, i1:i2]
-                else:
-                    tmp = W1**2 / (torch.diag(Hinv1).reshape((1, -1))) ** 2
-                    thresh = torch.sort(tmp.flatten())[0][int(tmp.numel() * sparsity)]
-                    mask1 = tmp <= thresh
+                tmp = W1**2 / (torch.diag(Hinv1).reshape((1, -1))) ** 2
+                thresh = torch.sort(tmp.flatten())[0][int(tmp.numel() * sparsity)]
+                mask1 = tmp <= thresh
             else:
                 mask1 = torch.zeros_like(W1) == 1
 
@@ -144,7 +139,6 @@ class SparseGPT:
 
             W[:, i2:] -= Err1.matmul(Hinv[i1:i2, i2:])
 
-        # torch.cuda.synchronize()
         if isinstance(self.layer, transformers.Conv1D):
             W = W.t()
         self.layer.weight.data = W.reshape(self.layer.weight.shape).to(
