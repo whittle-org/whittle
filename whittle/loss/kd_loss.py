@@ -119,7 +119,7 @@ class DistillLoss(nn.Module):
             if soft_target_loss == 0:
                 coefficient2 = 1.0
             else:
-                coefficient2 = hard_target_loss / soft_target_loss
+                coefficient2 = (hard_target_loss / soft_target_loss).detach()
         else:
             coefficient1 = self.alpha
             coefficient2 = self.beta

@@ -13,13 +13,13 @@ from typing import Literal
 
 import lightning as L
 import torch
-from lightning.fabric.strategies import DDPStrategy
+from lightning.fabric.strategies import DDPStrategy, FSDPStrategy
 from lightning.fabric.utilities.throughput import ThroughputMonitor, measure_flops
 from litgpt import Tokenizer
 from litgpt.args import EvalArgs, LogArgs, TrainArgs
 from litgpt.config import name_to_config
 from litgpt.data import DataModule, TinyLlama
-from litgpt.model import GPT, Config
+from litgpt.model import GPT, Block, Config
 from litgpt.pretrain import (
     copy_config_files,
     get_dataloaders,
@@ -40,7 +40,6 @@ from litgpt.utils import (
     get_default_supported_precision,
     init_out_dir,
     instantiate_torch_optimizer,
-    load_checkpoint,
     num_parameters,
     parse_devices,
 )
@@ -48,12 +47,21 @@ from torch.utils.data import DataLoader
 from torchmetrics.aggregation import RunningMean
 
 from whittle.args import DistillArgs
+from whittle.convert import create_litgpt_config_for_subnet
 from whittle.hyperparameters import dump_hyperparameters, save_hyperparameters
 from whittle.loss.kd_loss import DistillLoss
+from whittle.metrics.parameters import compute_parameters
+from whittle.models.gpt import GPT as WhittleGPT
+from whittle.models.gpt.blocks import Block as WhittleBlock
+from whittle.models.gpt.extract import extract_current_sub_network
+from whittle.pretrain_super_network import get_search_space
+from whittle.sampling.random_sampler import RandomSampler
+
+MAX_STUDENT_SAMPLES = 1000
 
 
 def setup(
-    model_name: str,
+    model_name: str | None = None,
     model_config: Config | None = None,
     out_dir: Path = Path("out/pretrain"),
     precision: Literal["bf16-true", "bf16-mixed", "32-true", None] = None,
@@ -90,12 +98,13 @@ def setup(
     seed: int = 42,
     init_from: str = "scratch",
     config_path: str | None = None,
+    subnetwork_student: bool = False,
+    min_ratio: float = 0.6,
+    max_ratio: float = 0.61,
+    random_init_student: bool = False,
+    strategy: Literal["ddp", "fsdp"] = "ddp",
 ):
     """Distil a teacher litgpt model into a student litgpt model.
-
-    Unlike `whittle.distill_super_network`, the student is not a sub-network of the teacher. It can
-    have any litgpt architecture, and it starts from scratch or from a raw state dict.
-    Each checkpoint contains the student, the optimizer, and also the teacher.
 
     Arguments:
         model_name: The name of the student model. Choose from names in
@@ -135,6 +144,18 @@ def setup(
         config_path: Optional path to the ``model_config.yaml`` file of the student.
             Overrides the `model_name` if specified. Mutually exclusive with
             ``model_config``.
+        subnetwork_student: If True, the student is a random sub-network of the teacher
+            whose parameter count is within ``min_ratio`` and ``max_ratio`` of the
+            teacher's. It inherits the teacher's weights. ``model_name``,
+            ``model_config``, ``config_path`` and ``init_from`` are not used.
+        min_ratio: Minimum allowed ratio (student_params / teacher_params). Only used
+            with ``subnetwork_student``.
+        max_ratio: Maximum allowed ratio (student_params / teacher_params). Only used
+            with ``subnetwork_student``.
+        random_init_student: If True, the sub-network student is randomly initialized
+            instead of inheriting the teacher's weights. Only used with
+            ``subnetwork_student``.
+        strategy: ``"ddp"`` or ``"fsdp"``.
     """
     if model_name == "list":
         available_models = "\n".join(sorted(name_to_config))
@@ -163,12 +184,26 @@ def setup(
             raise ValueError("Pass either `model_config` or `config_path`, not both.")
         student_config = Config.from_file(config_path)
 
+    if subnetwork_student:
+        if student_config is not None:
+            raise ValueError(
+                "`subnetwork_student` samples the student architecture; do not pass "
+                "`model_config` or `config_path`."
+            )
+        assert min_ratio < max_ratio, "min_ratio must be less than max_ratio"
+        assert 0 < min_ratio < 1, "min_ratio must be between 0 and 1"
+        assert 0 < max_ratio < 1, "max_ratio must be between 0 and 1"
+    elif student_config is None:
+        if model_name is None:
+            raise ValueError(
+                "Pass `model_name`, `model_config` or `config_path` for the student, "
+                "or set `subnetwork_student`."
+            )
+        student_config = Config.from_name(model_name)
+
     hparams = capture_hparams()
     data = TinyLlama() if data is None else data
 
-    student_config = (
-        Config.from_name(model_name) if student_config is None else student_config
-    )
     precision = precision or get_default_supported_precision(training=True)
     num_devices = int(parse_devices(devices))
     out_dir = init_out_dir(out_dir)
@@ -178,21 +213,29 @@ def setup(
     logger = choose_logger(
         logger_name,
         out_dir,
-        name=f"distill-{student_config.name}",
+        name=f"distill-{(student_config or teacher_config).name}",
         resume=bool(resume),
         log_interval=train.log_interval,
         log_args=asdict(log),
     )
 
-    if num_devices * num_nodes > 1:
-        strategy = DDPStrategy()
+    if num_devices * num_nodes == 1:
+        fabric_strategy = "auto"
+    elif strategy == "fsdp":
+        fabric_strategy = FSDPStrategy(
+            auto_wrap_policy={Block, WhittleBlock},
+            activation_checkpointing_policy={Block, WhittleBlock},
+            state_dict_type="full",
+            limit_all_gathers=True,
+            cpu_offload=False,
+        )
     else:
-        strategy = "auto"
+        fabric_strategy = DDPStrategy()
 
     fabric = L.Fabric(
         devices=num_devices,
         num_nodes=num_nodes,
-        strategy=strategy,
+        strategy=fabric_strategy,
         precision=precision,
         loggers=[logger],
     )
@@ -225,6 +268,10 @@ def setup(
         eval=eval,
         optimizer=optimizer,
         init_from=init_from,
+        subnetwork_student=subnetwork_student,
+        min_ratio=min_ratio,
+        max_ratio=max_ratio,
+        random_init_student=random_init_student,
         hyperparameters=hyperparameters,
     )
 
@@ -248,6 +295,10 @@ def main(
     distill: DistillArgs = DistillArgs(),
     student_config: Config | None = None,
     init_from: str = "scratch",
+    subnetwork_student: bool = False,
+    min_ratio: float = 0.6,
+    max_ratio: float = 0.61,
+    random_init_student: bool = False,
     hyperparameters: str | None = None,
 ) -> None:
     validate_args(train, eval, initial_checkpoint_dir, resume)
@@ -257,26 +308,38 @@ def main(
 
     fabric.seed_everything(seed)  # same seed for every process to init model (FSDP)
 
-    assert student_config is not None
+    teacher_checkpoint = os.path.join(teacher_checkpoint_dir, "lit_model.pth")
     t0 = time.perf_counter()
-    with fabric.init_module(empty_init=True):
-        student_model = GPT(student_config)
-    if init_from == "scratch":
-        initialize_weights(
+    if subnetwork_student:
+        student_model = sample_subnetwork_student(
             fabric,
-            student_model,
-            n_layer=student_config.n_layer,
-            n_embd=student_config.n_embd,
+            teacher_config,
+            teacher_checkpoint,
+            seed,
+            min_ratio,
+            max_ratio,
+            random_init_student,
         )
-        fabric.print("Initialized student model from scratch")
-    else:  # load from init from as path
-        if not init_from:
-            raise ValueError(
-                "init_from must be 'scratch' or a path to a checkpoint .pth file; got an empty value."
+    else:
+        assert student_config is not None
+        with fabric.init_module(empty_init=True):
+            student_model = GPT(student_config)
+        if init_from == "scratch":
+            initialize_weights(
+                fabric,
+                student_model,
+                n_layer=student_config.n_layer,
+                n_embd=student_config.n_embd,
             )
-        state_dict = torch.load(init_from, map_location="cpu")
-        student_model.load_state_dict(state_dict)
-        fabric.print(f"Initialized student model from {init_from}")
+            fabric.print("Initialized student model from scratch")
+        else:  # load from init from as path
+            if not init_from:
+                raise ValueError(
+                    "init_from must be 'scratch' or a path to a checkpoint .pth file; got an empty value."
+                )
+            state_dict = torch.load(init_from, map_location="cpu")
+            student_model.load_state_dict(state_dict)
+            fabric.print(f"Initialized student model from {init_from}")
     if train.tie_embeddings:
         student_model.transformer.wte.weight = student_model.lm_head.weight
     if train.max_seq_length:
@@ -285,7 +348,10 @@ def main(
     fabric.print(f"Time to instantiate model: {time.perf_counter() - t0:.02f} seconds.")
     fabric.print(f"Total parameters: {num_parameters(student_model):,}")
 
-    student_model = torch.compile(student_model)
+    if not os.environ.get("DISABLE_TORCH_COMPILE"):
+        if subnetwork_student:
+            torch._dynamo.config.suppress_errors = True
+        student_model = torch.compile(student_model)
     student_model = fabric.setup(student_model)
 
     extra_kwargs = {"fused": fabric.device.type == "cuda"}
@@ -302,14 +368,13 @@ def main(
     )
 
     if initial_checkpoint_dir:
-        fabric.load_raw(initial_checkpoint_dir / "lit_model.pth", student_model)
+        load_weights(fabric, student_model, initial_checkpoint_dir / "lit_model.pth")
 
     with fabric.init_module(empty_init=(fabric.world_size > 1)):
         teacher = GPT(teacher_config)
 
-    checkpoint = os.path.join(teacher_checkpoint_dir, "lit_model.pth")
     teacher = fabric.setup(teacher)
-    load_checkpoint(fabric, teacher, checkpoint)
+    load_weights(fabric, teacher, teacher_checkpoint)
     teacher.eval()
     teacher_val_loss = validate(fabric, teacher, val_dataloader, max_iters=eval.max_iters)
     teacher_val_loss = teacher_val_loss.item()
@@ -324,7 +389,6 @@ def main(
     )
     state = {
         "model": student_model,
-        "teacher": teacher,
         "optimizer": optimizer,
         "train_dataloader": train_dataloader,
         "iter_num": 0,
@@ -362,6 +426,7 @@ def main(
         devices=devices,
         num_nodes=num_nodes,
         state=state,
+        teacher=teacher,
         train_dataloader=train_dataloader,
         val_dataloader=val_dataloader,
         out_dir=out_dir,
@@ -401,10 +466,88 @@ def main(
     fabric.print(separator)
 
 
+def load_weights(
+    fabric: L.Fabric, model: torch.nn.Module, checkpoint_path: str | Path
+) -> None:
+    """Load weights saved as a raw state dict, or under "model" as in whittle sub-network
+    and Fabric checkpoints."""
+    checkpoint = torch.load(checkpoint_path, mmap=True, weights_only=False)
+    if "model" in checkpoint:
+        fabric.load(checkpoint_path, {"model": model}, weights_only=False)
+    else:
+        fabric.load_raw(checkpoint_path, model, weights_only=False)
+
+
+def sample_subnetwork_student(
+    fabric: L.Fabric,
+    teacher_config: Config,
+    teacher_checkpoint: str,
+    seed: int,
+    min_ratio: float,
+    max_ratio: float,
+    random_init: bool,
+) -> WhittleGPT:
+    """Sample a random sub-network of the teacher with a parameter ratio in
+    ``[min_ratio, max_ratio]``. It inherits the teacher's weights unless
+    ``random_init`` is set.
+
+    It is taken from a memory-mapped CPU copy of the teacher, since the training
+    teacher is sharded under FSDP.
+    """
+    with torch.device("meta"):
+        teacher = WhittleGPT(teacher_config)
+    if not random_init:
+        state_dict = torch.load(teacher_checkpoint, mmap=True, weights_only=False)
+        state_dict = state_dict.get("model", state_dict)
+        teacher.load_state_dict(state_dict, strict=False, assign=True)
+        missing = [name for name, p in teacher.named_parameters() if p.is_meta]
+        if missing:
+            raise ValueError(f"{teacher_checkpoint} has no weights for {missing}")
+
+    sampler = RandomSampler(get_search_space(teacher_config), seed=seed)
+    teacher_params = compute_parameters(teacher)
+    last_error: Exception | None = None
+    for _ in range(MAX_STUDENT_SAMPLES):
+        config = sampler.sample()
+        fabric.print(f"Random subnetwork config: {config}")
+        try:
+            teacher.select_sub_network(
+                {
+                    "embed_dim": config["sub_network_n_embd"],
+                    "mlp_ratio": config["sub_network_intermediate_size"]
+                    / config["sub_network_n_embd"],
+                    "num_heads": config["sub_network_num_heads"],
+                    "depth": config["sub_network_n_layers"],
+                }
+            )
+            ratio = compute_parameters(teacher) / teacher_params
+            if not min_ratio <= ratio <= max_ratio:
+                continue
+            if random_init:
+                with fabric.init_module():
+                    student = WhittleGPT(create_litgpt_config_for_subnet(teacher))
+            else:
+                student = extract_current_sub_network(teacher)
+        except Exception as e:
+            last_error = e
+            fabric.print(f"Error during subnet extraction: {e}")
+            fabric.print("Retrying with different random config...")
+            continue
+        finally:
+            teacher.reset_super_network()
+        fabric.print(f"Model parameter reduction: {ratio:.2%}")
+        return student
+    raise RuntimeError(
+        f"No student sub-network with a parameter ratio in "
+        f"[{min_ratio}, {max_ratio}] after {MAX_STUDENT_SAMPLES} samples."
+    ) from last_error
+
+
 def fit(
     fabric: L.Fabric,
     devices: int,
     state: dict,
+    teacher: torch.nn.Module,
     train_dataloader: DataLoader,
     val_dataloader: DataLoader,
     out_dir: Path,
@@ -416,7 +559,6 @@ def fit(
     hyperparameters: str | None = None,
 ) -> None:
     student = state["model"]
-    teacher = state["teacher"]
     optimizer = state["optimizer"]
     teacher.eval()
     distill_loss = DistillLoss(
@@ -508,11 +650,13 @@ def fit(
             teacher.eval()
             with torch.inference_mode():
                 teacher_logits = teacher(input_ids)
-        logits_reshaped = logits.view(-1, logits.size(-1))
-        targets_reshaped = targets.view(-1)
-        teacher_logits_reshaped = teacher_logits.view(-1, teacher_logits.size(-1))
-        loss = distill_loss(logits_reshaped, targets_reshaped, teacher_logits_reshaped)
-        fabric.backward(loss / train.gradient_accumulation_iters(devices, num_nodes))
+            logits_reshaped = logits.view(-1, logits.size(-1))
+            targets_reshaped = targets.view(-1)
+            teacher_logits_reshaped = teacher_logits.view(-1, teacher_logits.size(-1))
+            loss = distill_loss(
+                logits_reshaped, targets_reshaped, teacher_logits_reshaped
+            )
+            fabric.backward(loss / train.gradient_accumulation_iters(devices, num_nodes))
         running_loss.update(loss.detach())
 
         if not is_accumulating:
